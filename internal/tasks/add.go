@@ -2,18 +2,21 @@ package tasks
 
 import (
         "fmt"
+        "os"
+        "bufio"
 )
 
 // AddTask handles adding a new task to the list and returns the updated next ID.
 func AddTask(taskList *[]Task, nextID int) int {
-        var title string
-        var description string
+        scanner := bufio.NewScanner(os.Stdin)
 
 	fmt.Print("Enter task title: ")
-        fmt.Scanf("%s\n", &title)
+	scanner.Scan()
+        title := scanner.Text()
 
 	fmt.Print("Enter task description (optional): ")
-        fmt.Scanf("%s\n", &description)
+	scanner.Scan()
+        description := scanner.Text()
 
 	newTask := Task{
 		ID:          nextID,
