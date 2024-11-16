@@ -33,7 +33,7 @@ func main() {
 
 		switch choice {
 		case 1:
-			fmt.Println(taskList)
+			tasks.ListTasks(taskList)
 		case 2:
 			nextId = tasks.AddTask(&taskList, nextId)
 		case 3:

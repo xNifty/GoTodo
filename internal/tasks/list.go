@@ -2,7 +2,7 @@ package tasks
 
 import "fmt"
 
-func ListTask(taskList []Task) {
+func ListTasks(taskList []Task) {
 	if len(taskList) == 0 {
 		fmt.Println("No tasks")
 		return
