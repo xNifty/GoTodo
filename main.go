@@ -36,12 +36,12 @@ func main() {
 			fmt.Println(taskList)
 		case 2:
 			nextId = tasks.AddTask(&taskList, nextId)
-		//case 3:
-		//	markTaskComplete(&taskList)
-		//case 4:
-		//	deleteTask(&taskList)
-		//case 5:
-		//	markTaskIncomplete(&taskList)
+		case 3:
+			tasks.MarkTaskComplete(&taskList)
+		case 4:
+			tasks.MarkTaskIncomplete(&taskList)
+		case 5:
+			tasks.DeleteTask(&taskList)
 		case 6:
 			fmt.Println("Exiting...")
 			os.Exit(0)
