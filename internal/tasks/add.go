@@ -31,7 +31,7 @@ func AddTask(taskList *[]Task, nextID int) int {
 	}
 
 	*taskList = append(*taskList, newTask)
-	fmt.Println("Task added successfully!")
+	fmt.Println("\nTask added successfully!\n")
 
 	return nextID + 1
 }

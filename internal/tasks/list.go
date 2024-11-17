@@ -4,16 +4,20 @@ import "fmt"
 
 func ListTasks(taskList []Task) {
 	if len(taskList) == 0 {
-		fmt.Println("No tasks")
+		fmt.Println("\nNo tasks\n")
 		return
 	}
 
 	fmt.Println("\nTasks:")
-	for _, task := range taskList {
+	for i, task := range taskList {
 		status := "Incomplete"
 		if task.Completed { 
 			status = "Complete"
 		}
-		fmt.Printf("%d. %s: %s (%s)\n", task.ID, task.Title, task.Description, status)
+		if i == len(taskList)-1 {
+			fmt.Printf("%d. %s: %s (%s)\n\n", task.ID, task.Title, task.Description, status)
+		} else {
+			fmt.Printf("%d. %s: %s (%s)\n", task.ID, task.Title, task.Description, status)
+		}
 	}
 }

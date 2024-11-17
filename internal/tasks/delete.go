@@ -3,7 +3,7 @@ package tasks
 import "fmt"
 
 func DeleteTask(taskList *[]Task) {
-	fmt.Print("Enter task ID to delete: ")
+	fmt.Print("\nEnter task ID to delete: ")
 	var id int
 	_, err := fmt.Scan(&id)
 	if err != nil {
@@ -14,7 +14,7 @@ func DeleteTask(taskList *[]Task) {
 	for i, task := range *taskList {
 		if task.ID == id {
 			*taskList = append((*taskList)[:i], (*taskList)[i+1:]...)
-			fmt.Println("Task deleted")
+			fmt.Println("Task deleted\n")
 			return
 		}
 	}

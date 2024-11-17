@@ -27,7 +27,7 @@ func main() {
 		var choice int
 		_, err := fmt.Scan(&choice)
 		if err != nil {
-			fmt.Println("Invalid choice")
+			fmt.Println("Invalid choice\n")
 			continue
 		}
 
@@ -43,12 +43,12 @@ func main() {
 		case 5:
 			tasks.DeleteTask(&taskList)
 		case 6:
-			fmt.Println("Exiting...")
+			fmt.Println("Exiting...\n")
 			os.Exit(0)
 		case 7:
-			fmt.Println("Current Id: ", nextId)
+			fmt.Println("Current Id: \n", nextId)
 		default:
-			fmt.Println("Invalid choice")
+			fmt.Println("Invalid choice\n")
 		}
 	}
 }
