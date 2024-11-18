@@ -8,7 +8,7 @@ import (
 )
 
 // AddTask handles adding a new task to the list and returns the updated next ID.
-func AddTask(nextID int) int {
+func AddTask() {
 	db := storage.OpenDatebase()
 	defer db.Close()
 	scanner := bufio.NewScanner(os.Stdin)
@@ -23,7 +23,7 @@ func AddTask(nextID int) int {
 
 	if title == "" || description == "" {
 		fmt.Println("Title cannot be empty")
-		return nextID
+		return
 	}
 
 	stmt, err := db.Prepare("INSERT INTO tasks (title, description, completed) VALUES (?, ?, 0)")
@@ -41,9 +41,8 @@ func AddTask(nextID int) int {
 	if err != nil {
 		fmt.Println("Error in AddTask (exec):", err)
 	}
-	ListTasks()
+
 	//*taskList = append(*taskList, newTask)
 	fmt.Println("\nTask added successfully!\n")
 	db.Close()
-	return nextID + 1
 }

@@ -3,11 +3,16 @@ package tasks
 import (
 	"GoTodo/internal/storage"
 	"fmt"
+	"os"
+	"strings"
+	"text/tabwriter"
 )
 
 func ListTasks() {
 	db := storage.OpenDatebase()
 	defer db.Close()
+
+	writer := tabwriter.NewWriter(os.Stdout, 0, 0, 4, ' ', 0)
 
 	rows, err := db.Query("SELECT id, title, description, completed FROM tasks")
 
@@ -17,7 +22,17 @@ func ListTasks() {
 
 	defer rows.Close()
 
-	fmt.Println("\nTasks:")
+	headers := []string{"ID", "Title", "Description", "Status"}
+
+	fmt.Fprintln(writer, "\n"+strings.Join(headers, "\t"))
+
+	underlines := make([]string, len(headers))
+	for i, header := range headers {
+		underlines[i] = strings.Repeat("-", len(header))
+	}
+
+	fmt.Fprintf(writer, strings.Join(underlines, "\t")+"\n")
+
 	for rows.Next() {
 		var id int
 		var title string
@@ -34,7 +49,8 @@ func ListTasks() {
 		if completed {
 			status = "Complete"
 		}
-		fmt.Printf("%d. %s: %s (%s)\n", id, title, description, status)
+		fmt.Fprintf(writer, "%d\t%s\t%s\t%s\n", id, title, description, status)
 	}
+	writer.Flush()
 	fmt.Println()
 }

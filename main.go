@@ -1,5 +1,9 @@
 package main
 
+/*
+	Create function to grab next ID from database
+*/
+
 import (
 	"GoTodo/internal/storage"
 	"GoTodo/internal/tasks"
@@ -9,10 +13,6 @@ import (
 
 func main() {
 	//manager := tasks.NewTaskManager()
-
-	nextId := 1
-
-	var taskList []tasks.Task
 
 	storage.CreateDatabase()
 
@@ -30,7 +30,7 @@ func main() {
 		var choice int
 		_, err := fmt.Scan(&choice)
 		if err != nil {
-			fmt.Println("Invalid choice\n")
+			fmt.Print("Invalid choice\n")
 			continue
 		}
 
@@ -38,18 +38,19 @@ func main() {
 		case 1:
 			tasks.ListTasks()
 		case 2:
-			nextId = tasks.AddTask(nextId)
+			tasks.AddTask()
 		case 3:
 			tasks.MarkTaskComplete()
 		case 4:
 			tasks.MarkTaskIncomplete()
 		case 5:
-			tasks.DeleteTask(&taskList)
+			tasks.DeleteTask()
 		case 6:
-			fmt.Println("Exiting...\n")
+			fmt.Println("\nSee you next time!\n")
 			os.Exit(0)
 		case 7:
-			fmt.Println("Current Id: \n", nextId)
+			nextId := storage.GetNextID()
+			fmt.Printf("\nNext ID: %d\n\n", nextId)
 		default:
 			fmt.Println("Invalid choice\n")
 		}

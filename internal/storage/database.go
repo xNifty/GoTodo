@@ -32,6 +32,20 @@ func CreateDatabase() {
 	}
 }
 
+func GetNextID() int {
+	db := OpenDatebase()
+	defer db.Close()
+
+	var id int
+
+	err := db.QueryRow("SELECT MAX(id) FROM tasks").Scan(&id)
+	if err != nil {
+		return 1
+	} else {
+		return id + 1
+	}
+}
+
 func DeleteDatabase() {
 	var confirm bool = false
 
