@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"GoTodo/internal/tasks"
+	"GoTodo/internal/storage"
 )
 
 func main() {
@@ -12,6 +13,8 @@ func main() {
 	nextId := 1
 
 	var taskList []tasks.Task
+
+	storage.CreateDatabase()
 
 	for {
 		fmt.Println("TODO App")
