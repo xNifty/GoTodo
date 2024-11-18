@@ -8,6 +8,10 @@ import (
 	"text/tabwriter"
 )
 
+const RED = "\033[31m"
+const GREEN = "\033[32m"
+const RESET = "\033[0m"
+
 func ListTasks() {
 	db := storage.OpenDatebase()
 	defer db.Close()
@@ -45,9 +49,9 @@ func ListTasks() {
 			fmt.Println("Error in ListTasks (scan):", err)
 		}
 
-		status := "Incomplete"
+		status := RED + "Incomplete" + RESET
 		if completed {
-			status = "Complete"
+			status = GREEN + "Complete" + RESET
 		}
 		fmt.Fprintf(writer, "%d\t%s\t%s\t%s\n", id, title, description, status)
 	}

@@ -21,7 +21,7 @@ func AddTask() {
 	scanner.Scan()
 	description := scanner.Text()
 
-	if title == "" || description == "" {
+	if title == "" {
 		fmt.Println("Title cannot be empty")
 		return
 	}
