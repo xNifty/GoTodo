@@ -1,10 +1,10 @@
 package main
 
 import (
+	"GoTodo/internal/storage"
+	"GoTodo/internal/tasks"
 	"fmt"
 	"os"
-	"GoTodo/internal/tasks"
-	"GoTodo/internal/storage"
 )
 
 func main() {
@@ -36,13 +36,13 @@ func main() {
 
 		switch choice {
 		case 1:
-			tasks.ListTasks(taskList)
+			tasks.ListTasks()
 		case 2:
-			nextId = tasks.AddTask(&taskList, nextId)
+			nextId = tasks.AddTask(nextId)
 		case 3:
-			tasks.MarkTaskComplete(&taskList)
+			tasks.MarkTaskComplete()
 		case 4:
-			tasks.MarkTaskIncomplete(&taskList)
+			tasks.MarkTaskIncomplete()
 		case 5:
 			tasks.DeleteTask(&taskList)
 		case 6:
