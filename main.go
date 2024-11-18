@@ -5,6 +5,7 @@ package main
 */
 
 import (
+	"GoTodo/internal/server"
 	"GoTodo/internal/storage"
 	"GoTodo/internal/tasks"
 	"fmt"
@@ -15,6 +16,8 @@ func main() {
 	//manager := tasks.NewTaskManager()
 
 	storage.CreateDatabase()
+
+	server.StartWebsite()
 
 	for {
 		fmt.Println("TODO App")
