@@ -15,9 +15,14 @@ import (
 func main() {
 	//manager := tasks.NewTaskManager()
 
+	runArgs := os.Args
 	storage.CreateDatabase()
 
-	server.StartWebsite()
+	if runArgs != nil && len(runArgs) > 1 {
+		if runArgs[1] == "server" {
+			server.StartServer()
+		}
+	}
 
 	for {
 		fmt.Println("TODO App")
