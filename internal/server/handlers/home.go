@@ -2,11 +2,14 @@ package handlers
 
 import (
 	"GoTodo/internal/server/utils"
+	"GoTodo/internal/tasks"
 	"net/http"
 )
 
 func HomeHandler(w http.ResponseWriter, r *http.Request) {
-	utils.RenderTemplate(w, "index.html", map[string]string{
-		"Title": "Home",
+	taskList := tasks.ReturnTaskList()
+	utils.RenderTemplate(w, "index.html", map[string]interface{}{
+		"Title": "TODO App",
+		"Tasks": taskList,
 	})
 }

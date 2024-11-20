@@ -58,3 +58,34 @@ func ListTasks() {
 	writer.Flush()
 	fmt.Println()
 }
+
+func ReturnTaskList() []Task {
+	db := storage.OpenDatebase()
+	defer db.Close()
+
+	var tasks []Task
+
+	rows, err := db.Query("SELECT id, title, description, completed FROM tasks")
+
+	if err != nil {
+		fmt.Println("Error in ListTasks (query):", err)
+		return tasks
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var task Task
+
+		err = rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed)
+
+		if err != nil {
+			fmt.Println("Error in ListTasks (scan):", err)
+			return tasks
+		}
+		tasks = append(tasks, task)
+
+	}
+	fmt.Println(tasks)
+	return tasks
+}
