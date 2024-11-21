@@ -86,6 +86,5 @@ func ReturnTaskList() []Task {
 		tasks = append(tasks, task)
 
 	}
-	fmt.Println(tasks)
 	return tasks
 }
