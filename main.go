@@ -25,8 +25,9 @@ func main() {
 		fmt.Println("3. Complete Task")
 		fmt.Println("4. Incomplete Task")
 		fmt.Println("5. Delete Task")
-		fmt.Println("6. Exit")
-		fmt.Println("7. List Next Id")
+		fmt.Println("7. List Next ID")
+		fmt.Println("8. Delete All Tasks")
+		fmt.Println("9. Exit Program")
 		fmt.Print("Enter your choice: ")
 
 		var choice int
@@ -47,14 +48,16 @@ func main() {
 			tasks.MarkTaskIncomplete()
 		case 5:
 			tasks.DeleteTask()
-		case 6:
-			fmt.Println("\nSee you next time!\n")
-			os.Exit(0)
 		case 7:
 			nextId := storage.GetNextID()
 			fmt.Printf("\nNext ID: %d\n\n", nextId)
+		case 8:
+			storage.DeleteAllTasks()
+		case 9:
+			fmt.Println("\nSee you next time!")
+			os.Exit(0)
 		default:
-			fmt.Println("Invalid choice\n")
+			fmt.Println("Invalid choice")
 		}
 	}
 }

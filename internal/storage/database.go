@@ -61,3 +61,27 @@ func DeleteDatabase() {
 		fmt.Println("Database deletion cancelled")
 	}
 }
+
+func DeleteAllTasks() {
+	fmt.Print("\nAre you sure you want to delete all tasks? (y/n): ")
+	var confirm string
+	_, err := fmt.Scanln(&confirm)
+	if err != nil {
+		fmt.Println("Invalid ID")
+		return
+	}
+	if confirm == "y" {
+		db := OpenDatebase()
+		defer db.Close()
+
+		_, err := db.Exec("DELETE FROM tasks")
+		if err != nil {
+			fmt.Println(err)
+			return
+		} else {
+			fmt.Println("All tasks deleted successfully!")
+		}
+	} else {
+		fmt.Println("Deletion cancelled.")
+	}
+}

@@ -1,5 +1,8 @@
 document.addEventListener("DOMContentLoaded", () => {
-    setInterval(() => {
+    const timer = document.getElementById('time');
+    let time = 10;
+
+    function updateTable() {
         fetch('/api/')
             .then(response => response.json())
             .then(data => {
@@ -12,21 +15,22 @@ document.addEventListener("DOMContentLoaded", () => {
                         <td>${task.Completed ? '<font color="green">Complete</font>' : '<font color="red">Incomplete</font>'}</td>
                     </tr>
                 `).join('');
-            });
-    }, 10000);
+            })
+            .catch(error => console.error(error));
+    }
 
     function restartTimer() {
-        let time = 10;
-        const timer = document.getElementById('time');
+        time = 10;
         const interval = setInterval(() => {
             time--;
             timer.innerText = time;
             if (time === 0) {
                 clearInterval(interval);
-                timer.innerText = '10';
+                updateTable();
                 restartTimer();
             }
         }, 1000);
     }
+    updateTable();
     restartTimer();
 });
