@@ -1,13 +1,17 @@
-Simple TODO list written in Go. Initial version is in-memory only, and using a CLI for everything.
-
-I plan to expand this as I continue to learn and use Go more. This isn't useful for anything right  
-now, but in it's own simple way it works.
+# GoTodo: A simple CLI App with a basic web front end
 
 ## Usage
-
+### To start the CLI app:
 ```go
 go run .
 ```
+
+### To start the web app:
+```
+go run . server
+```
+
+Server available on localhost:8080 and refreshes every 10 seconds.
 
 ### Commands:
 

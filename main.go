@@ -1,9 +1,5 @@
 package main
 
-/*
-	Create function to grab next ID from database
-*/
-
 import (
 	"GoTodo/internal/server"
 	"GoTodo/internal/storage"
