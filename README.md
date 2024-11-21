@@ -7,7 +7,7 @@ go run .
 ```
 
 ### To start the web app:
-```
+```go
 go run . server
 ```
 
