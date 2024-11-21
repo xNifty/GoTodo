@@ -11,7 +11,7 @@ func DeleteTask() {
 
 	fmt.Print("\nEnter task ID to delete: ")
 	var id int
-	_, err := fmt.Scan(&id)
+	_, err := fmt.Scanln(&id)
 	if err != nil {
 		fmt.Println("Invalid ID")
 		return
@@ -28,7 +28,7 @@ func DeleteTask() {
 	if err != nil {
 		fmt.Println("Error in DeleteTask (exec):", err)
 	} else {
-		fmt.Println("Task deleted\n")
+		fmt.Println("Task deleted")
 		return
 	}
 

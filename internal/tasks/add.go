@@ -7,7 +7,6 @@ import (
 	"os"
 )
 
-// AddTask handles adding a new task to the list and returns the updated next ID.
 func AddTask() {
 	db := storage.OpenDatebase()
 	defer db.Close()
@@ -33,16 +32,12 @@ func AddTask() {
 
 	defer stmt.Close()
 
-	//fmt.Printf("title %s, description: %s", title, description)
 	_, err = stmt.Exec(title, description)
 
-	//_, err = stmt.Exec(title, description, false)
-	//fmt.Printf("call: %v", call)
 	if err != nil {
 		fmt.Println("Error in AddTask (exec):", err)
 	}
 
-	//*taskList = append(*taskList, newTask)
-	fmt.Println("\nTask added successfully!\n")
+	fmt.Println("\nTask added successfully!")
 	db.Close()
 }

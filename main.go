@@ -9,8 +9,6 @@ import (
 )
 
 func main() {
-	//manager := tasks.NewTaskManager()
-
 	runArgs := os.Args
 	storage.CreateDatabase()
 
@@ -21,18 +19,18 @@ func main() {
 	}
 
 	for {
-		fmt.Println("TODO App")
+		fmt.Println("\nTODO App")
 		fmt.Println("1. List Tasks")
 		fmt.Println("2. Add Task")
 		fmt.Println("3. Complete Task")
 		fmt.Println("4. Incomplete Task")
 		fmt.Println("5. Delete Task")
 		fmt.Println("6. Exit")
-		fmt.Println("7. List Current Id")
+		fmt.Println("7. List Next Id")
 		fmt.Print("Enter your choice: ")
 
 		var choice int
-		_, err := fmt.Scan(&choice)
+		_, err := fmt.Scanln(&choice)
 		if err != nil {
 			fmt.Print("Invalid choice\n")
 			continue

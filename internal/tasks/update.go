@@ -11,7 +11,7 @@ func MarkTaskComplete() {
 
 	fmt.Print("\nEnter task ID to mark as complete: ")
 	var id int
-	_, err := fmt.Scan(&id)
+	_, err := fmt.Scanln(&id)
 	if err != nil {
 		fmt.Println("Invalid ID")
 		return
@@ -30,7 +30,7 @@ func MarkTaskComplete() {
 	if err != nil {
 		fmt.Println("Error in MarkTaskComplete (exec):", err)
 	} else {
-		fmt.Println("Task marked as complete\n")
+		fmt.Print("Task marked as complete!")
 		return
 	}
 
@@ -43,7 +43,7 @@ func MarkTaskIncomplete() {
 
 	fmt.Print("\nEnter task ID to mark as incomplete: ")
 	var id int
-	_, err := fmt.Scan(&id)
+	_, err := fmt.Scanln(&id)
 	if err != nil {
 		fmt.Println("Invalid ID")
 		return
@@ -62,7 +62,7 @@ func MarkTaskIncomplete() {
 	if err != nil {
 		fmt.Println("Error in MarkTaskIncomplete (exec):", err)
 	} else {
-		fmt.Println("Task marked as incomplete\n")
+		fmt.Println("Task marked as incomplete!")
 		return
 	}
 
