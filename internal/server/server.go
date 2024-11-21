@@ -13,6 +13,10 @@ func StartServer() {
 
 	utils.Templates = template.Must(template.ParseGlob("internal/server/templates/*.html"))
 	utils.Templates = template.Must(utils.Templates.ParseGlob("internal/server/templates/partials/*.html"))
+
+	fs := http.FileServer(http.Dir("internal/server/public"))
+	http.Handle("/public/", http.StripPrefix("/public/", fs))
+
 	http.HandleFunc("/", handlers.HomeHandler)
 	http.HandleFunc("/api/", handlers.APIHandler)
 	fmt.Println("Starting server on :8080")

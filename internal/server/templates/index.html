@@ -8,6 +8,7 @@
     margin: 0;
     font-family: Arial, sans-serif;
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
     height: 100vh;
@@ -91,6 +92,12 @@ tbody tr:last-child td {
         text-align: left;
         font-weight: bold;
     }
+
+    #timer {
+        font-size: 14px;
+	color: #555;
+	width: 100%;
+    }
 }
 	</style>
 </head>
@@ -115,23 +122,10 @@ tbody tr:last-child td {
             {{ end }}
         </tbody>
 	</table>
-		<script>
-		setInterval(() => {
-    fetch('/api/')
-        .then(response => response.json())
-        .then(data => {
-            const tbody = document.querySelector("tbody");
-            tbody.innerHTML = data.map(task => `
-                <tr>
-                    <td>${task.ID}</td>
-                    <td>${task.Title}</td>
-                    <td>${task.Description}</td>
-<td>${task.Completed ? '<font color="green">Complete</font>' : '<font color="red">Incomplete</font>'}</td>
-                </tr>
-            `).join('');
-        });
-}, 5000); // Refresh every 5 seconds
-	</script>
+	<div id="timer" style="text-align: center; margin-top: 10px;">
+		Next update in: <span id="time">10</span> seconds
+	</div>
+	<script src="/public/js/site.js"></script>
 </body>
 	
 </html>
