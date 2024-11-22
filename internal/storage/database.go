@@ -7,6 +7,12 @@ import (
 	"log"
 )
 
+const (
+	RED   = "\033[31m"
+	GREEN = "\033[32m"
+	RESET = "\033[0m"
+)
+
 var dsn = "postgres://postgres:d0ggysh0tty@localhost:5432/todo"
 
 func OpenDatabase() *pgxpool.Pool {
@@ -29,7 +35,7 @@ func CreateDatabase() {
 	if err != nil {
 		log.Fatalf("Unable to create table: %v\n", err)
 	} else {
-		fmt.Println("Database created successfully")
+		fmt.Println("Database connection appears to be " + GREEN + "successful" + RESET + ".")
 	}
 }
 
