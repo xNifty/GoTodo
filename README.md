@@ -3,11 +3,11 @@
 ## Requirements
 - PostgreSQL
 
+## Setup and Running
+
 ### .env
 You will need to rename the ```.env.example``` file to ```.env``` and fill in the required information. This is needed to connect to the database.
 
-
-## Usage
 ### To start the CLI app:
 ```go
 go run .
@@ -20,19 +20,7 @@ go run . server
 
 Server available on localhost:8080 and refreshes every 10 seconds.
 
-### Commands:
-
-```
-TODO App
-1. List Tasks
-2. Add Task
-3. Complete Task
-4. Incomplete Task
-5. Delete Task
-6. Exit
-7. List Current Id
-Enter your choice:
-```
+---
 
 The commands are straight forward to work with.
 
