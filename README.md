@@ -1,5 +1,12 @@
 # GoTodo: A simple CLI App with a basic web front end
 
+## Requirements
+- PostgreSQL
+
+### .env
+You will need to rename the ```.env.example``` file to ```.env``` and fill in the required information. This is needed to connect to the database.
+
+
 ## Usage
 ### To start the CLI app:
 ```go
