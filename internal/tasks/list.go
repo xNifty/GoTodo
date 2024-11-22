@@ -2,28 +2,29 @@ package tasks
 
 import (
 	"GoTodo/internal/storage"
+	"context"
 	"fmt"
 	"os"
 	"strings"
 	"text/tabwriter"
 )
 
-const RED = "\033[31m"
-const GREEN = "\033[32m"
-const RESET = "\033[0m"
+const (
+	RED   = "\033[31m"
+	GREEN = "\033[32m"
+	RESET = "\033[0m"
+)
 
 func ListTasks() {
-	db := storage.OpenDatebase()
-	defer db.Close()
+	pool := storage.OpenDatabase()
+	defer storage.CloseDatabase(pool)
 
 	writer := tabwriter.NewWriter(os.Stdout, 0, 0, 4, ' ', 0)
 
-	rows, err := db.Query("SELECT id, title, description, completed FROM tasks")
-
+	rows, err := pool.Query(context.Background(), "SELECT id, title, description, completed FROM tasks ORDER BY id")
 	if err != nil {
 		fmt.Println("Error in ListTasks (query):", err)
 	}
-
 	defer rows.Close()
 
 	headers := []string{"ID", "Title", "Description", "Status"}
@@ -60,12 +61,12 @@ func ListTasks() {
 }
 
 func ReturnTaskList() []Task {
-	db := storage.OpenDatebase()
-	defer db.Close()
+	pool := storage.OpenDatabase()
+	defer storage.CloseDatabase(pool)
 
 	var tasks []Task
 
-	rows, err := db.Query("SELECT id, title, description, completed FROM tasks")
+	rows, err := pool.Query(context.Background(), "SELECT id, title, description, completed FROM tasks ORDER BY id")
 
 	if err != nil {
 		fmt.Println("Error in ListTasks (query):", err)

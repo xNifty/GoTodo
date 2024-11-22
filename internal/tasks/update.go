@@ -2,12 +2,13 @@ package tasks
 
 import (
 	"GoTodo/internal/storage"
+	"context"
 	"fmt"
 )
 
 func MarkTaskComplete() {
-	db := storage.OpenDatebase()
-	defer db.Close()
+	pool := storage.OpenDatabase()
+	defer storage.CloseDatabase(pool)
 
 	fmt.Print("\nEnter task ID to mark as complete: ")
 	var id int
@@ -17,20 +18,12 @@ func MarkTaskComplete() {
 		return
 	}
 
-	stmt, err := db.Prepare("UPDATE tasks SET completed = 1 WHERE id = ?")
+	_, err = pool.Exec(context.Background(), "UPDATE tasks SET completed = true WHERE id = $1", id)
 
 	if err != nil {
 		fmt.Println("Error in MarkTaskComplete (prepare):", err)
-	}
-
-	defer stmt.Close()
-
-	_, err = stmt.Exec(id)
-
-	if err != nil {
-		fmt.Println("Error in MarkTaskComplete (exec):", err)
 	} else {
-		fmt.Print("Task marked as complete!")
+		fmt.Println("Task marked as complete!")
 		return
 	}
 
@@ -38,8 +31,8 @@ func MarkTaskComplete() {
 }
 
 func MarkTaskIncomplete() {
-	db := storage.OpenDatebase()
-	defer db.Close()
+	pool := storage.OpenDatabase()
+	defer storage.CloseDatabase(pool)
 
 	fmt.Print("\nEnter task ID to mark as incomplete: ")
 	var id int
@@ -49,18 +42,10 @@ func MarkTaskIncomplete() {
 		return
 	}
 
-	stmt, err := db.Prepare("UPDATE tasks SET completed = 0 WHERE id = ?")
+	_, err = pool.Exec(context.Background(), "UPDATE tasks SET completed = false WHERE id = $1", id)
 
 	if err != nil {
 		fmt.Println("Error in MarkTaskIncomplete (prepare):", err)
-	}
-
-	defer stmt.Close()
-
-	_, err = stmt.Exec(id)
-
-	if err != nil {
-		fmt.Println("Error in MarkTaskIncomplete (exec):", err)
 	} else {
 		fmt.Println("Task marked as incomplete!")
 		return

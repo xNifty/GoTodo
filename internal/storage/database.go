@@ -1,65 +1,51 @@
 package storage
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
-	_ "github.com/mattn/go-sqlite3"
-	"os"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"log"
 )
 
-func OpenDatebase() *sql.DB {
-	db, err := sql.Open("sqlite3", "./tasks.db")
+var dsn = "postgres://postgres:d0ggysh0tty@localhost:5432/todo"
+
+func OpenDatabase() *pgxpool.Pool {
+	pool, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {
-		fmt.Println(err)
-		return nil
+		log.Fatalf("Unable to connect to database: %v\n", err)
 	}
-	return db
+	return pool
 }
 
-func CloseDatabase(db *sql.DB) {
-	db.Close()
+func CloseDatabase(pool *pgxpool.Pool) {
+	pool.Close()
 }
 
 func CreateDatabase() {
-	db := OpenDatebase()
-	defer CloseDatabase(db)
+	pool := OpenDatabase()
+	defer CloseDatabase(pool)
 
-	_, err := db.Exec("CREATE TABLE tasks (id INTEGER PRIMARY KEY, title TEXT, description TEXT, completed INTEGER)")
+	_, err := pool.Exec(context.Background(), "CREATE TABLE IF NOT EXISTS tasks (id SERIAL PRIMARY KEY, title TEXT, description TEXT, completed BOOLEAN DEFAULT FALSE)")
 	if err != nil {
-		return
+		log.Fatalf("Unable to create table: %v\n", err)
 	} else {
 		fmt.Println("Database created successfully")
 	}
 }
 
 func GetNextID() int {
-	db := OpenDatebase()
-	defer db.Close()
+	pool := OpenDatabase()
+	defer CloseDatabase(pool)
 
-	var id int
+	var nextID int
+	err := pool.QueryRow(context.Background(), "SELECT COALESCE(MAX(id), 0) FROM tasks").Scan(&nextID)
 
-	err := db.QueryRow("SELECT MAX(id) FROM tasks").Scan(&id)
 	if err != nil {
+		log.Printf("Error in GetNextID: %v\n", err)
 		return 1
-	} else {
-		return id + 1
 	}
-}
 
-func DeleteDatabase() {
-	var confirm bool = false
-
-	if confirm {
-		err := os.Remove("./tasks.db")
-		if err != nil {
-			fmt.Println(err)
-			return
-		} else {
-			fmt.Println("Database deleted successfully")
-		}
-	} else {
-		fmt.Println("Database deletion cancelled")
-	}
+	return nextID + 1
 }
 
 func DeleteAllTasks() {
@@ -71,13 +57,12 @@ func DeleteAllTasks() {
 		return
 	}
 	if confirm == "y" {
-		db := OpenDatebase()
-		defer db.Close()
+		pool := OpenDatabase()
+		defer CloseDatabase(pool)
 
-		_, err := db.Exec("DELETE FROM tasks")
+		_, err := pool.Exec(context.Background(), "DELETE FROM tasks")
 		if err != nil {
-			fmt.Println(err)
-			return
+			log.Printf("Error in DeleteAllTasks: %v\n", err)
 		} else {
 			fmt.Println("All tasks deleted successfully!")
 		}

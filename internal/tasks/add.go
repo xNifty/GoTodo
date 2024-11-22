@@ -3,13 +3,14 @@ package tasks
 import (
 	"GoTodo/internal/storage"
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 )
 
 func AddTask() {
-	db := storage.OpenDatebase()
-	defer db.Close()
+	pool := storage.OpenDatabase()
+	defer storage.CloseDatabase(pool)
 	scanner := bufio.NewScanner(os.Stdin)
 
 	fmt.Print("Enter task title: ")
@@ -25,19 +26,11 @@ func AddTask() {
 		return
 	}
 
-	stmt, err := db.Prepare("INSERT INTO tasks (title, description, completed) VALUES (?, ?, 0)")
+	_, err := pool.Exec(context.Background(), "INSERT INTO tasks (title, description, completed) VALUES ($1, $2, false)", title, description)
 	if err != nil {
 		fmt.Println("Error in AddTask (prepare):", err)
-	}
-
-	defer stmt.Close()
-
-	_, err = stmt.Exec(title, description)
-
-	if err != nil {
-		fmt.Println("Error in AddTask (exec):", err)
+		return
 	}
 
 	fmt.Println("\nTask added successfully!")
-	db.Close()
 }
