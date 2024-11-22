@@ -2,11 +2,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const timer = document.getElementById('time');
     let time = 10;
 
+    const tbody = document.querySelector("tbody");
+
     function updateTable() {
         fetch('/api/')
             .then(response => response.json())
             .then(data => {
-                const tbody = document.querySelector("tbody");
                 tbody.innerHTML = data.map(task => `
                     <tr>
                         <td>${task.ID}</td>
@@ -16,7 +17,13 @@ document.addEventListener("DOMContentLoaded", () => {
                     </tr>
                 `).join('');
             })
-            .catch(error => console.error(error));
+            .catch(error => {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4">No tasks available</td>
+                    </tr>
+                `;
+            });
     }
 
     function restartTimer() {
