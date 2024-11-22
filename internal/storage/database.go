@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
 	"log"
+	"os"
 )
 
 const (
@@ -13,9 +15,21 @@ const (
 	RESET = "\033[0m"
 )
 
-var dsn = "postgres://postgres:d0ggysh0tty@localhost:5432/todo"
-
 func OpenDatabase() *pgxpool.Pool {
+	err := godotenv.Load()
+
+	if err != nil {
+		log.Fatalf("Error loading .env file: %v\n", err)
+	}
+
+	dbHost := os.Getenv("DB_HOST")
+	dbPort := os.Getenv("DB_PORT")
+	dbUser := os.Getenv("DB_USER")
+	dbPassword := os.Getenv("DB_PASSWORD")
+	dbName := os.Getenv("DB_NAME")
+
+	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s", dbUser, dbPassword, dbHost, dbPort, dbName)
+
 	pool, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {
 		log.Fatalf("Unable to connect to database: %v\n", err)
