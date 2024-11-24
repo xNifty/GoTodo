@@ -15,7 +15,7 @@ const (
 	RESET = "\033[0m"
 )
 
-func OpenDatabase() *pgxpool.Pool {
+func OpenDatabase() (*pgxpool.Pool, error) {
 	err := godotenv.Load()
 
 	if err != nil {
@@ -34,7 +34,7 @@ func OpenDatabase() *pgxpool.Pool {
 	if err != nil {
 		log.Fatalf("Unable to connect to database: %v\n", err)
 	}
-	return pool
+	return pool, err
 }
 
 func CloseDatabase(pool *pgxpool.Pool) {
@@ -42,10 +42,11 @@ func CloseDatabase(pool *pgxpool.Pool) {
 }
 
 func CreateDatabase() {
-	pool := OpenDatabase()
+	pool, err := OpenDatabase()
 	defer CloseDatabase(pool)
 
-	_, err := pool.Exec(context.Background(), "CREATE TABLE IF NOT EXISTS tasks (id SERIAL PRIMARY KEY, title TEXT, description TEXT, completed BOOLEAN DEFAULT FALSE)")
+	_, err = pool.Exec(context.Background(), "CREATE TABLE IF NOT EXISTS tasks (id SERIAL PRIMARY KEY, title TEXT, description TEXT, completed BOOLEAN DEFAULT FALSE)")
+
 	if err != nil {
 		log.Fatalf("Unable to create table: %v\n", err)
 	} else {
@@ -54,11 +55,11 @@ func CreateDatabase() {
 }
 
 func GetNextID() int {
-	pool := OpenDatabase()
+	pool, err := OpenDatabase()
 	defer CloseDatabase(pool)
 
 	var nextID int
-	err := pool.QueryRow(context.Background(), "SELECT COALESCE(MAX(id), 0) FROM tasks").Scan(&nextID)
+	err = pool.QueryRow(context.Background(), "SELECT COALESCE(MAX(id), 0) FROM tasks").Scan(&nextID)
 
 	if err != nil {
 		log.Printf("Error in GetNextID: %v\n", err)
@@ -77,10 +78,10 @@ func DeleteAllTasks() {
 		return
 	}
 	if confirm == "y" {
-		pool := OpenDatabase()
+		pool, err := OpenDatabase()
 		defer CloseDatabase(pool)
 
-		_, err := pool.Exec(context.Background(), "DELETE FROM tasks")
+		_, err = pool.Exec(context.Background(), "DELETE FROM tasks")
 		if err != nil {
 			log.Printf("Error in DeleteAllTasks: %v\n", err)
 		} else {

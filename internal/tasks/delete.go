@@ -7,12 +7,12 @@ import (
 )
 
 func DeleteTask() {
-	pool := storage.OpenDatabase()
+	pool, err := storage.OpenDatabase()
 	defer pool.Close()
 
 	fmt.Print("\nEnter task ID to delete: ")
 	var id int
-	_, err := fmt.Scanln(&id)
+	_, err = fmt.Scanln(&id)
 	if err != nil {
 		fmt.Println("Invalid ID")
 		return

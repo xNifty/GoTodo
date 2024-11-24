@@ -7,12 +7,12 @@ import (
 )
 
 func MarkTaskComplete() {
-	pool := storage.OpenDatabase()
+	pool, err := storage.OpenDatabase()
 	defer storage.CloseDatabase(pool)
 
 	fmt.Print("\nEnter task ID to mark as complete: ")
 	var id int
-	_, err := fmt.Scanln(&id)
+	_, err = fmt.Scanln(&id)
 	if err != nil {
 		fmt.Println("Invalid ID")
 		return
@@ -31,12 +31,12 @@ func MarkTaskComplete() {
 }
 
 func MarkTaskIncomplete() {
-	pool := storage.OpenDatabase()
+	pool, err := storage.OpenDatabase()
 	defer storage.CloseDatabase(pool)
 
 	fmt.Print("\nEnter task ID to mark as incomplete: ")
 	var id int
-	_, err := fmt.Scanln(&id)
+	_, err = fmt.Scanln(&id)
 	if err != nil {
 		fmt.Println("Invalid ID")
 		return

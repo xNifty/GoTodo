@@ -16,7 +16,7 @@ const (
 )
 
 func ListTasks() {
-	pool := storage.OpenDatabase()
+	pool, err := storage.OpenDatabase()
 	defer storage.CloseDatabase(pool)
 
 	writer := tabwriter.NewWriter(os.Stdout, 0, 0, 4, ' ', 0)
@@ -44,7 +44,7 @@ func ListTasks() {
 		var description string
 		var completed bool
 
-		err = rows.Scan(&id, &title, &description, &completed)
+		err := rows.Scan(&id, &title, &description, &completed)
 
 		if err != nil {
 			fmt.Println("Error in ListTasks (scan):", err)
@@ -61,7 +61,7 @@ func ListTasks() {
 }
 
 func ReturnTaskList() []Task {
-	pool := storage.OpenDatabase()
+	pool, err := storage.OpenDatabase()
 	defer storage.CloseDatabase(pool)
 
 	var tasks []Task

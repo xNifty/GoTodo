@@ -26,9 +26,25 @@
             {{ end }}
         </tbody>
 	</table>
+        <div id ="status" class="hidden" style="background-color: #d4edda; color: #155724; padding: 10px; margin-bottom: 10px; border: 1px solid #c3e6cb; display: none;"></div>
+        <div id="add-task">
+            <h2>Add Task</h2>
+            <form hx-post="/api/add-task/" hx-target="#status" hx-swap="outerHTML" hx-trigger="click">
+                <div>
+                    <label for="title">Title</label>
+                    <input type="text" id="title" name="title" required>
+                </div>
+                <div>
+                    <label for="description">Description</label>
+                    <input type="text" id="description" name="description">
+                </div>
+                <button type="submit">Add Task</button>
+            </form>
+        </div>
 	<div id="timer" style="text-align: center; margin-top: 10px;">
 		Next update in: <span id="time">10</span> seconds
 	</div>
+        <script src="https://unpkg.com/htmx.org@2.0.3"></script>
 	<script src="/public/js/site.js"></script>
 </body>
 	
