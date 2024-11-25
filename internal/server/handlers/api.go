@@ -65,3 +65,26 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, `<div id="status" style="background-color: #d4edda; color: #155724; padding: 10px; margin-bottom: 10px; border: 1px solid #c3e6cb;">Task added successfully.</div>`)
 }
+
+func APIDeleteTasks(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	res, err := tasks.DeleteTask(id)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	} else {
+		if res {
+			w.WriteHeader(http.StatusOK)
+		} else {
+			http.Error(w, "Task not found", http.StatusNotFound)
+			return
+		}
+	}
+
+}
