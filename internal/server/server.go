@@ -22,6 +22,7 @@ func StartServer() {
 	http.HandleFunc("/api/add-task", handlers.APIAddTask)
 	http.HandleFunc("/api/confirm", handlers.APIConfirmDelete)
 	http.HandleFunc("/api/delete-task", handlers.APIDeleteTask)
+	http.HandleFunc("/api/update-status", handlers.APIUpdateTaskStatus)
 	fmt.Println("Starting server on :8080")
 	http.ListenAndServe(":8080", nil)
 }

@@ -3,9 +3,15 @@
     <td>{{.Title}}</td>
     <td>{{.Description}}</td>
     <td>
-        <span class="badge {{if .Completed}}bg-success{{else}}bg-secondary{{end}}">
+       <span 
+            class="badge {{if .Completed}}bg-success{{else}}bg-secondary{{end}}" 
+            hx-get="/api/update-status?id={{.ID}}" 
+            hx-target="#task-{{.ID}} .badge" 
+            hx-swap="outerHTML" 
+            style="cursor: pointer;"
+        >
             {{if .Completed}}Complete{{else}}Incomplete{{end}}
-        </span>
+        </span> 
     </td>
     <td>
         <!-- Delete Button to Load Modal -->
