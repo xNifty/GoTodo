@@ -1,85 +1,61 @@
 @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400&display=swap');
 
+/* Body styles */
 body {
-    margin: 0;
-    font-family: 'Fira Code', monospace;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    background-color: #f8f9fa;
-    line-height: 1.6;
+    font-family: 'Fira Code', monospace; /* Custom font */
+    background-color: #f8f9fa; /* Keep Bootstrap's light gray background */
+    line-height: 1.6; /* Matches Bootstrap's default */
 }
 
+/* Table styling */
 table {
-    width: 80%;
-    max-width: 800px;
     border-collapse: collapse;
-    margin: 20px auto;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    background-color: #ffffff;
-    border-radius: 8px;
-    overflow: hidden;
 }
 
 thead {
-    background-color: #007bff;
+    background-color: #007bff; /* Matches Bootstrap primary color */
     color: #ffffff;
-    text-transform: uppercase;
-    font-weight: bold;
 }
 
 thead th {
-    padding: 15px;
-    text-align: left;
-    border-bottom: 2px solid #0056b3;
+    text-transform: uppercase;
+    font-weight: bold; /* Matches Bootstrap table head font weight */
 }
 
 tbody tr:nth-child(even) {
-    background-color: #f2f2f2;
+    background-color: #f2f2f2; /* Subtle alternating row color */
 }
 
 tbody tr:hover {
-    background-color: #e9ecef;
+    background-color: #e9ecef; /* Matches Bootstrap's hover styles */
 }
 
 td, th {
     padding: 12px 15px;
-    text-align: left;
+    text-align: left; /* Ensures left alignment for all content */
 }
 
-tbody td {
-    border-bottom: 1px solid #dee2e6;
-}
-
-tbody tr:last-child td {
-    border-bottom: none;
-}
-
-/* Responsive Table */
+/* Responsive table tweaks */
 @media (max-width: 600px) {
     table {
         width: 100%;
     }
 
     thead {
-        display: none;
+        display: none; /* Simplifies table on small screens */
     }
 
-    tbody, tr, td {
+    tbody tr {
         display: block;
-        width: 100%;
-    }
-
-    tr {
         margin-bottom: 15px;
     }
 
     td {
-        text-align: right;
+        display: block;
         padding-left: 50%;
         position: relative;
+        text-align: left;
     }
 
     td::before {
@@ -87,129 +63,57 @@ tbody tr:last-child td {
         position: absolute;
         left: 15px;
         width: calc(50% - 15px);
-        text-align: left;
         font-weight: bold;
-    }
-
-    #timer {
-        font-size: 14px;
-        color: #555;
-        width: 100%;
     }
 }
 
-/* Expandable Box Styling */
+/* Expandable box styles */
 .expandable-box {
-    width: 80%;
-    max-width: 800px;
     border: 1px solid #ccc;
     border-radius: 8px;
-    margin: 20px 0;
-    overflow: hidden;
-    background-color: #ffffff;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    background-color: #ffffff;
 }
 
 /* Header for expandable box */
 .box-header {
     background-color: #007bff;
     color: white;
-    padding: 10px 15px;
     font-size: 1.2em;
     font-weight: bold;
     cursor: pointer;
-    user-select: none;
-    text-align: left;
 }
 
-/* Hover effect for the header */
 .box-header:hover {
-    background-color: #0056b3;
+    background-color: #0056b3; /* Matches Bootstrap's primary hover color */
 }
 
-/* Padding inside the form container */
-#add-task-form-container {
-    padding: 15px;
-}
-
-/* Form Styling */
+/* Form styling */
 .form-group {
     margin-bottom: 15px;
-}
-
-label {
-    display: block;
-    font-weight: bold;
-    margin-bottom: 5px;
-}
-
-input[type="text"],
-textarea {
-    width: 100%;
-    padding: 8px;
-    box-sizing: border-box;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 14px;
 }
 
 textarea {
     height: 80px;
     resize: none;
-    max-width: 100%;
 }
 
-textarea::placeholder {
-    font-size: 0.9em;
-    color: #aaa;
-}
-
-.form-hint {
-    font-size: 0.85em;
-    color: #777;
-    margin-top: 5px;
-}
-
-/* Gradient Button Styling */
-.btn {
-    display: inline-block;
-    padding: 10px 20px;
-    font-size: 14px;
-    font-weight: bold;
-    text-align: center;
-    color: white;
-    text-decoration: none;
-    border-radius: 5px;
-    border: none;
-    cursor: pointer;
-    transition: background 0.3s ease, transform 0.2s ease;
-}
-
+/* Button styles */
 .btn-gradient {
-    background: linear-gradient(45deg, #007bff, #0056b3);
+    background: linear-gradient(45deg, #007bff, #0056b3); /* Matches Bootstrap primary gradient */
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .btn-gradient:hover {
     background: linear-gradient(45deg, #0056b3, #003f7f);
-    transform: translateY(-2px);
 }
 
 .btn-gradient:active {
     background: linear-gradient(45deg, #003f7f, #002b59);
-    transform: translateY(1px);
 }
 
-/* Bootstrap Collapse overrides */
+/* Collapse styles */
 .collapse {
     transition: height 0.3s ease-out;
-}
-
-.collapse.show {
-    display: block !important;
-}
-
-.collapse:not(.show) {
-    display: none !important;
 }
 

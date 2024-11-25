@@ -66,7 +66,7 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, `<div id="status" style="background-color: #d4edda; color: #155724; padding: 10px; margin-bottom: 10px; border: 1px solid #c3e6cb;">Task added successfully.</div>`)
 }
 
-func APIDeleteTasks(w http.ResponseWriter, r *http.Request) {
+func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	if id == "" {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
@@ -86,5 +86,25 @@ func APIDeleteTasks(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+}
 
+func APIConfirmDelete(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	// Simulate fetching the task details (if necessary)
+	task := struct {
+		ID string
+	}{
+		ID: id,
+	}
+
+	// Render the modal content
+	tmpl := template.Must(template.ParseFiles("internal/server/templates/partials/confirm.html"))
+	if err := tmpl.Execute(w, task); err != nil {
+		http.Error(w, "Failed to load confirmation modal", http.StatusInternalServerError)
+	}
 }

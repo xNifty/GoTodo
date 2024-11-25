@@ -7,13 +7,35 @@
     <link rel="stylesheet" href="public/css/site.css">
 </head>
 <body>
-    <div id="status" class="hidden" style="background-color: #d4edda; color: #155724; padding: 10px; margin-bottom: 10px; border: 1px solid #c3e6cb; display: none;"></div>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <div class="container">
+            <a class="navbar-brand" href="#">Task Manager</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">About</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Status Message -->
+    <div id="status" class="container mt-3 hidden" style="background-color: #d4edda; color: #155724; padding: 10px; margin-bottom: 10px; border: 1px solid #c3e6cb; display: none;"></div>
 
     <!-- Main Container -->
     <div class="container mt-5">
-        <!-- Task List Table (Centered) -->
+        <!-- Task List Section -->
         <div class="row justify-content-center">
-            <div class="col-md-8">
+            <div class="col-lg-10">
+                <h2 class="text-center mb-4">Task List</h2>
                 <table class="table table-striped table-bordered w-100">
                     <thead>
                         <tr>
@@ -21,6 +43,7 @@
                             <th>Title</th>
                             <th>Description</th>
                             <th>Status</th>
+                            <th>Delete</th>
                         </tr>
                     </thead>
                     <tbody id="task-list">
@@ -28,7 +51,7 @@
                             {{ template "todo.html" . }}
                         {{ else }}
                             <tr>
-                                <td colspan="4">No tasks available</td>
+                                <td colspan="5">No tasks available</td>
                             </tr>
                         {{ end }}
                     </tbody>
@@ -36,9 +59,9 @@
             </div>
         </div>
 
-        <!-- Add Task Button and Form (Centered) -->
-        <div class="row justify-content-center">
-            <div class="col-md-8">
+        <!-- Add Task Section -->
+        <div class="row justify-content-center mt-5">
+            <div class="col-lg-10">
                 <div class="card w-100">
                     <div class="card-header" id="headingAddTask">
                         <button class="btn btn-link text-danger" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAddTask" aria-expanded="false" aria-controls="collapseAddTask">
@@ -72,11 +95,20 @@
                 </div>
             </div>
         </div>
-
     </div>
 
-    <div id="timer" style="text-align: center; margin-top: 10px;">
+    <!-- Timer Section -->
+    <div id="timer" class="text-center mt-4">
         Next update in: <span id="time">10</span> seconds
+    </div>
+
+    <!-- Modal -->
+    <div id="modal" class="modal fade" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <!-- Modal content dynamically loaded -->
+            </div>
+        </div>
     </div>
 
     <!-- Bootstrap JS -->

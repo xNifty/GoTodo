@@ -1,6 +1,23 @@
-  <tr>
-    <td>{{ .ID }}</td>
-    <td>{{ .Title }}</td>
-    <td>{{ .Description }}</td>
-    <td>{{ if .Completed }}<font color="green">Complete</font>{{ else }}<font color="red">Incomplete</font>{{ end }}</td>
-  </tr>
+<tr id="task-{{.ID}}">
+    <td>{{.ID}}</td>
+    <td>{{.Title}}</td>
+    <td>{{.Description}}</td>
+    <td>
+        <span class="badge {{if .Completed}}bg-success{{else}}bg-secondary{{end}}">
+            {{if .Completed}}Complete{{else}}Incomplete{{end}}
+        </span>
+    </td>
+    <td>
+        <!-- Delete Button to Load Modal -->
+        <button 
+            class="btn btn-danger btn-sm" 
+            hx-get="/api/confirm?id={{.ID}}" 
+            hx-target="#modal .modal-content" 
+            hx-trigger="click" 
+            data-bs-toggle="modal" 
+            data-bs-target="#modal">
+            Delete
+        </button>
+    </td>
+</tr>
+
