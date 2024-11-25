@@ -5,19 +5,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const tbody = document.querySelector("tbody");
 
     function updateTable() {
-        fetch('/api/')
-            .then(response => response.json())
-            .then(data => {
-                tbody.innerHTML = data.map(task => `
-                    <tr>
-                        <td>${task.ID}</td>
-                        <td>${task.Title}</td>
-                        <td>${task.Description}</td>
-                        <td>${task.Completed ? '<font color="green">Complete</font>' : '<font color="red">Incomplete</font>'}</td>
-                    </tr>
-                `).join('');
+        fetch('/api/fetch-tasks')
+            .then(response => response.text())
+            .then(html => {
+                tbody.innerHTML = html;
             })
             .catch(error => {
+                console.error(error);
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="4">No tasks available</td>

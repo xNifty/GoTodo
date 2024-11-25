@@ -18,7 +18,8 @@ func StartServer() {
 	http.Handle("/public/", http.StripPrefix("/public/", fs))
 
 	http.HandleFunc("/", handlers.HomeHandler)
-	http.HandleFunc("/api/", handlers.APIReturnTasks)
+	http.HandleFunc("/api/fetch-tasks", handlers.APIReturnTasks)
+	http.HandleFunc("/api/add-task", handlers.APIAddTask)
 	fmt.Println("Starting server on :8080")
 	http.ListenAndServe(":8080", nil)
 }

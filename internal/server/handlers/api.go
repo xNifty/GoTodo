@@ -4,18 +4,34 @@ import (
 	"GoTodo/internal/storage"
 	"GoTodo/internal/tasks"
 	"context"
-	"encoding/json"
 	"fmt"
+	"html/template"
 	"net/http"
 )
 
+var taskTemplate = template.Must(template.New("task").Parse(`
+<tr>
+    <td>{{ .ID }}</td>
+    <td>{{ .Title }}</td>
+    <td>{{ .Description }}</td>
+	<td>{{ if .Completed }}<font color="green">Complete</font>{{ else }}<font color="red">Incomplete</font>{{ end }}</td>
+</tr>
+`))
+
 func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 	tasks := tasks.ReturnTaskList()
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(tasks)
+	w.Header().Set("Content-Type", "text/html; character=utf-8")
+	//fmt.Println(tasks)
+	for _, task := range tasks {
+		if err := taskTemplate.Execute(w, task); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
 }
 
 func APIAddTask(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Request method: ", r.Method)
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
@@ -26,7 +42,7 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 
 	if title == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, `<div id="feedback" style="background-color: #f8d7da; color: #721c24; padding: 10px; margin-bottom: 10px; border: 1px solid #f5c6cb;">Title is required.</div>`)
+		fmt.Fprintf(w, `<div id="status" style="background-color: #f8d7da; color: #721c24; padding: 10px; margin-bottom: 10px; border: 1px solid #f5c6cb;">Title is required.</div>`)
 		return
 	}
 
@@ -47,5 +63,5 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, `<div id="feedback" style="background-color: #d4edda; color: #155724; padding: 10px; margin-bottom: 10px; border: 1px solid #c3e6cb;">Task added successfully.</div>`)
+	fmt.Fprintf(w, `<div id="status" style="background-color: #d4edda; color: #155724; padding: 10px; margin-bottom: 10px; border: 1px solid #c3e6cb;">Task added successfully.</div>`)
 }
