@@ -1,4 +1,4 @@
-# GoTodo: A simple CLI App with a basic web front end
+# GoTodo: A simple web based TODO List app
 
 ## Requirements
 - PostgreSQL
@@ -8,17 +8,14 @@
 ### .env
 You will need to rename the ```.env.example``` file to ```.env``` and fill in the required information. This is needed to connect to the database.
 
-### To start the CLI app:
+### To start:
 ```go
 go run .
 ```
 
-### To start the web app:
-```go
-go run . server
-```
-
-Server available on localhost:8080 and refreshes every 10 seconds.
+Server available on localhost:8080.  
+List will update automatically when adding a new item, deleting, or toggling complete/incomplete.  
+Web makes use of Bootstrap and HTMX for styling and updating elements.
 
 ---
 
