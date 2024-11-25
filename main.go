@@ -5,18 +5,18 @@ import (
 	"GoTodo/internal/storage"
 	// "GoTodo/internal/tasks"
 	// "fmt"
-	"os"
+	//"os"
 )
 
 func main() {
-	runArgs := os.Args
+	//runArgs := os.Args
 	storage.CreateDatabase()
-
-	if runArgs != nil && len(runArgs) > 1 {
-		if runArgs[1] == "server" {
-			server.StartServer()
-		}
-	}
+	server.StartServer()
+	// if runArgs != nil && len(runArgs) > 1 {
+	// 	if runArgs[1] == "server" {
+	// 		server.StartServer()
+	// 	}
+	// }
 
 	// for {
 	// 	fmt.Println("\nTODO App")

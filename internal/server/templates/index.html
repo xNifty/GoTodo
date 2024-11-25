@@ -46,7 +46,7 @@
                             <th>Delete</th>
                         </tr>
                     </thead>
-                    <tbody id="task-list">
+                    <tbody id="task-list" hx-swap-oob="true">
                         {{ range .Tasks }}
                             {{ template "todo.html" . }}
                         {{ else }}
@@ -76,8 +76,8 @@
                                 method="post"
                                 id="newTaskForm"
                                 enctype="multipart/form-data"
-                                hx-swap="outerHTML"
-                                hx-target="#status"
+                                hx-target="#task-list"
+                                hx-swap="beforeend"
                             >
                                 <div class="form-group">
                                     <label for="title">Title:</label>
@@ -132,7 +132,7 @@
 
         // Clear form after submitting
         document.body.addEventListener("htmx:afterRequest", (event) => {
-            if (event.detail.target.id === "newTaskForm") {
+            if (event.detail.target.id === "newTaskForm" && event.detail.xhr.status === 200) {
                 document.getElementById("title").value = "";
                 document.getElementById("description").value = "";
             }

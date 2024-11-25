@@ -18,6 +18,8 @@ var taskTemplate = template.Must(template.New("task").Parse(`
 </tr>
 `))
 
+var taskPartialTemplate *template.Template
+
 func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 	tasks := tasks.ReturnTaskList()
 	w.Header().Set("Content-Type", "text/html; character=utf-8")
@@ -62,8 +64,21 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, `<div id="status" style="background-color: #d4edda; color: #155724; padding: 10px; margin-bottom: 10px; border: 1px solid #c3e6cb;">Task added successfully.</div>`)
+	tasks := tasks.ReturnTaskList()
+	task := tasks[len(tasks)-1]
+	w.Header().Set("Content-Type", "text/html; character=utf-8")
+
+	taskPartialTemplate, err = template.ParseFiles("internal/server/templates/partials/todo.html")
+
+	if err = taskPartialTemplate.Execute(w, task); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// w.WriteHeader(http.StatusOK)
+	// fmt.Fprintf(w, `<div id="status" style="background-color: #d4edda; color: #155724; padding: 10px; margin-bottom: 10px; border: 1px solid #c3e6cb;">Task added successfully.</div>`)
+	//
+	// APIReturnTasks(w, r)
 }
 
 func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
