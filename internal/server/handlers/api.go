@@ -22,8 +22,10 @@ var taskTemplate = template.Must(template.New("task").Parse(`
 
 var taskPartialTemplate *template.Template
 
+var pageSize int = 15
+
 func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
-	pageSize := 15
+	//pageSize := 15
 
 	var page int
 
@@ -95,51 +97,90 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
-	if pageParam := r.URL.Query().Get("page"); pageParam != "" {
-		var err error
-		page, err = strconv.Atoi(pageParam)
-		if err != nil || page < 1 {
-			page = 1
-		}
-	} else {
-		page = 1
-	}
 
 	title := r.FormValue("title")
 	description := r.FormValue("description")
+	pageStr := r.FormValue("currentPage")
+	fmt.Println("currentPageStr: ", pageStr)
+
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page <= 0 {
+		page = 1 // Default to page 1 if no valid page is provided
+	}
+
+	fmt.Println("Page: ", page)
 
 	if title == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, `<div id="status" style="background-color: #f8d7da; color: #721c24; padding: 10px; margin-bottom: 10px; border: 1px solid #f5c6cb;">Title is required.</div>`)
 		return
 	}
 
 	db, err := storage.OpenDatabase()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "Error opening database")
 		return
 	}
-
 	defer db.Close()
 
+	// Insert the new task into the database
 	_, err = db.Exec(context.Background(), "INSERT INTO tasks (title, description, completed) VALUES ($1, $2, $3)", title, description, false)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "Error inserting task")
 		return
 	}
 
-	tasks := tasks.ReturnTaskList()
-	task := tasks[len(tasks)-1]
-	w.Header().Set("Content-Type", "text/html; character=utf-8")
-	//fmt.Fprintf(w, "<div id='status' class='container mt-3' style='background-color: #d4edda; color: #155724; padding: 10px; margin-bottom: 10px; border: 1px solid #c3e6cb;'>Task created successfully!</div>")
-
-	taskPartialTemplate, err = template.ParseFiles("internal/server/templates/partials/todo.html")
-
-	if err = taskPartialTemplate.Execute(w, task); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	pageSize := 15
+	tasks, totalTasks, err := tasks.ReturnPagination(page, pageSize)
+	if err != nil {
+		http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	prevDisabled := ""
+	if page == 1 {
+		prevDisabled = "disabled"
+	}
+
+	nextDisabled := ""
+	if page*pageSize >= totalTasks {
+		nextDisabled = "disabled"
+	}
+
+	// Prepare the context for pagination and task list
+	context := map[string]interface{}{
+		"Tasks":        tasks,
+		"PreviousPage": page - 1,
+		"NextPage":     page + 1,
+		"CurrentPage":  pageStr,
+		"PrevDisabled": prevDisabled,
+		"NextDisabled": nextDisabled,
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+	// If we're on the last page, return only the updated task list (with new task at the end)
+	if page*pageSize >= totalTasks {
+		// Append the new task to the task list
+		task := tasks[len(tasks)-1] // Get the newly added task
+		taskPartialTemplate, err := template.ParseFiles("internal/server/templates/partials/todo.html")
+		if err != nil {
+			http.Error(w, "Error rendering task partial: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Render the task as a partial (this will update the list immediately in HTMX)
+		err = taskPartialTemplate.Execute(w, task)
+		if err != nil {
+			http.Error(w, "Error executing task partial: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	} else {
+		// For pages that aren't the last, just return the full task list and pagination
+		err := utils.RenderTemplate(w, "pagination.html", context)
+		if err != nil {
+			http.Error(w, "Error rendering pagination template: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 }
 

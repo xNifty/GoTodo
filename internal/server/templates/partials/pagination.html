@@ -40,6 +40,44 @@
                 Next
             </button>
         </div>
+
+        <div class="row justify-content-center mt-5">
+            <div class="col-lg-10">
+                <div class="card w-100">
+                    <div class="card-header" id="headingAddTask">
+                        <button class="btn btn-link text-danger" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAddTask" aria-expanded="false" aria-controls="collapseAddTask">
+                            + Add Task
+                        </button>
+                    </div>
+                    <div id="collapseAddTask" class="collapse" aria-labelledby="headingAddTask" data-parent="#add-task-container">
+                        <div class="card-body">
+                            <form
+                                hx-post="/api/add-task"
+                                hx-include="#newTaskForm"
+                                method="post"
+                                id="newTaskForm"
+                                enctype="multipart/form-data"
+                                hx-target="#task-list"
+                                hx-swap="beforeend">
+                                <div class="form-group">
+                                    <label for="title">Title:</label>
+                                    <input type="text" id="title" name="title" class="form-control" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="description">Description:</label>
+                                    <textarea id="description" name="description" class="form-control" maxlength="100"></textarea>
+                                    <small class="form-hint">Max 100 Characters</small>
+                                </div>
+                                <!-- Hidden CurrentPage field -->
+                                <input type="hidden" name="currentPage" value="{{.CurrentPage}}" />
+
+                                <button type="submit" class="btn btn-primary w-100">Add Task</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
