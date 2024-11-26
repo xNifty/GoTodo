@@ -10,11 +10,12 @@
     <button 
         class="btn btn-danger" 
         hx-delete="/api/delete-task?id={{.ID}}" 
-        hx-target="#task-{{.ID}}" 
-        hx-swap="outerHTML"
+        hx-target="#task-{{.ID}}"  
+        hx-swap="outerHTML" 
         data-bs-dismiss="modal"
     >
         Yes, Delete
     </button>
 </div>
+
 

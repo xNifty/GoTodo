@@ -89,3 +89,40 @@ func ReturnTaskList() []Task {
 	}
 	return tasks
 }
+
+func ReturnPagination(page, pageSize int) ([]Task, int, error) {
+	pool, err := storage.OpenDatabase()
+	if err != nil {
+		return nil, 0, err
+	}
+	defer storage.CloseDatabase(pool)
+
+	var tasks []Task
+	offset := (page - 1) * pageSize
+	// Fetch paginated tasks
+	rows, err := pool.Query(context.Background(),
+		"SELECT id, title, description, completed FROM tasks ORDER BY id LIMIT $1 OFFSET $2",
+		pageSize, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var task Task
+		if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed); err != nil {
+			return nil, 0, err
+		}
+		tasks = append(tasks, task)
+	}
+
+	// Fetch total task count for pagination controls
+	var totalTasks int
+	err = pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks").Scan(&totalTasks)
+	if err != nil {
+		return nil, 0, err
+	}
+	// fmt.Println("\nTotal tasks:", totalTasks)
+	//fmt.Println("\nTasks:", tasks)
+	return tasks, totalTasks, nil
+}

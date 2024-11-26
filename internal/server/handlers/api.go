@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"GoTodo/internal/server/utils"
 	"GoTodo/internal/storage"
 	"GoTodo/internal/tasks"
 	"context"
 	"fmt"
 	"html/template"
 	"net/http"
+	"strconv"
 )
 
 var taskTemplate = template.Must(template.New("task").Parse(`
@@ -21,15 +23,70 @@ var taskTemplate = template.Must(template.New("task").Parse(`
 var taskPartialTemplate *template.Template
 
 func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
-	tasks := tasks.ReturnTaskList()
-	w.Header().Set("Content-Type", "text/html; character=utf-8")
-	//fmt.Println(tasks)
-	for _, task := range tasks {
-		if err := taskTemplate.Execute(w, task); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+	pageSize := 15
+
+	var page int
+
+	// Parse "page" query parameter
+	if pageParam := r.URL.Query().Get("page"); pageParam != "" {
+		var err error
+		page, err = strconv.Atoi(pageParam)
+		if err != nil || page < 1 {
+			page = 1
 		}
+	} else {
+		page = 1
 	}
+
+	//fmt.Println("\nPage, early: ", page)
+
+	// Fetch tasks for the current page
+	tasks, totalTasks, err := tasks.ReturnPagination(page, pageSize)
+	if err != nil {
+		http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Calculate pagination button states
+	prevDisabled := ""
+	if page == 1 {
+		prevDisabled = "disabled" // Disable on the first page
+	}
+
+	nextDisabled := ""
+	if page*pageSize >= totalTasks {
+		nextDisabled = "disabled" // Disable if next page is unavailable
+	}
+
+	// Set response header
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+	prevPage := page - 1
+	if prevPage < 1 {
+		prevPage = 1
+	}
+
+	nextPage := page + 1
+
+	if page*pageSize >= totalTasks {
+		nextPage = page
+	}
+
+	// Create a context for the tasks and pagination
+	context := map[string]interface{}{
+		"Tasks":        tasks,
+		"PreviousPage": prevPage,
+		"NextPage":     nextPage,
+		"CurrentPage":  page,
+		"PrevDisabled": prevDisabled,
+		"NextDisabled": nextDisabled,
+	}
+
+	if err := utils.RenderTemplate(w, "pagination.html", context); err != nil {
+		http.Error(w, "Error rendering template: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 }
 
 func APIAddTask(w http.ResponseWriter, r *http.Request) {
@@ -37,6 +94,15 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
+	}
+	if pageParam := r.URL.Query().Get("page"); pageParam != "" {
+		var err error
+		page, err = strconv.Atoi(pageParam)
+		if err != nil || page < 1 {
+			page = 1
+		}
+	} else {
+		page = 1
 	}
 
 	title := r.FormValue("title")
@@ -67,6 +133,7 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 	tasks := tasks.ReturnTaskList()
 	task := tasks[len(tasks)-1]
 	w.Header().Set("Content-Type", "text/html; character=utf-8")
+	//fmt.Fprintf(w, "<div id='status' class='container mt-3' style='background-color: #d4edda; color: #155724; padding: 10px; margin-bottom: 10px; border: 1px solid #c3e6cb;'>Task created successfully!</div>")
 
 	taskPartialTemplate, err = template.ParseFiles("internal/server/templates/partials/todo.html")
 
@@ -74,53 +141,58 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	// w.WriteHeader(http.StatusOK)
-	// fmt.Fprintf(w, `<div id="status" style="background-color: #d4edda; color: #155724; padding: 10px; margin-bottom: 10px; border: 1px solid #c3e6cb;">Task added successfully.</div>`)
-	//
-	// APIReturnTasks(w, r)
 }
 
 func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
-	if id == "" {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
 
-	res, err := tasks.DeleteTask(id)
-
+	taskID := r.URL.Query().Get("id")
+	db, err := storage.OpenDatabase()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "Error opening database")
 		return
-	} else {
-		if res {
-			w.WriteHeader(http.StatusOK)
-		} else {
-			http.Error(w, "Task not found", http.StatusNotFound)
-			return
-		}
 	}
+	defer db.Close()
+
+	// Delete the task from the database
+	_, err = db.Exec(context.Background(), "DELETE FROM tasks WHERE id = $1", taskID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "Error deleting task")
+		return
+	}
+
+	// Return an empty HTML response for the deleted task row
+	fmt.Fprintf(w, "<tr id=\"task-%s\"></tr>", taskID)
 }
 
 func APIConfirmDelete(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	if id == "" {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		http.Error(w, "Task ID is required", http.StatusBadRequest)
 		return
 	}
 
-	// Simulate fetching the task details (if necessary)
-	task := struct {
+	modalTemplate, err := template.ParseFiles("internal/server/templates/partials/confirm.html")
+	if err != nil {
+		http.Error(w, "Error loading template", http.StatusInternalServerError)
+		return
+	}
+
+	data := struct {
 		ID string
 	}{
 		ID: id,
 	}
 
-	// Render the modal content
-	tmpl := template.Must(template.ParseFiles("internal/server/templates/partials/confirm.html"))
-	if err := tmpl.Execute(w, task); err != nil {
-		http.Error(w, "Failed to load confirmation modal", http.StatusInternalServerError)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	err = modalTemplate.Execute(w, data)
+	if err != nil {
+		http.Error(w, "Error rendering template: "+err.Error(), http.StatusInternalServerError)
 	}
 }
 

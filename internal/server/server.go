@@ -9,6 +9,8 @@ import (
 	"net/http"
 )
 
+func doNothing(w http.ResponseWriter, r *http.Request) {}
+
 func StartServer() {
 
 	utils.Templates = template.Must(template.ParseGlob("internal/server/templates/*.html"))
@@ -18,6 +20,7 @@ func StartServer() {
 	http.Handle("/public/", http.StripPrefix("/public/", fs))
 
 	http.HandleFunc("/", handlers.HomeHandler)
+	http.HandleFunc("/favicon.ico", doNothing)
 	http.HandleFunc("/api/fetch-tasks", handlers.APIReturnTasks)
 	http.HandleFunc("/api/add-task", handlers.APIAddTask)
 	http.HandleFunc("/api/confirm", handlers.APIConfirmDelete)
