@@ -2,7 +2,16 @@
     <td>{{.ID}}</td>
     <td>{{.Title}}</td>
     <td>{{.Description}}</td>
-    <td>{{if .Completed}}<font color="green">Completed</font>{{else}}<font color="red">Incomplete</font>{{end}}</td>
+    <td>
+        <button 
+            class="badge bg-{{if .Completed}}success{{else}}danger{{end}}"
+            hx-get="/api/update-status?id={{.ID}}"
+            hx-target="#task-{{.ID}} .badge"
+            hx-swap="outerHTML"
+            style="cursor: pointer;">
+            {{if .Completed}}Complete{{else}}Incomplete{{end}}
+        </button>
+    </td>
     <td>
         <button 
             hx-delete="/api/confirm?id={{.ID}}"
@@ -10,7 +19,7 @@
             hx-trigger="click"
             data-bs-toggle="modal"
             data-bs-target="#modal"
-            class="btn btn-danger">
+            class="badge bg-danger">
             Delete
         </button>
     </td>

@@ -64,11 +64,9 @@
         });
 
         // Clear form after submitting
-        document.body.addEventListener("htmx:afterRequest", (event) => {
-            if (event.detail.target.id === "newTaskForm" && event.detail.xhr.status === 200) {
-                document.getElementById("title").value = "";
-                document.getElementById("description").value = "";
-            }
+        document.body.addEventListener("task-added", (event) => {
+            document.getElementById("title").value = "";
+            document.getElementById("description").value = "";
         });
     </script>
 </body>

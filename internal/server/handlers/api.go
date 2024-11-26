@@ -136,31 +136,11 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	prevDisabled := ""
-	if page == 1 {
-		prevDisabled = "disabled"
-	}
-
-	nextDisabled := ""
-	if page*pageSize >= totalTasks {
-		nextDisabled = "disabled"
-	}
-
-	// Prepare the context for pagination and task list
-	context := map[string]interface{}{
-		"Tasks":        tasks,
-		"PreviousPage": page - 1,
-		"NextPage":     page + 1,
-		"CurrentPage":  pageStr,
-		"PrevDisabled": prevDisabled,
-		"NextDisabled": nextDisabled,
-	}
-
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("HX-Trigger", "task-added")
 
-	// If we're on the last page, return only the updated task list (with new task at the end)
 	if page*pageSize >= totalTasks {
-		// Append the new task to the task list
+		// Last page, so add the new task to the response
 		task := tasks[len(tasks)-1] // Get the newly added task
 		taskPartialTemplate, err := template.ParseFiles("internal/server/templates/partials/todo.html")
 		if err != nil {
@@ -168,20 +148,17 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Render the task as a partial (this will update the list immediately in HTMX)
+		// Render just the new task
 		err = taskPartialTemplate.Execute(w, task)
 		if err != nil {
 			http.Error(w, "Error executing task partial: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 	} else {
-		// For pages that aren't the last, just return the full task list and pagination
-		err := utils.RenderTemplate(w, "pagination.html", context)
-		if err != nil {
-			http.Error(w, "Error rendering pagination template: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
+		// Not on the last page; no update needed
+		w.WriteHeader(http.StatusNoContent) // Respond with 204 No Content
 	}
+
 }
 
 func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
@@ -271,15 +248,15 @@ func APIUpdateTaskStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html; character=utf-8")
-	fmt.Fprintf(w, `<span 
+	fmt.Fprintf(w, `<button 
         class="badge %s"
-        hx-get="/api/update-task-status?id=%s" 
+        hx-get="/api/update-status?id=%s" 
         hx-target="#task-%s .badge" 
         hx-swap="outerHTML"
         style="cursor: pointer;">
         %s
-    </span>`,
-		map[bool]string{true: "bg-success", false: "bg-secondary"}[updatedStatus],
+    </button>`,
+		map[bool]string{true: "bg-success", false: "bg-danger"}[updatedStatus],
 		id,
 		id,
 		map[bool]string{true: "Complete", false: "Incomplete"}[updatedStatus],
