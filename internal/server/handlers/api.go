@@ -92,7 +92,7 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 }
 
 func APIAddTask(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("Request method: ", r.Method)
+	// fmt.Println("Request method: ", r.Method)
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
@@ -101,14 +101,13 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 	title := r.FormValue("title")
 	description := r.FormValue("description")
 	pageStr := r.FormValue("currentPage")
-	fmt.Println("currentPageStr: ", pageStr)
 
 	page, err := strconv.Atoi(pageStr)
 	if err != nil || page <= 0 {
 		page = 1 // Default to page 1 if no valid page is provided
 	}
 
-	fmt.Println("Page: ", page)
+	// fmt.Println("Page: ", page)
 
 	if title == "" {
 		w.WriteHeader(http.StatusBadRequest)

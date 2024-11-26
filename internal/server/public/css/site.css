@@ -11,6 +11,9 @@ body {
 table {
     border-collapse: collapse;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    table-layout: fixed;
+    width: 100%;
+    max-width: 100%;
 }
 
 thead {
@@ -34,6 +37,46 @@ tbody tr:hover {
 td, th {
     padding: 12px 15px;
     text-align: left; /* Ensures left alignment for all content */
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: normal;
+}
+th.description-column {
+    max-width: 25em;
+    /*width: 25em;*/
+}
+
+td.description-column {
+    max-width: 1.5em;
+}
+
+th.id-column,
+td.id-column {
+    width: 5%; /* Adjust as necessary for ID column */
+    max-width: 50px; /* Prevent excessive width */
+    text-align: center; /* Center-align for better presentation */
+}
+
+th.status-column,
+td.status-column {
+    width: 10%; /* Limit width for Status column */
+    max-width: 100px;
+    text-align: center;
+}
+
+th.delete-column,
+td.delete-column {
+    width: 10%; /* Limit width for Delete column */
+    max-width: 80px;
+    text-align: center;
+}
+
+.row {
+    overflow-x: auto;
+}
+
+.col-lg-10 {
+    padding: 0;
 }
 
 /* Responsive table tweaks */

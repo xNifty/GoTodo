@@ -1,10 +1,10 @@
 <tr id="task-{{.ID}}">
-    <td>{{.ID}}</td>
-    <td>{{.Title}}</td>
-    <td>{{.Description}}</td>
+    <td class="id-column">{{.ID}}</td>
+    <td class="description-column">{{.Title}}</td>
+    <td class="description-column">{{.Description}}</td>
     <td>
         <button 
-            class="badge bg-{{if .Completed}}success{{else}}danger{{end}}"
+            class="badge bg-{{if .Completed}}success{{else}}danger{{end}} status-column"
             hx-get="/api/update-status?id={{.ID}}"
             hx-target="#task-{{.ID}} .badge"
             hx-swap="outerHTML"
@@ -19,7 +19,7 @@
             hx-trigger="click"
             data-bs-toggle="modal"
             data-bs-target="#modal"
-            class="badge bg-danger">
+            class="badge bg-danger delete-column">
             Delete
         </button>
     </td>
