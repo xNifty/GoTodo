@@ -61,14 +61,14 @@ th.status-column,
 td.status-column {
     width: 10%; /* Limit width for Status column */
     max-width: 100px;
-    text-align: center;
+    /*text-align: center;*/
 }
 
 th.delete-column,
 td.delete-column {
     width: 10%; /* Limit width for Delete column */
     max-width: 80px;
-    text-align: center;
+    /*text-align: center;*/
 }
 
 .row {
