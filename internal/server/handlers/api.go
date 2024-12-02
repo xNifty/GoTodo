@@ -189,7 +189,7 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 			"NextPage":     page + 1,
 			"CurrentPage":  page,
 			"PrevDisabled": prevDisabled,
-			"NextDisabled": "sadhjkfas",
+			"NextDisabled": "",
 		}
 
 		err = utils.RenderTemplate(w, "pagination.html", context)
