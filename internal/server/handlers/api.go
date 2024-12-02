@@ -129,7 +129,7 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	pageSize := 15
-	tasks, totalTasks, err := tasks.ReturnPagination(page, pageSize)
+	_, totalTasks, err := tasks.ReturnPagination(page, pageSize)
 	if err != nil {
 		http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -140,24 +140,67 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 
 	if page*pageSize >= totalTasks {
 		// Last page, so add the new task to the response
-		task := tasks[len(tasks)-1] // Get the newly added task
-		taskPartialTemplate, err := template.ParseFiles("internal/server/templates/partials/todo.html")
+		tasks, _, err := tasks.ReturnPagination(page, pageSize)
+
+		//taskPartialTemplate, err := template.ParseFiles("internal/server/templates/partials/pagination.html")
 		if err != nil {
 			http.Error(w, "Error rendering task partial: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-
+		prevDisabled := ""
+		if page == 1 {
+			prevDisabled = "disabled" // Disable on the first page
+		}
 		// Render just the new task
-		err = taskPartialTemplate.Execute(w, task)
+		context := map[string]interface{}{
+			"Tasks":        tasks,
+			"PreviousPage": page,
+			"NextPage":     page,
+			"CurrentPage":  page,
+			"PrevDisabled": prevDisabled,
+			"NextDisabled": "disabled",
+		}
+
+		err = utils.RenderTemplate(w, "pagination.html", context)
 		if err != nil {
+			fmt.Println("Error executing task partial: ", err)
 			http.Error(w, "Error executing task partial: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+
 	} else {
 		// Not on the last page; no update needed
-		w.WriteHeader(http.StatusNoContent) // Respond with 204 No Content
-	}
+		// Last page, so add the new task to the response
+		tasks, _, err := tasks.ReturnPagination(page, pageSize)
 
+		//taskPartialTemplate, err := template.ParseFiles("internal/server/templates/partials/pagination.html")
+		if err != nil {
+			http.Error(w, "Error rendering task partial: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		prevDisabled := ""
+		if page == 1 {
+			prevDisabled = "disabled" // Disable on the first page
+		}
+		// Render just the new task
+		context := map[string]interface{}{
+			"Tasks":        tasks,
+			"PreviousPage": page,
+			"NextPage":     page + 1,
+			"CurrentPage":  page,
+			"PrevDisabled": prevDisabled,
+			"NextDisabled": "sadhjkfas",
+		}
+
+		err = utils.RenderTemplate(w, "pagination.html", context)
+		if err != nil {
+			fmt.Println("Error executing task partial: ", err)
+			http.Error(w, "Error executing task partial: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		fmt.Println("New page is now added")
+	}
 }
 
 func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
