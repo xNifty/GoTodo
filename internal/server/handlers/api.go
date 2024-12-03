@@ -151,10 +151,14 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 		if page == 1 {
 			prevDisabled = "disabled" // Disable on the first page
 		}
+		prevPage := page - 1
+		if prevPage < 1 {
+			prevPage = 1
+		}
 		// Render just the new task
 		context := map[string]interface{}{
 			"Tasks":        tasks,
-			"PreviousPage": page,
+			"PreviousPage": prevPage,
 			"NextPage":     page,
 			"CurrentPage":  page,
 			"PrevDisabled": prevDisabled,
@@ -182,10 +186,15 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 		if page == 1 {
 			prevDisabled = "disabled" // Disable on the first page
 		}
+
+		prevPage := page - 1
+		if prevPage < 1 {
+			prevPage = 1
+		}
 		// Render just the new task
 		context := map[string]interface{}{
 			"Tasks":        tasks,
-			"PreviousPage": page,
+			"PreviousPage": prevPage,
 			"NextPage":     page + 1,
 			"CurrentPage":  page,
 			"PrevDisabled": prevDisabled,
