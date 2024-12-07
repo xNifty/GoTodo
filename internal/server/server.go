@@ -9,6 +9,8 @@ import (
 	"net/http"
 )
 
+// Literally just used to prevent favicon.ico from being requestedi
+// TODO:: Add a favicon
 func doNothing(w http.ResponseWriter, r *http.Request) {}
 
 func StartServer() {
@@ -26,6 +28,7 @@ func StartServer() {
 	http.HandleFunc("/api/confirm", handlers.APIConfirmDelete)
 	http.HandleFunc("/api/delete-task", handlers.APIDeleteTask)
 	http.HandleFunc("/api/update-status", handlers.APIUpdateTaskStatus)
+	http.HandleFunc("/about", handlers.AboutHandler)
 	fmt.Println("Starting server on :8080")
 	http.ListenAndServe(":8080", nil)
 }
