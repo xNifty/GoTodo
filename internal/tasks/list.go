@@ -126,3 +126,44 @@ func ReturnPagination(page, pageSize int) ([]Task, int, error) {
 	//fmt.Println("\nTasks:", tasks)
 	return tasks, totalTasks, nil
 }
+
+func SearchTasks(page, pageSize int, searchQuery string) ([]Task, int, error) {
+	pool, err := storage.OpenDatabase()
+	if err != nil {
+		return nil, 0, err
+	}
+
+	defer storage.CloseDatabase(pool)
+
+	var tasks []Task
+	offset := (page - 1) * pageSize
+	searchQuery = "%" + searchQuery + "%"
+
+	rows, err := pool.Query(context.Background(),
+		"SELECT id, title, description, completed FROM tasks WHERE title ILIKE $1 OR description ILIKE $1 ORDER BY id LIMIT $2 OFFSET $3",
+		searchQuery, pageSize, offset)
+
+	defer rows.Close()
+
+	if err != nil {
+		return nil, 0, err
+	}
+
+	for rows.Next() {
+		var task Task
+		if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed); err != nil {
+			return nil, 0, err
+		}
+		tasks = append(tasks, task)
+	}
+
+	var totalTasks int
+	err = pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE title ILIKE $1 OR description ILIKE $1", searchQuery).Scan(&totalTasks)
+
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return tasks, totalTasks, nil
+
+}

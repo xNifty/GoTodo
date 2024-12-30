@@ -4,17 +4,34 @@ import (
 	"GoTodo/internal/server/utils"
 	"GoTodo/internal/tasks"
 	"net/http"
+	"strings"
 )
 
 func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	page := 1
 	pageSize := 15
+	searchQuery := r.URL.Query().Get("search")
 
-	tasks, totalTasks, err := tasks.ReturnPagination(page, pageSize)
+	var taskList []tasks.Task
+	var totalTasks int
+	var err error
+
+	if searchQuery != "" {
+		taskList, totalTasks, err = tasks.SearchTasks(page, pageSize, searchQuery)
+	} else {
+		taskList, totalTasks, err = tasks.ReturnPagination(page, pageSize)
+	}
 
 	if err != nil {
 		http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	if searchQuery != "" {
+		for i, task := range taskList {
+			taskList[i].Title = highlightMatches(task.Title, searchQuery)
+			taskList[i].Description = highlightMatches(task.Description, searchQuery)
+		}
 	}
 
 	// Calculate pagination button states
@@ -40,7 +57,7 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Create a context for the tasks and pagination
 	context := map[string]interface{}{
-		"Tasks":        tasks,
+		"Tasks":        taskList,
 		"PreviousPage": prevPage,
 		"NextPage":     nextPage,
 		"CurrentPage":  page,
@@ -54,4 +71,12 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+}
+
+func highlightMatches(text, searchQuery string) string {
+	words := strings.Fields(searchQuery)
+	for _, word := range words {
+		text = strings.ReplaceAll(text, word, "<mark>"+word+"</mark>")
+	}
+	return text
 }
