@@ -1,7 +1,7 @@
 <tr id="task-{{.ID}}">
     <td class="id-column">{{.ID}}</td>
-    <td class="description-column">{{.Title}}</td>
-    <td class="description-column">{{.Description}}</td>
+    <td class="description-column">{{safeHTML .Title}}</td>
+    <td class="description-column">{{safeHTML .Description}}</td>
     <td>
         <button 
             class="badge bg-{{if .Completed}}success{{else}}danger{{end}} status-column"

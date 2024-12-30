@@ -5,7 +5,7 @@ import (
 	"GoTodo/internal/server/handlers"
 	"GoTodo/internal/server/utils"
 	"fmt"
-	"html/template"
+	// "html/template"
 	"net/http"
 )
 
@@ -14,9 +14,15 @@ import (
 func doNothing(w http.ResponseWriter, r *http.Request) {}
 
 func StartServer() {
+	//
+	// utils.Templates = template.Must(template.ParseGlob("internal/server/templates/*.html"))
+	// utils.Templates = template.Must(utils.Templates.ParseGlob("internal/server/templates/partials/*.html"))
 
-	utils.Templates = template.Must(template.ParseGlob("internal/server/templates/*.html"))
-	utils.Templates = template.Must(utils.Templates.ParseGlob("internal/server/templates/partials/*.html"))
+	err := utils.InitializeTemplates()
+	if err != nil {
+		fmt.Println("Failed to initialize templates:", err)
+		return
+	}
 
 	fs := http.FileServer(http.Dir("internal/server/public"))
 	http.Handle("/public/", http.StripPrefix("/public/", fs))
@@ -29,6 +35,7 @@ func StartServer() {
 	http.HandleFunc("/api/delete-task", handlers.APIDeleteTask)
 	http.HandleFunc("/api/update-status", handlers.APIUpdateTaskStatus)
 	http.HandleFunc("/about", handlers.AboutHandler)
+	http.HandleFunc("/search", handlers.SearchHandler)
 	fmt.Println("Starting server on :8080")
 	http.ListenAndServe(":8080", nil)
 }

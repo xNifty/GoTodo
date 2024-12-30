@@ -13,16 +13,12 @@
     <!-- Status Message -->
     <div id="status" class="container mt-3 hidden" style="background-color: #d4edda; color: #155724; padding: 10px; margin-bottom: 10px; border: 1px solid #c3e6cb; display: none;"></div>
 
-    <!-- Search Form -->
-    <!-- Needs to target pagination to update the content on search -->
-    <!-- Uses htmx to submit the form and update the content -->
     <div class="container mt-3">
-        <form id="search-form" class="form-inline">
-            <input type="text" id="search" name="search" class="form-control" placeholder="Search">
+        <form id="search-form" class="form-inline" hx-post="/search" hx-target="#task-container" hx-swap="innerHTML">
+            <input type="text" id="search" name="search" class="form-control" placeholder="Search" value="{{.SearchQuery}}">
             <button type="submit" class="btn btn-primary">Search</button>
         </form>
     </div>
-
     
     <div id="task-container" class="container">
         {{template "pagination.html" .}}

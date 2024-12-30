@@ -4,6 +4,7 @@ import (
 	"GoTodo/internal/server/utils"
 	"GoTodo/internal/tasks"
 	"net/http"
+	"regexp"
 	"strings"
 )
 
@@ -73,10 +74,41 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func SearchHandler(w http.ResponseWriter, r *http.Request) {
+	searchQuery := r.FormValue("search")
+
+	page := 1
+	pageSize := 15
+
+	taskList, _, err := tasks.SearchTasks(page, pageSize, searchQuery)
+	if err != nil {
+		http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if searchQuery != "" {
+		for i, task := range taskList {
+			taskList[i].Title = highlightMatches(task.Title, searchQuery)
+			taskList[i].Description = highlightMatches(task.Description, searchQuery)
+		}
+	}
+
+	context := map[string]interface{}{
+		"Tasks":       taskList,
+		"SearchQuery": searchQuery,
+	}
+
+	if err := utils.RenderTemplate(w, "pagination.html", context); err != nil {
+		http.Error(w, "Error rendering template: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
 func highlightMatches(text, searchQuery string) string {
 	words := strings.Fields(searchQuery)
 	for _, word := range words {
-		text = strings.ReplaceAll(text, word, "<mark>"+word+"</mark>")
+		re := regexp.MustCompile(`(?i)` + regexp.QuoteMeta(word))
+		text = re.ReplaceAllString(text, "<mark>$0</mark>")
 	}
 	return text
 }
