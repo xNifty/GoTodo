@@ -8,7 +8,7 @@ import (
 )
 
 func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
-	//pageSize := 15
+	pageSize := utils.AppConstants.PageSize
 
 	var page int
 
@@ -39,7 +39,7 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	nextDisabled := ""
-	if page*utils.AppConstants.PageSize >= totalTasks {
+	if page*pageSize >= totalTasks {
 		nextDisabled = "disabled" // Disable if next page is unavailable
 	}
 
@@ -53,7 +53,7 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 
 	nextPage := page + 1
 
-	if page*utils.AppConstants.PageSize >= totalTasks {
+	if page*pageSize >= totalTasks {
 		nextPage = page
 	}
 

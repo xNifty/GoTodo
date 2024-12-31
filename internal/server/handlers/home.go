@@ -10,7 +10,7 @@ import (
 
 func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	page := 1
-	pageSize := 15
+	pageSize := utils.AppConstants.PageSize
 	searchQuery := r.URL.Query().Get("search")
 
 	var taskList []tasks.Task
@@ -78,7 +78,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	searchQuery := r.FormValue("search")
 
 	page := 1
-	pageSize := 15
+	pageSize := utils.AppConstants.PageSize
 
 	taskList, _, err := tasks.SearchTasks(page, pageSize, searchQuery)
 	if err != nil {
