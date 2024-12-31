@@ -15,7 +15,7 @@
 
     <div class="container mt-3">
         <form id="search-form" class="form-inline" hx-post="/search" hx-target="#task-container" hx-swap="innerHTML">
-            <input type="text" id="search" name="search" class="form-control" placeholder="Search" value="{{.SearchQuery}}">
+            <input type="search" id="search" name="search" class="form-control" placeholder="Search" value="{{.SearchQuery}}">
             <button type="submit" class="btn btn-primary">Search</button>
         </form>
     </div>
