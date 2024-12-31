@@ -41,6 +41,33 @@ func CloseDatabase(pool *pgxpool.Pool) {
 	pool.Close()
 }
 
+// This will solely add new columns we need later down the line..it's dumb, but this is how I'm handling it for now
+func AddColumns() (bool, error) {
+	pool, err := OpenDatabase()
+	defer CloseDatabase(pool)
+
+	_, err = pool.Exec(context.Background(), "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS time_stamp TIMESTAMP default NOW()")
+	if err != nil {
+		log.Printf("Error in AddColumns: %v\n", err)
+		return false, err
+	}
+
+	return true, nil
+}
+
+func RemoveColumns() (bool, error) {
+	pool, err := OpenDatabase()
+	defer CloseDatabase(pool)
+
+	_, err = pool.Exec(context.Background(), "ALTER TABLE tasks DROP COLUMN IF EXISTS time_stamp")
+	if err != nil {
+		log.Printf("Error in RemoveColumns: %v\n", err)
+		return false, err
+	}
+
+	return true, nil
+}
+
 func CreateDatabase() {
 	pool, err := OpenDatabase()
 	defer CloseDatabase(pool)

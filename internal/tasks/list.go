@@ -21,7 +21,7 @@ func ListTasks() {
 
 	writer := tabwriter.NewWriter(os.Stdout, 0, 0, 4, ' ', 0)
 
-	rows, err := pool.Query(context.Background(), "SELECT id, title, description, completed FROM tasks ORDER BY id")
+	rows, err := pool.Query(context.Background(), "SELECT id, title, description, completed, time_stamp FROM tasks ORDER BY id")
 	if err != nil {
 		fmt.Println("Error in ListTasks (query):", err)
 	}
@@ -66,7 +66,7 @@ func ReturnTaskList() []Task {
 
 	var tasks []Task
 
-	rows, err := pool.Query(context.Background(), "SELECT id, title, description, completed FROM tasks ORDER BY id")
+	rows, err := pool.Query(context.Background(), "SELECT id, title, description, completed, time_stamp FROM tasks ORDER BY id")
 
 	if err != nil {
 		fmt.Println("Error in ListTasks (query):", err)
@@ -101,7 +101,7 @@ func ReturnPagination(page, pageSize int) ([]Task, int, error) {
 	offset := (page - 1) * pageSize
 	// Fetch paginated tasks
 	rows, err := pool.Query(context.Background(),
-		"SELECT id, title, description, completed FROM tasks ORDER BY id LIMIT $1 OFFSET $2",
+		"SELECT id, title, description, completed, time_stamp FROM tasks ORDER BY id LIMIT $1 OFFSET $2",
 		pageSize, offset)
 	if err != nil {
 		return nil, 0, err
@@ -110,7 +110,7 @@ func ReturnPagination(page, pageSize int) ([]Task, int, error) {
 
 	for rows.Next() {
 		var task Task
-		if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed); err != nil {
+		if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed, &task.DateAdded); err != nil {
 			return nil, 0, err
 		}
 		tasks = append(tasks, task)
@@ -140,7 +140,7 @@ func SearchTasks(page, pageSize int, searchQuery string) ([]Task, int, error) {
 	searchQuery = "%" + searchQuery + "%"
 
 	rows, err := pool.Query(context.Background(),
-		"SELECT id, title, description, completed FROM tasks WHERE title ILIKE $1 OR description ILIKE $1 ORDER BY id LIMIT $2 OFFSET $3",
+		"SELECT id, title, description, completed, time_stamp FROM tasks WHERE title ILIKE $1 OR description ILIKE $1 ORDER BY id LIMIT $2 OFFSET $3",
 		searchQuery, pageSize, offset)
 
 	defer rows.Close()
@@ -151,7 +151,7 @@ func SearchTasks(page, pageSize int, searchQuery string) ([]Task, int, error) {
 
 	for rows.Next() {
 		var task Task
-		if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed); err != nil {
+		if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed, &task.DateAdded); err != nil {
 			return nil, 0, err
 		}
 		tasks = append(tasks, task)

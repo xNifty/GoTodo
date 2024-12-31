@@ -3,6 +3,7 @@ package tasks
 import (
 	"fmt"
 	"sync"
+	"time"
 )
 
 type Task struct {
@@ -10,6 +11,7 @@ type Task struct {
 	Title       string
 	Description string
 	Completed   bool
+	DateAdded   time.Time
 }
 
 type TaskManager struct {

@@ -2,6 +2,7 @@
     <td class="id-column">{{.ID}}</td>
     <td class="description-column">{{safeHTML .Title}}</td>
     <td class="description-column">{{safeHTML .Description}}</td>
+    <td class="date-added">{{.DateAdded}}</td>
     <td>
         <button 
             class="badge bg-{{if .Completed}}success{{else}}danger{{end}} status-column"
