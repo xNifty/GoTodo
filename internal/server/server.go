@@ -14,10 +14,6 @@ import (
 func doNothing(w http.ResponseWriter, r *http.Request) {}
 
 func StartServer() {
-	//
-	// utils.Templates = template.Must(template.ParseGlob("internal/server/templates/*.html"))
-	// utils.Templates = template.Must(utils.Templates.ParseGlob("internal/server/templates/partials/*.html"))
-
 	err := utils.InitializeTemplates()
 	if err != nil {
 		fmt.Println("Failed to initialize templates:", err)
