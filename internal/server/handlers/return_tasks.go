@@ -3,7 +3,6 @@ package handlers
 import (
 	"GoTodo/internal/server/utils"
 	"GoTodo/internal/tasks"
-	"fmt"
 	"net/http"
 	"strconv"
 )

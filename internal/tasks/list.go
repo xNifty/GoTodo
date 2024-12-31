@@ -101,7 +101,7 @@ func ReturnPagination(page, pageSize int) ([]Task, int, error) {
 	offset := (page - 1) * pageSize
 	// Fetch paginated tasks
 	rows, err := pool.Query(context.Background(),
-		"SELECT id, title, description, completed, time_stamp FROM tasks ORDER BY id LIMIT $1 OFFSET $2",
+		"SELECT id, title, description, completed, TO_CHAR(time_stamp, 'YYYY/MM/DD HH:MM AM') FROM tasks ORDER BY id LIMIT $1 OFFSET $2",
 		pageSize, offset)
 	if err != nil {
 		return nil, 0, err
@@ -140,7 +140,7 @@ func SearchTasks(page, pageSize int, searchQuery string) ([]Task, int, error) {
 	searchQuery = "%" + searchQuery + "%"
 
 	rows, err := pool.Query(context.Background(),
-		"SELECT id, title, description, completed, time_stamp FROM tasks WHERE title ILIKE $1 OR description ILIKE $1 ORDER BY id LIMIT $2 OFFSET $3",
+		"SELECT id, title, description, completed, TO_CHAR(time_stamp, 'YYYY/MM/DD HH:MM AM') FROM tasks WHERE title ILIKE $1 OR description ILIKE $1 ORDER BY id LIMIT $2 OFFSET $3",
 		searchQuery, pageSize, offset)
 
 	defer rows.Close()
