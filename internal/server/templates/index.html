@@ -14,9 +14,13 @@
     <div id="status" class="container mt-3 hidden" style="background-color: #d4edda; color: #155724; padding: 10px; margin-bottom: 10px; border: 1px solid #c3e6cb; display: none;"></div>
 
     <div class="container mt-3">
-        <form id="search-form" class="form-inline" hx-post="/search" hx-target="#task-container" hx-swap="innerHTML">
-            <input type="search" id="search" name="search" class="form-control" placeholder="Search" value="{{.SearchQuery}}">
-            <button type="submit" class="btn btn-primary">Search</button>
+        <form id="search-form" class="row g-3" hx-post="/search" hx-target="#task-container" hx-swap="innerHTML">
+            <div class="col-auto">
+                <input type="search" id="search" name="search" class="form-control" placeholder="Search" value="{{.SearchQuery}}">
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-primary">Search</button>
+            </div>
         </form>
     </div>
     

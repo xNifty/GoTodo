@@ -5,7 +5,6 @@ import (
 	"GoTodo/internal/tasks"
 	"net/http"
 	"regexp"
-	"strings"
 )
 
 func HomeHandler(w http.ResponseWriter, r *http.Request) {
@@ -105,10 +104,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func highlightMatches(text, searchQuery string) string {
-	words := strings.Fields(searchQuery)
-	for _, word := range words {
-		re := regexp.MustCompile(`(?i)` + regexp.QuoteMeta(word))
-		text = re.ReplaceAllString(text, "<mark>$0</mark>")
-	}
+	re := regexp.MustCompile(`(?i)` + regexp.QuoteMeta(searchQuery))
+	text = re.ReplaceAllString(text, "<mark>$0</mark>")
 	return text
 }
