@@ -32,7 +32,6 @@ func StartServer() {
 	http.HandleFunc("/api/update-status", handlers.APIUpdateTaskStatus)
 	http.HandleFunc("/about", handlers.AboutHandler)
 	http.HandleFunc("/search", handlers.SearchHandler)
-	http.HandleFunc("/sort", handlers.SortHandler)
 	fmt.Println("Starting server on :8080")
 	http.ListenAndServe(":8080", nil)
 }
