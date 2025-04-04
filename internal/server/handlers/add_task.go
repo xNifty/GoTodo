@@ -21,6 +21,8 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 	description := r.FormValue("description")
 	pageStr := r.FormValue("currentPage")
 
+	fmt.Println("We are within AddTask")
+
 	page, err := strconv.Atoi(pageStr)
 	if err != nil || page <= 0 {
 		page = 1 // Default to page 1 if no valid page is provided
@@ -35,6 +37,7 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 
 	db, err := storage.OpenDatabase()
 	if err != nil {
+		fmt.Println("We failed to open the database.")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -43,6 +46,8 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 	// Insert the new task into the database
 	_, err = db.Exec(context.Background(), "INSERT INTO tasks (title, description, completed) VALUES ($1, $2, $3)", title, description, false)
 	if err != nil {
+		fmt.Println("We failed to insert into the database.")
+		fmt.Println("Failed values:", title, description, false)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
