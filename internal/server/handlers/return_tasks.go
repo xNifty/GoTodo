@@ -14,8 +14,7 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 
 	// Parse "page" query parameter
 	if pageParam := r.URL.Query().Get("page"); pageParam != "" {
-		var err error
-		page, err = strconv.Atoi(pageParam)
+		page, err := strconv.Atoi(pageParam)
 		if err != nil || page < 1 {
 			page = 1
 		}
@@ -26,7 +25,7 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 	//fmt.Println("\nPage, early: ", page)
 
 	// Fetch tasks for the current page
-	tasks, totalTasks, err := tasks.ReturnPagination(page, utils.AppConstants.PageSize)
+	tasks, totalTasks, err := tasks.ReturnPagination(page, utils.AppConstants.PageSize, "")
 	if err != nil {
 		http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
 		return

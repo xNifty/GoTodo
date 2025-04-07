@@ -16,7 +16,7 @@ const (
 )
 
 func ListTasks() {
-	pool, err := storage.OpenDatabase()
+	pool, _ := storage.OpenDatabase()
 	defer storage.CloseDatabase(pool)
 
 	writer := tabwriter.NewWriter(os.Stdout, 0, 0, 4, ' ', 0)
@@ -61,7 +61,7 @@ func ListTasks() {
 }
 
 func ReturnTaskList() []Task {
-	pool, err := storage.OpenDatabase()
+	pool, _ := storage.OpenDatabase()
 	defer storage.CloseDatabase(pool)
 
 	var tasks []Task
@@ -90,7 +90,7 @@ func ReturnTaskList() []Task {
 	return tasks
 }
 
-func ReturnPagination(page, pageSize int) ([]Task, int, error) {
+func ReturnPagination(page, pageSize int, search string) ([]Task, int, error) {
 	pool, err := storage.OpenDatabase()
 	if err != nil {
 		return nil, 0, err
@@ -98,14 +98,24 @@ func ReturnPagination(page, pageSize int) ([]Task, int, error) {
 	defer storage.CloseDatabase(pool)
 
 	var tasks []Task
+
+	var query string
 	offset := (page - 1) * pageSize
-	// Fetch paginated tasks
+
+	if search == "" {
+		query = "SELECT id, title, description, completed, TO_CHAR(time_stamp, 'YYYY/MM/DD HH:MM AM') FROM tasks ORDER BY id LIMIT $1 OFFSET $2"
+	} else {
+		query = `SELECT id, title, description, completed, TO_CHAR(time_stamp, 'YYYY/MM/DD HH:MM AM') 
+			FROM tasks WHERE title ILIKE $1 OR description ILIKE $1 ORDER BY id LIMIT $2 OFFSET $3`
+	}
+
 	rows, err := pool.Query(context.Background(),
-		"SELECT id, title, description, completed, TO_CHAR(time_stamp, 'YYYY/MM/DD HH:MM AM') FROM tasks ORDER BY id LIMIT $1 OFFSET $2",
+		query,
 		pageSize, offset)
 	if err != nil {
 		return nil, 0, err
 	}
+
 	defer rows.Close()
 
 	for rows.Next() {
@@ -148,11 +158,11 @@ func SearchTasks(page, pageSize int, searchQuery string) ([]Task, int, error) {
 		 FROM tasks WHERE title ILIKE $1 OR description ILIKE $1 ORDER BY id LIMIT $2 OFFSET $3`,
 		searchQuery, pageSize, offset)
 
-	defer rows.Close()
-
 	if err != nil {
 		return nil, 0, err
 	}
+
+	defer rows.Close()
 
 	for rows.Next() {
 		var task Task

@@ -9,7 +9,7 @@ import (
 )
 
 func AddTask() {
-	pool, err := storage.OpenDatabase()
+	pool, _ := storage.OpenDatabase()
 	defer storage.CloseDatabase(pool)
 	scanner := bufio.NewScanner(os.Stdin)
 
@@ -26,7 +26,7 @@ func AddTask() {
 		return
 	}
 
-	_, err = pool.Exec(context.Background(), "INSERT INTO tasks (title, description, completed) VALUES ($1, $2, false)", title, description)
+	_, err := pool.Exec(context.Background(), "INSERT INTO tasks (title, description, completed) VALUES ($1, $2, false)", title, description)
 	if err != nil {
 		fmt.Println("Error in AddTask (prepare):", err)
 		return

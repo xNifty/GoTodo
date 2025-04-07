@@ -53,7 +53,7 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//utils.AppConstants.PageSize := 15
-	_, totalTasks, err := tasks.ReturnPagination(page, utils.AppConstants.PageSize)
+	_, totalTasks, err := tasks.ReturnPagination(page, utils.AppConstants.PageSize, "")
 	if err != nil {
 		http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -64,7 +64,7 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 
 	if page*utils.AppConstants.PageSize >= totalTasks {
 		// Last page, so add the new task to the response
-		tasks, _, err := tasks.ReturnPagination(page, utils.AppConstants.PageSize)
+		tasks, _, err := tasks.ReturnPagination(page, utils.AppConstants.PageSize, "")
 
 		if err != nil {
 			http.Error(w, "Error rendering task partial: "+err.Error(), http.StatusInternalServerError)
@@ -98,7 +98,7 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// Not on the last page; no update needed
 		// Last page, so add the new task to the response
-		tasks, _, err := tasks.ReturnPagination(page, utils.AppConstants.PageSize)
+		tasks, _, err := tasks.ReturnPagination(page, utils.AppConstants.PageSize, "")
 
 		if err != nil {
 			http.Error(w, "Error rendering task partial: "+err.Error(), http.StatusInternalServerError)
