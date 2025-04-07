@@ -140,7 +140,12 @@ func SearchTasks(page, pageSize int, searchQuery string) ([]Task, int, error) {
 	searchQuery = "%" + searchQuery + "%"
 
 	rows, err := pool.Query(context.Background(),
-		"SELECT id, title, description, completed, TO_CHAR(time_stamp, 'YYYY/MM/DD HH:MM AM') FROM tasks WHERE title ILIKE $1 OR description ILIKE $1 ORDER BY id LIMIT $2 OFFSET $3",
+		`SELECT id,
+			title, 
+			description,
+			completed, 
+			TO_CHAR(time_stamp, 'YYYY/MM/DD HH:MM AM') 
+		 FROM tasks WHERE title ILIKE $1 OR description ILIKE $1 ORDER BY id LIMIT $2 OFFSET $3`,
 		searchQuery, pageSize, offset)
 
 	defer rows.Close()
