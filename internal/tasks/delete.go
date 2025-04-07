@@ -16,11 +16,6 @@ func DeleteTask(id string) (bool, error) {
 		return false, err
 	}
 
-	if err != nil {
-		fmt.Println("Error in DeleteTask (exec):", err)
-		return false, err
-	} else {
-		fmt.Println("Task deleted")
-		return true, nil
-	}
+	fmt.Println("Task deleted")
+	return true, nil
 }
