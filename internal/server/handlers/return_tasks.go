@@ -14,7 +14,8 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 
 	// Parse "page" query parameter
 	if pageParam := r.URL.Query().Get("page"); pageParam != "" {
-		page, err := strconv.Atoi(pageParam)
+		var err error
+		page, err = strconv.Atoi(pageParam)
 		if err != nil || page < 1 {
 			page = 1
 		}
@@ -22,10 +23,8 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 		page = 1
 	}
 
-	//fmt.Println("\nPage, early: ", page)
-
 	// Fetch tasks for the current page
-	tasks, totalTasks, err := tasks.ReturnPagination(page, utils.AppConstants.PageSize, "")
+	tasks, totalTasks, err := tasks.ReturnPagination(page, pageSize)
 	if err != nil {
 		http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -51,7 +50,6 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	nextPage := page + 1
-
 	if page*pageSize >= totalTasks {
 		nextPage = page
 	}
@@ -68,7 +66,5 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 
 	if err := utils.RenderTemplate(w, "pagination.html", context); err != nil {
 		http.Error(w, "Error rendering template: "+err.Error(), http.StatusInternalServerError)
-		return
 	}
-
 }

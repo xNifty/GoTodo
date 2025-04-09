@@ -90,7 +90,7 @@ func ReturnTaskList() []Task {
 	return tasks
 }
 
-func ReturnPagination(page, pageSize int, search string) ([]Task, int, error) {
+func ReturnPagination(page, pageSize int) ([]Task, int, error) {
 	pool, err := storage.OpenDatabase()
 	if err != nil {
 		return nil, 0, err
@@ -98,24 +98,18 @@ func ReturnPagination(page, pageSize int, search string) ([]Task, int, error) {
 	defer storage.CloseDatabase(pool)
 
 	var tasks []Task
-
-	var query string
 	offset := (page - 1) * pageSize
-
-	if search == "" {
-		query = "SELECT id, title, description, completed, TO_CHAR(time_stamp, 'YYYY/MM/DD HH:MM AM') FROM tasks ORDER BY id LIMIT $1 OFFSET $2"
-	} else {
-		query = `SELECT id, title, description, completed, TO_CHAR(time_stamp, 'YYYY/MM/DD HH:MM AM') 
-			FROM tasks WHERE title ILIKE $1 OR description ILIKE $1 ORDER BY id LIMIT $2 OFFSET $3`
-	}
-
+	// Fetch paginated tasks
 	rows, err := pool.Query(context.Background(),
-		query,
+		`SELECT id, title, description, completed, 
+			TO_CHAR(time_stamp, 'YYYY/MM/DD HH:MI AM') AS date_added 
+			FROM tasks 
+			ORDER BY id 
+			LIMIT $1 OFFSET $2`,
 		pageSize, offset)
 	if err != nil {
 		return nil, 0, err
 	}
-
 	defer rows.Close()
 
 	for rows.Next() {
@@ -132,8 +126,6 @@ func ReturnPagination(page, pageSize int, search string) ([]Task, int, error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	// fmt.Println("\nTotal tasks:", totalTasks)
-	//fmt.Println("\nTasks:", tasks)
 	return tasks, totalTasks, nil
 }
 
