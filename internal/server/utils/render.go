@@ -9,7 +9,8 @@ import (
 var Templates *template.Template
 
 func InitializeTemplates() error {
-	Templates, err := template.New("").Funcs(template.FuncMap{
+	var err error
+	Templates, err = template.New("").Funcs(template.FuncMap{
 		"safeHTML": func(s string) template.HTML {
 			return template.HTML(s)
 		},

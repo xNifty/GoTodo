@@ -19,7 +19,7 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	if searchQuery != "" {
 		taskList, totalTasks, err = tasks.SearchTasks(page, pageSize, searchQuery)
 	} else {
-		taskList, totalTasks, err = tasks.ReturnPagination(page, pageSize, "")
+		taskList, totalTasks, err = tasks.ReturnPagination(page, pageSize)
 	}
 
 	if err != nil {
