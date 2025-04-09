@@ -146,8 +146,11 @@ func SearchTasks(page, pageSize int, searchQuery string) ([]Task, int, error) {
 			title, 
 			description,
 			completed, 
-			TO_CHAR(time_stamp, 'YYYY/MM/DD HH:MM AM') 
-		 FROM tasks WHERE title ILIKE $1 OR description ILIKE $1 ORDER BY id LIMIT $2 OFFSET $3`,
+			TO_CHAR(time_stamp, 'YYYY/MM/DD HH:MM AM')  as date_added
+		 FROM tasks 
+		 WHERE title ILIKE $1 OR description ILIKE $1 
+		 ORDER BY id 
+		 LIMIT $2 OFFSET $3`,
 		searchQuery, pageSize, offset)
 
 	if err != nil {
@@ -165,7 +168,11 @@ func SearchTasks(page, pageSize int, searchQuery string) ([]Task, int, error) {
 	}
 
 	var totalTasks int
-	err = pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE title ILIKE $1 OR description ILIKE $1", searchQuery).Scan(&totalTasks)
+	err = pool.QueryRow(context.Background(),
+		`SELECT COUNT(*) 
+			FROM tasks 
+			WHERE title ILIKE $1 OR description ILIKE $1`,
+		searchQuery).Scan(&totalTasks)
 
 	if err != nil {
 		return nil, 0, err
