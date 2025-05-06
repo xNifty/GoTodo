@@ -174,20 +174,11 @@ textarea {
     width: 400px;
     background-color: #f8f9fa;
     box-shadow: -2px 0 5px rgba(0, 0, 0, 0.2);
-    transition: right 0.3s ease;
+    transition: right 0.3s ease; /* Smooth slide-in transition */
     z-index: 1040;
     overflow-y: auto;
 }
 
 #sidebar.active {
     right: 0; /* Slide into view when active */
-}
-
-#sidebar .sidebar-header {
-    padding: 1.5rem;
-    border-bottom: 1px solid #ddd;
-}
-
-#sidebar .sidebar-body {
-    padding: 1rem;
 }
