@@ -1,67 +1,161 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>{{.Title}}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="public/css/site.css">
-</head>
-<body>
-  
-    {{template "navbar.html" .}}
+    <head>
+        <meta charset="UTF-8" />
+        <title>{{.Title}}</title>
+        <link
+            href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="public/css/site.css" />
+        <style>
+            /* Sidebar Pop-Out Styling */
+            #sidebar {
+                position: fixed;
+                top: 0;
+                right: -400px; /* Hidden off-screen by default */
+                height: 100%;
+                width: 400px;
+                background-color: #f8f9fa;
+                box-shadow: -2px 0 5px rgba(0, 0, 0, 0.2);
+                transition: right 0.3s ease;
+                z-index: 1040;
+                overflow-y: auto;
+            }
+            #sidebar.active {
+                right: 0; /* Slide into view when active */
+            }
+            #sidebar .sidebar-header {
+                padding: 1.5rem;
+                border-bottom: 1px solid #ddd;
+            }
+            #sidebar .sidebar-body {
+                padding: 1rem;
+            }
+        </style>
+    </head>
+    <body>
+        {{template "navbar.html" .}}
 
-    <!-- Status Message -->
-    <div id="status" class="container mt-3 hidden" style="background-color: #d4edda; color: #155724; padding: 10px; margin-bottom: 10px; border: 1px solid #c3e6cb; display: none;"></div>
+        <div
+            id="status"
+            class="container mt-3 hidden"
+            style="
+                background-color: #d4edda;
+                color: #155724;
+                padding: 10px;
+                margin-bottom: 10px;
+                border: 1px solid #c3e6cb;
+                display: none;
+            "
+        ></div>
 
-    <div class="container mt-3">
-        <form id="search-form" class="row g-3" hx-post="/search" hx-target="#task-container" hx-swap="innerHTML">
-            <div class="col-auto">
-                <input type="search" id="search" name="search" class="form-control" placeholder="Search" value="{{.SearchQuery}}">
+        <div class="container mt-3">
+            <form
+                id="search-form"
+                class="row g-3"
+                hx-post="/search"
+                hx-target="#task-container"
+                hx-swap="innerHTML"
+            >
+                <div class="col-auto">
+                    <input
+                        type="search"
+                        id="search"
+                        name="search"
+                        class="form-control"
+                        placeholder="Search"
+                        value="{{.SearchQuery}}"
+                    />
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary">
+                        Search
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div id="task-container" class="container">
+            {{template "pagination.html" .}}
+        </div>
+
+        <!-- Sidebar Pop-Out -->
+        <div id="sidebar">
+            <div class="sidebar-header">
+                <button
+                    type="button"
+                    class="btn-close float-end"
+                    id="closeSidebar"
+                ></button>
+                <h5>Add Task</h5>
             </div>
-            <div class="col-auto">
-                <button type="submit" class="btn btn-primary">Search</button>
-            </div>
-        </form>
-    </div>
-    
-    <div id="task-container" class="container">
-        {{template "pagination.html" .}}
-    </div>
-
- 
-    <!-- Modal -->
-    <div id="modal" class="modal fade" tabindex="-1" role="dialog">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <!-- Modal content dynamically loaded -->
+            <div class="sidebar-body">
+                <form
+                    hx-post="/api/add-task"
+                    hx-include="#newTaskForm"
+                    method="post"
+                    id="newTaskForm"
+                    enctype="multipart/form-data"
+                    hx-target="#task-container"
+                    hx-swap="innerHTML"
+                >
+                    <div class="form-group">
+                        <label for="title">Title:</label>
+                        <input
+                            type="text"
+                            id="title"
+                            name="title"
+                            class="form-control"
+                            required
+                        />
+                    </div>
+                    <div class="form-group">
+                        <label for="description">Description:</label>
+                        <textarea
+                            id="description"
+                            name="description"
+                            class="form-control"
+                            maxlength="100"
+                        ></textarea>
+                        <small class="form-hint">Max 100 Characters</small>
+                    </div>
+                    <input
+                        type="hidden"
+                        name="currentPage"
+                        value="{{.CurrentPage}}"
+                    />
+                    <button type="submit" class="btn btn-primary w-100 mt-3">
+                        Add Task
+                    </button>
+                </form>
             </div>
         </div>
-    </div>
 
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.min.js"></script> 
+        <!-- Bootstrap JS -->
+        <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.min.js"></script>
 
-    <!-- HTMX -->
-    <script src="https://unpkg.com/htmx.org@2.0.3"></script>
+        <!-- HTMX -->
+        <script src="https://unpkg.com/htmx.org@2.0.3"></script>
 
-    <script src="/public/js/site.js"></script>
+        <script src="/public/js/site.js"></script>
 
-    <script>
-        // Fade out feedback messages after 5 seconds
-        document.body.addEventListener('htmx:afterSwap', (event) => {
-            if (event.target.id === 'status') {
-                setTimeout(() => {
-                    event.target.style.display = 'none';
-                }, 5000);
-            }
-        });
+        <script>
+            // Fade out feedback messages after 5 seconds
+            document.body.addEventListener("htmx:afterSwap", (event) => {
+                if (event.target.id === "status") {
+                    setTimeout(() => {
+                        event.target.style.display = "none";
+                    }, 5000);
+                }
+            });
 
-        // Clear form after submitting
-        document.body.addEventListener("task-added", (event) => {
-            document.getElementById("title").value = "";
-            document.getElementById("description").value = "";
-        });
-    </script>
-</body>
+            // Clear form after submitting
+            document.body.addEventListener("task-added", (event) => {
+                document.getElementById("title").value = "";
+                document.getElementById("description").value = "";
+            });
+        </script>
+    </body>
 </html>

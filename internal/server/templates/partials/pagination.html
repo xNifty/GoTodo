@@ -12,73 +12,21 @@
                 </tr>
             </thead>
             <tbody id="task-list">
-                {{range .Tasks}}
-                    {{template "todo.html" .}}
-                {{else}}
-                    <tr>
-                        <td colspan="5" class="text-center">No tasks available</td>
-                    </tr>
+                {{range .Tasks}} {{template "todo.html" .}} {{else}}
+                <tr>
+                    <td colspan="5" class="text-center">No tasks available</td>
+                </tr>
                 {{end}}
             </tbody>
         </table>
 
-        <!-- Pagination Controls -->
-        <div class="pagination d-flex justify-content-between">
-            <button 
-                hx-get="/api/fetch-tasks?page={{.PreviousPage}}" 
-                hx-target="#task-container" 
-                hx-swap="innerHTML" 
-                class="btn btn-secondary"
-                {{.PrevDisabled}}>
-                Previous
-            </button>
-            <button 
-                hx-get="/api/fetch-tasks?page={{.NextPage}}" 
-                hx-target="#task-container" 
-                hx-swap="innerHTML" 
-                class="btn btn-secondary"
-                {{.NextDisabled}}>
-                Next
-            </button>
-        </div>
-
+        <!-- Add Task Button -->
         <div class="row justify-content-center mt-5">
             <div class="col-lg-10">
-                <div class="card w-100">
-                    <div class="card-header" id="headingAddTask">
-                        <button class="btn btn-link text-danger" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAddTask" aria-expanded="false" aria-controls="collapseAddTask">
-                            + Add Task
-                        </button>
-                    </div>
-                    <div id="collapseAddTask" class="collapse" aria-labelledby="headingAddTask" data-parent="#add-task-container">
-                        <div class="card-body">
-                            <form
-                                hx-post="/api/add-task"
-                                hx-include="#newTaskForm"
-                                method="post"
-                                id="newTaskForm"
-                                enctype="multipart/form-data"
-                                hx-target="#task-container"
-                                hx-swap="innerHTML">
-                                <div class="form-group">
-                                    <label for="title">Title:</label>
-                                    <input type="text" id="title" name="title" class="form-control" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="description">Description:</label>
-                                    <textarea id="description" name="description" class="form-control" maxlength="100"></textarea>
-                                    <small class="form-hint">Max 100 Characters</small>
-                                </div>
-                                <!-- Hidden CurrentPage field -->
-                                <input type="hidden" name="currentPage" value="{{.CurrentPage}}" />
-
-                                <button type="submit" class="btn btn-primary w-100">Add Task</button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
+                <button class="btn btn-success w-100" id="openSidebar">
+                    + Add Task
+                </button>
             </div>
         </div>
     </div>
 </div>
-

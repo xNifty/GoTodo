@@ -5,6 +5,7 @@ import (
 	"GoTodo/internal/tasks"
 	"net/http"
 	"regexp"
+	"strconv"
 )
 
 func HomeHandler(w http.ResponseWriter, r *http.Request) {
@@ -74,12 +75,22 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func SearchHandler(w http.ResponseWriter, r *http.Request) {
+	pageSize := utils.AppConstants.PageSize
+	var page int
+
+	if pageParam := r.URL.Query().Get("page"); pageParam != "" {
+		var err error
+		page, err = strconv.Atoi(pageParam)
+		if err != nil || page < 1 {
+			page = 1
+		}
+	} else {
+		page = 1
+	}
+
 	searchQuery := r.FormValue("search")
 
-	page := 1
-	pageSize := utils.AppConstants.PageSize
-
-	taskList, _, err := tasks.SearchTasks(page, pageSize, searchQuery)
+	taskList, totalResults, err := tasks.SearchTasks(page, pageSize, searchQuery)
 	if err != nil {
 		http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -92,9 +103,25 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	prevDisabled := ""
+	if page == 1 {
+		prevDisabled = "disabled"
+	}
+
+	nextDisabled := ""
+	if page*pageSize >= totalResults {
+		nextDisabled = "disabled"
+	}
+
 	context := map[string]interface{}{
-		"Tasks":       taskList,
-		"SearchQuery": searchQuery,
+		"Tasks":        taskList,
+		"TotalResults": totalResults,
+		"SearchQuery":  searchQuery,
+		"PreviousPage": page - 1,
+		"NextPage":     page + 1,
+		"CurrentPage":  page,
+		"PrevDisabled": prevDisabled,
+		"NextDisabled": nextDisabled,
 	}
 
 	if err := utils.RenderTemplate(w, "pagination.html", context); err != nil {

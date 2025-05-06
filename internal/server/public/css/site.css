@@ -1,8 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Fira+Code:wght@400&display=swap");
 
 /* Body styles */
 body {
-    font-family: 'Fira Code', monospace; /* Custom font */
+    font-family: "Fira Code", monospace; /* Custom font */
     background-color: #f8f9fa; /* Keep Bootstrap's light gray background */
     line-height: 1.6; /* Matches Bootstrap's default */
 }
@@ -34,7 +34,8 @@ tbody tr:hover {
     background-color: #e9ecef; /* Matches Bootstrap's hover styles */
 }
 
-td, th {
+td,
+th {
     padding: 12px 15px;
     text-align: left; /* Ensures left alignment for all content */
     word-wrap: break-word;
@@ -143,7 +144,11 @@ textarea {
 
 /* Button styles */
 .btn-gradient {
-    background: linear-gradient(45deg, #007bff, #0056b3); /* Matches Bootstrap primary gradient */
+    background: linear-gradient(
+        45deg,
+        #007bff,
+        #0056b3
+    ); /* Matches Bootstrap primary gradient */
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
@@ -160,3 +165,19 @@ textarea {
     transition: height 0.3s ease-out;
 }
 
+/* Sidebar Pop-Out */
+#sidebar {
+    position: fixed;
+    top: 0;
+    right: -400px; /* Hidden off-screen by default */
+    height: 100%;
+    width: 400px;
+    background-color: #f8f9fa;
+    box-shadow: -2px 0 5px rgba(0, 0, 0, 0.2);
+    transition: right 0.3s ease;
+    z-index: 1040;
+    overflow-y: auto;
+}
+#sidebar.active {
+    right: 0; /* Slide into view */
+}
