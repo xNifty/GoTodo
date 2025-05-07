@@ -53,4 +53,19 @@ document.addEventListener("DOMContentLoaded", () => {
       closeSidebar();
     });
   }
+
+  const modalElement = document.getElementById("modal");
+
+  if (modalElement) {
+    modalElement.addEventListener("hide.bs.modal", () => {
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+    });
+
+    // Optional: Set aria-hidden to true when the modal is hidden (if necessary)
+    modalElement.addEventListener("hidden.bs.modal", () => {
+      modalElement.setAttribute("aria-hidden", "true");
+    });
+  }
 });

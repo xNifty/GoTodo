@@ -11,7 +11,7 @@ import (
 )
 
 func APIAddTask(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("Request method: ", r.Method)
+	// fmt.Println("Request method: ", r.Method)
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
