@@ -9,13 +9,20 @@
     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
     <button 
         class="btn btn-danger" 
-        hx-delete="/api/delete-task?id={{.ID}}" 
-        hx-target="#task-{{.ID}}"  
-        hx-swap="outerHTML" 
+        hx-delete="/api/delete-task?id={{.ID}}&page={{.CurrentPage}}" 
+        hx-target="#task-{{.ID}}"
+        hx-swap="delete"
         data-bs-dismiss="modal"
     >
         Yes, Delete
     </button>
+</div>
+
+<div id="task-list"
+    hx-get="/api/get-next-item?page={{.CurrentPage}}"
+    hx-trigger="taskDeleted from:body"
+    hx-target="#task-list"
+    hx-swap="beforeend">
 </div>
 
 

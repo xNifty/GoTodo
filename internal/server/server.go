@@ -5,6 +5,7 @@ import (
 	"GoTodo/internal/server/handlers"
 	"GoTodo/internal/server/utils"
 	"fmt"
+
 	// "html/template"
 	"net/http"
 )
@@ -13,11 +14,10 @@ import (
 // TODO:: Add a favicon
 func doNothing(w http.ResponseWriter, r *http.Request) {}
 
-func StartServer() {
+func StartServer() error {
 	err := utils.InitializeTemplates()
 	if err != nil {
-		fmt.Println("Failed to initialize templates:", err)
-		return
+		return fmt.Errorf("failed to initialize templates: %v", err)
 	}
 
 	fs := http.FileServer(http.Dir("internal/server/public"))
@@ -29,9 +29,11 @@ func StartServer() {
 	http.HandleFunc("/api/add-task", handlers.APIAddTask)
 	http.HandleFunc("/api/confirm", handlers.APIConfirmDelete)
 	http.HandleFunc("/api/delete-task", handlers.APIDeleteTask)
+	http.HandleFunc("/api/get-next-item", handlers.APIGetNextItem)
 	http.HandleFunc("/api/update-status", handlers.APIUpdateTaskStatus)
 	http.HandleFunc("/about", handlers.AboutHandler)
 	http.HandleFunc("/search", handlers.SearchHandler)
+
 	fmt.Println("Starting server on :8080")
-	http.ListenAndServe(":8080", nil)
+	return http.ListenAndServe(":8080", nil)
 }

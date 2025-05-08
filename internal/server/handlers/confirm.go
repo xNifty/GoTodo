@@ -12,6 +12,11 @@ func APIConfirmDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	page := r.URL.Query().Get("page")
+	if page == "" {
+		page = "1"
+	}
+
 	modalTemplate, err := template.ParseFiles("internal/server/templates/partials/confirm.html")
 	if err != nil {
 		http.Error(w, "Error loading template", http.StatusInternalServerError)
@@ -19,9 +24,11 @@ func APIConfirmDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := struct {
-		ID string
+		ID          string
+		CurrentPage string
 	}{
-		ID: id,
+		ID:          id,
+		CurrentPage: page,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

@@ -11,6 +11,7 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 	pageSize := utils.AppConstants.PageSize
 
 	var page int
+	searchQuery := r.URL.Query().Get("search")
 
 	// Parse "page" query parameter
 	if pageParam := r.URL.Query().Get("page"); pageParam != "" {
@@ -24,10 +25,28 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch tasks for the current page
-	tasks, totalTasks, err := tasks.ReturnPagination(page, pageSize)
-	if err != nil {
-		http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
-		return
+	var taskList []tasks.Task
+	var totalTasks int
+	var err error
+
+	if searchQuery != "" {
+		taskList, totalTasks, err = tasks.SearchTasks(page, pageSize, searchQuery)
+		if err != nil {
+			http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Highlight search matches
+		for i, task := range taskList {
+			taskList[i].Title = highlightMatches(task.Title, searchQuery)
+			taskList[i].Description = highlightMatches(task.Description, searchQuery)
+		}
+	} else {
+		taskList, totalTasks, err = tasks.ReturnPagination(page, pageSize)
+		if err != nil {
+			http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// Calculate pagination button states
@@ -56,12 +75,13 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 
 	// Create a context for the tasks and pagination
 	context := map[string]interface{}{
-		"Tasks":        tasks,
+		"Tasks":        taskList,
 		"PreviousPage": prevPage,
 		"NextPage":     nextPage,
 		"CurrentPage":  page,
 		"PrevDisabled": prevDisabled,
 		"NextDisabled": nextDisabled,
+		"SearchQuery":  searchQuery,
 	}
 
 	if err := utils.RenderTemplate(w, "pagination.html", context); err != nil {

@@ -11,6 +11,7 @@ type Task struct {
 	Description string
 	Completed   bool
 	DateAdded   string
+	Page        int
 }
 
 type TaskManager struct {

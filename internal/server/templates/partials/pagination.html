@@ -23,7 +23,7 @@
         <!-- Pagination Controls -->
         <div class="pagination d-flex justify-content-between">
             <button
-                hx-get="/api/fetch-tasks?page={{.PreviousPage}}"
+                hx-get="/api/fetch-tasks?page={{.PreviousPage}}&search={{.SearchQuery}}"
                 hx-target="#task-container"
                 hx-swap="innerHTML"
                 class="btn btn-secondary"
@@ -32,7 +32,7 @@
                 Previous
             </button>
             <button
-                hx-get="/api/fetch-tasks?page={{.NextPage}}"
+                hx-get="/api/fetch-tasks?page={{.NextPage}}&search={{.SearchQuery}}"
                 hx-target="#task-container"
                 hx-swap="innerHTML"
                 class="btn btn-secondary"

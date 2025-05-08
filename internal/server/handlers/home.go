@@ -24,6 +24,9 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
+		if w.Header().Get("Content-Type") == "" {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		}
 		http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -33,6 +36,11 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 			taskList[i].Title = highlightMatches(task.Title, searchQuery)
 			taskList[i].Description = highlightMatches(task.Description, searchQuery)
 		}
+	}
+
+	// Set the page number for each task
+	for i := range taskList {
+		taskList[i].Page = page
 	}
 
 	// Calculate pagination button states
@@ -45,9 +53,6 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	if page*pageSize >= totalTasks {
 		nextDisabled = "disabled" // Disable if next page is unavailable
 	}
-
-	// Set response header
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
 	prevPage := page - 1
 	if prevPage < 1 {
@@ -68,10 +73,12 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Render the tasks and pagination controls
 	if err := utils.RenderTemplate(w, "index.html", context); err != nil {
+		if w.Header().Get("Content-Type") == "" {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		}
 		http.Error(w, "Error rendering template: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-
 }
 
 func SearchHandler(w http.ResponseWriter, r *http.Request) {
@@ -92,6 +99,9 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 
 	taskList, totalResults, err := tasks.SearchTasks(page, pageSize, searchQuery)
 	if err != nil {
+		if w.Header().Get("Content-Type") == "" {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		}
 		http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -101,6 +111,11 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 			taskList[i].Title = highlightMatches(task.Title, searchQuery)
 			taskList[i].Description = highlightMatches(task.Description, searchQuery)
 		}
+	}
+
+	// Set the page number for each task
+	for i := range taskList {
+		taskList[i].Page = page
 	}
 
 	prevDisabled := ""
@@ -125,6 +140,9 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := utils.RenderTemplate(w, "pagination.html", context); err != nil {
+		if w.Header().Get("Content-Type") == "" {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		}
 		http.Error(w, "Error rendering template: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
