@@ -49,6 +49,11 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Set the Page field for each task
+	for i := range taskList {
+		taskList[i].Page = page
+	}
+
 	// Calculate pagination button states
 	prevDisabled := ""
 	if page == 1 {

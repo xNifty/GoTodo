@@ -15,7 +15,7 @@
     </td>
     <td>
         <button 
-            hx-delete="/api/confirm?id={{.ID}}&page={{.Page}}"
+            hx-get="/api/confirm?id={{.ID}}&page={{.Page}}"
             hx-target="#modal .modal-content"
             hx-trigger="click"
             data-bs-toggle="modal"
