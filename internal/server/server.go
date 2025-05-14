@@ -1,16 +1,13 @@
 package server
 
 import (
-	//"GoTodo/internal/storage"
 	"GoTodo/internal/server/handlers"
 	"GoTodo/internal/server/utils"
 	"fmt"
-
-	// "html/template"
 	"net/http"
 )
 
-// Literally just used to prevent favicon.ico from being requestedi
+// Literally just used to prevent favicon.ico from being requested
 // TODO:: Add a favicon
 func doNothing(w http.ResponseWriter, r *http.Request) {}
 
