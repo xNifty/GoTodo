@@ -517,3 +517,17 @@ textarea {
 [data-theme="dark"] .table > tbody > tr > th * {
     color: var(--text-color) !important;
 }
+
+mark {
+    background-color: #ffe066;
+    color: #212529;
+    padding: 0 0.15em;
+    border-radius: 0.2em;
+}
+
+[data-theme="dark"] mark {
+    background-color: #ffd43b;
+    color: #222;
+    padding: 0 0.15em;
+    border-radius: 0.2em;
+}

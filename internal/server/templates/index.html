@@ -49,25 +49,30 @@
         ></div>
 
         <div class="container mt-3 rounded p-3">
-            <form
-                id="search-form"
-                class="d-flex gap-2 mb-4"
-                hx-post="/search"
-                hx-target="#task-container"
-                hx-swap="innerHTML"
-            >
-                <input
-                    type="search"
-                    id="search"
-                    name="search"
-                    class="form-control search-input"
-                    placeholder="Search tasks..."
-                    value="{{.SearchQuery}}"
-                />
-                <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-search"></i>
+            <div class="d-flex justify-content-between mb-4">
+                <form
+                    id="search-form"
+                    class="d-flex gap-2"
+                    hx-post="/search"
+                    hx-target="#task-container"
+                    hx-swap="innerHTML"
+                >
+                    <input
+                        type="search"
+                        id="search"
+                        name="search"
+                        class="form-control search-input"
+                        placeholder="Search tasks..."
+                        value="{{.SearchQuery}}"
+                    />
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </form>
+                <button class="btn btn-success" id="openSidebar">
+                    <i class="bi bi-plus-lg"></i> Add Task
                 </button>
-            </form>
+            </div>
         </div>
 
         <div id="task-container" class="container">
