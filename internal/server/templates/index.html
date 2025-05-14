@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
     <head>
         <meta charset="UTF-8" />
         <title>{{.Title}}</title>
@@ -17,8 +17,6 @@
                 right: -400px; /* Hidden off-screen by default */
                 height: 100%;
                 width: 400px;
-                background-color: #f8f9fa;
-                box-shadow: -2px 0 5px rgba(0, 0, 0, 0.2);
                 transition: right 0.3s ease;
                 z-index: 1040;
                 overflow-y: auto;
@@ -46,18 +44,11 @@
 
         <div
             id="status"
-            class="container mt-3 hidden"
-            style="
-                background-color: #d4edda;
-                color: #155724;
-                padding: 10px;
-                margin-bottom: 10px;
-                border: 1px solid #c3e6cb;
-                display: none;
-            "
+            class="container mt-3 hidden status-notification"
+            style="display: none;"
         ></div>
 
-        <div class="container mt-3">
+        <div class="container mt-3 rounded p-3">
             <form
                 id="search-form"
                 class="d-flex gap-2 mb-4"
@@ -69,7 +60,7 @@
                     type="search"
                     id="search"
                     name="search"
-                    class="form-control"
+                    class="form-control search-input"
                     placeholder="Search tasks..."
                     value="{{.SearchQuery}}"
                 />

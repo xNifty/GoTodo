@@ -1,6 +1,44 @@
 document.addEventListener("DOMContentLoaded", () => {
   let sidebar = document.getElementById("sidebar");
 
+  // Theme toggle functionality
+  function initTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    const themeToggle = document.getElementById('theme-toggle');
+    
+    if (savedTheme === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      if (themeToggle) themeToggle.classList.add('active');
+    } else {
+      document.documentElement.setAttribute('data-theme', 'light');
+      if (themeToggle) themeToggle.classList.remove('active');
+    }
+  }
+
+  function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+    const themeToggle = document.getElementById('theme-toggle');
+    
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    
+    if (newTheme === 'dark') {
+      if (themeToggle) themeToggle.classList.add('active');
+    } else {
+      if (themeToggle) themeToggle.classList.remove('active');
+    }
+  }
+  
+  // Initialize theme on page load
+  initTheme();
+  
+  // Set up theme toggle event listener
+  const themeToggle = document.getElementById('theme-toggle');
+  if (themeToggle) {
+    themeToggle.addEventListener('click', toggleTheme);
+  }
+
   function openSidebar() {
     sidebar = document.getElementById("sidebar"); // Refetch in case HTMX replaced this element
     if (sidebar) {
@@ -27,6 +65,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (closeSidebarBtn) {
       closeSidebarBtn.removeEventListener("click", closeSidebar); // Prevent duplicate bindings
       closeSidebarBtn.addEventListener("click", closeSidebar);
+    }
+    
+    // Reattach theme toggle if needed
+    const themeToggle = document.getElementById('theme-toggle');
+    if (themeToggle) {
+      themeToggle.removeEventListener('click', toggleTheme);
+      themeToggle.addEventListener('click', toggleTheme);
     }
   }
 
