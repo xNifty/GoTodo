@@ -3,10 +3,12 @@ package storage
 import (
 	"context"
 	"fmt"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/joho/godotenv"
 	"log"
 	"os"
+	"strings"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
 )
 
 const (
@@ -117,4 +119,36 @@ func DeleteAllTasks() {
 	} else {
 		fmt.Println("Deletion cancelled.")
 	}
+}
+
+func CreateTable(tableName string, columns []string) error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return fmt.Errorf("failed to open database: %v", err)
+	}
+	defer CloseDatabase(pool)
+
+	query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (%s)", tableName, strings.Join(columns, ", "))
+
+	_, err = pool.Exec(context.Background(), query)
+	if err != nil {
+		return fmt.Errorf("failed to create table %s: %v", tableName, err)
+	}
+
+	fmt.Printf("Table %s created successfully\n", tableName)
+	return nil
+}
+
+// CreateUsersTable creates the users table with predefined columns
+func CreateUsersTable() error {
+	columns := []string{
+		"id SERIAL PRIMARY KEY",
+		"email VARCHAR(255) UNIQUE NOT NULL",
+		"password VARCHAR(255) NOT NULL",
+		"role_id INTEGER NOT NULL",
+		"created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+		"updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+	}
+
+	return CreateTable("users", columns)
 }
