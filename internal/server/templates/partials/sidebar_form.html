@@ -1,0 +1,43 @@
+<form
+    hx-post="/api/add-task"
+    hx-include="#newTaskForm"
+    method="post"
+    id="newTaskForm"
+    enctype="multipart/form-data"
+    hx-target="#task-container"
+    hx-swap="innerHTML"
+>
+    <div class="form-group">
+        <label for="title">Title:</label>
+        <input
+            type="text"
+            id="title"
+            name="title"
+            class="form-control"
+            required
+            value="{{.Title}}"
+        />
+    </div>
+    <div class="form-group">
+        <label for="description">Description:</label>
+        <textarea
+            id="description"
+            name="description"
+            class="form-control"
+            maxlength="100"
+        >{{.Description}}</textarea>
+        <div class="d-flex justify-content-between align-items-center mt-1">
+            <small class="form-hint">Max 100 Characters</small>
+            <small class="text-muted"><span id="char-count">{{if .Description}}{{len .Description}}{{else}}0{{end}}</span>/100</small>
+        </div>
+        {{if .Error}}
+        <div id="description-error" class="invalid-feedback d-block">{{.Error}}</div>
+        {{else}}
+        <div id="description-error" class="invalid-feedback d-block"></div>
+        {{end}}
+    </div>
+    <input type="hidden" name="currentPage" value="{{.CurrentPage}}" />
+    <button type="submit" class="btn btn-primary w-100 mt-3">
+        Add Task
+    </button>
+</form> 

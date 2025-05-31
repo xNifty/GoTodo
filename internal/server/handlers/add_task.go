@@ -10,6 +10,8 @@ import (
 	"strconv"
 )
 
+const MaxDescriptionLength = 100
+
 func APIAddTask(w http.ResponseWriter, r *http.Request) {
 	// fmt.Println("Request method: ", r.Method)
 	if r.Method != http.MethodPost {
@@ -26,10 +28,22 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 		page = 1 // Default to page 1 if no valid page is provided
 	}
 
-	// fmt.Println("Page: ", page)
+	// Validate description length
+	if len(description) > MaxDescriptionLength {
+		// On validation failure, return a 200 status with the error message
+		// and use HX-Retarget and HX-Reswap to update the error div specifically
+		w.Header().Set("HX-Trigger", "description-error")   // Keep trigger for potential JS handling
+		w.Header().Set("HX-Retarget", "#description-error") // Target the specific error div
+		w.Header().Set("HX-Reswap", "innerHTML")            // Swap the content inside the error div
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, "Description must be %d characters or less", MaxDescriptionLength) // The content to swap
+		return
+	}
 
 	if title == "" {
-		w.WriteHeader(http.StatusBadRequest)
+		// Handle empty title error - maybe similar HX-Retarget for title error div?
+		// For now, just return bad request
+		http.Error(w, "Title is required", http.StatusBadRequest)
 		return
 	}
 
@@ -50,84 +64,56 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//utils.AppConstants.PageSize := 15
-	_, totalTasks, err := tasks.ReturnPagination(page, utils.AppConstants.PageSize)
+	// After successful insertion, render the updated task list (pagination.html)
+	pageSize := utils.AppConstants.PageSize
+	// We might need the total tasks and tasks for the current page here to render pagination correctly
+
+	// Fetch tasks for the current page again to get the updated list
+	taskList, totalTasks, err := tasks.ReturnPagination(page, pageSize)
 	if err != nil {
-		http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Error fetching tasks after add: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("HX-Trigger", "task-added")
-
-	if page*utils.AppConstants.PageSize >= totalTasks {
-		// Last page, so add the new task to the response
-		tasks, _, err := tasks.ReturnPagination(page, utils.AppConstants.PageSize)
-
-		if err != nil {
-			http.Error(w, "Error rendering task partial: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-		prevDisabled := ""
-		if page == 1 {
-			prevDisabled = "disabled" // Disable on the first page
-		}
-		prevPage := page - 1
-		if prevPage < 1 {
-			prevPage = 1
-		}
-		// Render just the new task
-		context := map[string]interface{}{
-			"Tasks":        tasks,
-			"PreviousPage": prevPage,
-			"NextPage":     page,
-			"CurrentPage":  page,
-			"PrevDisabled": prevDisabled,
-			"NextDisabled": "disabled",
-		}
-
-		err = utils.RenderTemplate(w, "pagination.html", context)
-		if err != nil {
-			fmt.Println("Error executing task partial: ", err)
-			http.Error(w, "Error executing task partial: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-	} else {
-		// Not on the last page; no update needed
-		// Last page, so add the new task to the response
-		tasks, _, err := tasks.ReturnPagination(page, utils.AppConstants.PageSize)
-
-		if err != nil {
-			http.Error(w, "Error rendering task partial: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-		prevDisabled := ""
-		if page == 1 {
-			prevDisabled = "disabled" // Disable on the first page
-		}
-
-		prevPage := page - 1
-		if prevPage < 1 {
-			prevPage = 1
-		}
-		// Render just the new task
-		context := map[string]interface{}{
-			"Tasks":        tasks,
-			"PreviousPage": prevPage,
-			"NextPage":     page + 1,
-			"CurrentPage":  page,
-			"PrevDisabled": prevDisabled,
-			"NextDisabled": "",
-		}
-
-		err = utils.RenderTemplate(w, "pagination.html", context)
-		if err != nil {
-			fmt.Println("Error executing task partial: ", err)
-			http.Error(w, "Error executing task partial: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		fmt.Println("New page is now added")
+	// Calculate pagination button states based on new totalTasks
+	prevDisabled := ""
+	if page == 1 {
+		prevDisabled = "disabled"
 	}
+
+	nextDisabled := ""
+	if page*pageSize >= totalTasks {
+		nextDisabled = "disabled"
+	}
+
+	prevPage := page - 1
+	if prevPage < 1 {
+		prevPage = 1
+	}
+
+	nextPage := page + 1
+
+	// Create a context for rendering pagination.html
+	context := map[string]interface{}{
+		"Tasks":        taskList,
+		"PreviousPage": prevPage,
+		"NextPage":     nextPage,
+		"CurrentPage":  page,
+		"PrevDisabled": prevDisabled,
+		"NextDisabled": nextDisabled,
+		// Assuming SearchQuery might need to be preserved, pass it if available
+		// "SearchQuery":  r.FormValue("search"), // Need to get search query from form if needed
+	}
+
+	// Set headers for successful addition
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("HX-Trigger", "task-added") // Signal JS to close sidebar and clear form
+
+	// Render the updated task list into the main task-container
+	if err := utils.RenderTemplate(w, "pagination.html", context); err != nil {
+		http.Error(w, "Error rendering tasks after add: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Success response (HTMX will handle the swap due to hx-target and hx-swap on the form)
 }
