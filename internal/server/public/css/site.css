@@ -69,12 +69,17 @@ thead th {
     font-weight: bold; /* Matches Bootstrap table head font weight */
 }
 
+tbody tr {
+    transition: background-color var(--transition-time), color var(--transition-time);
+}
+
 tbody tr:nth-child(even) {
     background-color: var(--table-row-even);
 }
 
 tbody tr:hover {
     background-color: var(--table-row-hover);
+    cursor: pointer; /* Indicate interactivity */
 }
 
 td,
@@ -84,7 +89,10 @@ th {
     word-wrap: break-word;
     overflow-wrap: break-word;
     white-space: normal;
+    border-bottom: 1px solid var(--box-border); /* Add bottom border to cells */
+    transition: background-color var(--transition-time), color var(--transition-time), border-color var(--transition-time);
 }
+
 th.description-column {
     max-width: 25em;
     /*width: 25em;*/
@@ -530,4 +538,34 @@ mark {
     color: #222;
     padding: 0 0.15em;
     border-radius: 0.2em;
+}
+
+/* Ensure borders within the table adapt to dark mode */
+[data-theme="dark"] td,
+[data-theme="dark"] th {
+    border-bottom: 1px solid var(--box-border);
+}
+
+[data-theme="dark"] .table-bordered,
+[data-theme="dark"] .table-bordered th,
+[data-theme="dark"] .table-bordered td {
+    border-color: var(--box-border);
+}
+
+/* Enhance hover for buttons */
+.btn {
+    transition: background-color var(--transition-time), color var(--transition-time), border-color var(--transition-time), box-shadow var(--transition-time);
+}
+
+.btn-outline-primary:hover:not([disabled]) {
+     box-shadow: 0 2px 5px rgba(0, 123, 255, 0.3); /* Add subtle shadow on hover */
+}
+
+[data-theme="dark"] .btn-outline-primary:hover:not([disabled]) {
+     box-shadow: 0 2px 5px rgba(13, 110, 253, 0.4); /* Dark mode shadow */
+}
+
+/* Add transition to links */
+a {
+    transition: color var(--transition-time);
 }
