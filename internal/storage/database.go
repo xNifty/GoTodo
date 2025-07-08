@@ -152,3 +152,25 @@ func CreateUsersTable() error {
 
 	return CreateTable("users", columns)
 }
+
+// MigrateTasksTable adds a user_id column and a foreign key constraint to the tasks table
+func MigrateTasksTable() error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return fmt.Errorf("failed to open database: %v", err)
+	}
+	defer CloseDatabase(pool)
+
+	// Add user_id column
+	_, err = pool.Exec(context.Background(), "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS user_id INTEGER")
+	if err != nil {
+		return fmt.Errorf("failed to add user_id column to tasks table: %v", err)
+	}
+
+	// Add foreign key constraint
+	_, err = pool.Exec(context.Background(), "ALTER TABLE tasks ADD CONSTRAINT fk_tasks_users FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE")
+	if err != nil {
+		return fmt.Errorf("failed to add foreign key constraint to tasks table: %v", err)
+	}
+	return nil
+}

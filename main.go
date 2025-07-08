@@ -13,6 +13,7 @@ func main() {
 	storage.AddColumns()
 	storage.RemoveColumns()
 	storage.CreateUsersTable()
+	storage.MigrateTasksTable()
 	*/
 
 	server.StartServer()
