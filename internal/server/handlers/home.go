@@ -43,32 +43,16 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 		taskList[i].Page = page
 	}
 
-	// Calculate pagination button states
-	prevDisabled := ""
-	if page == 1 {
-		prevDisabled = "disabled" // Disable on the first page
-	}
-
-	nextDisabled := ""
-	if page*pageSize >= totalTasks {
-		nextDisabled = "disabled" // Disable if next page is unavailable
-	}
-
-	prevPage := page - 1
-	if prevPage < 1 {
-		prevPage = 1
-	}
-
-	nextPage := page + 1
+	pagination := utils.GetPaginationData(page, pageSize, totalTasks)
 
 	// Create a context for the tasks and pagination
 	context := map[string]interface{}{
 		"Tasks":        taskList,
-		"PreviousPage": prevPage,
-		"NextPage":     nextPage,
 		"CurrentPage":  page,
-		"PrevDisabled": prevDisabled,
-		"NextDisabled": nextDisabled,
+		"PreviousPage": pagination.PreviousPage,
+		"NextPage":     pagination.NextPage,
+		"PrevDisabled": pagination.PrevDisabled,
+		"NextDisabled": pagination.NextDisabled,
 	}
 
 	// Render the tasks and pagination controls

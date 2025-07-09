@@ -54,38 +54,19 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 		taskList[i].Page = page
 	}
 
-	// Calculate pagination button states
-	prevDisabled := ""
-	if page == 1 {
-		prevDisabled = "disabled" // Disable on the first page
-	}
-
-	nextDisabled := ""
-	if page*pageSize >= totalTasks {
-		nextDisabled = "disabled" // Disable if next page is unavailable
-	}
+	pagination := utils.GetPaginationData(page, pageSize, totalTasks)
 
 	// Set response header
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
-	prevPage := page - 1
-	if prevPage < 1 {
-		prevPage = 1
-	}
-
-	nextPage := page + 1
-	if page*pageSize >= totalTasks {
-		nextPage = page
-	}
-
 	// Create a context for the tasks and pagination
 	context := map[string]interface{}{
 		"Tasks":        taskList,
-		"PreviousPage": prevPage,
-		"NextPage":     nextPage,
-		"CurrentPage":  page,
-		"PrevDisabled": prevDisabled,
-		"NextDisabled": nextDisabled,
+		"PreviousPage": pagination.PreviousPage,
+		"NextPage":     pagination.NextPage,
+		"CurrentPage":  pagination.CurrentPage,
+		"PrevDisabled": pagination.PrevDisabled,
+		"NextDisabled": pagination.NextDisabled,
 		"SearchQuery":  searchQuery,
 	}
 
