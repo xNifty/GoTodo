@@ -81,7 +81,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 
 	searchQuery := r.FormValue("search")
 
-	taskList, totalResults, err := tasks.SearchTasks(page, pageSize, searchQuery)
+	taskList, totalTasks, err := tasks.SearchTasks(page, pageSize, searchQuery)
 	if err != nil {
 		if w.Header().Get("Content-Type") == "" {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -102,25 +102,17 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 		taskList[i].Page = page
 	}
 
-	prevDisabled := ""
-	if page == 1 {
-		prevDisabled = "disabled"
-	}
-
-	nextDisabled := ""
-	if page*pageSize >= totalResults {
-		nextDisabled = "disabled"
-	}
+	pagination := utils.GetPaginationData(page, pageSize, totalTasks)
 
 	context := map[string]interface{}{
 		"Tasks":        taskList,
-		"TotalResults": totalResults,
+		"TotalResults": totalTasks,
 		"SearchQuery":  searchQuery,
-		"PreviousPage": page - 1,
-		"NextPage":     page + 1,
 		"CurrentPage":  page,
-		"PrevDisabled": prevDisabled,
-		"NextDisabled": nextDisabled,
+		"PreviousPage": pagination.PreviousPage,
+		"NextPage":     pagination.NextPage,
+		"PrevDisabled": pagination.PrevDisabled,
+		"NextDisabled": pagination.NextDisabled,
 	}
 
 	if err := utils.RenderTemplate(w, "pagination.html", context); err != nil {
