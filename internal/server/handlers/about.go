@@ -6,6 +6,5 @@ import (
 )
 
 func AboutHandler(w http.ResponseWriter, r *http.Request) {
-	//	http.ServeFile(w, r, "internal/server/templates/about.html")
 	utils.RenderTemplate(w, "about.html", nil)
 }
