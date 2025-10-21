@@ -14,12 +14,21 @@
                         <a class="nav-link" href="about">About</a>
                     </li>
                 </ul>
-                <div class="d-flex align-items-center">
+                <div class="d-flex align-items-center gap-3">
                     <span class="me-2"><i class="bi bi-sun-fill"></i></span>
                     <span class="theme-toggle" id="theme-toggle" role="button" aria-label="Toggle dark/light mode"></span>
                     <span class="ms-2"><i class="bi bi-moon-fill"></i></span>
+                    {{if .LoggedIn}}
+                    <span class="text-muted me-2">{{.UserEmail}}</span>
+                    <button class="btn btn-outline-danger btn-sm" id="logout-btn" hx-post="/api/logout" hx-trigger="click">
+                        <i class="bi bi-box-arrow-right"></i> Logout
+                    </button>
+                    {{else}}
+                    <button class="btn btn-outline-primary btn-sm" id="login-btn" data-bs-toggle="modal" data-bs-target="#modal" hx-get="/public/partials/login.html" hx-target="#modal .modal-content" hx-swap="innerHTML">
+                        <i class="bi bi-box-arrow-in-right"></i> Login
+                    </button>
+                    {{end}}
                 </div>
-                <!-- Space for future user profile -->
             </div>
         </div>
     </nav>

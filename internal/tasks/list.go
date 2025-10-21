@@ -91,6 +91,10 @@ func ReturnTaskList() []Task {
 }
 
 func ReturnPagination(page, pageSize int) ([]Task, int, error) {
+	return ReturnPaginationForUser(page, pageSize, nil)
+}
+
+func ReturnPaginationForUser(page, pageSize int, userID *int) ([]Task, int, error) {
 	pool, err := storage.OpenDatabase()
 	if err != nil {
 		return nil, 0, err
@@ -99,17 +103,31 @@ func ReturnPagination(page, pageSize int) ([]Task, int, error) {
 
 	var tasks []Task
 	offset := (page - 1) * pageSize
-	// Fetch paginated tasks
-	rows, err := pool.Query(context.Background(),
-		`SELECT id, title, description, completed, 
-			TO_CHAR(time_stamp, 'YYYY/MM/DD HH:MI AM') AS date_added 
-			FROM tasks 
-			ORDER BY id 
-			LIMIT $1 OFFSET $2`,
-		pageSize, offset)
+
+	// Build query based on whether user is logged in
+	query := `SELECT id, title, description, completed, 
+		TO_CHAR(time_stamp, 'YYYY/MM/DD HH:MI AM') AS date_added 
+		FROM tasks `
+
+	var countQuery string
+	var rows interface {
+		Next() bool
+		Scan(...interface{}) error
+		Close()
+	}
+
+	if userID == nil {
+		// Not logged in - don't show any tasks
+		return tasks, 0, nil
+	}
+
+	// Logged in - filter by user_id
+	query += `WHERE user_id = $3 ORDER BY id LIMIT $1 OFFSET $2`
+	rows, err = pool.Query(context.Background(), query, pageSize, offset, *userID)
 	if err != nil {
 		return nil, 0, err
 	}
+	countQuery = "SELECT COUNT(*) FROM tasks WHERE user_id = $1"
 	defer rows.Close()
 
 	for rows.Next() {
@@ -122,7 +140,7 @@ func ReturnPagination(page, pageSize int) ([]Task, int, error) {
 
 	// Fetch total task count for pagination controls
 	var totalTasks int
-	err = pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks").Scan(&totalTasks)
+	err = pool.QueryRow(context.Background(), countQuery, *userID).Scan(&totalTasks)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -130,6 +148,10 @@ func ReturnPagination(page, pageSize int) ([]Task, int, error) {
 }
 
 func SearchTasks(page, pageSize int, searchQuery string) ([]Task, int, error) {
+	return SearchTasksForUser(page, pageSize, searchQuery, nil)
+}
+
+func SearchTasksForUser(page, pageSize int, searchQuery string, userID *int) ([]Task, int, error) {
 	pool, err := storage.OpenDatabase()
 	if err != nil {
 		return nil, 0, err
@@ -139,7 +161,12 @@ func SearchTasks(page, pageSize int, searchQuery string) ([]Task, int, error) {
 
 	var tasks []Task
 	offset := (page - 1) * pageSize
-	searchQuery = "%" + searchQuery + "%"
+	searchPattern := "%" + searchQuery + "%"
+
+	// If not logged in, return empty results
+	if userID == nil {
+		return tasks, 0, nil
+	}
 
 	rows, err := pool.Query(context.Background(),
 		`SELECT id,
@@ -148,10 +175,10 @@ func SearchTasks(page, pageSize int, searchQuery string) ([]Task, int, error) {
 			completed, 
 			TO_CHAR(time_stamp, 'YYYY/MM/DD HH:MM AM')  as date_added
 		 FROM tasks 
-		 WHERE title ILIKE $1 OR description ILIKE $1 
+		 WHERE (title ILIKE $1 OR description ILIKE $1) AND user_id = $4
 		 ORDER BY id 
 		 LIMIT $2 OFFSET $3`,
-		searchQuery, pageSize, offset)
+		searchPattern, pageSize, offset, *userID)
 
 	if err != nil {
 		return nil, 0, err
@@ -171,8 +198,8 @@ func SearchTasks(page, pageSize int, searchQuery string) ([]Task, int, error) {
 	err = pool.QueryRow(context.Background(),
 		`SELECT COUNT(*) 
 			FROM tasks 
-			WHERE title ILIKE $1 OR description ILIKE $1`,
-		searchQuery).Scan(&totalTasks)
+			WHERE (title ILIKE $1 OR description ILIKE $1) AND user_id = $2`,
+		searchPattern, *userID).Scan(&totalTasks)
 
 	if err != nil {
 		return nil, 0, err

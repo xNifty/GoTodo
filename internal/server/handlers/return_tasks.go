@@ -24,13 +24,20 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 		page = 1
 	}
 
+	// Get user ID if logged in
+	email, _, loggedIn := utils.GetSessionUser(r)
+	var userID *int
+	if loggedIn {
+		userID = getUserIDFromEmail(email)
+	}
+
 	// Fetch tasks for the current page
 	var taskList []tasks.Task
 	var totalTasks int
 	var err error
 
 	if searchQuery != "" {
-		taskList, totalTasks, err = tasks.SearchTasks(page, pageSize, searchQuery)
+		taskList, totalTasks, err = tasks.SearchTasksForUser(page, pageSize, searchQuery, userID)
 		if err != nil {
 			http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -42,7 +49,7 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 			taskList[i].Description = highlightMatches(task.Description, searchQuery)
 		}
 	} else {
-		taskList, totalTasks, err = tasks.ReturnPagination(page, pageSize)
+		taskList, totalTasks, err = tasks.ReturnPaginationForUser(page, pageSize, userID)
 		if err != nil {
 			http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -68,6 +75,8 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 		"PrevDisabled": pagination.PrevDisabled,
 		"NextDisabled": pagination.NextDisabled,
 		"SearchQuery":  searchQuery,
+		"TotalTasks":   totalTasks,
+		"LoggedIn":     loggedIn,
 	}
 
 	if err := utils.RenderTemplate(w, "pagination.html", context); err != nil {

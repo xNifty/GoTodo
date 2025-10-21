@@ -193,6 +193,20 @@ document.addEventListener("DOMContentLoaded", () => {
     htmx.ajax('GET', url, { target: "#task-container", swap: "innerHTML" });
   });
 
+  // Handle login success
+  document.body.addEventListener("login-success", function (evt) {
+    // Close the login modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('modal'));
+    if (modal) {
+      modal.hide();
+    }
+    
+    // Optionally reload the page to show logged-in state
+    window.location.reload();
+  });
+
+  // Note: Logout now uses HX-Redirect in the handler, so no event listener needed
+
   // Re-initialize character counter and theme toggle after HTMX swaps if sidebar is active
   document.body.addEventListener("htmx:afterSwap", (event) => {
     // Check if the sidebar element exists and is currently active

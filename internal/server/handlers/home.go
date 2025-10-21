@@ -2,25 +2,53 @@ package handlers
 
 import (
 	"GoTodo/internal/server/utils"
+	"GoTodo/internal/storage"
 	"GoTodo/internal/tasks"
+	"context"
 	"net/http"
 	"regexp"
 	"strconv"
 )
+
+func getUserIDFromEmail(email string) *int {
+	pool, err := storage.OpenDatabase()
+	if err != nil {
+		return nil
+	}
+	defer storage.CloseDatabase(pool)
+
+	var userID int
+	err = pool.QueryRow(context.Background(), "SELECT id FROM users WHERE email = $1", email).Scan(&userID)
+	if err != nil {
+		return nil
+	}
+
+	return &userID
+}
 
 func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	page := 1
 	pageSize := utils.AppConstants.PageSize
 	searchQuery := r.URL.Query().Get("search")
 
+	loggedOut := r.URL.Query().Get("logged_out") == "true"
+
+	email, _, loggedIn := utils.GetSessionUser(r)
+
 	var taskList []tasks.Task
 	var totalTasks int
 	var err error
+	var userID *int
+
+	// Get user ID if logged in
+	if loggedIn {
+		userID = getUserIDFromEmail(email)
+	}
 
 	if searchQuery != "" {
-		taskList, totalTasks, err = tasks.SearchTasks(page, pageSize, searchQuery)
+		taskList, totalTasks, err = tasks.SearchTasksForUser(page, pageSize, searchQuery, userID)
 	} else {
-		taskList, totalTasks, err = tasks.ReturnPagination(page, pageSize)
+		taskList, totalTasks, err = tasks.ReturnPaginationForUser(page, pageSize, userID)
 	}
 
 	if err != nil {
@@ -53,6 +81,10 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 		"NextPage":     pagination.NextPage,
 		"PrevDisabled": pagination.PrevDisabled,
 		"NextDisabled": pagination.NextDisabled,
+		"LoggedIn":     loggedIn,
+		"UserEmail":    email,
+		"LoggedOut":    loggedOut,
+		"TotalTasks":   totalTasks,
 	}
 
 	// Render the tasks and pagination controls

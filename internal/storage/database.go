@@ -174,3 +174,26 @@ func MigrateTasksTable() error {
 	}
 	return nil
 }
+
+// User represents a user in the system
+type User struct {
+	ID       int
+	Email    string
+	Password string
+}
+
+// GetUserByEmail fetches a user by email from the users table
+func GetUserByEmail(email string) (*User, error) {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return nil, err
+	}
+	defer CloseDatabase(pool)
+
+	var user User
+	err = pool.QueryRow(context.Background(), "SELECT id, email, password FROM users WHERE email=$1", email).Scan(&user.ID, &user.Email, &user.Password)
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}

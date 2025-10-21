@@ -55,8 +55,24 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	// Insert the new task into the database
-	_, err = db.Exec(context.Background(), "INSERT INTO tasks (title, description, completed) VALUES ($1, $2, $3)", title, description, false)
+	// Get user ID from session
+	email, _, loggedIn := utils.GetSessionUser(r)
+	if !loggedIn {
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprint(w, "Please log in to add tasks.")
+		return
+	}
+
+	var userID int
+	err = db.QueryRow(context.Background(), "SELECT id FROM users WHERE email = $1", email).Scan(&userID)
+	if err != nil {
+		fmt.Printf("Error getting user ID: %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Insert the new task into the database with user_id
+	_, err = db.Exec(context.Background(), "INSERT INTO tasks (title, description, completed, user_id) VALUES ($1, $2, $3, $4)", title, description, false, userID)
 	if err != nil {
 		fmt.Println("We failed to insert into the database.")
 		fmt.Println("Failed values:", title, description, false)
@@ -69,7 +85,7 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 	// We might need the total tasks and tasks for the current page here to render pagination correctly
 
 	// Fetch tasks for the current page again to get the updated list
-	taskList, totalTasks, err := tasks.ReturnPagination(page, pageSize)
+	taskList, totalTasks, err := tasks.ReturnPaginationForUser(page, pageSize, &userID)
 	if err != nil {
 		http.Error(w, "Error fetching tasks after add: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -101,8 +117,8 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 		"CurrentPage":  page,
 		"PrevDisabled": prevDisabled,
 		"NextDisabled": nextDisabled,
-		// Assuming SearchQuery might need to be preserved, pass it if available
-		// "SearchQuery":  r.FormValue("search"), // Need to get search query from form if needed
+		"TotalTasks":   totalTasks,
+		"LoggedIn":     true,
 	}
 
 	// Set headers for successful addition
