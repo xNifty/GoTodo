@@ -2,3 +2,4 @@
 *.exe
 .env
 GoTodo
+nodemon.json
