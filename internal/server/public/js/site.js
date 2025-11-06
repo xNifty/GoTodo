@@ -173,6 +173,17 @@ document.addEventListener("DOMContentLoaded", () => {
     htmx.ajax('GET', url, { target: "#task-container", swap: "innerHTML" });
   });
 
+  // Handle reload with specific page number
+  document.body.addEventListener("reloadPage", function (evt) {
+    const page = evt.detail.page || 1;
+    let url = `/api/fetch-tasks?page=${page}`;
+    const searchInput = document.getElementById("search");
+    if (searchInput && searchInput.value) {
+      url += `&search=${encodeURIComponent(searchInput.value)}`;
+    }
+    htmx.ajax('GET', url, { target: "#task-container", swap: "innerHTML" });
+  });
+
   document.body.addEventListener("reload-previous-page", function (evt) {
     // Get the current page from the page number display
     const pageDisplay = document.querySelector('.text-muted');

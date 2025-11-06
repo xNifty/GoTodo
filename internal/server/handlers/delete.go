@@ -24,6 +24,14 @@ func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
 		currentPage = 1
 	}
 
+	// Get user ID from session
+	email, _, loggedIn := utils.GetSessionUser(r)
+	if !loggedIn {
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprintf(w, "Please log in to delete tasks")
+		return
+	}
+
 	db, err := storage.OpenDatabase()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -32,17 +40,34 @@ func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	// Delete the task from the database
-	_, err = db.Exec(context.Background(), "DELETE FROM tasks WHERE id = $1", taskID)
+	// Get user ID
+	var userID int
+	err = db.QueryRow(context.Background(), "SELECT id FROM users WHERE email = $1", email).Scan(&userID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "Error getting user ID")
+		return
+	}
+
+	// Delete the task from the database (only if it belongs to the user)
+	result, err := db.Exec(context.Background(), "DELETE FROM tasks WHERE id = $1 AND user_id = $2", taskID, userID)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, "Error deleting task")
 		return
 	}
 
-	// Get total number of tasks after deletion
+	// Check if any rows were actually deleted
+	rowsAffected := result.RowsAffected()
+	if rowsAffected == 0 {
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprintf(w, "Task not found or you don't have permission to delete it")
+		return
+	}
+
+	// Get total number of tasks for this user after deletion
 	var totalTasks int
-	err = db.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks").Scan(&totalTasks)
+	err = db.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1", userID).Scan(&totalTasks)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, "Error counting tasks")
@@ -52,12 +77,25 @@ func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
 	// Calculate last page
 	pageSize := utils.AppConstants.PageSize
 	lastPage := (totalTasks + pageSize - 1) / pageSize
+	if lastPage < 1 {
+		lastPage = 1
+	}
 
-	// If current page is beyond last page, we need to reload the previous page
-	if currentPage > lastPage && currentPage > 1 {
-		w.Header().Set("HX-Trigger", "reload-previous-page")
+	// Determine which page to reload - clamp to valid range
+	reloadPage := currentPage
+	if currentPage > lastPage {
+		reloadPage = lastPage
+	}
+	if reloadPage < 1 {
+		reloadPage = 1
+	}
+
+	// Set the page to reload in the trigger
+	if reloadPage != currentPage {
+		// Page changed, reload the correct page
+		w.Header().Set("HX-Trigger", fmt.Sprintf(`{"reloadPage": {"page": %d}}`, reloadPage))
 	} else {
-		// Otherwise, just reload the current page
+		// Same page, just reload it
 		w.Header().Set("HX-Trigger", "taskDeleted")
 	}
 
@@ -72,6 +110,13 @@ func APIGetNextItem(w http.ResponseWriter, r *http.Request) {
 		currentPage = 1
 	}
 
+	// Get user ID from session
+	email, _, loggedIn := utils.GetSessionUser(r)
+	if !loggedIn {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
 	db, err := storage.OpenDatabase()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -80,9 +125,17 @@ func APIGetNextItem(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	// Get total number of tasks first
+	// Get user ID
+	var userID int
+	err = db.QueryRow(context.Background(), "SELECT id FROM users WHERE email = $1", email).Scan(&userID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Get total number of tasks for this user
 	var totalTasks int
-	err = db.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks").Scan(&totalTasks)
+	err = db.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1", userID).Scan(&totalTasks)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -101,9 +154,11 @@ func APIGetNextItem(w http.ResponseWriter, r *http.Request) {
 
 	offset := (currentPage - 1) * pageSize
 
-	// Check how many items are on the current page
+	// Check how many items are on the current page for this user
 	var itemsOnPage int
-	err = db.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks LIMIT $1 OFFSET $2", pageSize, offset).Scan(&itemsOnPage)
+	err = db.QueryRow(context.Background(),
+		"SELECT COUNT(*) FROM (SELECT id FROM tasks WHERE user_id = $1 ORDER BY id LIMIT $2 OFFSET $3) AS page_tasks",
+		userID, pageSize, offset).Scan(&itemsOnPage)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -138,7 +193,7 @@ func APIGetNextItem(w http.ResponseWriter, r *http.Request) {
 
 	row := db.QueryRow(context.Background(),
 		`SELECT id, title, description, completed, TO_CHAR(time_stamp, 'YYYY/MM/DD HH:MI AM') AS date_added
-		 FROM tasks ORDER BY id LIMIT 1 OFFSET $1`, nextItemOffset)
+		 FROM tasks WHERE user_id = $1 ORDER BY id LIMIT 1 OFFSET $2`, userID, nextItemOffset)
 
 	var task tasks.Task
 	err = row.Scan(&task.ID, &task.Title, &task.Description, &task.Completed, &task.DateAdded)

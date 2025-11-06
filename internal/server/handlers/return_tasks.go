@@ -10,19 +10,20 @@ import (
 func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 	pageSize := utils.AppConstants.PageSize
 
-	var page int
 	searchQuery := r.URL.Query().Get("search")
 
 	// Parse "page" query parameter
+	var currentPage int
 	if pageParam := r.URL.Query().Get("page"); pageParam != "" {
 		var err error
-		page, err = strconv.Atoi(pageParam)
-		if err != nil || page < 1 {
-			page = 1
+		currentPage, err = strconv.Atoi(pageParam)
+		if err != nil || currentPage < 1 {
+			currentPage = 1
 		}
 	} else {
-		page = 1
+		currentPage = 1
 	}
+	page := currentPage
 
 	// Get user ID if logged in
 	email, _, loggedIn := utils.GetSessionUser(r)
@@ -53,6 +54,40 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
 			return
+		}
+	}
+
+	// Validate and clamp page number to valid range
+	lastPage := (totalTasks + pageSize - 1) / pageSize
+	if lastPage < 1 {
+		lastPage = 1
+	}
+	if page > lastPage {
+		page = lastPage
+	}
+	if page < 1 {
+		page = 1
+	}
+
+	// If page was adjusted, we need to refetch with the correct page
+	if page != currentPage {
+		if searchQuery != "" {
+			taskList, totalTasks, err = tasks.SearchTasksForUser(page, pageSize, searchQuery, userID)
+			if err != nil {
+				http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			// Highlight search matches
+			for i, task := range taskList {
+				taskList[i].Title = highlightMatches(task.Title, searchQuery)
+				taskList[i].Description = highlightMatches(task.Description, searchQuery)
+			}
+		} else {
+			taskList, totalTasks, err = tasks.ReturnPaginationForUser(page, pageSize, userID)
+			if err != nil {
+				http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
 	}
 
