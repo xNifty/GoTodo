@@ -6,10 +6,12 @@ type PaginationData struct {
 	CurrentPage  int
 	PrevDisabled string
 	NextDisabled string
+	TotalPages   int
 }
 
 func GetPaginationData(page, pageSize, totalItems int) PaginationData {
 	prevDisabled := ""
+	totalPages := (totalItems + pageSize - 1) / pageSize
 	if page == 1 {
 		prevDisabled = "disabled"
 	}
@@ -35,5 +37,6 @@ func GetPaginationData(page, pageSize, totalItems int) PaginationData {
 		CurrentPage:  page,
 		PrevDisabled: prevDisabled,
 		NextDisabled: nextDisabled,
+		TotalPages:   totalPages,
 	}
 }

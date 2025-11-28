@@ -85,6 +85,7 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 		"UserEmail":    email,
 		"LoggedOut":    loggedOut,
 		"TotalTasks":   totalTasks,
+		"TotalPages":   pagination.TotalPages,
 	}
 
 	// Render the tasks and pagination controls
@@ -145,6 +146,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 		"NextPage":     pagination.NextPage,
 		"PrevDisabled": pagination.PrevDisabled,
 		"NextDisabled": pagination.NextDisabled,
+		"TotalPages":   pagination.TotalPages,
 	}
 
 	if err := utils.RenderTemplate(w, "pagination.html", context); err != nil {
