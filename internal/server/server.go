@@ -41,11 +41,12 @@ func StartServer() error {
 
 	// Handle PUT and DELETE for invites with path parameters
 	http.HandleFunc("/api/invite/", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPut {
+		switch r.Method {
+		case http.MethodPut:
 			utils.RequirePermission("createinvites", handlers.APIUpdateInvite)(w, r)
-		} else if r.Method == http.MethodDelete {
+		case http.MethodDelete:
 			utils.RequirePermission("createinvites", handlers.APIDeleteInvite)(w, r)
-		} else {
+		default:
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
