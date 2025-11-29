@@ -4,12 +4,25 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"os"
+	"strings"
 )
 
 var Templates *template.Template
+var BasePath string
 
 func InitializeTemplates() error {
 	var err error
+	BasePath = os.Getenv("BASE_PATH")
+	if BasePath == "" {
+		BasePath = "/"
+	}
+
+	BasePath = strings.TrimSuffix(BasePath, "/")
+	if BasePath == "" {
+		BasePath = "/"
+	}
+
 	Templates, err = template.New("").Funcs(template.FuncMap{
 		"safeHTML": func(s string) template.HTML {
 			return template.HTML(s)
@@ -21,6 +34,9 @@ func InitializeTemplates() error {
 				}
 			}
 			return false
+		},
+		"basePath": func() string {
+			return GetBasePath()
 		},
 	}).ParseGlob("internal/server/templates/*.html")
 	if err != nil {
@@ -41,4 +57,9 @@ func RenderTemplate(w http.ResponseWriter, tmpl string, data interface{}) error 
 		return err
 	}
 	return nil
+}
+
+// GetBasePath returns the base path for use in templates
+func GetBasePath() string {
+	return BasePath
 }

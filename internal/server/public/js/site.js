@@ -7,10 +7,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Character counter for description
   if (description && charCount) {
-    description.addEventListener("input", function() {
+    description.addEventListener("input", function () {
       const length = this.value.length;
       charCount.textContent = length;
-      
+
       // Add visual feedback when approaching limit
       if (length > 90) {
         charCount.classList.add("text-warning");
@@ -27,40 +27,41 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Theme toggle functionality
   function initTheme() {
-    const savedTheme = localStorage.getItem('theme') || 'light';
-    const themeToggle = document.getElementById('theme-toggle');
-    
-    if (savedTheme === 'dark') {
-      document.documentElement.setAttribute('data-theme', 'dark');
-      if (themeToggle) themeToggle.classList.add('active');
+    const savedTheme = localStorage.getItem("theme") || "light";
+    const themeToggle = document.getElementById("theme-toggle");
+
+    if (savedTheme === "dark") {
+      document.documentElement.setAttribute("data-theme", "dark");
+      if (themeToggle) themeToggle.classList.add("active");
     } else {
-      document.documentElement.setAttribute('data-theme', 'light');
-      if (themeToggle) themeToggle.classList.remove('active');
+      document.documentElement.setAttribute("data-theme", "light");
+      if (themeToggle) themeToggle.classList.remove("active");
     }
   }
 
   function toggleTheme() {
-    const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
-    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-    const themeToggle = document.getElementById('theme-toggle');
-    
-    document.documentElement.setAttribute('data-theme', newTheme);
-    localStorage.setItem('theme', newTheme);
-    
-    if (newTheme === 'dark') {
-      if (themeToggle) themeToggle.classList.add('active');
+    const currentTheme =
+      document.documentElement.getAttribute("data-theme") || "light";
+    const newTheme = currentTheme === "light" ? "dark" : "light";
+    const themeToggle = document.getElementById("theme-toggle");
+
+    document.documentElement.setAttribute("data-theme", newTheme);
+    localStorage.setItem("theme", newTheme);
+
+    if (newTheme === "dark") {
+      if (themeToggle) themeToggle.classList.add("active");
     } else {
-      if (themeToggle) themeToggle.classList.remove('active');
+      if (themeToggle) themeToggle.classList.remove("active");
     }
   }
-  
+
   // Initialize theme on page load
   initTheme();
-  
+
   // Set up theme toggle event listener
-  const themeToggle = document.getElementById('theme-toggle');
+  const themeToggle = document.getElementById("theme-toggle");
   if (themeToggle) {
-    themeToggle.addEventListener('click', toggleTheme);
+    themeToggle.addEventListener("click", toggleTheme);
   }
 
   function openSidebar() {
@@ -87,12 +88,12 @@ document.addEventListener("DOMContentLoaded", () => {
       closeSidebarBtn.removeEventListener("click", closeSidebar); // Prevent duplicate bindings
       closeSidebarBtn.addEventListener("click", closeSidebar);
     }
-    
+
     // Reattach theme toggle if needed
-    const themeToggle = document.getElementById('theme-toggle');
+    const themeToggle = document.getElementById("theme-toggle");
     if (themeToggle) {
-      themeToggle.removeEventListener('click', toggleTheme);
-      themeToggle.addEventListener('click', toggleTheme);
+      themeToggle.removeEventListener("click", toggleTheme);
+      themeToggle.addEventListener("click", toggleTheme);
     }
   }
 
@@ -119,7 +120,9 @@ document.addEventListener("DOMContentLoaded", () => {
       // Only close sidebar if the request was successful and not a validation error
       // event.detail.successful will be true for a 200 status code response, even with HX-Trigger/HX-Retarget
       // We check the triggerSpec to see if it was the validation error response
-      const isValidationError = event.detail.triggerSpec && event.detail.triggerSpec.trigger === 'description-error';
+      const isValidationError =
+        event.detail.triggerSpec &&
+        event.detail.triggerSpec.trigger === "description-error";
 
       if (event.detail.successful && !isValidationError) {
         closeSidebar();
@@ -161,8 +164,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // Handle task deletion
   document.body.addEventListener("taskDeleted", function (evt) {
     // Get the current page from the page number display
-    const pageDisplay = document.querySelector('.text-muted');
-    const currentPage = pageDisplay ? parseInt(pageDisplay.textContent.match(/\d+/)[0]) : 1;
+    const pageDisplay = document.querySelector(".text-muted");
+    const currentPage = pageDisplay
+      ? parseInt(pageDisplay.textContent.match(/\d+/)[0])
+      : 1;
 
     // Reload the current page
     let url = `/api/fetch-tasks?page=${currentPage}`;
@@ -170,7 +175,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (searchInput && searchInput.value) {
       url += `&search=${encodeURIComponent(searchInput.value)}`;
     }
-    htmx.ajax('GET', url, { target: "#task-container", swap: "innerHTML" });
+    htmx.ajax("GET", url, { target: "#task-container", swap: "innerHTML" });
   });
 
   // Handle reload with specific page number
@@ -181,13 +186,15 @@ document.addEventListener("DOMContentLoaded", () => {
     if (searchInput && searchInput.value) {
       url += `&search=${encodeURIComponent(searchInput.value)}`;
     }
-    htmx.ajax('GET', url, { target: "#task-container", swap: "innerHTML" });
+    htmx.ajax("GET", url, { target: "#task-container", swap: "innerHTML" });
   });
 
   document.body.addEventListener("reload-previous-page", function (evt) {
     // Get the current page from the page number display
-    const pageDisplay = document.querySelector('.text-muted');
-    const currentPage = pageDisplay ? parseInt(pageDisplay.textContent.match(/\d+/)[0]) : 1;
+    const pageDisplay = document.querySelector(".text-muted");
+    const currentPage = pageDisplay
+      ? parseInt(pageDisplay.textContent.match(/\d+/)[0])
+      : 1;
     const prevPage = Math.max(currentPage - 1, 1);
 
     // Optionally, preserve search query if present
@@ -197,21 +204,21 @@ document.addEventListener("DOMContentLoaded", () => {
     // Build the URL for the previous page
     let url = `/api/fetch-tasks?page=${prevPage}`;
     if (searchQuery) {
-        url += `&search=${encodeURIComponent(searchQuery)}`;
+      url += `&search=${encodeURIComponent(searchQuery)}`;
     }
 
     // Use HTMX to load the previous page into the task container
-    htmx.ajax('GET', url, { target: "#task-container", swap: "innerHTML" });
+    htmx.ajax("GET", url, { target: "#task-container", swap: "innerHTML" });
   });
 
   // Handle login success
   document.body.addEventListener("login-success", function (evt) {
     // Close the login modal
-    const modal = bootstrap.Modal.getInstance(document.getElementById('modal'));
+    const modal = bootstrap.Modal.getInstance(document.getElementById("modal"));
     if (modal) {
       modal.hide();
     }
-    
+
     // Optionally reload the page to show logged-in state
     window.location.reload();
   });
@@ -249,19 +256,27 @@ document.addEventListener("DOMContentLoaded", () => {
         // This listener might be added multiple times if the description element isn't fully replaced,
         // but HTMX swap="innerHTML" on the form usually replaces the whole form content.
         // Let's add a check to see if the element has a marker class indicating listener already added.
-        if (!description.classList.contains('char-count-listener-added')) {
-            description.addEventListener("input", function() {
-                const length = this.value.length;
-                charCount.textContent = length;
-                // Add visual feedback when approaching limit
-                if (length > 90) { charCount.classList.add("text-warning"); } else { charCount.classList.remove("text-warning"); }
-                if (length > 95) { charCount.classList.add("text-danger"); } else { charCount.classList.remove("text-danger"); }
-            });
-             description.classList.add('char-count-listener-added'); // Mark as having listener
+        if (!description.classList.contains("char-count-listener-added")) {
+          description.addEventListener("input", function () {
+            const length = this.value.length;
+            charCount.textContent = length;
+            // Add visual feedback when approaching limit
+            if (length > 90) {
+              charCount.classList.add("text-warning");
+            } else {
+              charCount.classList.remove("text-warning");
+            }
+            if (length > 95) {
+              charCount.classList.add("text-danger");
+            } else {
+              charCount.classList.remove("text-danger");
+            }
+          });
+          description.classList.add("char-count-listener-added"); // Mark as having listener
         }
       }
       // Re-initialize theme toggle if needed
-      if (typeof initTheme === 'function') {
+      if (typeof initTheme === "function") {
         initTheme(); // This function should be idempotent or handle re-running safely
       }
     }
