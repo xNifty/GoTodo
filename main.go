@@ -3,9 +3,11 @@ package main
 import (
 	"GoTodo/internal/server"
 	"GoTodo/internal/storage"
+	"fmt"
 )
 
 func main() {
+	fmt.Println("Application main function started.")
 	storage.CreateDatabase()
 	storage.CreateUsersTable()
 	storage.CreateRolesTable()
