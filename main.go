@@ -12,6 +12,7 @@ func main() {
 	storage.CreateUsersTable()
 	storage.CreateRolesTable()
 	storage.CreateInvitesTable()
+	storage.CreateTasksTable()
 	storage.MigrateInvitesTable() // Ensure inviteused column exists
 
 	// The following is just for modifying columns during testing

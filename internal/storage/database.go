@@ -209,6 +209,18 @@ func CreateRolesTable() error {
 	return CreateTable("roles", columns)
 }
 
+func CreateTasksTable() error {
+	columns := []string{
+		"id SERIAL PRIMARY KEY",
+		"title TEXT NOT NULL",
+		"description TEXT",
+		"completed BOOLEAN DEFAULT FALSE",
+		"time_stamp TIMESTAMP DEFAULT NOW()",
+		"user_id INTEGER",
+	}
+	return CreateTable("tasks", columns)
+}
+
 // MigrateTasksTable adds a user_id column and a foreign key constraint to the tasks table
 func MigrateTasksTable() error {
 	pool, err := OpenDatabase()
