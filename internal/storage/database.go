@@ -31,19 +31,16 @@ func OpenDatabase() (*pgxpool.Pool, error) {
 	}
 
 	config := make(map[string]string)
-	missing := []string{}
+	//missing := []string{}
 
 	for _, key := range required {
 		val := os.Getenv(key)
 		if val == "" {
-			missing = append(missing, key)
+			//missing = append(missing, key)
+			log.Fatalf("missing env variables: %v", val)
 		} else {
 			config[key] = val
 		}
-	}
-
-	if len(missing) > 0 {
-		return nil, fmt.Errorf("missing required environment variables: %v", missing)
 	}
 
 	dsn := fmt.Sprintf(
