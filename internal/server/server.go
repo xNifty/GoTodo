@@ -15,6 +15,7 @@ func doNothing(w http.ResponseWriter, r *http.Request) {}
 func StartServer() error {
 	err := utils.InitializeTemplates()
 	if err != nil {
+		fmt.Println("Error initializing templates: ", err)
 		return fmt.Errorf("failed to initialize templates: %v", err)
 	}
 

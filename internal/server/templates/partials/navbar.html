@@ -11,11 +11,11 @@
                         <a class="nav-link" href="/">Home</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/about">About</a>
+                        <a class="nav-link" href="{{basePath}}/about">About</a>
                     </li>
                     {{if and .LoggedIn (hasPermission .Permissions "createinvites")}}
                     <li class="nav-item">
-                        <a class="nav-link" href="/createinvite">Create Invite</a>
+                        <a class="nav-link" href="{{basePath}}/createinvite">Create Invite</a>
                     </li>
                     {{end}}
                 </ul>
@@ -25,14 +25,14 @@
                     <span class="ms-2"><i class="bi bi-moon-fill"></i></span>
                     {{if .LoggedIn}}
                     <span class="text-muted me-2">{{.UserEmail}}</span>
-                    <button class="btn btn-outline-danger btn-sm" id="logout-btn" hx-post="/api/logout" hx-trigger="click">
+                    <button class="btn btn-outline-danger btn-sm" id="logout-btn" hx-post="{{basePath}}/api/logout" hx-trigger="click">
                         <i class="bi bi-box-arrow-right"></i> Logout
                     </button>
                     {{else}}
-                    <a href="/signup" class="btn btn-outline-secondary btn-sm me-2">
+                    <a href="{{basePath}}/signup" class="btn btn-outline-secondary btn-sm me-2">
                         <i class="bi bi-person-plus"></i> Sign Up
                     </a>
-                    <button class="btn btn-outline-primary btn-sm" id="login-btn" data-bs-toggle="modal" data-bs-target="#modal" hx-get="/public/partials/login.html" hx-target="#modal .modal-content" hx-swap="innerHTML">
+                    <button class="btn btn-outline-primary btn-sm" id="login-btn" data-bs-toggle="modal" data-bs-target="#modal" hx-get="{{basePath}}/public/partials/login.html" hx-target="#modal .modal-content" hx-swap="innerHTML">
                         <i class="bi bi-box-arrow-in-right"></i> Login
                     </button>
                     {{end}}
