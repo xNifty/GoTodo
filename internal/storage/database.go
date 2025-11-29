@@ -210,14 +210,12 @@ func MigrateTasksTable() error {
 	return nil
 }
 
-// User represents a user in the system
 type User struct {
 	ID       int
 	Email    string
 	Password string
 }
 
-// GetUserByEmail fetches a user by email from the users table
 func GetUserByEmail(email string) (*User, error) {
 	pool, err := OpenDatabase()
 	if err != nil {
@@ -233,7 +231,6 @@ func GetUserByEmail(email string) (*User, error) {
 	return &user, nil
 }
 
-// GetPermissionsByRoleID fetches permissions array for a given role_id
 func GetPermissionsByRoleID(roleID int) ([]string, error) {
 	pool, err := OpenDatabase()
 	if err != nil {
@@ -247,4 +244,19 @@ func GetPermissionsByRoleID(roleID int) ([]string, error) {
 		return nil, err
 	}
 	return permissions, nil
+}
+
+func GetDefaultRoleID() (int, error) {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return 0, err
+	}
+	defer CloseDatabase(pool)
+
+	var roleID int
+	err = pool.QueryRow(context.Background(), "SELECT id FROM roles WHERE name = 'user'").Scan(&roleID)
+	if err != nil {
+		return 1, nil
+	}
+	return roleID, nil
 }
