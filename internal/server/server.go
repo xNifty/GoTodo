@@ -23,6 +23,8 @@ func StartServer() error {
 		port = "8080"
 	}
 
+	addr := fmt.Sprintf(":%s", port)
+
 	fs := http.FileServer(http.Dir("internal/server/public"))
 	http.Handle("/public/", http.StripPrefix("/public/", fs))
 
@@ -60,5 +62,5 @@ func StartServer() error {
 	})
 
 	fmt.Println("Starting server on :8080")
-	return http.ListenAndServe(port, nil)
+	return http.ListenAndServe(addr, nil)
 }
