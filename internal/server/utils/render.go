@@ -14,6 +14,14 @@ func InitializeTemplates() error {
 		"safeHTML": func(s string) template.HTML {
 			return template.HTML(s)
 		},
+		"hasPermission": func(permissions []string, permission string) bool {
+			for _, p := range permissions {
+				if p == permission {
+					return true
+				}
+			}
+			return false
+		},
 	}).ParseGlob("internal/server/templates/*.html")
 	if err != nil {
 		return err

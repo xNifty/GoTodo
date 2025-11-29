@@ -33,6 +33,23 @@ func StartServer() error {
 	http.HandleFunc("/about", handlers.AboutHandler)
 	http.HandleFunc("/search", handlers.SearchHandler)
 
+	// Invite routes
+	http.HandleFunc("/createinvite", utils.RequirePermission("createinvites", handlers.CreateInvitePageHandler))
+	http.HandleFunc("/api/create-invite", utils.RequirePermission("createinvites", handlers.APICreateInvite))
+	http.HandleFunc("/api/invites", utils.RequirePermission("createinvites", handlers.APIGetInvites))
+	http.HandleFunc("/api/confirm-invite-delete", utils.RequirePermission("createinvites", handlers.APIConfirmDeleteInvite))
+
+	// Handle PUT and DELETE for invites with path parameters
+	http.HandleFunc("/api/invite/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPut {
+			utils.RequirePermission("createinvites", handlers.APIUpdateInvite)(w, r)
+		} else if r.Method == http.MethodDelete {
+			utils.RequirePermission("createinvites", handlers.APIDeleteInvite)(w, r)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
 	fmt.Println("Starting server on :8080")
 	return http.ListenAndServe(":8080", nil)
 }

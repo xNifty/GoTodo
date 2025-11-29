@@ -25,7 +25,7 @@ func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get user ID from session
-	email, _, loggedIn := utils.GetSessionUser(r)
+	email, _, _, loggedIn := utils.GetSessionUser(r)
 	if !loggedIn {
 		w.WriteHeader(http.StatusUnauthorized)
 		fmt.Fprintf(w, "Please log in to delete tasks")
@@ -111,7 +111,7 @@ func APIGetNextItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get user ID from session
-	email, _, loggedIn := utils.GetSessionUser(r)
+	email, _, _, loggedIn := utils.GetSessionUser(r)
 	if !loggedIn {
 		w.WriteHeader(http.StatusUnauthorized)
 		return

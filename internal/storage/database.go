@@ -153,6 +153,41 @@ func CreateUsersTable() error {
 	return CreateTable("users", columns)
 }
 
+func CreateInvitesTable() error {
+	columns := []string{
+		"id SERIAL PRIMARY KEY",
+		"email VARCHAR(255) UNIQUE NOT NULL",
+		"token VARCHAR(255) UNIQUE NOT NULL",
+		"inviteused INTEGER DEFAULT 0",
+	}
+	return CreateTable("invites", columns)
+}
+
+// MigrateInvitesTable adds the inviteused column if it doesn't exist
+func MigrateInvitesTable() error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return fmt.Errorf("failed to open database: %v", err)
+	}
+	defer CloseDatabase(pool)
+
+	// Add inviteused column if it doesn't exist
+	_, err = pool.Exec(context.Background(), "ALTER TABLE invites ADD COLUMN IF NOT EXISTS inviteused INTEGER DEFAULT 0")
+	if err != nil {
+		return fmt.Errorf("failed to add inviteused column to invites table: %v", err)
+	}
+	return nil
+}
+
+func CreateRolesTable() error {
+	columns := []string{
+		"id SERIAL PRIMARY KEY",
+		"name VARCHAR(50) UNIQUE NOT NULL",
+		"permissions TEXT[] NOT NULL",
+	}
+	return CreateTable("roles", columns)
+}
+
 // MigrateTasksTable adds a user_id column and a foreign key constraint to the tasks table
 func MigrateTasksTable() error {
 	pool, err := OpenDatabase()
@@ -196,4 +231,20 @@ func GetUserByEmail(email string) (*User, error) {
 		return nil, err
 	}
 	return &user, nil
+}
+
+// GetPermissionsByRoleID fetches permissions array for a given role_id
+func GetPermissionsByRoleID(roleID int) ([]string, error) {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return nil, err
+	}
+	defer CloseDatabase(pool)
+
+	var permissions []string
+	err = pool.QueryRow(context.Background(), "SELECT permissions FROM roles WHERE id=$1", roleID).Scan(&permissions)
+	if err != nil {
+		return nil, err
+	}
+	return permissions, nil
 }

@@ -56,7 +56,7 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 	defer db.Close()
 
 	// Get user ID from session
-	email, _, loggedIn := utils.GetSessionUser(r)
+	email, _, _, loggedIn := utils.GetSessionUser(r)
 	if !loggedIn {
 		w.WriteHeader(http.StatusUnauthorized)
 		fmt.Fprint(w, "Please log in to add tasks.")

@@ -7,11 +7,12 @@ import (
 
 func AboutHandler(w http.ResponseWriter, r *http.Request) {
 	// Check if user is logged in
-	email, _, loggedIn := utils.GetSessionUser(r)
+	email, _, permissions, loggedIn := utils.GetSessionUser(r)
 
 	context := map[string]interface{}{
-		"LoggedIn":  loggedIn,
-		"UserEmail": email,
+		"LoggedIn":   loggedIn,
+		"UserEmail":  email,
+		"Permissions": permissions,
 	}
 
 	utils.RenderTemplate(w, "about.html", context)

@@ -33,7 +33,7 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 
 	loggedOut := r.URL.Query().Get("logged_out") == "true"
 
-	email, _, loggedIn := utils.GetSessionUser(r)
+	email, _, permissions, loggedIn := utils.GetSessionUser(r)
 
 	var taskList []tasks.Task
 	var totalTasks int
@@ -86,6 +86,7 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 		"NextDisabled": pagination.NextDisabled,
 		"LoggedIn":     loggedIn,
 		"UserEmail":    email,
+		"Permissions": permissions,
 		"LoggedOut":    loggedOut,
 		"TotalTasks":   totalTasks,
 		"TotalPages":   pagination.TotalPages,
@@ -125,7 +126,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 
 	loggedOut := r.URL.Query().Get("logged_out") == "true"
 
-	email, _, loggedIn := utils.GetSessionUser(r)
+	email, _, permissions, loggedIn := utils.GetSessionUser(r)
 
 	searchQuery := r.FormValue("search")
 
@@ -174,6 +175,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 		"TotalPages":   pagination.TotalPages,
 		"LoggedIn":     loggedIn,
 		"UserEmail":    email,
+		"Permissions": permissions,
 		"LoggedOut":    loggedOut,
 		"IsSearching":  isSearching,
 		"TotalTasks":   totalTasks,

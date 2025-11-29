@@ -63,6 +63,12 @@ func APILogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	permissions, err := storage.GetPermissionsByRoleID(roleID)
+	if err != nil {
+		fmt.Printf("Error fetching permissions: %v\n", err)
+		permissions = []string{}
+	}
+
 	session, err := sessionstore.Store.Get(r, "session")
 	if err != nil {
 		fmt.Printf("Error getting session: %v\n", err)
@@ -73,6 +79,7 @@ func APILogin(w http.ResponseWriter, r *http.Request) {
 
 	session.Values["email"] = email
 	session.Values["role_id"] = roleID
+	session.Values["permissions"] = permissions
 
 	err = session.Save(r, w)
 	if err != nil {
