@@ -5,6 +5,7 @@ import (
 	"GoTodo/internal/server/utils"
 	"fmt"
 	"net/http"
+	"os"
 )
 
 // Literally just used to prevent favicon.ico from being requested
@@ -15,6 +16,11 @@ func StartServer() error {
 	err := utils.InitializeTemplates()
 	if err != nil {
 		return fmt.Errorf("failed to initialize templates: %v", err)
+	}
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
 	}
 
 	fs := http.FileServer(http.Dir("internal/server/public"))
@@ -54,5 +60,5 @@ func StartServer() error {
 	})
 
 	fmt.Println("Starting server on :8080")
-	return http.ListenAndServe(":8080", nil)
+	return http.ListenAndServe(port, nil)
 }
