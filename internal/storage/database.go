@@ -57,7 +57,7 @@ func OpenDatabase() (*pgxpool.Pool, error) {
 
 	pool, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {
-		return nil, fmt.Errorf("unable to connect to database: %w", err)
+		log.Fatalf("Failed to open database: %v", err)
 	}
 
 	return pool, nil
