@@ -2,7 +2,7 @@
     <h5 class="modal-title">Login</h5>
     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
 </div>
-<form id="loginForm" hx-post="/api/login" hx-target="#login-error" hx-swap="innerHTML" method="post" autocomplete="off" hx-headers='{"HX-Trigger":"true"}'>
+<form id="loginForm" hx-post="{{basePath}}/api/login" hx-target="#login-error" hx-swap="innerHTML" method="post" autocomplete="off" hx-headers='{"HX-Trigger":"true"}'>
     <div class="modal-body">
         <div class="mb-3">
             <label for="login-email" class="form-label">Email</label>
