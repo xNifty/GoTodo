@@ -95,7 +95,7 @@ func CreateDatabase() {
 	pool, err := OpenDatabase()
 	defer CloseDatabase(pool)
 
-	_, err = pool.Exec(context.Background(), "CREATE TABLE IF NOT EXISTS tasks (id SERIAL PRIMARY KEY, title TEXT, description TEXT, completed BOOLEAN DEFAULT FALSE)")
+	err = CreateTasksTable()
 
 	if err != nil {
 		log.Fatalf("Unable to create table: %v\n", err)
