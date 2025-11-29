@@ -185,24 +185,15 @@ func SearchTasksForUser(page, pageSize int, searchQuery string, userID *int) ([]
 	}
 
 	defer rows.Close()
+	var totalTasks int = 0
 
 	for rows.Next() {
 		var task Task
 		if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed, &task.DateAdded); err != nil {
 			return nil, 0, err
 		}
+		totalTasks++
 		tasks = append(tasks, task)
-	}
-
-	var totalTasks int
-	err = pool.QueryRow(context.Background(),
-		`SELECT COUNT(*) 
-			FROM tasks 
-			WHERE (title ILIKE $1 OR description ILIKE $1) AND user_id = $2`,
-		searchPattern, *userID).Scan(&totalTasks)
-
-	if err != nil {
-		return nil, 0, err
 	}
 
 	return tasks, totalTasks, nil

@@ -40,6 +40,8 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	var err error
 	var userID *int
 
+	isSearching := false
+
 	// Get user ID if logged in
 	if loggedIn {
 		userID = getUserIDFromEmail(email)
@@ -60,6 +62,7 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if searchQuery != "" {
+		isSearching = true
 		for i, task := range taskList {
 			taskList[i].Title = highlightMatches(task.Title, searchQuery)
 			taskList[i].Description = highlightMatches(task.Description, searchQuery)
@@ -86,6 +89,7 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 		"LoggedOut":    loggedOut,
 		"TotalTasks":   totalTasks,
 		"TotalPages":   pagination.TotalPages,
+		"IsSearching":  isSearching,
 	}
 
 	// Render the tasks and pagination controls
@@ -100,7 +104,14 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 
 func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	pageSize := utils.AppConstants.PageSize
+
 	var page int
+	var userID *int
+	var taskList []tasks.Task
+	var totalTasks int
+	var err error
+
+	isSearching := false
 
 	if pageParam := r.URL.Query().Get("page"); pageParam != "" {
 		var err error
@@ -112,9 +123,23 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 		page = 1
 	}
 
+	loggedOut := r.URL.Query().Get("logged_out") == "true"
+
+	email, _, loggedIn := utils.GetSessionUser(r)
+
 	searchQuery := r.FormValue("search")
 
-	taskList, totalTasks, err := tasks.SearchTasks(page, pageSize, searchQuery)
+	if loggedIn {
+		userID = getUserIDFromEmail(email)
+	}
+
+	if searchQuery != "" {
+		isSearching = true
+		taskList, totalTasks, err = tasks.SearchTasksForUser(page, pageSize, searchQuery, userID)
+	} else {
+		taskList, totalTasks, err = tasks.ReturnPaginationForUser(page, pageSize, userID)
+	}
+
 	if err != nil {
 		if w.Header().Get("Content-Type") == "" {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -147,6 +172,11 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 		"PrevDisabled": pagination.PrevDisabled,
 		"NextDisabled": pagination.NextDisabled,
 		"TotalPages":   pagination.TotalPages,
+		"LoggedIn":     loggedIn,
+		"UserEmail":    email,
+		"LoggedOut":    loggedOut,
+		"IsSearching":  isSearching,
+		"TotalTasks":   totalTasks,
 	}
 
 	if err := utils.RenderTemplate(w, "pagination.html", context); err != nil {
