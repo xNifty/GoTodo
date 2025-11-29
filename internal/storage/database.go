@@ -37,7 +37,7 @@ func OpenDatabase() (*pgxpool.Pool, error) {
 		val := os.Getenv(key)
 		if val == "" {
 			//missing = append(missing, key)
-			log.Fatalf("missing env variables: %v", val)
+			log.Fatalf("missing env variables: %v", key)
 		} else {
 			config[key] = val
 		}
