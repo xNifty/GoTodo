@@ -86,11 +86,12 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 		"NextDisabled": pagination.NextDisabled,
 		"LoggedIn":     loggedIn,
 		"UserEmail":    email,
-		"Permissions": permissions,
+		"Permissions":  permissions,
 		"LoggedOut":    loggedOut,
 		"TotalTasks":   totalTasks,
 		"TotalPages":   pagination.TotalPages,
 		"IsSearching":  isSearching,
+		"Title":        "GoTodo - Home",
 	}
 
 	// Render the tasks and pagination controls
@@ -175,7 +176,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 		"TotalPages":   pagination.TotalPages,
 		"LoggedIn":     loggedIn,
 		"UserEmail":    email,
-		"Permissions": permissions,
+		"Permissions":  permissions,
 		"LoggedOut":    loggedOut,
 		"IsSearching":  isSearching,
 		"TotalTasks":   totalTasks,

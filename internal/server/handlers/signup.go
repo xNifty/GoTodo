@@ -23,6 +23,7 @@ func SignupPageHandler(w http.ResponseWriter, r *http.Request) {
 	context := map[string]interface{}{
 		"LoggedIn":  false,
 		"UserEmail": email,
+		"Title":     "GoTodo - Sign Up",
 	}
 
 	utils.RenderTemplate(w, "signup.html", context)

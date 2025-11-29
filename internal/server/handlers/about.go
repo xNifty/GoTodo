@@ -10,9 +10,10 @@ func AboutHandler(w http.ResponseWriter, r *http.Request) {
 	email, _, permissions, loggedIn := utils.GetSessionUser(r)
 
 	context := map[string]interface{}{
-		"LoggedIn":   loggedIn,
-		"UserEmail":  email,
+		"LoggedIn":    loggedIn,
+		"UserEmail":   email,
 		"Permissions": permissions,
+		"Title":       "GoTodo - About",
 	}
 
 	utils.RenderTemplate(w, "about.html", context)
