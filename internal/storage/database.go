@@ -18,25 +18,49 @@ const (
 )
 
 func OpenDatabase() (*pgxpool.Pool, error) {
-	err := godotenv.Load()
+	// Try to load .env, but don't crash if it's not there.
+	// In Cloud Run, there won't be a .env file at all.
+	_ = godotenv.Load()
 
-	if err != nil {
-		log.Fatalf("Error loading .env file: %v\n", err)
+	required := []string{
+		"DB_HOST",
+		"DB_PORT",
+		"DB_USER",
+		"DB_PASSWORD",
+		"DB_NAME",
 	}
 
-	dbHost := os.Getenv("DB_HOST")
-	dbPort := os.Getenv("DB_PORT")
-	dbUser := os.Getenv("DB_USER")
-	dbPassword := os.Getenv("DB_PASSWORD")
-	dbName := os.Getenv("DB_NAME")
+	config := make(map[string]string)
+	missing := []string{}
 
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s", dbUser, dbPassword, dbHost, dbPort, dbName)
+	for _, key := range required {
+		val := os.Getenv(key)
+		if val == "" {
+			missing = append(missing, key)
+		} else {
+			config[key] = val
+		}
+	}
+
+	if len(missing) > 0 {
+		return nil, fmt.Errorf("missing required environment variables: %v", missing)
+	}
+
+	dsn := fmt.Sprintf(
+		"postgres://%s:%s@%s:%s/%s",
+		config["DB_USER"],
+		config["DB_PASSWORD"],
+		config["DB_HOST"],
+		config["DB_PORT"],
+		config["DB_NAME"],
+	)
 
 	pool, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {
-		log.Fatalf("Unable to connect to database: %v\n", err)
+		return nil, fmt.Errorf("unable to connect to database: %w", err)
 	}
-	return pool, err
+
+	return pool, nil
 }
 
 func CloseDatabase(pool *pgxpool.Pool) {
