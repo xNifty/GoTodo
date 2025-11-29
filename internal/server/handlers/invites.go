@@ -201,7 +201,7 @@ func APICreateInvite(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "An invite for this email already exists")
 		return
 	}
-	
+
 	errStr := err.Error()
 	if errStr != "no rows in result set" && !errors.Is(err, sql.ErrNoRows) {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -226,14 +226,14 @@ func APICreateInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(ctx)
-	
+
 	_, err = tx.Exec(ctx, "INSERT INTO invites (email, token, inviteused) VALUES ($1, $2, 0)", email, token)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprint(w, "Error creating invite")
 		return
 	}
-	
+
 	err = tx.Commit(ctx)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -332,6 +332,7 @@ func APIUpdateInvite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, _, permissions, loggedIn := utils.GetSessionUser(r)
+	basePath := utils.GetBasePath()
 	if !loggedIn {
 		w.WriteHeader(http.StatusUnauthorized)
 		fmt.Fprint(w, "Please log in")
@@ -375,7 +376,7 @@ func APIUpdateInvite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	newEmail := strings.TrimSpace(r.FormValue(fmt.Sprintf("email-%d", inviteID)))
-	
+
 	if newEmail == "" {
 		for key, values := range r.Form {
 			if strings.HasPrefix(key, "email-") && len(values) > 0 {
@@ -384,7 +385,7 @@ func APIUpdateInvite(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	
+
 	if newEmail == "" {
 		w.Header().Set("HX-Retarget", "#invite-error")
 		w.Header().Set("HX-Reswap", "innerHTML")
@@ -434,7 +435,7 @@ func APIUpdateInvite(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "An invite for this email already exists")
 		return
 	}
-	
+
 	errStr := err.Error()
 	if errStr != "no rows in result set" && !errors.Is(err, sql.ErrNoRows) {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -450,14 +451,14 @@ func APIUpdateInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(ctx)
-	
+
 	result, err := tx.Exec(ctx, "UPDATE invites SET email = $1 WHERE id = $2", newEmail, inviteID)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprint(w, "Error updating invite")
 		return
 	}
-	
+
 	if result.RowsAffected() == 0 {
 		w.Header().Set("HX-Retarget", "#invite-error")
 		w.Header().Set("HX-Reswap", "innerHTML")
@@ -465,7 +466,7 @@ func APIUpdateInvite(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "No changes made - invite not found or email unchanged")
 		return
 	}
-	
+
 	err = tx.Commit(ctx)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -474,7 +475,7 @@ func APIUpdateInvite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Redirect to reload the page
-	w.Header().Set("HX-Redirect", "/createinvite")
+	w.Header().Set("HX-Redirect", basePath+"/createinvite")
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, " ")
 }
@@ -562,10 +563,9 @@ func APIDeleteInvite(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "Error deleting invite")
 		return
 	}
-
-	w.Header().Set("HX-Redirect", "/createinvite")
+	basePath := utils.GetBasePath()
+	w.Header().Set("HX-Redirect", basePath+"/createinvite")
 	w.Header().Set("HX-Trigger", "inviteDeleted")
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, " ")
 }
-
