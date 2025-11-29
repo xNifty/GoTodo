@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"GoTodo/internal/server/utils"
 	"GoTodo/internal/sessionstore"
 	"GoTodo/internal/storage"
 	"context"
@@ -89,8 +90,10 @@ func APILogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	basePath := utils.GetBasePath()
+
 	w.Header().Set("HX-Trigger", "login-success")
-	w.Header().Set("HX-Redirect", "/")
+	w.Header().Set("HX-Redirect", basePath)
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, " ")
 }
