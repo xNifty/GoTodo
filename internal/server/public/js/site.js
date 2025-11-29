@@ -1,3 +1,11 @@
+// Helper to build correct API URLs that work on both localhost and subpaths
+window.apiPath = function (endpoint) {
+  // Remove leading slash if present
+  const path = endpoint.startsWith("/") ? endpoint.slice(1) : endpoint;
+  // Use relative path with dot prefix so HTMX resolves it relative to current location
+  return "./" + path;
+};
+
 document.addEventListener("DOMContentLoaded", () => {
   let sidebar = document.getElementById("sidebar");
   let openSidebarBtn = document.getElementById("openSidebar");

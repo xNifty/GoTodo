@@ -36,6 +36,7 @@ func StartServer() error {
 	http.HandleFunc("/api/login", handlers.APILogin)
 	http.HandleFunc("/api/logout", handlers.APILogout)
 	http.HandleFunc("/api/fetch-tasks", handlers.APIReturnTasks)
+	http.HandleFunc("/partials/login", handlers.APIGetLoginPartial)
 	http.HandleFunc("/api/add-task", handlers.APIAddTask)
 	http.HandleFunc("/api/confirm", handlers.APIConfirmDelete)
 	http.HandleFunc("/api/delete-task", handlers.APIDeleteTask)
