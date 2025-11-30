@@ -82,5 +82,7 @@ func APIUpdateTimezone(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, "/profile?status=success", http.StatusSeeOther)
+	basePath := utils.GetBasePath()
+
+	http.Redirect(w, r, basePath+"/profile?status=success", http.StatusSeeOther)
 }
