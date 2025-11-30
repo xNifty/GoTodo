@@ -66,7 +66,7 @@
                 <form
                     id="search-form"
                     class="d-flex gap-2"
-                    hx-post="/search"
+                    hx-post="{{basePath}}/search"
                     hx-target="#task-container"
                     hx-swap="innerHTML"
                 >
@@ -93,6 +93,21 @@
 
         <div id="task-container" class="container">
             {{template "pagination.html" .}}
+        </div>
+
+        <!-- Sidebar -->
+        <div id="sidebar">
+            <div class="sidebar-header">
+                <button
+                    type="button"
+                    class="btn-close float-end"
+                    id="closeSidebar"
+                ></button>
+                <h5>Add Task</h5>
+            </div>
+            <div class="sidebar-body">
+                {{template "sidebar_form.html" .}}
+            </div>
         </div>
 
         <!-- Modal -->

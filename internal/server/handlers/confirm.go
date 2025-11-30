@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"html/template"
+	"GoTodo/internal/server/utils"
 	"net/http"
 )
 
@@ -17,12 +17,6 @@ func APIConfirmDelete(w http.ResponseWriter, r *http.Request) {
 		page = "1"
 	}
 
-	modalTemplate, err := template.ParseFiles("internal/server/templates/partials/confirm.html")
-	if err != nil {
-		http.Error(w, "Error loading template", http.StatusInternalServerError)
-		return
-	}
-
 	data := struct {
 		ID          string
 		CurrentPage string
@@ -32,7 +26,7 @@ func APIConfirmDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	err = modalTemplate.Execute(w, data)
+	err := utils.Templates.ExecuteTemplate(w, "confirm.html", data)
 	if err != nil {
 		http.Error(w, "Error rendering template: "+err.Error(), http.StatusInternalServerError)
 	}
