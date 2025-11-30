@@ -79,6 +79,13 @@ func APILogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Fetch user_name for session
+	user, err := storage.GetUserByEmail(email)
+	if err == nil && user != nil {
+		session.Values["user_name"] = user.UserName
+	} else {
+		session.Values["user_name"] = ""
+	}
 	session.Values["email"] = email
 	session.Values["role_id"] = roleID
 	session.Values["permissions"] = permissions
