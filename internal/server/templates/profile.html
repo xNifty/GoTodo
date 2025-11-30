@@ -22,7 +22,7 @@
                         </div>
                         <div class="card-body">
                             <div id="successMessage" class="alert alert-success alert-dismissible fade d-none" role="alert" aria-live="polite" style="margin-bottom: 1rem;">
-                                Timezone updated successfully!
+                                Profile updated successfully!
                                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                             </div>
                             <div id="errorMessage" class="alert alert-danger alert-dismissible fade" role="alert" style="display: none;">
@@ -35,7 +35,12 @@
                                 <div class="form-control" style="background-color: var(--form-control-bg); cursor: default;">{{.Email}}</div>
                             </div>
 
-                            <form id="timezoneForm">
+
+                            <form id="profileForm">
+                                <div class="mb-3">
+                                    <label for="user_name" class="form-label fw-bold">Name</label>
+                                    <input type="text" id="user_name" name="user_name" class="form-control" value="{{.Name}}" maxlength="100" required />
+                                </div>
                                 <div class="mb-3">
                                     <label for="timezone" class="form-label fw-bold">Timezone</label>
                                     <select id="timezone" class="form-select" name="timezone" required>
@@ -82,18 +87,16 @@
                 document.documentElement.setAttribute('data-theme', theme);
             });
 
-            document.getElementById('timezoneForm').addEventListener('submit', async function(e) {
+            document.getElementById('profileForm').addEventListener('submit', async function(e) {
                 e.preventDefault();
-                
                 const formData = new FormData();
                 formData.append('timezone', document.getElementById('timezone').value);
-                
+                formData.append('user_name', document.getElementById('user_name').value);
                 try {
-                    const response = await fetch('{{basePath}}/api/update-timezone', {
+                    const response = await fetch('{{basePath}}/api/update-profile', {
                         method: 'POST',
                         body: formData
                     });
-                    
                     if (response.ok) {
                         const successMsg = document.getElementById('successMessage');
                         successMsg.classList.remove('d-none');
@@ -103,12 +106,11 @@
                             successMsg.classList.add('d-none');
                         }, 3000);
                     } else {
-                                    // Hide the success message on page load
-                                    var successMsg = document.getElementById('successMessage');
-                                    successMsg.classList.remove('show');
-                                    successMsg.classList.add('d-none');
+                        var successMsg = document.getElementById('successMessage');
+                        successMsg.classList.remove('show');
+                        successMsg.classList.add('d-none');
                         const errorMsg = document.getElementById('errorMessage');
-                        document.getElementById('errorText').textContent = 'Error updating timezone. Please try again.';
+                        document.getElementById('errorText').textContent = 'Error updating profile. Please try again.';
                         errorMsg.style.display = 'block';
                     }
                 } catch (error) {

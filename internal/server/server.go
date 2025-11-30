@@ -48,6 +48,7 @@ func StartServer() error {
 	// Profile routes
 	http.HandleFunc("/profile", handlers.ProfilePage)
 	http.HandleFunc("/api/update-timezone", handlers.APIUpdateTimezone)
+	http.HandleFunc("/api/update-profile", handlers.APIUpdateProfile)
 
 	// Invite routes
 	http.HandleFunc("/createinvite", utils.RequirePermission("createinvites", handlers.CreateInvitePageHandler))

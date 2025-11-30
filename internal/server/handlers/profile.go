@@ -8,13 +8,66 @@ import (
 	"net/http"
 )
 
+// APIUpdateProfile updates the user's name and timezone
+func APIUpdateProfile(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	email, _, _, _, loggedIn, _ := utils.GetSessionUserWithTimezone(r)
+	if !loggedIn {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	userName := r.FormValue("user_name")
+	timezone := r.FormValue("timezone")
+	if userName == "" {
+		http.Error(w, "Name is required", http.StatusBadRequest)
+		return
+	}
+	if timezone == "" {
+		http.Error(w, "Timezone is required", http.StatusBadRequest)
+		return
+	}
+
+	db, err := storage.OpenDatabase()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	defer db.Close()
+
+	_, err = db.Exec(context.Background(), "UPDATE users SET user_name = $1, timezone = $2 WHERE email = $3", userName, timezone, email)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	session, err := sessionstore.Store.Get(r, "session")
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	session.Values["user_name"] = userName
+	session.Values["timezone"] = timezone
+	err = session.Save(r, w)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 func ProfilePage(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
 
-	email, _, _, timezone, loggedIn := utils.GetSessionUserWithTimezone(r)
+	email, _, _, timezone, loggedIn, user_name := utils.GetSessionUserWithTimezone(r)
 	if !loggedIn {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
@@ -30,6 +83,7 @@ func ProfilePage(w http.ResponseWriter, r *http.Request) {
 		"Email":    email,
 		"Timezone": timezone,
 		"Status":   statusMsg,
+		"Name":     user_name,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -44,7 +98,7 @@ func APIUpdateTimezone(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	email, _, _, _, loggedIn := utils.GetSessionUserWithTimezone(r)
+	email, _, _, _, loggedIn, _ := utils.GetSessionUserWithTimezone(r)
 	if !loggedIn {
 		w.WriteHeader(http.StatusUnauthorized)
 		return

@@ -259,10 +259,27 @@ func MigrateUsersAddTimezone() error {
 	return nil
 }
 
+func MigrateUsersAddName() error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return fmt.Errorf("failed to open database: %v", err)
+	}
+	defer CloseDatabase(pool)
+
+	// name column
+	_, err = pool.Exec(context.Background(), "ALTER TABLE users ADD COLUMN IF NOT EXISTS user_name VARCHAR(100)")
+	if err != nil {
+		return fmt.Errorf("failed to add user_name column to users table: %v", err)
+	}
+
+	return nil
+}
+
 type User struct {
 	ID       int
 	Email    string
 	Password string
+	UserName string
 }
 
 func GetUserByEmail(email string) (*User, error) {
@@ -273,7 +290,7 @@ func GetUserByEmail(email string) (*User, error) {
 	defer CloseDatabase(pool)
 
 	var user User
-	err = pool.QueryRow(context.Background(), "SELECT id, email, password FROM users WHERE email=$1", email).Scan(&user.ID, &user.Email, &user.Password)
+	err = pool.QueryRow(context.Background(), "SELECT id, email, password, user_name FROM users WHERE email=$1", email).Scan(&user.ID, &user.Email, &user.Password, &user.UserName)
 	if err != nil {
 		return nil, err
 	}

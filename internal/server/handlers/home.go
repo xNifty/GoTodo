@@ -33,7 +33,7 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 
 	loggedOut := r.URL.Query().Get("logged_out") == "true"
 
-	email, _, permissions, timezone, loggedIn := utils.GetSessionUserWithTimezone(r)
+	email, _, permissions, timezone, loggedIn, _ := utils.GetSessionUserWithTimezone(r)
 
 	var taskList []tasks.Task
 	var totalTasks int
@@ -127,7 +127,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 
 	loggedOut := r.URL.Query().Get("logged_out") == "true"
 
-	email, _, permissions, timezone, loggedIn := utils.GetSessionUserWithTimezone(r)
+	email, _, permissions, timezone, loggedIn, _ := utils.GetSessionUserWithTimezone(r)
 
 	searchQuery := r.FormValue("search")
 

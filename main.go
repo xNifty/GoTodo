@@ -15,6 +15,7 @@ func main() {
 	storage.CreateTasksTable()
 	storage.MigrateInvitesTable()     // Ensure inviteused column exists
 	storage.MigrateUsersAddTimezone() // Ensure timezone column exists
+	storage.MigrateUsersAddName()
 
 	// The following is just for modifying columns during testing
 	/**

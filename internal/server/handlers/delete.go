@@ -25,7 +25,7 @@ func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get user ID from session
-	email, _, _, timezone, loggedIn := utils.GetSessionUserWithTimezone(r)
+	email, _, _, timezone, loggedIn, _ := utils.GetSessionUserWithTimezone(r)
 	if !loggedIn {
 		w.WriteHeader(http.StatusUnauthorized)
 		fmt.Fprintf(w, "Please log in to delete tasks")

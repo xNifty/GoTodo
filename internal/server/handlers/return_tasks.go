@@ -26,7 +26,7 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 	page := currentPage
 
 	// Get user ID if logged in
-	email, _, _, timezone, loggedIn := utils.GetSessionUserWithTimezone(r)
+	email, _, _, timezone, loggedIn, _ := utils.GetSessionUserWithTimezone(r)
 	var userID *int
 	if loggedIn {
 		userID = getUserIDFromEmail(email)

@@ -56,36 +56,36 @@ func GetSessionUser(r *http.Request) (email string, roleID int, permissions []st
 }
 
 // GetSessionUserWithTimezone retrieves session user data including timezone
-func GetSessionUserWithTimezone(r *http.Request) (email string, roleID int, permissions []string, timezone string, loggedIn bool) {
+func GetSessionUserWithTimezone(r *http.Request) (email string, roleID int, permissions []string, timezone string, loggedIn bool, user_name string) {
 	session, err := sessionstore.Store.Get(r, "session")
 	if err != nil {
 		fmt.Printf("GetSessionUserWithTimezone error getting session: %v\n", err)
-		return "", 0, nil, "America/New_York", false
+		return "", 0, nil, "America/New_York", false, ""
 	}
 
 	emailVal, ok := session.Values["email"]
 	if !ok {
-		return "", 0, nil, "America/New_York", false
+		return "", 0, nil, "America/New_York", false, ""
 	}
 
 	email, ok = emailVal.(string)
 	if !ok {
-		return "", 0, nil, "America/New_York", false
+		return "", 0, nil, "America/New_York", false, ""
 	}
 
 	roleIDVal, ok := session.Values["role_id"]
 	if !ok {
-		return email, 0, nil, "America/New_York", true
+		return email, 0, nil, "America/New_York", true, ""
 	}
 
 	roleID, ok = roleIDVal.(int)
 	if !ok {
-		return email, 0, nil, "America/New_York", true
+		return email, 0, nil, "America/New_York", true, ""
 	}
 
 	permissionsVal, ok := session.Values["permissions"]
 	if !ok {
-		return email, roleID, []string{}, "America/New_York", true
+		return email, roleID, []string{}, "America/New_York", true, ""
 	}
 
 	permissions, ok = permissionsVal.([]string)
@@ -104,15 +104,24 @@ func GetSessionUserWithTimezone(r *http.Request) (email string, roleID int, perm
 
 	timezoneVal, ok := session.Values["timezone"]
 	if !ok {
-		return email, roleID, permissions, "America/New_York", true
+		return email, roleID, permissions, "America/New_York", true, ""
 	}
 
 	timezone, ok = timezoneVal.(string)
 	if !ok {
-		return email, roleID, permissions, "America/New_York", true
+		timezone = "America/New_York"
 	}
 
-	return email, roleID, permissions, timezone, true
+	userNameVal, ok := session.Values["user_name"]
+	if !ok {
+		return email, roleID, permissions, timezone, true, ""
+	}
+	userName, ok := userNameVal.(string)
+	if !ok {
+		userName = ""
+	}
+
+	return email, roleID, permissions, timezone, true, userName
 }
 
 // RequireAuth is a middleware that checks if a user is logged in
