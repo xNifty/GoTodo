@@ -32,14 +32,22 @@
                             
                             <div class="mb-3">
                                 <label class="form-label fw-bold">Email</label>
-                                <div class="form-control" style="background-color: var(--form-control-bg); cursor: default;">{{.Email}}</div>
+                                <input type="text" class="form-control-plaintext" id="email" name="email" value="{{.Email}}" readonly tabindex="-1" aria-readonly="true" style="color: var(--email-plain-color, #000);" />
+                                    <style>
+                                        html[data-theme="dark"] #email.form-control-plaintext {
+                                            color: #fff !important;
+                                        }
+                                        html[data-theme="light"] #email.form-control-plaintext {
+                                            color: #000 !important;
+                                        }
+                                    </style>
                             </div>
 
 
                             <form id="profileForm">
                                 <div class="mb-3">
                                     <label for="user_name" class="form-label fw-bold">Name</label>
-                                    <input type="text" id="user_name" name="user_name" class="form-control" value="{{.Name}}" maxlength="100" required />
+                                    <input type="text" id="user_name" name="user_name" class="form-control editable-field" value="{{.Name}}" maxlength="100" required autocomplete="name" />
                                 </div>
                                 <div class="mb-3">
                                     <label for="timezone" class="form-label fw-bold">Timezone</label>
@@ -80,6 +88,7 @@
         <!-- Bootstrap JS -->
         <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.min.js"></script>
+        <script src="{{basePath}}/public/js/site.js"></script>
 
         <script>
             document.addEventListener('DOMContentLoaded', function() {

@@ -67,7 +67,7 @@ func ProfilePage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	email, _, _, timezone, loggedIn, user_name := utils.GetSessionUserWithTimezone(r)
+	email, _, permissions, timezone, loggedIn, user_name := utils.GetSessionUserWithTimezone(r)
 	if !loggedIn {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
@@ -80,10 +80,13 @@ func ProfilePage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	context := map[string]interface{}{
-		"Email":    email,
-		"Timezone": timezone,
-		"Status":   statusMsg,
-		"Name":     user_name,
+		"UserEmail":   email,
+		"Email":       email,
+		"Timezone":    timezone,
+		"Status":      statusMsg,
+		"Name":        user_name,
+		"LoggedIn":    loggedIn,
+		"Permissions": permissions,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
