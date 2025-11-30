@@ -164,8 +164,8 @@ func APISignup(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "Internal server error")
 		return
 	}
-
-	w.Header().Set("HX-Redirect", "/")
+	basePath := utils.GetBasePath()
+	w.Header().Set("HX-Redirect", basePath+"/")
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, " ")
 }
