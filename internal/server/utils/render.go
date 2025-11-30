@@ -47,14 +47,30 @@ func InitializeTemplates() error {
 }
 
 func RenderTemplate(w http.ResponseWriter, tmpl string, data interface{}) error {
-	err := Templates.ExecuteTemplate(w, tmpl, data)
-	if err != nil {
-		fmt.Println("Error parsing template: ", err)
+	assetVersion := os.Getenv("ASSET_VERSION")
+	if assetVersion == "" {
+		assetVersion = "20251130"
+	}
+
+	var execErr error
+	// If data is a map, inject AssetVersion
+	if ctx, ok := data.(map[string]interface{}); ok {
+		ctx["AssetVersion"] = assetVersion
+		execErr = Templates.ExecuteTemplate(w, tmpl, ctx)
+	} else {
+		ctx := map[string]interface{}{
+			"Data":         data,
+			"AssetVersion": assetVersion,
+		}
+		execErr = Templates.ExecuteTemplate(w, tmpl, ctx)
+	}
+	if execErr != nil {
+		fmt.Println("Error parsing template: ", execErr)
 		if w.Header().Get("Content-Type") == "" {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return err
+		http.Error(w, execErr.Error(), http.StatusInternalServerError)
+		return execErr
 	}
 	return nil
 }
