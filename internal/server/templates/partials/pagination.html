@@ -47,7 +47,7 @@
         <!-- Pagination Controls -->
         <div class="d-flex justify-content-between align-items-center">
             <button
-                hx-get="/api/fetch-tasks?page={{.PreviousPage}}&search={{.SearchQuery}}"
+                hx-get="{{basePath}}/api/fetch-tasks?page={{.PreviousPage}}&search={{.SearchQuery}}"
                 hx-target="#task-container"
                 hx-swap="innerHTML"
                 class="btn btn-outline-primary btn-sm"
@@ -57,7 +57,7 @@
             </button>
             <span class="text-muted">Page {{.CurrentPage}} of {{.TotalPages}}</span>
             <button
-                hx-get="/api/fetch-tasks?page={{.NextPage}}&search={{.SearchQuery}}"
+                hx-get="{{basePath}}/api/fetch-tasks?page={{.NextPage}}&search={{.SearchQuery}}"
                 hx-target="#task-container"
                 hx-swap="innerHTML"
                 class="btn btn-outline-primary btn-sm"

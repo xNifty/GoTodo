@@ -172,10 +172,16 @@ document.addEventListener("DOMContentLoaded", () => {
   // Handle task deletion
   document.body.addEventListener("taskDeleted", function (evt) {
     // Get the current page from the page number display
-    const pageDisplay = document.querySelector(".text-muted");
-    const currentPage = pageDisplay
-      ? parseInt(pageDisplay.textContent.match(/\d+/)[0])
-      : 1;
+    // Find the pagination span that contains "Page X of Y"
+    const spans = document.querySelectorAll("#task-container span");
+    let currentPage = 1;
+    for (let span of spans) {
+      const match = span.textContent.match(/Page\s+(\d+)\s+of\s+(\d+)/);
+      if (match) {
+        currentPage = parseInt(match[1]);
+        break;
+      }
+    }
 
     // Reload the current page
     let url = `/api/fetch-tasks?page=${currentPage}`;
@@ -199,10 +205,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.body.addEventListener("reload-previous-page", function (evt) {
     // Get the current page from the page number display
-    const pageDisplay = document.querySelector(".text-muted");
-    const currentPage = pageDisplay
-      ? parseInt(pageDisplay.textContent.match(/\d+/)[0])
-      : 1;
+    // Find the pagination span that contains "Page X of Y"
+    const spans = document.querySelectorAll("#task-container span");
+    let currentPage = 1;
+    for (let span of spans) {
+      const match = span.textContent.match(/Page\s+(\d+)\s+of\s+(\d+)/);
+      if (match) {
+        currentPage = parseInt(match[1]);
+        break;
+      }
+    }
     const prevPage = Math.max(currentPage - 1, 1);
 
     // Optionally, preserve search query if present

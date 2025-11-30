@@ -90,18 +90,41 @@ func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
 		reloadPage = 1
 	}
 
-	// Set the page to reload in the trigger
-	if reloadPage != currentPage {
-		// Page changed, reload the correct page
-		w.Header().Set("HX-Trigger", fmt.Sprintf(`{"reloadPage": {"page": %d}}`, reloadPage))
-	} else {
-		// Same page, just reload it
-		w.Header().Set("HX-Trigger", "taskDeleted")
+	// Fetch tasks for the reload page
+	pageSize = utils.AppConstants.PageSize
+	taskList, totalTasks, err := tasks.ReturnPaginationForUser(reloadPage, pageSize, &userID)
+	if err != nil {
+		http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Set the page number for each task
+	for i := range taskList {
+		taskList[i].Page = reloadPage
+	}
+
+	// Get pagination data
+	pagination := utils.GetPaginationData(reloadPage, pageSize, totalTasks)
+
+	// Create context for rendering
+	context := map[string]interface{}{
+		"Tasks":        taskList,
+		"PreviousPage": pagination.PreviousPage,
+		"NextPage":     pagination.NextPage,
+		"CurrentPage":  pagination.CurrentPage,
+		"PrevDisabled": pagination.PrevDisabled,
+		"NextDisabled": pagination.NextDisabled,
+		"TotalTasks":   totalTasks,
+		"LoggedIn":     loggedIn,
 	}
 
 	// Set response headers
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
+
+	// Render the updated pagination
+	if err := utils.RenderTemplate(w, "pagination.html", context); err != nil {
+		http.Error(w, "Error rendering pagination: "+err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func APIGetNextItem(w http.ResponseWriter, r *http.Request) {

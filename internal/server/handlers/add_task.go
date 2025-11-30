@@ -109,6 +109,11 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 
 	nextPage := page + 1
 
+	// Set the page number for each task
+	for i := range taskList {
+		taskList[i].Page = page
+	}
+
 	// Create a context for rendering pagination.html
 	context := map[string]interface{}{
 		"Tasks":        taskList,
@@ -119,6 +124,7 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 		"NextDisabled": nextDisabled,
 		"TotalTasks":   totalTasks,
 		"LoggedIn":     true,
+		"TotalPages":   (totalTasks + pageSize - 1) / pageSize,
 	}
 
 	// Set headers for successful addition

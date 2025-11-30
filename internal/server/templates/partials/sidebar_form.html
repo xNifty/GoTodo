@@ -1,5 +1,5 @@
 <form
-    hx-post="/api/add-task"
+    hx-post="{{basePath}}/api/add-task"
     hx-include="#newTaskForm"
     method="post"
     id="newTaskForm"
@@ -15,7 +15,8 @@
             name="title"
             class="form-control"
             required
-            value="{{.Title}}"
+            value=""
+            placeholder="Your Task Title"
         />
     </div>
     <div class="form-group">

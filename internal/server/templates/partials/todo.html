@@ -5,7 +5,7 @@
     <td>
         <button 
             class="badge bg-{{if .Completed}}success{{else}}danger{{end}} status-column"
-            hx-get="/api/update-status?id={{.ID}}"
+            hx-get="{{basePath}}/api/update-status?id={{.ID}}"
             hx-target="#task-{{.ID}} .badge"
             hx-swap="outerHTML"
             style="cursor: pointer;">
@@ -14,7 +14,7 @@
     </td>
     <td>
         <button 
-            hx-get="/api/confirm?id={{.ID}}&page={{.Page}}"
+            hx-get="{{basePath}}/api/confirm?id={{.ID}}&page={{.Page}}"
             hx-target="#modal .modal-content"
             hx-trigger="click"
             data-bs-toggle="modal"
