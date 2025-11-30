@@ -116,6 +116,7 @@ func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
 		"NextDisabled": pagination.NextDisabled,
 		"TotalTasks":   totalTasks,
 		"LoggedIn":     loggedIn,
+		"TotalPages":   pagination.TotalPages,
 	}
 
 	// Set response headers

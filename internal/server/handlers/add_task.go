@@ -80,11 +80,28 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// After successful insertion, render the updated task list (pagination.html)
+	// After successful insertion, determine the correct page to display
 	pageSize := utils.AppConstants.PageSize
-	// We might need the total tasks and tasks for the current page here to render pagination correctly
 
-	// Fetch tasks for the current page again to get the updated list
+	// Open a new DB connection to count total tasks (or reuse db if possible)
+	var totalTasks int
+	err = db.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1", userID).Scan(&totalTasks)
+	if err != nil {
+		http.Error(w, "Error counting tasks after add: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Calculate the new last page
+	lastPage := (totalTasks + pageSize - 1) / pageSize
+	if lastPage < 1 {
+		lastPage = 1
+	}
+
+	// If the new task caused a new page, go to the last page
+	if page < lastPage {
+		page = lastPage
+	}
+
 	taskList, totalTasks, err := tasks.ReturnPaginationForUser(page, pageSize, &userID, timezone)
 	if err != nil {
 		http.Error(w, "Error fetching tasks after add: "+err.Error(), http.StatusInternalServerError)
