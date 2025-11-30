@@ -9,7 +9,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"html/template"
 	"net/http"
 	"strconv"
 	"strings"
@@ -117,12 +116,6 @@ func APIConfirmDeleteInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	modalTemplate, err := template.ParseFiles("internal/server/templates/partials/confirm_invite.html")
-	if err != nil {
-		http.Error(w, "Error loading template", http.StatusInternalServerError)
-		return
-	}
-
 	data := struct {
 		ID    int
 		Email string
@@ -132,7 +125,7 @@ func APIConfirmDeleteInvite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	err = modalTemplate.Execute(w, data)
+	err = utils.Templates.ExecuteTemplate(w, "confirm_invite.html", data)
 	if err != nil {
 		http.Error(w, "Error rendering template: "+err.Error(), http.StatusInternalServerError)
 	}
