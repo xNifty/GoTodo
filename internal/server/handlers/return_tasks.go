@@ -112,6 +112,7 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 		"SearchQuery":  searchQuery,
 		"TotalTasks":   totalTasks,
 		"LoggedIn":     loggedIn,
+		"TotalPages":   pagination.TotalPages,
 	}
 
 	if err := utils.RenderTemplate(w, "pagination.html", context); err != nil {
