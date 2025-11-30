@@ -146,6 +146,7 @@ func APICreateInvite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, _, permissions, loggedIn := utils.GetSessionUser(r)
+	basePath := utils.GetBasePath()
 	if !loggedIn {
 		w.WriteHeader(http.StatusUnauthorized)
 		fmt.Fprint(w, "Please log in to create invites")
@@ -242,7 +243,7 @@ func APICreateInvite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Redirect to reload the page
-	w.Header().Set("HX-Redirect", "/createinvite")
+	w.Header().Set("HX-Redirect", basePath+"/createinvite")
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, " ")
 }

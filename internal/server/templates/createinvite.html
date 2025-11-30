@@ -89,7 +89,7 @@
                                         {{if eq .InviteUsed 0}}
                                         <button 
                                             class="btn btn-sm btn-warning me-1" 
-                                            hx-put="/api/invite/{{.ID}}" 
+                                            hx-put="{{basePath}}/api/invite/{{.ID}}" 
                                             hx-target="#invite-error" 
                                             hx-swap="innerHTML" 
                                             hx-include="#edit-invite-{{.ID}}"
@@ -99,7 +99,7 @@
                                         </button>
                                         <button 
                                             class="btn btn-sm btn-danger" 
-                                            hx-get="/api/confirm-invite-delete?id={{.ID}}"
+                                            hx-get="{{basePath}}/api/confirm-invite-delete?id={{.ID}}"
                                             hx-target="#modal .modal-content"
                                             hx-trigger="click"
                                             data-bs-toggle="modal"
