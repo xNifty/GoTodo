@@ -33,7 +33,7 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 
 	loggedOut := r.URL.Query().Get("logged_out") == "true"
 
-	email, _, permissions, loggedIn := utils.GetSessionUser(r)
+	email, _, permissions, timezone, loggedIn := utils.GetSessionUserWithTimezone(r)
 
 	var taskList []tasks.Task
 	var totalTasks int
@@ -48,9 +48,9 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if searchQuery != "" {
-		taskList, totalTasks, err = tasks.SearchTasksForUser(page, pageSize, searchQuery, userID)
+		taskList, totalTasks, err = tasks.SearchTasksForUser(page, pageSize, searchQuery, userID, timezone)
 	} else {
-		taskList, totalTasks, err = tasks.ReturnPaginationForUser(page, pageSize, userID)
+		taskList, totalTasks, err = tasks.ReturnPaginationForUser(page, pageSize, userID, timezone)
 	}
 
 	if err != nil {
@@ -127,7 +127,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 
 	loggedOut := r.URL.Query().Get("logged_out") == "true"
 
-	email, _, permissions, loggedIn := utils.GetSessionUser(r)
+	email, _, permissions, timezone, loggedIn := utils.GetSessionUserWithTimezone(r)
 
 	searchQuery := r.FormValue("search")
 
@@ -137,9 +137,9 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 
 	if searchQuery != "" {
 		isSearching = true
-		taskList, totalTasks, err = tasks.SearchTasksForUser(page, pageSize, searchQuery, userID)
+		taskList, totalTasks, err = tasks.SearchTasksForUser(page, pageSize, searchQuery, userID, timezone)
 	} else {
-		taskList, totalTasks, err = tasks.ReturnPaginationForUser(page, pageSize, userID)
+		taskList, totalTasks, err = tasks.ReturnPaginationForUser(page, pageSize, userID, timezone)
 	}
 
 	if err != nil {

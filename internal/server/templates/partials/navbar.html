@@ -25,6 +25,9 @@
                     <span class="ms-2"><i class="bi bi-moon-fill"></i></span>
                     {{if .LoggedIn}}
                     <span class="text-muted me-2">{{.UserEmail}}</span>
+                    <a href="{{basePath}}/profile" class="btn btn-outline-secondary btn-sm me-2">
+                        <i class="bi bi-person-circle"></i> Profile
+                    </a>
                     <button class="btn btn-outline-danger btn-sm" id="logout-btn" hx-post="{{basePath}}/api/logout" hx-trigger="click">
                         <i class="bi bi-box-arrow-right"></i> Logout
                     </button>

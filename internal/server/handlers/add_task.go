@@ -56,7 +56,7 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 	defer db.Close()
 
 	// Get user ID from session
-	email, _, _, loggedIn := utils.GetSessionUser(r)
+	email, _, _, timezone, loggedIn := utils.GetSessionUserWithTimezone(r)
 	if !loggedIn {
 		w.WriteHeader(http.StatusUnauthorized)
 		fmt.Fprint(w, "Please log in to add tasks.")
@@ -72,7 +72,7 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Insert the new task into the database with user_id
-	_, err = db.Exec(context.Background(), "INSERT INTO tasks (title, description, completed, user_id) VALUES ($1, $2, $3, $4)", title, description, false, userID)
+	_, err = db.Exec(context.Background(), "INSERT INTO tasks (title, description, completed, user_id, time_stamp) VALUES ($1, $2, $3, $4, NOW() AT TIME ZONE 'UTC')", title, description, false, userID)
 	if err != nil {
 		fmt.Println("We failed to insert into the database.")
 		fmt.Println("Failed values:", title, description, false)
@@ -85,7 +85,7 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 	// We might need the total tasks and tasks for the current page here to render pagination correctly
 
 	// Fetch tasks for the current page again to get the updated list
-	taskList, totalTasks, err := tasks.ReturnPaginationForUser(page, pageSize, &userID)
+	taskList, totalTasks, err := tasks.ReturnPaginationForUser(page, pageSize, &userID, timezone)
 	if err != nil {
 		http.Error(w, "Error fetching tasks after add: "+err.Error(), http.StatusInternalServerError)
 		return

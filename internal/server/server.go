@@ -45,6 +45,10 @@ func StartServer() error {
 	http.HandleFunc("/about", handlers.AboutHandler)
 	http.HandleFunc("/search", handlers.SearchHandler)
 
+	// Profile routes
+	http.HandleFunc("/profile", handlers.ProfilePage)
+	http.HandleFunc("/api/update-timezone", handlers.APIUpdateTimezone)
+
 	// Invite routes
 	http.HandleFunc("/createinvite", utils.RequirePermission("createinvites", handlers.CreateInvitePageHandler))
 	http.HandleFunc("/api/create-invite", utils.RequirePermission("createinvites", handlers.APICreateInvite))
@@ -63,6 +67,6 @@ func StartServer() error {
 		}
 	})
 
-	fmt.Println("Starting server on :8080")
+	fmt.Printf("Starting server on %s\n", addr)
 	return http.ListenAndServe(addr, nil)
 }

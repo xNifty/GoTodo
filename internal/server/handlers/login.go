@@ -45,8 +45,9 @@ func APILogin(w http.ResponseWriter, r *http.Request) {
 
 	var hashedPassword string
 	var roleID int
-	row := db.QueryRow(context.Background(), "SELECT password, role_id FROM users WHERE email = $1", email)
-	err = row.Scan(&hashedPassword, &roleID)
+	var timezone string
+	row := db.QueryRow(context.Background(), "SELECT password, role_id, COALESCE(timezone, 'America/New_York') FROM users WHERE email = $1", email)
+	err = row.Scan(&hashedPassword, &roleID, &timezone)
 	if err != nil {
 		w.Header().Set("HX-Retarget", "#login-error")
 		w.Header().Set("HX-Reswap", "innerHTML")
@@ -81,6 +82,7 @@ func APILogin(w http.ResponseWriter, r *http.Request) {
 	session.Values["email"] = email
 	session.Values["role_id"] = roleID
 	session.Values["permissions"] = permissions
+	session.Values["timezone"] = timezone
 
 	err = session.Save(r, w)
 	if err != nil {

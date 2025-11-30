@@ -25,7 +25,7 @@ func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get user ID from session
-	email, _, _, loggedIn := utils.GetSessionUser(r)
+	email, _, _, timezone, loggedIn := utils.GetSessionUserWithTimezone(r)
 	if !loggedIn {
 		w.WriteHeader(http.StatusUnauthorized)
 		fmt.Fprintf(w, "Please log in to delete tasks")
@@ -92,7 +92,7 @@ func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
 
 	// Fetch tasks for the reload page
 	pageSize = utils.AppConstants.PageSize
-	taskList, totalTasks, err := tasks.ReturnPaginationForUser(reloadPage, pageSize, &userID)
+	taskList, totalTasks, err := tasks.ReturnPaginationForUser(reloadPage, pageSize, &userID, timezone)
 	if err != nil {
 		http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
 		return

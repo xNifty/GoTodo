@@ -26,7 +26,7 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 	page := currentPage
 
 	// Get user ID if logged in
-	email, _, _, loggedIn := utils.GetSessionUser(r)
+	email, _, _, timezone, loggedIn := utils.GetSessionUserWithTimezone(r)
 	var userID *int
 	if loggedIn {
 		userID = getUserIDFromEmail(email)
@@ -38,7 +38,7 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 	var err error
 
 	if searchQuery != "" {
-		taskList, totalTasks, err = tasks.SearchTasksForUser(page, pageSize, searchQuery, userID)
+		taskList, totalTasks, err = tasks.SearchTasksForUser(page, pageSize, searchQuery, userID, timezone)
 		if err != nil {
 			http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -50,7 +50,7 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 			taskList[i].Description = highlightMatches(task.Description, searchQuery)
 		}
 	} else {
-		taskList, totalTasks, err = tasks.ReturnPaginationForUser(page, pageSize, userID)
+		taskList, totalTasks, err = tasks.ReturnPaginationForUser(page, pageSize, userID, timezone)
 		if err != nil {
 			http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -72,7 +72,7 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 	// If page was adjusted, we need to refetch with the correct page
 	if page != currentPage {
 		if searchQuery != "" {
-			taskList, totalTasks, err = tasks.SearchTasksForUser(page, pageSize, searchQuery, userID)
+			taskList, totalTasks, err = tasks.SearchTasksForUser(page, pageSize, searchQuery, userID, timezone)
 			if err != nil {
 				http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
 				return
@@ -83,7 +83,7 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 				taskList[i].Description = highlightMatches(task.Description, searchQuery)
 			}
 		} else {
-			taskList, totalTasks, err = tasks.ReturnPaginationForUser(page, pageSize, userID)
+			taskList, totalTasks, err = tasks.ReturnPaginationForUser(page, pageSize, userID, timezone)
 			if err != nil {
 				http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
 				return
@@ -112,6 +112,7 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 		"SearchQuery":  searchQuery,
 		"TotalTasks":   totalTasks,
 		"LoggedIn":     loggedIn,
+		"Timezone":     timezone,
 		"TotalPages":   pagination.TotalPages,
 	}
 

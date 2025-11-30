@@ -13,7 +13,8 @@ func main() {
 	storage.CreateRolesTable()
 	storage.CreateInvitesTable()
 	storage.CreateTasksTable()
-	storage.MigrateInvitesTable() // Ensure inviteused column exists
+	storage.MigrateInvitesTable()     // Ensure inviteused column exists
+	storage.MigrateUsersAddTimezone() // Ensure timezone column exists
 
 	// The following is just for modifying columns during testing
 	/**
@@ -22,5 +23,8 @@ func main() {
 	storage.MigrateTasksTable()
 	*/
 
-	server.StartServer()
+	err := server.StartServer()
+	if err != nil {
+		fmt.Printf("Server error: %v\n", err)
+	}
 }

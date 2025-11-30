@@ -72,6 +72,24 @@
                                         autocomplete="new-password"
                                     />
                                 </div>
+                                <div class="mb-3">
+                                    <label for="timezone" class="form-label">Timezone</label>
+                                    <select id="timezone" class="form-select" name="timezone" required>
+                                        <option value="America/New_York" selected>Eastern Time (ET) - GMT-5</option>
+                                        <option value="America/Chicago">Central Time (CT) - GMT-6</option>
+                                        <option value="America/Denver">Mountain Time (MT) - GMT-7</option>
+                                        <option value="America/Los_Angeles">Pacific Time (PT) - GMT-8</option>
+                                        <option value="America/Anchorage">Alaska Time (AKT) - GMT-9</option>
+                                        <option value="Pacific/Honolulu">Hawaii Time (HST) - GMT-10</option>
+                                        <option value="UTC">UTC - GMT+0</option>
+                                        <option value="Europe/London">London (GMT) - GMT+0</option>
+                                        <option value="Europe/Paris">Central European Time (CET) - GMT+1</option>
+                                        <option value="Asia/Kolkata">India Standard Time (IST) - GMT+5:30</option>
+                                        <option value="Asia/Shanghai">China Standard Time (CST) - GMT+8</option>
+                                        <option value="Asia/Tokyo">Japan Standard Time (JST) - GMT+9</option>
+                                        <option value="Pacific/Auckland">New Zealand Time (NZDT) - GMT+13</option>
+                                    </select>
+                                </div>
                                 <div id="signup-error" class="text-danger mb-2"></div>
                                 <button type="submit" class="btn btn-primary">
                                     <i class="bi bi-person-plus"></i> Sign Up

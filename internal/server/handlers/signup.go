@@ -53,8 +53,9 @@ func APISignup(w http.ResponseWriter, r *http.Request) {
 	token := strings.TrimSpace(r.FormValue("token"))
 	password := r.FormValue("password")
 	confirmPassword := r.FormValue("confirm_password")
+	timezone := strings.TrimSpace(r.FormValue("timezone"))
 
-	if email == "" || token == "" || password == "" || confirmPassword == "" {
+	if email == "" || token == "" || password == "" || confirmPassword == "" || timezone == "" {
 		w.Header().Set("HX-Retarget", "#signup-error")
 		w.Header().Set("HX-Reswap", "innerHTML")
 		w.WriteHeader(http.StatusOK)
@@ -144,7 +145,7 @@ func APISignup(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(ctx)
 
-	_, err = tx.Exec(ctx, "INSERT INTO users (email, password, role_id) VALUES ($1, $2, $3)", email, string(hashedPassword), defaultRoleID)
+	_, err = tx.Exec(ctx, "INSERT INTO users (email, password, role_id, timezone) VALUES ($1, $2, $3, $4)", email, string(hashedPassword), defaultRoleID, timezone)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprint(w, "Internal server error")

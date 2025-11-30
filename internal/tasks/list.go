@@ -91,10 +91,10 @@ func ReturnTaskList() []Task {
 }
 
 func ReturnPagination(page, pageSize int) ([]Task, int, error) {
-	return ReturnPaginationForUser(page, pageSize, nil)
+	return ReturnPaginationForUser(page, pageSize, nil, "America/New_York")
 }
 
-func ReturnPaginationForUser(page, pageSize int, userID *int) ([]Task, int, error) {
+func ReturnPaginationForUser(page, pageSize int, userID *int, timezone string) ([]Task, int, error) {
 	pool, err := storage.OpenDatabase()
 	if err != nil {
 		return nil, 0, err
@@ -106,7 +106,7 @@ func ReturnPaginationForUser(page, pageSize int, userID *int) ([]Task, int, erro
 
 	// Build query based on whether user is logged in
 	query := `SELECT id, title, description, completed, 
-		TO_CHAR(time_stamp, 'YYYY/MM/DD HH:MI AM') AS date_added 
+		TO_CHAR((time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $3, 'YYYY/MM/DD HH:MI AM') AS date_added 
 		FROM tasks `
 
 	var countQuery string
@@ -122,8 +122,8 @@ func ReturnPaginationForUser(page, pageSize int, userID *int) ([]Task, int, erro
 	}
 
 	// Logged in - filter by user_id
-	query += `WHERE user_id = $3 ORDER BY id LIMIT $1 OFFSET $2`
-	rows, err = pool.Query(context.Background(), query, pageSize, offset, *userID)
+	query += `WHERE user_id = $4 ORDER BY id LIMIT $1 OFFSET $2`
+	rows, err = pool.Query(context.Background(), query, pageSize, offset, timezone, *userID)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -148,10 +148,10 @@ func ReturnPaginationForUser(page, pageSize int, userID *int) ([]Task, int, erro
 }
 
 func SearchTasks(page, pageSize int, searchQuery string) ([]Task, int, error) {
-	return SearchTasksForUser(page, pageSize, searchQuery, nil)
+	return SearchTasksForUser(page, pageSize, searchQuery, nil, "America/New_York")
 }
 
-func SearchTasksForUser(page, pageSize int, searchQuery string, userID *int) ([]Task, int, error) {
+func SearchTasksForUser(page, pageSize int, searchQuery string, userID *int, timezone string) ([]Task, int, error) {
 	pool, err := storage.OpenDatabase()
 	if err != nil {
 		return nil, 0, err
@@ -173,12 +173,12 @@ func SearchTasksForUser(page, pageSize int, searchQuery string, userID *int) ([]
 			title, 
 			description,
 			completed, 
-			TO_CHAR(time_stamp, 'YYYY/MM/DD HH:MM AM')  as date_added
+			TO_CHAR((time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MM AM')  as date_added
 		 FROM tasks 
 		 WHERE (title ILIKE $1 OR description ILIKE $1) AND user_id = $4
 		 ORDER BY id 
-		 LIMIT $2 OFFSET $3`,
-		searchPattern, pageSize, offset, *userID)
+		 LIMIT $3 OFFSET $5`,
+		searchPattern, timezone, pageSize, *userID, offset)
 
 	if err != nil {
 		return nil, 0, err

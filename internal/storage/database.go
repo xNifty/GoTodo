@@ -243,6 +243,22 @@ func MigrateTasksTable() error {
 	return nil
 }
 
+// MigrateUsersAddTimezone adds timezone column to users table
+func MigrateUsersAddTimezone() error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return fmt.Errorf("failed to open database: %v", err)
+	}
+	defer CloseDatabase(pool)
+
+	// Add timezone column with default value America/New_York (GMT-5)
+	_, err = pool.Exec(context.Background(), "ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone VARCHAR(100) DEFAULT 'America/New_York'")
+	if err != nil {
+		return fmt.Errorf("failed to add timezone column to users table: %v", err)
+	}
+	return nil
+}
+
 type User struct {
 	ID       int
 	Email    string

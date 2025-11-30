@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+    <head>
+        <meta charset="UTF-8" />
+        <title>User Profile</title>
+        <link
+            href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="{{basePath}}/public/css/site.css" />
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    </head>
+    <body>
+        {{template "navbar.html" .}}
+
+        <div class="container mt-5">
+            <div class="row justify-content-center">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title mb-0">User Profile</h2>
+                        </div>
+                        <div class="card-body">
+                            <div id="successMessage" class="alert alert-success alert-dismissible fade d-none" role="alert" aria-live="polite" style="margin-bottom: 1rem;">
+                                Timezone updated successfully!
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                            <div id="errorMessage" class="alert alert-danger alert-dismissible fade" role="alert" style="display: none;">
+                                <span id="errorText"></span>
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Email</label>
+                                <div class="form-control" style="background-color: var(--form-control-bg); cursor: default;">{{.Email}}</div>
+                            </div>
+
+                            <form id="timezoneForm">
+                                <div class="mb-3">
+                                    <label for="timezone" class="form-label fw-bold">Timezone</label>
+                                    <select id="timezone" class="form-select" name="timezone" required>
+                                        <option value="America/New_York" {{if eq .Timezone "America/New_York"}}selected{{end}}>Eastern Time (ET) - GMT-5</option>
+                                        <option value="America/Chicago" {{if eq .Timezone "America/Chicago"}}selected{{end}}>Central Time (CT) - GMT-6</option>
+                                        <option value="America/Denver" {{if eq .Timezone "America/Denver"}}selected{{end}}>Mountain Time (MT) - GMT-7</option>
+                                        <option value="America/Los_Angeles" {{if eq .Timezone "America/Los_Angeles"}}selected{{end}}>Pacific Time (PT) - GMT-8</option>
+                                        <option value="America/Anchorage" {{if eq .Timezone "America/Anchorage"}}selected{{end}}>Alaska Time (AKT) - GMT-9</option>
+                                        <option value="Pacific/Honolulu" {{if eq .Timezone "Pacific/Honolulu"}}selected{{end}}>Hawaii Time (HST) - GMT-10</option>
+                                        <option value="UTC" {{if eq .Timezone "UTC"}}selected{{end}}>UTC - GMT+0</option>
+                                        <option value="Europe/London" {{if eq .Timezone "Europe/London"}}selected{{end}}>London (GMT) - GMT+0</option>
+                                        <option value="Europe/Paris" {{if eq .Timezone "Europe/Paris"}}selected{{end}}>Central European Time (CET) - GMT+1</option>
+                                        <option value="Asia/Kolkata" {{if eq .Timezone "Asia/Kolkata"}}selected{{end}}>India Standard Time (IST) - GMT+5:30</option>
+                                        <option value="Asia/Shanghai" {{if eq .Timezone "Asia/Shanghai"}}selected{{end}}>China Standard Time (CST) - GMT+8</option>
+                                        <option value="Asia/Tokyo" {{if eq .Timezone "Asia/Tokyo"}}selected{{end}}>Japan Standard Time (JST) - GMT+9</option>
+                                        <option value="Pacific/Auckland" {{if eq .Timezone "Pacific/Auckland"}}selected{{end}}>New Zealand Time (NZDT) - GMT+13</option>
+                                    </select>
+                                </div>
+
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="bi bi-check-lg"></i> Save Changes
+                                    </button>
+                                    <a href="/" class="btn btn-secondary">
+                                        <i class="bi bi-arrow-left"></i> Back
+                                    </a>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{template "footer.html" .}}
+
+        <!-- Bootstrap JS -->
+        <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.min.js"></script>
+
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const theme = localStorage.getItem('theme') || 'light';
+                document.documentElement.setAttribute('data-theme', theme);
+            });
+
+            document.getElementById('timezoneForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData();
+                formData.append('timezone', document.getElementById('timezone').value);
+                
+                try {
+                    const response = await fetch('{{basePath}}/api/update-timezone', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    if (response.ok) {
+                        const successMsg = document.getElementById('successMessage');
+                        successMsg.classList.remove('d-none');
+                        successMsg.classList.add('show');
+                        setTimeout(function() {
+                            successMsg.classList.remove('show');
+                            successMsg.classList.add('d-none');
+                        }, 3000);
+                    } else {
+                                    // Hide the success message on page load
+                                    var successMsg = document.getElementById('successMessage');
+                                    successMsg.classList.remove('show');
+                                    successMsg.classList.add('d-none');
+                        const errorMsg = document.getElementById('errorMessage');
+                        document.getElementById('errorText').textContent = 'Error updating timezone. Please try again.';
+                        errorMsg.style.display = 'block';
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    const errorMsg = document.getElementById('errorMessage');
+                    document.getElementById('errorText').textContent = 'An error occurred. Please try again.';
+                    errorMsg.style.display = 'block';
+                }
+            });
+        </script>
+    </body>
+</html>
