@@ -36,7 +36,7 @@ func ListTasks() {
 		underlines[i] = strings.Repeat("-", len(header))
 	}
 
-	fmt.Fprintf(writer, strings.Join(underlines, "\t")+"\n")
+	fmt.Fprintf(writer, "%s", strings.Join(underlines, "\t")+"\n")
 
 	for rows.Next() {
 		var id int

@@ -10,8 +10,8 @@
     <button 
         class="btn btn-danger" 
         hx-delete="{{basePath}}/api/delete-task?id={{.ID}}&page={{.CurrentPage}}" 
-        hx-target="#task-{{.ID}}"
-        hx-swap="delete"
+        hx-target="#task-container"
+        hx-swap="innerHTML"
         data-bs-dismiss="modal"
     >
         Yes, Delete
