@@ -1,3 +1,9 @@
+html[data-theme="dark"] #email.form-control-plaintext {
+    color: #fff !important;
+}
+html[data-theme="light"] #email.form-control-plaintext {
+    color: #000 !important;
+}
 @import url("https://fonts.googleapis.com/css2?family=Fira+Code:wght@400&display=swap");
 
 :root {
