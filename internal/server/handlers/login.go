@@ -73,16 +73,31 @@ func APILogin(w http.ResponseWriter, r *http.Request) {
 
 	session, err := sessionstore.Store.Get(r, "session")
 	if err != nil {
-		fmt.Printf("Error getting session: %v\n", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprint(w, "Session error.")
-		return
+		// If cookie has an expired securecookie timestamp, clear it and retry
+		if strings.Contains(err.Error(), "securecookie: expired timestamp") {
+			sessionstore.ClearSessionCookie(w, r)
+			// Try to get a fresh session after clearing
+			session, err = sessionstore.Store.Get(r, "session")
+			if err != nil {
+				fmt.Printf("Error getting session after clearing cookie: %v\n", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprint(w, "Session error.")
+				return
+			}
+		} else {
+			fmt.Printf("Error getting session: %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "Session error.")
+			return
+		}
 	}
 
 	// Fetch user_name for session
 	user, err := storage.GetUserByEmail(email)
 	if err == nil && user != nil {
 		session.Values["user_name"] = user.UserName
+		// Store user ID in session so handlers can use it directly without extra DB lookups
+		session.Values["user_id"] = user.ID
 	} else {
 		session.Values["user_name"] = ""
 	}

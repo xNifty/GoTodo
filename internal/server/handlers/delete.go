@@ -24,7 +24,7 @@ func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
 		currentPage = 1
 	}
 
-	// Get user ID from session
+	// Get user ID from session (fallback to querying by email)
 	email, _, _, timezone, loggedIn, _ := utils.GetSessionUserWithTimezone(r)
 	if !loggedIn {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -40,13 +40,17 @@ func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	// Get user ID
+	// Determine user ID (prefer session value)
 	var userID int
-	err = db.QueryRow(context.Background(), "SELECT id FROM users WHERE email = $1", email).Scan(&userID)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "Error getting user ID")
-		return
+	if uid := utils.GetSessionUserID(r); uid != nil {
+		userID = *uid
+	} else {
+		err = db.QueryRow(context.Background(), "SELECT id FROM users WHERE email = $1", email).Scan(&userID)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, "Error getting user ID")
+			return
+		}
 	}
 
 	// Delete the task from the database (only if it belongs to the user)
@@ -104,7 +108,7 @@ func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get pagination data
-	pagination := utils.GetPaginationData(reloadPage, pageSize, totalTasks)
+	pagination := utils.GetPaginationData(reloadPage, pageSize, totalTasks, userID)
 
 	// Create context for rendering
 	context := map[string]interface{}{
@@ -149,12 +153,16 @@ func APIGetNextItem(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	// Get user ID
+	// Get user ID (prefer session value)
 	var userID int
-	err = db.QueryRow(context.Background(), "SELECT id FROM users WHERE email = $1", email).Scan(&userID)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+	if uid := utils.GetSessionUserID(r); uid != nil {
+		userID = *uid
+	} else {
+		err = db.QueryRow(context.Background(), "SELECT id FROM users WHERE email = $1", email).Scan(&userID)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// Get total number of tasks for this user

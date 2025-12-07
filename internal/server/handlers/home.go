@@ -11,6 +11,10 @@ import (
 )
 
 func getUserIDFromEmail(email string) *int {
+	// First try to read user_id from the session (avoid extra DB lookup)
+	// Note: we don't have *http.Request here, so callers may prefer using
+	// utils.GetSessionUserID directly. This function remains for backward
+	// compatibility and will perform a DB lookup by email if needed.
 	pool, err := storage.OpenDatabase()
 	if err != nil {
 		return nil
@@ -42,9 +46,13 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 
 	isSearching := false
 
-	// Get user ID if logged in
+	// Get user ID if logged in (prefer session-stored ID)
 	if loggedIn {
-		userID = getUserIDFromEmail(email)
+		if uid := utils.GetSessionUserID(r); uid != nil {
+			userID = uid
+		} else {
+			userID = getUserIDFromEmail(email)
+		}
 	}
 
 	if searchQuery != "" {
@@ -74,24 +82,26 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 		taskList[i].Page = page
 	}
 
-	pagination := utils.GetPaginationData(page, pageSize, totalTasks)
+	pagination := utils.GetPaginationData(page, pageSize, totalTasks, *userID)
 
 	// Create a context for the tasks and pagination
 	context := map[string]interface{}{
-		"Tasks":        taskList,
-		"CurrentPage":  page,
-		"PreviousPage": pagination.PreviousPage,
-		"NextPage":     pagination.NextPage,
-		"PrevDisabled": pagination.PrevDisabled,
-		"NextDisabled": pagination.NextDisabled,
-		"LoggedIn":     loggedIn,
-		"UserEmail":    email,
-		"Permissions":  permissions,
-		"LoggedOut":    loggedOut,
-		"TotalTasks":   totalTasks,
-		"TotalPages":   pagination.TotalPages,
-		"IsSearching":  isSearching,
-		"Title":        "GoTodo - Home",
+		"Tasks":           taskList,
+		"CurrentPage":     page,
+		"PreviousPage":    pagination.PreviousPage,
+		"NextPage":        pagination.NextPage,
+		"PrevDisabled":    pagination.PrevDisabled,
+		"NextDisabled":    pagination.NextDisabled,
+		"LoggedIn":        loggedIn,
+		"UserEmail":       email,
+		"Permissions":     permissions,
+		"LoggedOut":       loggedOut,
+		"TotalTasks":      totalTasks,
+		"TotalPages":      pagination.TotalPages,
+		"IsSearching":     isSearching,
+		"Title":           "GoTodo - Home",
+		"CompletedTasks":  utils.GetCompletedTasksCount(userID),
+		"IncompleteTasks": utils.GetIncompleteTasksCount(userID),
 	}
 
 	// Render the tasks and pagination controls
@@ -132,7 +142,11 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	searchQuery := r.FormValue("search")
 
 	if loggedIn {
-		userID = getUserIDFromEmail(email)
+		if uid := utils.GetSessionUserID(r); uid != nil {
+			userID = uid
+		} else {
+			userID = getUserIDFromEmail(email)
+		}
 	}
 
 	if searchQuery != "" {
@@ -162,24 +176,26 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 		taskList[i].Page = page
 	}
 
-	pagination := utils.GetPaginationData(page, pageSize, totalTasks)
+	pagination := utils.GetPaginationData(page, pageSize, totalTasks, *userID)
 
 	context := map[string]interface{}{
-		"Tasks":        taskList,
-		"TotalResults": totalTasks,
-		"SearchQuery":  searchQuery,
-		"CurrentPage":  page,
-		"PreviousPage": pagination.PreviousPage,
-		"NextPage":     pagination.NextPage,
-		"PrevDisabled": pagination.PrevDisabled,
-		"NextDisabled": pagination.NextDisabled,
-		"TotalPages":   pagination.TotalPages,
-		"LoggedIn":     loggedIn,
-		"UserEmail":    email,
-		"Permissions":  permissions,
-		"LoggedOut":    loggedOut,
-		"IsSearching":  isSearching,
-		"TotalTasks":   totalTasks,
+		"Tasks":           taskList,
+		"TotalResults":    totalTasks,
+		"SearchQuery":     searchQuery,
+		"CurrentPage":     page,
+		"PreviousPage":    pagination.PreviousPage,
+		"NextPage":        pagination.NextPage,
+		"PrevDisabled":    pagination.PrevDisabled,
+		"NextDisabled":    pagination.NextDisabled,
+		"TotalPages":      pagination.TotalPages,
+		"LoggedIn":        loggedIn,
+		"UserEmail":       email,
+		"Permissions":     permissions,
+		"LoggedOut":       loggedOut,
+		"IsSearching":     isSearching,
+		"TotalTasks":      totalTasks,
+		"CompletedTasks":  utils.GetCompletedTasksCount(userID),
+		"IncompleteTasks": utils.GetIncompleteTasksCount(userID),
 	}
 
 	if err := utils.RenderTemplate(w, "pagination.html", context); err != nil {

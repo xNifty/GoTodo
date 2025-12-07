@@ -4,11 +4,17 @@ import (
 	"GoTodo/internal/server/utils"
 	"GoTodo/internal/sessionstore"
 	"net/http"
+	"strings"
 )
 
 func APILogout(w http.ResponseWriter, r *http.Request) {
 	session, err := sessionstore.Store.Get(r, "session")
-	if err == nil {
+	if err != nil {
+		if strings.Contains(err.Error(), "securecookie: expired timestamp") {
+			// Clear expired cookie and continue
+			sessionstore.ClearSessionCookie(w, r)
+		}
+	} else {
 		session.Values = make(map[interface{}]interface{})
 		session.Options.MaxAge = -1
 		session.Save(r, w)

@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
+	"GoTodo/internal/config"
 )
 
 var Templates *template.Template
@@ -13,7 +15,9 @@ var BasePath string
 
 func InitializeTemplates() error {
 	var err error
-	BasePath = os.Getenv("BASE_PATH")
+	// Load repo config (fallbacks to env/defaults internally)
+	config.Load()
+	BasePath = config.Cfg.BasePath
 	if BasePath == "" {
 		BasePath = "/"
 	}
@@ -49,7 +53,12 @@ func InitializeTemplates() error {
 func RenderTemplate(w http.ResponseWriter, tmpl string, data interface{}) error {
 	assetVersion := os.Getenv("ASSET_VERSION")
 	if assetVersion == "" {
-		assetVersion = "20251130"
+		// fallback to config asset version
+		if config.Cfg.AssetVersion != "" {
+			assetVersion = config.Cfg.AssetVersion
+		} else {
+			assetVersion = "20251130"
+		}
 	}
 
 	var execErr error

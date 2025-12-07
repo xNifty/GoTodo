@@ -4,7 +4,41 @@ import (
 	"GoTodo/internal/sessionstore"
 	"fmt"
 	"net/http"
+	"strconv"
 )
+
+// GetSessionUserID returns the user_id stored in the session as a pointer to int.
+// Returns nil if not present or on error.
+func GetSessionUserID(r *http.Request) *int {
+	session, err := sessionstore.Store.Get(r, "session")
+	if err != nil {
+		fmt.Printf("GetSessionUserID error getting session: %v\n", err)
+		return nil
+	}
+
+	idVal, ok := session.Values["user_id"]
+	if !ok {
+		return nil
+	}
+
+	switch v := idVal.(type) {
+	case int:
+		return &v
+	case int64:
+		i := int(v)
+		return &i
+	case float64:
+		i := int(v)
+		return &i
+	case string:
+		if n, err := strconv.Atoi(v); err == nil {
+			return &n
+		}
+	default:
+		return nil
+	}
+	return nil
+}
 
 func GetSessionUser(r *http.Request) (email string, roleID int, permissions []string, loggedIn bool) {
 	session, err := sessionstore.Store.Get(r, "session")

@@ -6,6 +6,7 @@ import (
 	"GoTodo/internal/storage"
 	"context"
 	"net/http"
+	"strings"
 )
 
 // APIUpdateProfile updates the user's name and timezone
@@ -47,6 +48,12 @@ func APIUpdateProfile(w http.ResponseWriter, r *http.Request) {
 
 	session, err := sessionstore.Store.Get(r, "session")
 	if err != nil {
+		if strings.Contains(err.Error(), "securecookie: expired timestamp") {
+			sessionstore.ClearSessionCookie(w, r)
+			// Require re-login when session cookie was expired
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -128,6 +135,11 @@ func APIUpdateTimezone(w http.ResponseWriter, r *http.Request) {
 
 	session, err := sessionstore.Store.Get(r, "session")
 	if err != nil {
+		if strings.Contains(err.Error(), "securecookie: expired timestamp") {
+			sessionstore.ClearSessionCookie(w, r)
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}

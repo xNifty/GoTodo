@@ -96,24 +96,26 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 		taskList[i].Page = page
 	}
 
-	pagination := utils.GetPaginationData(page, pageSize, totalTasks)
+	pagination := utils.GetPaginationData(page, pageSize, totalTasks, *userID)
 
 	// Set response header
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
 	// Create a context for the tasks and pagination
 	context := map[string]interface{}{
-		"Tasks":        taskList,
-		"PreviousPage": pagination.PreviousPage,
-		"NextPage":     pagination.NextPage,
-		"CurrentPage":  pagination.CurrentPage,
-		"PrevDisabled": pagination.PrevDisabled,
-		"NextDisabled": pagination.NextDisabled,
-		"SearchQuery":  searchQuery,
-		"TotalTasks":   totalTasks,
-		"LoggedIn":     loggedIn,
-		"Timezone":     timezone,
-		"TotalPages":   pagination.TotalPages,
+		"Tasks":           taskList,
+		"PreviousPage":    pagination.PreviousPage,
+		"NextPage":        pagination.NextPage,
+		"CurrentPage":     pagination.CurrentPage,
+		"PrevDisabled":    pagination.PrevDisabled,
+		"NextDisabled":    pagination.NextDisabled,
+		"SearchQuery":     searchQuery,
+		"TotalTasks":      totalTasks,
+		"LoggedIn":        loggedIn,
+		"Timezone":        timezone,
+		"TotalPages":      pagination.TotalPages,
+		"CompletedTasks":  pagination.TotalCompletedTasks,
+		"IncompleteTasks": pagination.TotalIncompleteTasks,
 	}
 
 	if err := utils.RenderTemplate(w, "pagination.html", context); err != nil {

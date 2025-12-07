@@ -65,27 +65,33 @@ func ReturnTaskList() []Task {
 	defer storage.CloseDatabase(pool)
 
 	var tasks []Task
+	return tasks
+}
 
-	rows, err := pool.Query(context.Background(), "SELECT id, title, description, completed, time_stamp FROM tasks ORDER BY id")
+func ReturnTaskListForUser(userID *int) []Task {
+	pool, _ := storage.OpenDatabase()
+	defer storage.CloseDatabase(pool)
 
+	var tasks []Task
+	if userID == nil {
+		return tasks
+	}
+
+	rows, err := pool.Query(context.Background(), "SELECT id, title, description, completed FROM tasks WHERE user_id = $1 ORDER BY id", *userID)
 	if err != nil {
 		fmt.Println("Error in ListTasks (query):", err)
 		return tasks
 	}
-
 	defer rows.Close()
 
 	for rows.Next() {
 		var task Task
-
 		err = rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed)
-
 		if err != nil {
 			fmt.Println("Error in ListTasks (scan):", err)
 			return tasks
 		}
 		tasks = append(tasks, task)
-
 	}
 	return tasks
 }
@@ -104,7 +110,6 @@ func ReturnPaginationForUser(page, pageSize int, userID *int, timezone string) (
 	var tasks []Task
 	offset := (page - 1) * pageSize
 
-	// Build query based on whether user is logged in
 	query := `SELECT id, title, description, completed, 
 		TO_CHAR((time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $3, 'YYYY/MM/DD HH:MI AM') AS date_added 
 		FROM tasks `

@@ -28,10 +28,23 @@ func init() {
 
 	Store = sessions.NewCookieStore([]byte(sessionKey))
 
+	const sessionMaxAge = 86400 * 30 // 30 days
+	Store.MaxAge(sessionMaxAge)
+
 	Store.Options = &sessions.Options{
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   false, // Set to true in production with HTTPS
 		SameSite: http.SameSiteLaxMode,
+		MaxAge:   sessionMaxAge,
 	}
+}
+
+func ClearSessionCookie(w http.ResponseWriter, r *http.Request) {
+	sess, _ := Store.Get(r, "session")
+	sess.Options = &sessions.Options{
+		Path:   "/",
+		MaxAge: -1,
+	}
+	_ = sess.Save(r, w)
 }

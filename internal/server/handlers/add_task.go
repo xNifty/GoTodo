@@ -55,7 +55,7 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	// Get user ID from session
+	// Get user ID from session (fallback to querying by email if not present)
 	email, _, _, timezone, loggedIn, _ := utils.GetSessionUserWithTimezone(r)
 	if !loggedIn {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -64,11 +64,16 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var userID int
-	err = db.QueryRow(context.Background(), "SELECT id FROM users WHERE email = $1", email).Scan(&userID)
-	if err != nil {
-		fmt.Printf("Error getting user ID: %v\n", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+	if uid := utils.GetSessionUserID(r); uid != nil {
+		userID = *uid
+	} else {
+		// fallback to DB lookup if session doesn't contain user_id
+		err = db.QueryRow(context.Background(), "SELECT id FROM users WHERE email = $1", email).Scan(&userID)
+		if err != nil {
+			fmt.Printf("Error getting user ID: %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// Insert the new task into the database with user_id
