@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"GoTodo/internal/server/utils"
 	"GoTodo/internal/storage"
 	"context"
 	"fmt"
@@ -51,10 +52,12 @@ func APIUpdateTaskStatus(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("HX-Trigger", fmt.Sprintf(`{"taskCountsChanged":{"completed":%d,"incomplete":%d}}`, completedCount, incompleteCount))
 	}
 
+	basePath := utils.GetBasePath()
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	fmt.Fprintf(w, `<button 
         class="badge %s"
-        hx-get="/api/update-status?id=%s" 
+        hx-get="`+basePath+`/api/update-status?id=%s" 
         hx-target="#task-%s .badge" 
         hx-swap="outerHTML"
         style="cursor: pointer;">
