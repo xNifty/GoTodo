@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 const MaxDescriptionLength = 100
@@ -19,9 +20,9 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	title := r.FormValue("title")
-	description := r.FormValue("description")
-	pageStr := r.FormValue("currentPage")
+	title := strings.TrimSpace(r.FormValue("title"))
+	description := strings.TrimSpace(r.FormValue("description"))
+	pageStr := strings.TrimSpace(r.FormValue("currentPage"))
 
 	page, err := strconv.Atoi(pageStr)
 	if err != nil || page <= 0 {
@@ -32,6 +33,8 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 	if len(description) > MaxDescriptionLength {
 		// On validation failure, return a 200 status with the error message
 		// and use HX-Retarget and HX-Reswap to update the error div specifically
+		// Tell the client this was a validation error so JS won't close the sidebar
+		w.Header().Set("X-Validation-Error", "true")
 		w.Header().Set("HX-Trigger", "description-error")   // Keep trigger for potential JS handling
 		w.Header().Set("HX-Retarget", "#description-error") // Target the specific error div
 		w.Header().Set("HX-Reswap", "innerHTML")            // Swap the content inside the error div
@@ -41,10 +44,16 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if title == "" {
-		// Handle empty title error - maybe similar HX-Retarget for title error div?
-		// For now, just return bad request
-		http.Error(w, "Title is required", http.StatusBadRequest)
+		// Title missing — return validation error and appropriate message
+		w.Header().Set("X-Validation-Error", "true")
+		w.Header().Set("HX-Trigger", "description-error")   // Keep trigger for potential JS handling
+		w.Header().Set("HX-Retarget", "#description-error") // Target the specific error div
+		w.Header().Set("HX-Reswap", "innerHTML")            // Swap the content inside the error div
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "Title is required")
 		return
+		// http.Error(w, "Title is required", http.StatusBadRequest)
+		// return
 	}
 
 	db, err := storage.OpenDatabase()

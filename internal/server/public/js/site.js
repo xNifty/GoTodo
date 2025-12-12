@@ -127,16 +127,35 @@ document.addEventListener("DOMContentLoaded", () => {
     taskForm.addEventListener("htmx:afterRequest", (event) => {
       // Only close sidebar if the request was successful and not a validation error
       // event.detail.successful will be true for a 200 status code response, even with HX-Trigger/HX-Retarget
-      // We check the triggerSpec to see if it was the validation error response
-      const isValidationError =
-        event.detail.triggerSpec &&
-        event.detail.triggerSpec.trigger === "description-error";
+      // Check for a validation header set by the server (preferred) or fall back to triggerSpec for compatibility
+      let isValidationError = false;
+      try {
+        const xhr = event.detail && event.detail.xhr;
+        const header =
+          xhr && xhr.getResponseHeader
+            ? xhr.getResponseHeader("X-Validation-Error")
+            : null;
+        if (header && header.toLowerCase() === "true") {
+          isValidationError = true;
+        } else if (
+          event.detail &&
+          event.detail.triggerSpec &&
+          event.detail.triggerSpec.trigger === "description-error"
+        ) {
+          // Backwards compat: if older handlers used triggerSpec, respect that too
+          isValidationError = true;
+        }
+      } catch (e) {
+        // ignore and treat as not a validation error
+      }
 
       if (event.detail.successful && !isValidationError) {
         closeSidebar();
         // Clear the form fields on successful submission
-        document.getElementById("title").value = "";
-        document.getElementById("description").value = "";
+        const tEl = document.getElementById("title");
+        if (tEl) tEl.value = "";
+        const dEl = document.getElementById("description");
+        if (dEl) dEl.value = "";
         // Reset character counter
         let charCount = document.getElementById("char-count");
         if (charCount) charCount.textContent = "0";
@@ -146,8 +165,7 @@ document.addEventListener("DOMContentLoaded", () => {
       } else if (isValidationError) {
         // Keep the sidebar open and show the error (HTMX will swap the error message into #description-error due to HX-Retarget)
         // The form fields and char counter are retained automatically by the browser
-        event.preventDefault(); // Prevent default HTMX swap action on the main target if it somehow gets here
-        return false; // Stop further event propagation
+        return; // Stop further processing so sidebar remains open
       }
       // Note: For network errors (non-2xx status), event.detail.successful will be false,
       // and this handler will not close the sidebar, which is the desired behavior.
