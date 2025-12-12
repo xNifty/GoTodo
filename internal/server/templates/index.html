@@ -94,30 +94,7 @@
         <div id="task-container" class="container">
             {{template "pagination.html" .}}
         </div>
-
-        <!-- Sidebar -->
-        <div id="sidebar">
-            <div class="sidebar-header">
-                <button
-                    type="button"
-                    class="btn-close float-end"
-                    id="closeSidebar"
-                ></button>
-                <h5>Add Task</h5>
-            </div>
-            <div class="sidebar-body">
-                {{template "sidebar_form.html" .}}
-            </div>
-        </div>
-
-        <!-- Modal -->
-        <div id="modal" class="modal fade" tabindex="-1" role="dialog">
-            <div class="modal-dialog" role="document">
-                <div class="modal-content">
-                    <!-- Modal content dynamically loaded -->
-                </div>
-            </div>
-        </div>
+        
         {{template "footer.html" .}}
 
         <!-- Bootstrap JS -->

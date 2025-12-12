@@ -87,14 +87,18 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function initializeSidebarEventListeners() {
-    if (openSidebarBtn) {
-      openSidebarBtn.removeEventListener("click", openSidebar); // Prevent duplicate bindings
-      openSidebarBtn.addEventListener("click", openSidebar);
+    // Re-query buttons in case HTMX replaced the DOM inside #task-container
+    const openBtn = document.getElementById("openSidebar");
+    const closeBtn = document.getElementById("closeSidebar");
+
+    if (openBtn) {
+      openBtn.removeEventListener("click", openSidebar); // Prevent duplicate bindings
+      openBtn.addEventListener("click", openSidebar);
     }
 
-    if (closeSidebarBtn) {
-      closeSidebarBtn.removeEventListener("click", closeSidebar); // Prevent duplicate bindings
-      closeSidebarBtn.addEventListener("click", closeSidebar);
+    if (closeBtn) {
+      closeBtn.removeEventListener("click", closeSidebar); // Prevent duplicate bindings
+      closeBtn.addEventListener("click", closeSidebar);
     }
 
     // Reattach theme toggle if needed
