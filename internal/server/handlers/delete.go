@@ -112,15 +112,17 @@ func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
 
 	// Create context for rendering
 	context := map[string]interface{}{
-		"Tasks":        taskList,
-		"PreviousPage": pagination.PreviousPage,
-		"NextPage":     pagination.NextPage,
-		"CurrentPage":  pagination.CurrentPage,
-		"PrevDisabled": pagination.PrevDisabled,
-		"NextDisabled": pagination.NextDisabled,
-		"TotalTasks":   totalTasks,
-		"LoggedIn":     loggedIn,
-		"TotalPages":   pagination.TotalPages,
+		"Tasks":           taskList,
+		"PreviousPage":    pagination.PreviousPage,
+		"NextPage":        pagination.NextPage,
+		"CurrentPage":     pagination.CurrentPage,
+		"PrevDisabled":    pagination.PrevDisabled,
+		"NextDisabled":    pagination.NextDisabled,
+		"TotalTasks":      totalTasks,
+		"LoggedIn":        loggedIn,
+		"TotalPages":      pagination.TotalPages,
+		"CompletedTasks":  utils.GetCompletedTasksCount(&userID),
+		"IncompleteTasks": utils.GetIncompleteTasksCount(&userID),
 	}
 
 	// Set response headers
