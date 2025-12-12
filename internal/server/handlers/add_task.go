@@ -165,7 +165,7 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("HX-Trigger", "task-added") // Signal JS to close sidebar and clear form
 
 	// Render the updated task list into the main task-container
-	if err := utils.RenderTemplate(w, "pagination.html", context); err != nil {
+	if err := utils.RenderTemplate(w, r, "pagination.html", context); err != nil {
 		http.Error(w, "Error rendering tasks after add: "+err.Error(), http.StatusInternalServerError)
 		return
 	}

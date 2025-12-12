@@ -129,7 +129,7 @@ func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
 	// Render the updated pagination
-	if err := utils.RenderTemplate(w, "pagination.html", context); err != nil {
+	if err := utils.RenderTemplate(w, r, "pagination.html", context); err != nil {
 		http.Error(w, "Error rendering pagination: "+err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -243,7 +243,7 @@ func APIGetNextItem(w http.ResponseWriter, r *http.Request) {
 
 	task.Page = currentPage
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := utils.RenderTemplate(w, "todo.html", &task); err != nil {
+	if err := utils.RenderTemplate(w, r, "todo.html", &task); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}

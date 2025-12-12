@@ -21,7 +21,12 @@
                 </ul>
                 <div class="d-flex align-items-center gap-3">
                     <span class="me-2"><i class="bi bi-sun-fill"></i></span>
+                    {{/* Render toggle with active class when server-provided theme is dark to avoid client flip */}}
+                    {{if themeIs .Theme "dark"}}
+                    <span class="theme-toggle active" id="theme-toggle" role="button" aria-label="Toggle dark/light mode"></span>
+                    {{else}}
                     <span class="theme-toggle" id="theme-toggle" role="button" aria-label="Toggle dark/light mode"></span>
+                    {{end}}
                     <span class="ms-2"><i class="bi bi-moon-fill"></i></span>
                     {{if .LoggedIn}}
                     <span class="text-muted me-2">{{.UserEmail}}</span>

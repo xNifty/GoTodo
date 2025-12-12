@@ -105,7 +105,7 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Render the tasks and pagination controls
-	if err := utils.RenderTemplate(w, "index.html", context); err != nil {
+	if err := utils.RenderTemplate(w, r, "index.html", context); err != nil {
 		if w.Header().Get("Content-Type") == "" {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		}
@@ -198,7 +198,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 		"IncompleteTasks": utils.GetIncompleteTasksCount(userID),
 	}
 
-	if err := utils.RenderTemplate(w, "pagination.html", context); err != nil {
+	if err := utils.RenderTemplate(w, r, "pagination.html", context); err != nil {
 		if w.Header().Get("Content-Type") == "" {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		}

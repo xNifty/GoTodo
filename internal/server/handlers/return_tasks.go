@@ -118,7 +118,7 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 		"IncompleteTasks": pagination.TotalIncompleteTasks,
 	}
 
-	if err := utils.RenderTemplate(w, "pagination.html", context); err != nil {
+	if err := utils.RenderTemplate(w, r, "pagination.html", context); err != nil {
 		http.Error(w, "Error rendering template: "+err.Error(), http.StatusInternalServerError)
 	}
 }

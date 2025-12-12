@@ -42,6 +42,9 @@ func InitializeTemplates() error {
 		"basePath": func() string {
 			return GetBasePath()
 		},
+		"themeIs": func(theme interface{}, want string) bool {
+			return fmt.Sprintf("%v", theme) == want
+		},
 	}).ParseGlob("internal/server/templates/*.html")
 	if err != nil {
 		return err
@@ -50,7 +53,8 @@ func InitializeTemplates() error {
 	return err
 }
 
-func RenderTemplate(w http.ResponseWriter, tmpl string, data interface{}) error {
+// RenderTemplate renders templates and injects AssetVersion and optional theme from cookie.
+func RenderTemplate(w http.ResponseWriter, r *http.Request, tmpl string, data interface{}) error {
 	assetVersion := os.Getenv("ASSET_VERSION")
 	if assetVersion == "" {
 		// fallback to config asset version
@@ -62,14 +66,25 @@ func RenderTemplate(w http.ResponseWriter, tmpl string, data interface{}) error 
 	}
 
 	var execErr error
-	// If data is a map, inject AssetVersion
+	// If data is a map, inject AssetVersion and theme
 	if ctx, ok := data.(map[string]interface{}); ok {
 		ctx["AssetVersion"] = assetVersion
+		// Inject theme from cookie if present
+		if r != nil {
+			if c, err := r.Cookie("theme"); err == nil {
+				ctx["Theme"] = c.Value
+			}
+		}
 		execErr = Templates.ExecuteTemplate(w, tmpl, ctx)
 	} else {
 		ctx := map[string]interface{}{
 			"Data":         data,
 			"AssetVersion": assetVersion,
+		}
+		if r != nil {
+			if c, err := r.Cookie("theme"); err == nil {
+				ctx["Theme"] = c.Value
+			}
 		}
 		execErr = Templates.ExecuteTemplate(w, tmpl, ctx)
 	}

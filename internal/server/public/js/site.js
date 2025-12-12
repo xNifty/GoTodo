@@ -35,14 +35,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Theme toggle functionality
   function initTheme() {
-    const savedTheme = localStorage.getItem("theme") || "light";
     const themeToggle = document.getElementById("theme-toggle");
-
-    if (savedTheme === "dark") {
-      document.documentElement.setAttribute("data-theme", "dark");
+    // Prefer an existing data-theme (may be set server-side), fall back to localStorage, then default to light
+    const existing = document.documentElement.getAttribute("data-theme");
+    const saved = existing || localStorage.getItem("theme") || "light";
+    document.documentElement.setAttribute("data-theme", saved);
+    if (saved === "dark") {
       if (themeToggle) themeToggle.classList.add("active");
     } else {
-      document.documentElement.setAttribute("data-theme", "light");
       if (themeToggle) themeToggle.classList.remove("active");
     }
   }
@@ -55,6 +55,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     document.documentElement.setAttribute("data-theme", newTheme);
     localStorage.setItem("theme", newTheme);
+
+    // Persist to cookie so server-side rendering can pick it up as a fallback
+    try {
+      document.cookie =
+        "theme=" + newTheme + "; path=/; max-age=31536000; SameSite=Lax";
+    } catch (e) {
+      // ignore
+    }
 
     if (newTheme === "dark") {
       if (themeToggle) themeToggle.classList.add("active");

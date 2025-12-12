@@ -1,6 +1,21 @@
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en" {{if .Theme}}data-theme="{{.Theme}}"{{end}}>
     <head>
+        <script>
+            (function () {
+                try {
+                    // Only set data-theme if not already set (server-side fallback)
+                    if (!document.documentElement.getAttribute('data-theme')) {
+                        var theme = localStorage.getItem('theme');
+                        if (theme) {
+                            document.documentElement.setAttribute('data-theme', theme);
+                        }
+                    }
+                } catch (e) {
+                    // ignore
+                }
+            })();
+        </script>
         <meta charset="UTF-8" />
         <title>{{.Title}}</title>
         <link

@@ -97,7 +97,7 @@ func ProfilePage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := utils.RenderTemplate(w, "profile.html", context); err != nil {
+	if err := utils.RenderTemplate(w, r, "profile.html", context); err != nil {
 		http.Error(w, "Error rendering template: "+err.Error(), http.StatusInternalServerError)
 	}
 }

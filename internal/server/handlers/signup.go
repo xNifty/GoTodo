@@ -26,7 +26,7 @@ func SignupPageHandler(w http.ResponseWriter, r *http.Request) {
 		"Title":     "GoTodo - Sign Up",
 	}
 
-	utils.RenderTemplate(w, "signup.html", context)
+	utils.RenderTemplate(w, r, "signup.html", context)
 }
 
 func APISignup(w http.ResponseWriter, r *http.Request) {

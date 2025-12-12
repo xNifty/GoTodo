@@ -80,7 +80,7 @@ func CreateInvitePageHandler(w http.ResponseWriter, r *http.Request) {
 		"Invites":   invites,
 	}
 
-	utils.RenderTemplate(w, "createinvite.html", context)
+	utils.RenderTemplate(w, r, "createinvite.html", context)
 }
 
 // APIConfirmDeleteInvite shows the confirmation modal for deleting an invite

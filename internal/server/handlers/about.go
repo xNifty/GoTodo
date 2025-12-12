@@ -16,5 +16,5 @@ func AboutHandler(w http.ResponseWriter, r *http.Request) {
 		"Title":       "GoTodo - About",
 	}
 
-	utils.RenderTemplate(w, "about.html", context)
+	utils.RenderTemplate(w, r, "about.html", context)
 }
