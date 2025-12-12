@@ -147,17 +147,17 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 
 	// Create a context for rendering pagination.html
 	context := map[string]interface{}{
-		"Tasks":           taskList,
-		"PreviousPage":    prevPage,
-		"NextPage":        nextPage,
-		"CurrentPage":     page,
-		"PrevDisabled":    prevDisabled,
-		"NextDisabled":    nextDisabled,
-		"TotalTasks":      totalTasks,
-		"LoggedIn":        true,
-		"TotalPages":      (totalTasks + pageSize - 1) / pageSize,
-		"CompletedTasks":  utils.GetCompletedTasksCount(&userID),
-		"IncompleteTasks": utils.GetIncompleteTasksCount(&userID),
+		"Tasks":        taskList,
+		"PreviousPage": prevPage,
+		"NextPage":     nextPage,
+		"CurrentPage":  page,
+		"PrevDisabled": prevDisabled,
+		"NextDisabled": nextDisabled,
+		"TotalTasks":   totalTasks,
+		"LoggedIn":     true,
+		"TotalPages":   (totalTasks + pageSize - 1) / pageSize,
+		// "CompletedTasks":  utils.GetCompletedTasksCount(&userID),
+		// "IncompleteTasks": utils.GetIncompleteTasksCount(&userID),
 	}
 
 	// Set headers for successful addition

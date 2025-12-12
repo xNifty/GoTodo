@@ -41,7 +41,14 @@ func init() {
 }
 
 func ClearSessionCookie(w http.ResponseWriter, r *http.Request) {
-	sess, _ := Store.Get(r, "session")
+	if Store == nil {
+		return
+	}
+	sess, err := Store.Get(r, "session")
+	if err != nil || sess == nil {
+		// nothing to clear
+		return
+	}
 	sess.Options = &sessions.Options{
 		Path:   "/",
 		MaxAge: -1,

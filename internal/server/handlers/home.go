@@ -82,7 +82,12 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 		taskList[i].Page = page
 	}
 
-	pagination := utils.GetPaginationData(page, pageSize, totalTasks, *userID)
+	// Avoid dereferencing nil userID; use 0 for anonymous users
+	uid := 0
+	if userID != nil {
+		uid = *userID
+	}
+	pagination := utils.GetPaginationData(page, pageSize, totalTasks, uid)
 
 	// Create a context for the tasks and pagination
 	context := map[string]interface{}{
@@ -176,7 +181,12 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 		taskList[i].Page = page
 	}
 
-	pagination := utils.GetPaginationData(page, pageSize, totalTasks, *userID)
+	// Avoid dereferencing nil userID; use 0 for anonymous users
+	uid := 0
+	if userID != nil {
+		uid = *userID
+	}
+	pagination := utils.GetPaginationData(page, pageSize, totalTasks, uid)
 
 	context := map[string]interface{}{
 		"Tasks":           taskList,

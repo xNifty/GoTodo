@@ -96,7 +96,12 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 		taskList[i].Page = page
 	}
 
-	pagination := utils.GetPaginationData(page, pageSize, totalTasks, *userID)
+	// Avoid dereferencing nil userID; use 0 for anonymous users
+	uid := 0
+	if userID != nil {
+		uid = *userID
+	}
+	pagination := utils.GetPaginationData(page, pageSize, totalTasks, uid)
 
 	// Set response header
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
