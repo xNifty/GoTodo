@@ -3,9 +3,9 @@
         {{if .TotalTasks}}
         <!-- Show Total Tasks; Tasks Completed; Task Incomplete -->
          <div class="mb-3">
-            <span class="badge bg-primary me-2">Total Tasks: {{.TotalTasks}}</span>
-            <span class="badge bg-success me-2">Completed: {{.CompletedTasks}}</span>
-            <span class="badge bg-warning text-dark">Incomplete: {{.IncompleteTasks}}</span>
+            <span id="total-tasks-badge" class="badge bg-primary me-2">Total Tasks: {{.TotalTasks}}</span>
+            <span id="completed-tasks-badge" class="badge bg-success me-2">Completed: {{.CompletedTasks}}</span>
+            <span id="incomplete-tasks-badge" class="badge bg-warning text-dark">Incomplete: {{.IncompleteTasks}}</span>
         <table class="table table-striped table-bordered w-100 mb-3">
             <thead>
                 <tr>

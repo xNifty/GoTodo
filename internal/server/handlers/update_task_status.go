@@ -40,7 +40,18 @@ func APIUpdateTaskStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/html; character=utf-8")
+	// Fetch updated counts for the task's owner so the UI badges can be refreshed
+	var ownerID int
+	if err := db.QueryRow(context.Background(), "SELECT user_id FROM tasks WHERE id = $1", id).Scan(&ownerID); err == nil {
+		var completedCount int
+		var incompleteCount int
+		_ = db.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND completed = true", ownerID).Scan(&completedCount)
+		_ = db.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND completed = false", ownerID).Scan(&incompleteCount)
+		// Emit HTMX trigger with counts payload so client can update badges
+		w.Header().Set("HX-Trigger", fmt.Sprintf(`{"taskCountsChanged":{"completed":%d,"incomplete":%d}}`, completedCount, incompleteCount))
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	fmt.Fprintf(w, `<button 
         class="badge %s"
         hx-get="/api/update-status?id=%s" 

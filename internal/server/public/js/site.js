@@ -273,6 +273,32 @@ document.addEventListener("DOMContentLoaded", () => {
     window.location.reload();
   });
 
+  // Update completed/incomplete badges when server notifies via HX-Trigger
+  document.body.addEventListener("taskCountsChanged", function (evt) {
+    try {
+      const d = evt.detail || {};
+      if (typeof d.completed !== "undefined") {
+        const el = document.getElementById("completed-tasks-badge");
+        if (el) el.textContent = `Completed: ${d.completed}`;
+      }
+      if (typeof d.incomplete !== "undefined") {
+        const el2 = document.getElementById("incomplete-tasks-badge");
+        if (el2) el2.textContent = `Incomplete: ${d.incomplete}`;
+      }
+      // update total if both present
+      if (
+        typeof d.completed !== "undefined" &&
+        typeof d.incomplete !== "undefined"
+      ) {
+        const totalEl = document.getElementById("total-tasks-badge");
+        if (totalEl)
+          totalEl.textContent = `Total Tasks: ${d.completed + d.incomplete}`;
+      }
+    } catch (e) {
+      // ignore
+    }
+  });
+
   // Note: Logout now uses HX-Redirect in the handler, so no event listener needed
 
   // Re-initialize character counter and theme toggle after HTMX swaps if sidebar is active
