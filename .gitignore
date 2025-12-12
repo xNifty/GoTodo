@@ -3,3 +3,4 @@
 .env
 GoTodo
 nodemon.json
+config.json
