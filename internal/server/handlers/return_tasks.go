@@ -2,13 +2,37 @@ package handlers
 
 import (
 	"GoTodo/internal/server/utils"
+	"GoTodo/internal/sessionstore"
 	"GoTodo/internal/tasks"
 	"net/http"
 	"strconv"
 )
 
 func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
+	// Determine page size from session (set on login/profile). Do NOT accept per_page query param.
 	pageSize := utils.AppConstants.PageSize
+	if sess, err := sessionstore.Store.Get(r, "session"); err == nil && sess != nil {
+		if val, ok := sess.Values["items_per_page"]; ok {
+			switch tv := val.(type) {
+			case int:
+				if tv > 0 {
+					pageSize = tv
+				}
+			case int64:
+				if int(tv) > 0 {
+					pageSize = int(tv)
+				}
+			case float64:
+				if int(tv) > 0 {
+					pageSize = int(tv)
+				}
+			case string:
+				if v, err := strconv.Atoi(tv); err == nil && v > 0 {
+					pageSize = v
+				}
+			}
+		}
+	}
 
 	searchQuery := r.URL.Query().Get("search")
 
@@ -108,19 +132,22 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 
 	// Create a context for the tasks and pagination
 	context := map[string]interface{}{
-		"Tasks":           taskList,
-		"PreviousPage":    pagination.PreviousPage,
-		"NextPage":        pagination.NextPage,
-		"CurrentPage":     pagination.CurrentPage,
-		"PrevDisabled":    pagination.PrevDisabled,
-		"NextDisabled":    pagination.NextDisabled,
-		"SearchQuery":     searchQuery,
-		"TotalTasks":      totalTasks,
-		"LoggedIn":        loggedIn,
-		"Timezone":        timezone,
-		"TotalPages":      pagination.TotalPages,
-		"CompletedTasks":  pagination.TotalCompletedTasks,
-		"IncompleteTasks": pagination.TotalIncompleteTasks,
+		"Tasks":            taskList,
+		"PreviousPage":     pagination.PreviousPage,
+		"NextPage":         pagination.NextPage,
+		"CurrentPage":      pagination.CurrentPage,
+		"PrevDisabled":     pagination.PrevDisabled,
+		"NextDisabled":     pagination.NextDisabled,
+		"SearchQuery":      searchQuery,
+		"TotalTasks":       totalTasks,
+		"LoggedIn":         loggedIn,
+		"Timezone":         timezone,
+		"TotalPages":       pagination.TotalPages,
+		"Pages":            pagination.Pages,
+		"HasRightEllipsis": pagination.HasRightEllipsis,
+		"PerPage":          pageSize,
+		"CompletedTasks":   pagination.TotalCompletedTasks,
+		"IncompleteTasks":  pagination.TotalIncompleteTasks,
 	}
 
 	if err := utils.RenderTemplate(w, r, "pagination.html", context); err != nil {

@@ -70,6 +70,18 @@
                                     </select>
                                 </div>
 
+                                <div class="mb-3">
+                                    <label for="items_per_page" class="form-label fw-bold">Tasks Per Page</label>
+                                    <select id="items_per_page" name="items_per_page" class="form-select">
+                                        <option value="10" {{if eq .ItemsPerPage 10}}selected{{end}}>10</option>
+                                        <option value="15" {{if eq .ItemsPerPage 15}}selected{{end}}>15</option>
+                                        <option value="25" {{if eq .ItemsPerPage 25}}selected{{end}}>25</option>
+                                        <option value="50" {{if eq .ItemsPerPage 50}}selected{{end}}>50</option>
+                                    </select>
+                                </div>
+
+                                
+
                                 <div class="d-flex gap-2">
                                     <button type="submit" class="btn btn-primary">
                                         <i class="bi bi-check-lg"></i> Save Changes
@@ -104,6 +116,8 @@
                 const formData = new FormData();
                 formData.append('timezone', document.getElementById('timezone').value);
                 formData.append('user_name', document.getElementById('user_name').value);
+                const per = document.getElementById('items_per_page');
+                if (per) formData.append('items_per_page', per.value);
                 try {
                     const response = await fetch('{{basePath}}/api/update-profile', {
                         method: 'POST',

@@ -98,6 +98,8 @@ func APILogin(w http.ResponseWriter, r *http.Request) {
 		session.Values["user_name"] = user.UserName
 		// Store user ID in session so handlers can use it directly without extra DB lookups
 		session.Values["user_id"] = user.ID
+		// Store user's default items per page in session
+		session.Values["items_per_page"] = user.ItemsPerPage
 	} else {
 		session.Values["user_name"] = ""
 	}

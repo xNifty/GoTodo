@@ -167,6 +167,7 @@ func CreateUsersTable() error {
 		"email VARCHAR(255) UNIQUE NOT NULL",
 		"password VARCHAR(255) NOT NULL",
 		"role_id INTEGER NOT NULL",
+		"items_per_page INTEGER DEFAULT 15",
 		"created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
 		"updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
 	}
@@ -275,11 +276,27 @@ func MigrateUsersAddName() error {
 	return nil
 }
 
+// MigrateUsersAddItemsPerPage adds items_per_page column to users table
+func MigrateUsersAddItemsPerPage() error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return fmt.Errorf("failed to open database: %v", err)
+	}
+	defer CloseDatabase(pool)
+
+	_, err = pool.Exec(context.Background(), "ALTER TABLE users ADD COLUMN IF NOT EXISTS items_per_page INTEGER DEFAULT 15")
+	if err != nil {
+		return fmt.Errorf("failed to add items_per_page column to users table: %v", err)
+	}
+	return nil
+}
+
 type User struct {
-	ID       int
-	Email    string
-	Password string
-	UserName string
+	ID           int
+	Email        string
+	Password     string
+	UserName     string
+	ItemsPerPage int
 }
 
 func GetUserByEmail(email string) (*User, error) {
@@ -290,7 +307,8 @@ func GetUserByEmail(email string) (*User, error) {
 	defer CloseDatabase(pool)
 
 	var user User
-	err = pool.QueryRow(context.Background(), "SELECT id, email, password, user_name FROM users WHERE email=$1", email).Scan(&user.ID, &user.Email, &user.Password, &user.UserName)
+	// include items_per_page (use COALESCE to ensure default)
+	err = pool.QueryRow(context.Background(), "SELECT id, email, password, user_name, COALESCE(items_per_page, 15) FROM users WHERE email=$1", email).Scan(&user.ID, &user.Email, &user.Password, &user.UserName, &user.ItemsPerPage)
 	if err != nil {
 		return nil, err
 	}

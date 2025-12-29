@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"GoTodo/internal/server/utils"
+	"GoTodo/internal/sessionstore"
 	"GoTodo/internal/storage"
 	"GoTodo/internal/tasks"
 	"context"
@@ -96,6 +97,28 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 
 	// After successful insertion, determine the correct page to display
 	pageSize := utils.AppConstants.PageSize
+	if sess, err := sessionstore.Store.Get(r, "session"); err == nil && sess != nil {
+		if val, ok := sess.Values["items_per_page"]; ok {
+			switch tv := val.(type) {
+			case int:
+				if tv > 0 {
+					pageSize = tv
+				}
+			case int64:
+				if int(tv) > 0 {
+					pageSize = int(tv)
+				}
+			case float64:
+				if int(tv) > 0 {
+					pageSize = int(tv)
+				}
+			case string:
+				if v, err := strconv.Atoi(tv); err == nil && v > 0 {
+					pageSize = v
+				}
+			}
+		}
+	}
 
 	// Open a new DB connection to count total tasks (or reuse db if possible)
 	var totalTasks int
@@ -147,17 +170,20 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 
 	// Create a context for rendering pagination.html
 	context := map[string]interface{}{
-		"Tasks":           taskList,
-		"PreviousPage":    prevPage,
-		"NextPage":        nextPage,
-		"CurrentPage":     page,
-		"PrevDisabled":    prevDisabled,
-		"NextDisabled":    nextDisabled,
-		"TotalTasks":      totalTasks,
-		"LoggedIn":        true,
-		"TotalPages":      (totalTasks + pageSize - 1) / pageSize,
-		"CompletedTasks":  utils.GetCompletedTasksCount(&userID),
-		"IncompleteTasks": utils.GetIncompleteTasksCount(&userID),
+		"Tasks":            taskList,
+		"PreviousPage":     prevPage,
+		"NextPage":         nextPage,
+		"CurrentPage":      page,
+		"PrevDisabled":     prevDisabled,
+		"NextDisabled":     nextDisabled,
+		"TotalTasks":       totalTasks,
+		"LoggedIn":         true,
+		"TotalPages":       (totalTasks + pageSize - 1) / pageSize,
+		"Pages":            utils.GetPaginationData(page, pageSize, totalTasks, userID).Pages,
+		"HasRightEllipsis": utils.GetPaginationData(page, pageSize, totalTasks, userID).HasRightEllipsis,
+		"CompletedTasks":   utils.GetCompletedTasksCount(&userID),
+		"IncompleteTasks":  utils.GetIncompleteTasksCount(&userID),
+		"PerPage":          pageSize,
 	}
 
 	// Set headers for successful addition

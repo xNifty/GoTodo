@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"GoTodo/internal/server/utils"
+	"GoTodo/internal/sessionstore"
 	"GoTodo/internal/storage"
 	"GoTodo/internal/tasks"
 	"context"
@@ -80,6 +81,28 @@ func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
 
 	// Calculate last page
 	pageSize := utils.AppConstants.PageSize
+	if sess, err := sessionstore.Store.Get(r, "session"); err == nil && sess != nil {
+		if val, ok := sess.Values["items_per_page"]; ok {
+			switch tv := val.(type) {
+			case int:
+				if tv > 0 {
+					pageSize = tv
+				}
+			case int64:
+				if int(tv) > 0 {
+					pageSize = int(tv)
+				}
+			case float64:
+				if int(tv) > 0 {
+					pageSize = int(tv)
+				}
+			case string:
+				if v, err := strconv.Atoi(tv); err == nil && v > 0 {
+					pageSize = v
+				}
+			}
+		}
+	}
 	lastPage := (totalTasks + pageSize - 1) / pageSize
 	if lastPage < 1 {
 		lastPage = 1
@@ -95,7 +118,6 @@ func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch tasks for the reload page
-	pageSize = utils.AppConstants.PageSize
 	taskList, totalTasks, err := tasks.ReturnPaginationForUser(reloadPage, pageSize, &userID, timezone)
 	if err != nil {
 		http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
@@ -112,17 +134,20 @@ func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
 
 	// Create context for rendering
 	context := map[string]interface{}{
-		"Tasks":           taskList,
-		"PreviousPage":    pagination.PreviousPage,
-		"NextPage":        pagination.NextPage,
-		"CurrentPage":     pagination.CurrentPage,
-		"PrevDisabled":    pagination.PrevDisabled,
-		"NextDisabled":    pagination.NextDisabled,
-		"TotalTasks":      totalTasks,
-		"LoggedIn":        loggedIn,
-		"TotalPages":      pagination.TotalPages,
-		"CompletedTasks":  utils.GetCompletedTasksCount(&userID),
-		"IncompleteTasks": utils.GetIncompleteTasksCount(&userID),
+		"Tasks":            taskList,
+		"PreviousPage":     pagination.PreviousPage,
+		"NextPage":         pagination.NextPage,
+		"CurrentPage":      pagination.CurrentPage,
+		"PrevDisabled":     pagination.PrevDisabled,
+		"NextDisabled":     pagination.NextDisabled,
+		"TotalTasks":       totalTasks,
+		"LoggedIn":         loggedIn,
+		"TotalPages":       pagination.TotalPages,
+		"Pages":            pagination.Pages,
+		"HasRightEllipsis": pagination.HasRightEllipsis,
+		"PerPage":          pageSize,
+		"CompletedTasks":   utils.GetCompletedTasksCount(&userID),
+		"IncompleteTasks":  utils.GetIncompleteTasksCount(&userID),
 	}
 
 	// Set response headers

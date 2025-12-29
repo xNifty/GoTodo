@@ -16,6 +16,7 @@ func main() {
 	storage.MigrateInvitesTable()     // Ensure inviteused column exists
 	storage.MigrateUsersAddTimezone() // Ensure timezone column exists
 	storage.MigrateUsersAddName()
+	storage.MigrateUsersAddItemsPerPage()
 
 	// The following is just for modifying columns during testing
 	/**

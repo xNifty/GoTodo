@@ -6,6 +6,7 @@ import (
 	"GoTodo/internal/storage"
 	"context"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -24,6 +25,13 @@ func APIUpdateProfile(w http.ResponseWriter, r *http.Request) {
 
 	userName := r.FormValue("user_name")
 	timezone := r.FormValue("timezone")
+	itemsPerPageStr := r.FormValue("items_per_page")
+	var itemsPerPage int
+	if itemsPerPageStr != "" {
+		if v, err := strconv.Atoi(itemsPerPageStr); err == nil {
+			itemsPerPage = v
+		}
+	}
 	if userName == "" {
 		http.Error(w, "Name is required", http.StatusBadRequest)
 		return
@@ -40,7 +48,11 @@ func APIUpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	_, err = db.Exec(context.Background(), "UPDATE users SET user_name = $1, timezone = $2 WHERE email = $3", userName, timezone, email)
+	if itemsPerPage > 0 {
+		_, err = db.Exec(context.Background(), "UPDATE users SET user_name = $1, timezone = $2, items_per_page = $3 WHERE email = $4", userName, timezone, itemsPerPage, email)
+	} else {
+		_, err = db.Exec(context.Background(), "UPDATE users SET user_name = $1, timezone = $2 WHERE email = $3", userName, timezone, email)
+	}
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -59,6 +71,9 @@ func APIUpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 	session.Values["user_name"] = userName
 	session.Values["timezone"] = timezone
+	if itemsPerPage > 0 {
+		session.Values["items_per_page"] = itemsPerPage
+	}
 	err = session.Save(r, w)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -86,14 +101,22 @@ func ProfilePage(w http.ResponseWriter, r *http.Request) {
 		statusMsg = "Timezone updated successfully!"
 	}
 
+	// fetch user to get items_per_page
+	user, _ := storage.GetUserByEmail(email)
+	itemsPerPage := 15
+	if user != nil && user.ItemsPerPage > 0 {
+		itemsPerPage = user.ItemsPerPage
+	}
+
 	context := map[string]interface{}{
-		"UserEmail":   email,
-		"Email":       email,
-		"Timezone":    timezone,
-		"Status":      statusMsg,
-		"Name":        user_name,
-		"LoggedIn":    loggedIn,
-		"Permissions": permissions,
+		"UserEmail":    email,
+		"Email":        email,
+		"Timezone":     timezone,
+		"Status":       statusMsg,
+		"Name":         user_name,
+		"ItemsPerPage": itemsPerPage,
+		"LoggedIn":     loggedIn,
+		"Permissions":  permissions,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

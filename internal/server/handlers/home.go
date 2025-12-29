@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"GoTodo/internal/server/utils"
+	"GoTodo/internal/sessionstore"
 	"GoTodo/internal/storage"
 	"GoTodo/internal/tasks"
 	"context"
@@ -32,7 +33,30 @@ func getUserIDFromEmail(email string) *int {
 
 func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	page := 1
+	// determine page size from session if present
 	pageSize := utils.AppConstants.PageSize
+	if sess, err := sessionstore.Store.Get(r, "session"); err == nil && sess != nil {
+		if val, ok := sess.Values["items_per_page"]; ok {
+			switch tv := val.(type) {
+			case int:
+				if tv > 0 {
+					pageSize = tv
+				}
+			case int64:
+				if int(tv) > 0 {
+					pageSize = int(tv)
+				}
+			case float64:
+				if int(tv) > 0 {
+					pageSize = int(tv)
+				}
+			case string:
+				if v, err := strconv.Atoi(tv); err == nil && v > 0 {
+					pageSize = v
+				}
+			}
+		}
+	}
 	searchQuery := r.URL.Query().Get("search")
 
 	loggedOut := r.URL.Query().Get("logged_out") == "true"
@@ -91,22 +115,25 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Create a context for the tasks and pagination
 	context := map[string]interface{}{
-		"Tasks":           taskList,
-		"CurrentPage":     page,
-		"PreviousPage":    pagination.PreviousPage,
-		"NextPage":        pagination.NextPage,
-		"PrevDisabled":    pagination.PrevDisabled,
-		"NextDisabled":    pagination.NextDisabled,
-		"LoggedIn":        loggedIn,
-		"UserEmail":       email,
-		"Permissions":     permissions,
-		"LoggedOut":       loggedOut,
-		"TotalTasks":      totalTasks,
-		"TotalPages":      pagination.TotalPages,
-		"IsSearching":     isSearching,
-		"Title":           "GoTodo - Home",
-		"CompletedTasks":  utils.GetCompletedTasksCount(userID),
-		"IncompleteTasks": utils.GetIncompleteTasksCount(userID),
+		"Tasks":            taskList,
+		"CurrentPage":      page,
+		"PreviousPage":     pagination.PreviousPage,
+		"NextPage":         pagination.NextPage,
+		"PrevDisabled":     pagination.PrevDisabled,
+		"NextDisabled":     pagination.NextDisabled,
+		"Pages":            pagination.Pages,
+		"HasRightEllipsis": pagination.HasRightEllipsis,
+		"PerPage":          pageSize,
+		"LoggedIn":         loggedIn,
+		"UserEmail":        email,
+		"Permissions":      permissions,
+		"LoggedOut":        loggedOut,
+		"TotalTasks":       totalTasks,
+		"TotalPages":       pagination.TotalPages,
+		"IsSearching":      isSearching,
+		"Title":            "GoTodo - Home",
+		"CompletedTasks":   utils.GetCompletedTasksCount(userID),
+		"IncompleteTasks":  utils.GetIncompleteTasksCount(userID),
 	}
 
 	// Render the tasks and pagination controls
@@ -120,7 +147,30 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func SearchHandler(w http.ResponseWriter, r *http.Request) {
+	// determine page size from session if present
 	pageSize := utils.AppConstants.PageSize
+	if sess, err := sessionstore.Store.Get(r, "session"); err == nil && sess != nil {
+		if val, ok := sess.Values["items_per_page"]; ok {
+			switch tv := val.(type) {
+			case int:
+				if tv > 0 {
+					pageSize = tv
+				}
+			case int64:
+				if int(tv) > 0 {
+					pageSize = int(tv)
+				}
+			case float64:
+				if int(tv) > 0 {
+					pageSize = int(tv)
+				}
+			case string:
+				if v, err := strconv.Atoi(tv); err == nil && v > 0 {
+					pageSize = v
+				}
+			}
+		}
+	}
 
 	var page int
 	var userID *int
@@ -189,23 +239,25 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	pagination := utils.GetPaginationData(page, pageSize, totalTasks, uid)
 
 	context := map[string]interface{}{
-		"Tasks":           taskList,
-		"TotalResults":    totalTasks,
-		"SearchQuery":     searchQuery,
-		"CurrentPage":     page,
-		"PreviousPage":    pagination.PreviousPage,
-		"NextPage":        pagination.NextPage,
-		"PrevDisabled":    pagination.PrevDisabled,
-		"NextDisabled":    pagination.NextDisabled,
-		"TotalPages":      pagination.TotalPages,
-		"LoggedIn":        loggedIn,
-		"UserEmail":       email,
-		"Permissions":     permissions,
-		"LoggedOut":       loggedOut,
-		"IsSearching":     isSearching,
-		"TotalTasks":      totalTasks,
-		"CompletedTasks":  utils.GetCompletedTasksCount(userID),
-		"IncompleteTasks": utils.GetIncompleteTasksCount(userID),
+		"Tasks":            taskList,
+		"TotalResults":     totalTasks,
+		"SearchQuery":      searchQuery,
+		"CurrentPage":      page,
+		"PreviousPage":     pagination.PreviousPage,
+		"NextPage":         pagination.NextPage,
+		"PrevDisabled":     pagination.PrevDisabled,
+		"NextDisabled":     pagination.NextDisabled,
+		"TotalPages":       pagination.TotalPages,
+		"Pages":            pagination.Pages,
+		"HasRightEllipsis": pagination.HasRightEllipsis,
+		"LoggedIn":         loggedIn,
+		"UserEmail":        email,
+		"Permissions":      permissions,
+		"LoggedOut":        loggedOut,
+		"IsSearching":      isSearching,
+		"TotalTasks":       totalTasks,
+		"CompletedTasks":   utils.GetCompletedTasksCount(userID),
+		"IncompleteTasks":  utils.GetIncompleteTasksCount(userID),
 	}
 
 	if err := utils.RenderTemplate(w, r, "pagination.html", context); err != nil {

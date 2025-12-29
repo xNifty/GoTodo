@@ -9,6 +9,8 @@ type PaginationData struct {
 	PrevDisabled         string
 	NextDisabled         string
 	TotalPages           int
+	Pages                []int
+	HasRightEllipsis     bool
 	TotalCompletedTasks  int
 	TotalIncompleteTasks int
 }
@@ -36,6 +38,32 @@ func GetPaginationData(page, pageSize, totalItems, userID int) PaginationData {
 		nextPage = page
 	}
 
+	// Build a small sliding window of page numbers to display.
+	// Behavior: show pages 1..windowSize at the start; once current >= windowSize,
+	// start the window at the current page. Always offer an ellipsis + last page
+	// when there are pages beyond the window.
+	windowSize := 4
+	var start int
+	if page >= windowSize {
+		start = page
+	} else {
+		start = 1
+	}
+	end := start + windowSize - 1
+	if end > totalPages {
+		end = totalPages
+	}
+
+	pages := make([]int, 0)
+	for i := start; i <= end; i++ {
+		pages = append(pages, i)
+	}
+
+	hasRightEllipsis := false
+	if end < totalPages {
+		hasRightEllipsis = true
+	}
+
 	return PaginationData{
 		PreviousPage:         prevPage,
 		NextPage:             nextPage,
@@ -43,6 +71,8 @@ func GetPaginationData(page, pageSize, totalItems, userID int) PaginationData {
 		PrevDisabled:         prevDisabled,
 		NextDisabled:         nextDisabled,
 		TotalPages:           totalPages,
+		Pages:                pages,
+		HasRightEllipsis:     hasRightEllipsis,
 		TotalCompletedTasks:  GetCompletedTasksCount(&userID),
 		TotalIncompleteTasks: GetIncompleteTasksCount(&userID),
 	}
