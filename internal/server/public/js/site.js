@@ -380,6 +380,65 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // Toast helper: create container and show transient toasts matching theme
+  function ensureToastContainer() {
+    let c = document.querySelector(".app-toast-container");
+    if (!c) {
+      c = document.createElement("div");
+      c.className = "app-toast-container";
+      document.body.appendChild(c);
+    }
+    return c;
+  }
+
+  function showToast(message, opts) {
+    opts = opts || {};
+    const container = ensureToastContainer();
+    const t = document.createElement("div");
+    t.className = "app-toast" + (opts.error ? " app-toast--error" : "");
+    t.setAttribute("role", "status");
+    t.setAttribute("aria-live", "polite");
+    t.textContent = message;
+    container.appendChild(t);
+
+    // ensure next frame for animation
+    requestAnimationFrame(() => {
+      t.classList.add("show");
+    });
+
+    const timeout = typeof opts.duration === "number" ? opts.duration : 3500;
+    const remove = () => {
+      t.classList.remove("show");
+      setTimeout(() => {
+        try {
+          t.remove();
+        } catch (e) {}
+      }, 220);
+    };
+
+    // Auto-remove
+    const to = setTimeout(remove, timeout);
+
+    // Allow manual dismissal on click
+    t.addEventListener("click", function () {
+      clearTimeout(to);
+      remove();
+    });
+  }
+
+  // Listen for favorite-limit-reached HTMX trigger (server sets HX-Trigger header)
+  document.body.addEventListener("favorite-limit-reached", function (evt) {
+    try {
+      // If server provided a detail.message, prefer that, otherwise default text
+      const msg =
+        (evt && evt.detail && evt.detail.message) ||
+        "You can only favorite up to 5 tasks";
+      showToast(msg, { error: true });
+    } catch (e) {
+      showToast("You can only favorite up to 5 tasks", { error: true });
+    }
+  });
+
   // Note: Logout now uses HX-Redirect in the handler, so no event listener needed
 
   // Re-initialize character counter and theme toggle after HTMX swaps if sidebar is active

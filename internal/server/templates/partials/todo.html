@@ -1,7 +1,7 @@
 <tr id="task-{{.ID}}">
     <td class="text-center align-middle drag-column">
         <span class="drag-handle" style="cursor:move;">
-            <i class="fa-solid fa-grip-lines"></i>
+            <i class="bi bi-grip-vertical"></i>
         </span>
     </td>
     <td class="description-column">
@@ -9,9 +9,9 @@
             hx-get="{{basePath}}/api/toggle-favorite?id={{.ID}}&page={{.Page}}"
             hx-target="#task-container" hx-swap="innerHTML" aria-label="Toggle favorite">
             {{if .IsFavorite}}
-                <i class="fa-solid fa-star" style="color:gold;"></i>
+                <i class="bi bi-star-fill" style="color:gold;"></i>
             {{else}}
-                <i class="fa-regular fa-star"></i>
+                <i class="bi bi-star"></i>
             {{end}}
         </button>
         {{safeHTML .Title}}
