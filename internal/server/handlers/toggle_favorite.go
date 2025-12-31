@@ -6,7 +6,6 @@ import (
 	"GoTodo/internal/storage"
 	"GoTodo/internal/tasks"
 	"context"
-	"fmt"
 	"net/http"
 	"strconv"
 )
@@ -67,10 +66,10 @@ func APIToggleFavorite(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if favCount >= 5 {
-			// Return a 400 and an HX-Trigger to show an alert
-			w.Header().Set("HX-Trigger", "favorite-limit-reached")
-			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprint(w, "You can only favorite up to 5 tasks")
+			// Trigger client-side event via HTMX without returning an error status
+			// Provide a small JSON payload so the client can show a custom message
+			w.Header().Set("HX-Trigger", `{"favorite-limit-reached":{"message":"You can only favorite up to 5 tasks"}}`)
+			w.WriteHeader(http.StatusNoContent) // 204 prevents HTMX from swapping content
 			return
 		}
 	}

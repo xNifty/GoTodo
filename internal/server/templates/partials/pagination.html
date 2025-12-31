@@ -18,9 +18,11 @@
                     <th class="delete-column">Delete</th>
                 </tr>
             </thead>
+            {{if eq .CurrentPage 1}}
             <tbody id="favorite-task-list">
                 {{with .FavoriteTasks}}{{range .}} {{template "todo.html" .}} {{end}}{{end}}
             </tbody>
+            {{end}}
             <tbody id="task-list">
                 {{range .Tasks}} {{template "todo.html" .}} {{end}}
             </tbody>

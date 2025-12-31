@@ -210,9 +210,82 @@ document.addEventListener("DOMContentLoaded", () => {
   initSortable();
   document.body.addEventListener("htmx:afterSwap", function (evt) {
     if (evt.target.id === "task-container") {
+      // Ensure table retains expected Bootstrap classes after HTMX replaces content
+      try {
+        ensureTableStructure();
+        ensureTableClasses();
+      } catch (e) {}
+
       initSortable();
     }
   });
+
+  // Ensure table element inside #task-container has expected classes
+  function ensureTableClasses() {
+    const container = document.getElementById("task-container");
+    if (!container) return;
+    const table = container.querySelector("table");
+    if (!table) return;
+    const classes = [
+      "table",
+      "table-striped",
+      "table-bordered",
+      "w-100",
+      "mb-3",
+    ];
+    classes.forEach((c) => {
+      if (!table.classList.contains(c)) table.classList.add(c);
+    });
+  }
+
+  // If HTMX returned rows or tbody elements without a surrounding table, wrap them
+  function ensureTableStructure() {
+    const container = document.getElementById("task-container");
+    if (!container) return;
+    // If a table already exists, nothing to do
+    if (container.querySelector("table")) return;
+
+    // Look for tbody elements or lists that should be wrapped
+    const fav = container.querySelector("#favorite-task-list");
+    const reg = container.querySelector("#task-list");
+
+    const nodesToWrap = [];
+    if (fav) nodesToWrap.push(fav);
+    if (reg) nodesToWrap.push(reg);
+
+    // If there are no known tbody containers, look for direct <tr> children
+    if (nodesToWrap.length === 0) {
+      const trs = Array.from(container.querySelectorAll(":scope > tr"));
+      if (trs.length) {
+        nodesToWrap.push(...trs);
+      }
+    }
+
+    if (nodesToWrap.length === 0) return;
+
+    // Build a table structure and move the nodes into it
+    const table = document.createElement("table");
+    table.className = "table table-striped table-bordered w-100 mb-3";
+
+    // If there's a thead elsewhere in the container, move it into the table
+    const thead = container.querySelector("thead");
+    if (thead) {
+      table.appendChild(thead.cloneNode(true));
+      try {
+        thead.remove();
+      } catch (e) {}
+    }
+
+    // Append each node into a tbody. If node is already a tbody, append directly.
+    const tbody = document.createElement("tbody");
+    nodesToWrap.forEach((n) => {
+      tbody.appendChild(n);
+    });
+    table.appendChild(tbody);
+
+    // Insert the table at the top of the container
+    container.insertBefore(table, container.firstChild);
+  }
 
   // Optional: Close sidebar after form submission
   const taskForm = document.getElementById("newTaskForm");
