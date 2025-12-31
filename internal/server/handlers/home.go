@@ -60,6 +60,7 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	searchQuery := r.URL.Query().Get("search")
 
 	loggedOut := r.URL.Query().Get("logged_out") == "true"
+	accountCreated := r.URL.Query().Get("account_created") == "true"
 
 	email, _, permissions, timezone, loggedIn, _ := utils.GetSessionUserWithTimezone(r)
 
@@ -136,6 +137,7 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 		"UserEmail":        email,
 		"Permissions":      permissions,
 		"LoggedOut":        loggedOut,
+		"AccountCreated":   accountCreated,
 		"TotalTasks":       totalTasks,
 		"TotalPages":       pagination.TotalPages,
 		"IsSearching":      isSearching,

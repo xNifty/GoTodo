@@ -234,6 +234,12 @@ func APICreateInvite(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "Error creating invite")
 		return
 	}
+	subject := "You're invited to join GoTodo!"
+	body := fmt.Sprintf("You have been invited to join GoTodo. Use the following link to register:\n\n%s/register?token=%s\n\nIf you did not request this invite, please ignore this email.", basePath, token)
+	err = utils.SendEmail(subject, body, email)
+	if err != nil {
+		fmt.Printf("Warning: Failed to send invite email to %s: %v\n", email, err)
+	}
 
 	// Redirect to reload the page
 	w.Header().Set("HX-Redirect", basePath+"/createinvite")

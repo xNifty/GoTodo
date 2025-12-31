@@ -68,6 +68,16 @@
             <i class="bi bi-check-circle"></i> You have been logged out successfully
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
+        {{else if .AccountCreated}}
+        <div
+            id="status"
+            class="container mt-3 status-notification alert alert-success alert-dismissible fade show"
+            role="alert"
+            style="display: block;"
+        >
+            <i class="bi bi-check-circle"></i> Account Created - please log in to begin!
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
         {{else}}
         <div
             id="status"
@@ -148,11 +158,12 @@
             });
 
             // Remove logged_out query parameter from URL after showing message
-            (function() {
+                (function() {
                 const urlParams = new URLSearchParams(window.location.search);
-                if (urlParams.get('logged_out') === 'true') {
-                    // Remove the parameter from URL without reloading
+                if (urlParams.get('logged_out') === 'true' || urlParams.get('account_created') === 'true') {
+                    // Remove the parameter(s) from URL without reloading
                     urlParams.delete('logged_out');
+                    urlParams.delete('account_created');
                     const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
                     window.history.replaceState({}, '', newUrl);
                     

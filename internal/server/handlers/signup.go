@@ -24,6 +24,33 @@ func SignupPageHandler(w http.ResponseWriter, r *http.Request) {
 		"LoggedIn":  false,
 		"UserEmail": email,
 		"Title":     "GoTodo - Sign Up",
+		"Token":     "",
+	}
+
+	// If a token query parameter is provided (e.g., via /register?token=XYZ), preserve it
+	if t := r.URL.Query().Get("token"); t != "" {
+		context["Token"] = t
+	}
+
+	utils.RenderTemplate(w, r, "signup.html", context)
+}
+
+// RegisterHandler redirects to signup page while populating the token from the URL
+func RegisterHandler(w http.ResponseWriter, r *http.Request) {
+	email, _, _, loggedIn := utils.GetSessionUser(r)
+	if loggedIn {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	token := r.URL.Query().Get("token")
+
+	context := map[string]interface{}{
+		"LoggedIn":    false,
+		"UserEmail":   email,
+		"Title":       "GoTodo - Sign Up",
+		"Token":       token,
+		"TokenLocked": true,
 	}
 
 	utils.RenderTemplate(w, r, "signup.html", context)
@@ -166,7 +193,8 @@ func APISignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	basePath := utils.GetBasePath()
-	w.Header().Set("HX-Redirect", basePath+"/")
+	// Redirect to home with a flag so the home page can show a splash banner
+	w.Header().Set("HX-Redirect", basePath+"/?account_created=true")
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, " ")
 }

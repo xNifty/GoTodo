@@ -50,7 +50,9 @@
                                     />
                                 </div>
                                 <div class="mb-3">
-                                    <label for="token" class="form-label">Invite Token</label>
+                                    <label for="token" class="form-label">Invite Token
+                                        {{if .TokenLocked}}<span class="badge bg-secondary ms-2">Locked</span>{{end}}
+                                    </label>
                                     <input 
                                         type="text" 
                                         class="form-control" 
@@ -58,7 +60,12 @@
                                         name="token" 
                                         required 
                                         placeholder="Enter your invite token"
+                                        value="{{.Token}}"
+                                        {{if .TokenLocked}}readonly{{end}}
                                     />
+                                    <!-- <div class="form-text text-muted">
+                                        {{if .TokenLocked}}This token came from an invite link and is locked; you cannot change it.{{end}}
+                                    </div> -->
                                 </div>
                                 <div class="mb-3">
                                     <label for="password" class="form-label">Password</label>

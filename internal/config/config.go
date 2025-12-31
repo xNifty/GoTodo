@@ -10,6 +10,7 @@ type Config struct {
 	BasePath     string `json:"basePath"`
 	UseHTTPS     bool   `json:"useHttps"`
 	AssetVersion string `json:"assetVersion,omitempty"`
+	FromEmail    string `json:"from_email,omitempty"`
 }
 
 var Cfg Config
@@ -43,6 +44,14 @@ func Load() {
 			Cfg.AssetVersion = v
 		} else {
 			Cfg.AssetVersion = "20251130"
+		}
+	}
+	// FromEmail may be set in config.json; allow env override
+	if Cfg.FromEmail == "" {
+		if v := os.Getenv("FROM_EMAIL"); v != "" {
+			Cfg.FromEmail = v
+		} else {
+			Cfg.FromEmail = "no-reply@example.com"
 		}
 	}
 	// Also allow env override for UseHTTPS

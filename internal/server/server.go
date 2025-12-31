@@ -32,6 +32,7 @@ func StartServer() error {
 	http.HandleFunc("/", handlers.HomeHandler)
 	http.HandleFunc("/favicon.ico", doNothing)
 	http.HandleFunc("/signup", handlers.SignupPageHandler)
+	http.HandleFunc("/register", handlers.RegisterHandler)
 	http.HandleFunc("/api/signup", handlers.APISignup)
 	http.HandleFunc("/api/login", handlers.APILogin)
 	http.HandleFunc("/api/logout", handlers.APILogout)
