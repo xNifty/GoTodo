@@ -13,6 +13,43 @@ document.addEventListener("DOMContentLoaded", () => {
   let description = document.getElementById("description");
   let charCount = document.getElementById("char-count");
 
+  // Save original footer HTML so we can restore it if an HTMX swap accidentally removes it
+  let __originalFooterHTML = null;
+  (function captureFooter() {
+    try {
+      const f = document.querySelector("footer");
+      if (f) __originalFooterHTML = f.outerHTML;
+    } catch (e) {}
+  })();
+
+  function restoreFooterIfMissing() {
+    try {
+      if (!document.querySelector("footer") && __originalFooterHTML) {
+        // Insert footer after the main container if present, otherwise append to body
+        const container = document.getElementById("task-container");
+        if (container && container.parentNode) {
+          // Create a temporary node and insert
+          const temp = document.createElement("div");
+          temp.innerHTML = __originalFooterHTML;
+          // append after container
+          if (container.nextSibling) {
+            container.parentNode.insertBefore(
+              temp.firstElementChild,
+              container.nextSibling
+            );
+          } else {
+            container.parentNode.appendChild(temp.firstElementChild);
+          }
+        } else {
+          const temp = document.createElement("div");
+          temp.innerHTML = __originalFooterHTML;
+          document.body.appendChild(temp.firstElementChild);
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
   // Character counter for description
   if (description && charCount) {
     description.addEventListener("input", function () {
@@ -190,6 +227,21 @@ document.addEventListener("DOMContentLoaded", () => {
                   try {
                     initSortable();
                   } catch (e) {}
+                  // Reattach sidebar and modal listeners which may have been lost
+                  try {
+                    if (typeof initializeSidebarEventListeners === "function") {
+                      initializeSidebarEventListeners();
+                    }
+                  } catch (e) {}
+                  try {
+                    if (typeof initializeModalEventListeners === "function") {
+                      initializeModalEventListeners();
+                    }
+                  } catch (e) {}
+                  // Ensure footer still exists after manual replacement
+                  try {
+                    restoreFooterIfMissing();
+                  } catch (e) {}
                 }
               })
               .catch((err) => {
@@ -353,6 +405,67 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Modal initialization helper - re-attach listeners after HTMX swaps
+  function initializeModalEventListeners() {
+    const modalEl = document.getElementById("modal");
+    if (!modalEl) return;
+    if (!modalEl.classList.contains("modal-listeners-initialized")) {
+      modalEl.addEventListener("hide.bs.modal", () => {
+        if (document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+      });
+      modalEl.addEventListener("hidden.bs.modal", () => {
+        modalEl.setAttribute("aria-hidden", "true");
+      });
+      modalEl.classList.add("modal-listeners-initialized");
+    }
+    // ensure bootstrap modal instance exists so data-bs-dismiss works
+    try {
+      if (
+        typeof bootstrap !== "undefined" &&
+        bootstrap.Modal &&
+        typeof bootstrap.Modal.getOrCreateInstance === "function"
+      ) {
+        bootstrap.Modal.getOrCreateInstance(modalEl);
+      }
+    } catch (e) {}
+  }
+
+  // Call once on initial load
+  initializeModalEventListeners();
+
+  // Debug helper: when ?cssdebug=1 is present in the URL, log which media queries match.
+  (function cssDebugHelper() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (!params.get("cssdebug")) return;
+
+      const queries = {
+        "max-420": "(max-width: 420px)",
+        "max-600": "(max-width: 600px)",
+        "max-768": "(max-width: 768px)",
+        "max-1024": "(max-width: 1024px)",
+        "pointer-coarse": "(pointer: coarse)",
+        "hover-none": "(hover: none)",
+      };
+
+      console.groupCollapsed("CSS Debug — media query matches");
+      Object.entries(queries).forEach(([k, q]) => {
+        try {
+          const m = window.matchMedia(q);
+          console.log(q + ":", m.matches);
+        } catch (e) {
+          console.log(q + ": error");
+        }
+      });
+      // Also log touch-capability and maxTouchPoints
+      console.log("navigator.maxTouchPoints:", navigator.maxTouchPoints);
+      console.log("ontouchstart in window:", "ontouchstart" in window);
+      console.groupEnd();
+    } catch (e) {}
+  })();
+
   // Handle task deletion
   document.body.addEventListener("taskDeleted", function (evt) {
     // Get the current page from the page number display
@@ -512,6 +625,21 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // Delegate clicks on task title toggles to expand/collapse details on mobile
+  document.body.addEventListener("click", function (e) {
+    const toggle = e.target.closest && e.target.closest(".task-toggle");
+    if (!toggle) return;
+    // Don't toggle when favorite button was the click target
+    if (toggle.classList.contains("favorite-btn")) return;
+    const tr = toggle.closest("tr");
+    if (!tr) return;
+    const expanded = tr.classList.toggle("expanded");
+    // update aria-expanded
+    try {
+      toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+    } catch (e) {}
+  });
+
   // Note: Logout now uses HX-Redirect in the handler, so no event listener needed
 
   // Re-initialize character counter and theme toggle after HTMX swaps if sidebar is active
@@ -568,6 +696,15 @@ document.addEventListener("DOMContentLoaded", () => {
       if (typeof initTheme === "function") {
         initTheme(); // This function should be idempotent or handle re-running safely
       }
+    }
+  });
+
+  // Reattach modal listeners after HTMX swaps that replace task container
+  document.body.addEventListener("htmx:afterSwap", function (evt) {
+    if (evt.target && evt.target.id === "task-container") {
+      try {
+        initializeModalEventListeners();
+      } catch (e) {}
     }
   });
 });

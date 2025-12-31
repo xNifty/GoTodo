@@ -105,7 +105,7 @@ th.description-column {
 }
 
 td.description-column {
-    max-width: 1.5em;
+    max-width: none; /* allow description and title columns to size naturally */
 }
 
 th.id-column,
@@ -165,6 +165,417 @@ td.delete-column {
         left: 15px;
         width: calc(50% - 15px);
         font-weight: bold;
+    }
+
+    /* Hide drag handle on very small screens to avoid overlap */
+    .drag-column {
+        display: none;
+    }
+
+    /* Make action buttons stack nicely */
+    .status-column, .delete-column {
+        display: inline-block;
+        margin-top: 0.5rem;
+        margin-right: 0.5rem;
+    }
+
+    .drag-handle {
+        margin-right: 0.5rem;
+    }
+}
+
+/* Compact card-style for small/medium screens */
+@media (max-width: 768px) {
+    /* Make each row a compact horizontal card when collapsed (flex),
+       and allow switching to block when expanded. */
+    tbody tr {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.6rem;
+        background-color: var(--box-bg);
+        border: 1px solid var(--box-border);
+        border-radius: 6px;
+        padding: 0.4rem;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.06);
+    }
+
+    /* Stack cells and show label above value */
+    td {
+        /* default for collapsed: let cells behave inline inside the flex row */
+        display: inline-block;
+        padding: 0.12rem 0.25rem;
+        position: relative;
+        text-align: left;
+        border: none;
+        vertical-align: middle;
+    }
+
+    td::before {
+        content: attr(data-label);
+        display: block;
+        font-weight: 600;
+        margin-bottom: 0.2rem;
+        color: #6c757d;
+        font-size: 0.78rem;
+    }
+
+    [data-theme="dark"] td::before {
+        color: #adb5bd;
+    }
+
+    /* Emphasize title */
+    .description-column {
+        font-size: 0.95rem;
+        font-weight: 700;
+    }
+
+    /* Ensure the favorite/star button and title align on one line */
+    .description-column > .btn,
+    .description-column > .btn-link {
+        vertical-align: middle;
+        display: inline-flex;
+        align-items: center;
+        padding: 0;
+        margin-right: 0.35rem;
+    }
+
+    .description-column .bi {
+        margin-right: 0.35rem;
+        vertical-align: middle;
+    }
+
+    .date-added {
+        font-size: 0.78rem;
+        color: #6c757d;
+    }
+
+    [data-theme="dark"] .date-added {
+        color: #adb5bd;
+    }
+
+    /* Action buttons: align to right on wider small screens */
+    td[data-label="Status"], td[data-label="Delete"] {
+        text-align: right;
+    }
+
+    .status-column, .delete-column {
+        display: inline-block;
+        margin-left: 0.35rem;
+        padding: 0.2rem 0.45rem;
+        font-size: 0.78rem;
+        border-radius: 0.35rem;
+    }
+
+    /* On very small screens make buttons full-width stacked */
+    @media (max-width: 420px) {
+        .status-column, .delete-column {
+            display: block;
+            width: 100%;
+            margin-left: 0;
+            margin-top: 0.25rem;
+            padding: 0.35rem 0.5rem;
+            font-size: 0.82rem;
+        }
+    }
+
+    /* Hide drag column on small/medium screens to save space */
+    .drag-column {
+        display: inline-table; /* keep drag visible */
+        vertical-align: middle;
+    }
+
+    /* COLLAPSED MOBILE: show only title, favorite and drag icon */
+    /* Hide description/date/buttons by default on compact mobile */
+    td.desc-column,
+    td.date-added,
+    td[data-label="Status"],
+    td[data-label="Delete"] {
+        display: none; /* hidden in collapsed */
+    }
+
+    /* Keep title visible */
+    td.title-column {
+        display: inline-block;
+        flex: 1 1 auto; /* allow title to take remaining width */
+    }
+
+    /* hide the label for the title cell in compact mode */
+    td.title-column::before { display: none; }
+
+    /* When a row is expanded, reveal details but keep drag+title inline on the first row.
+       Use a flex wrap layout so title and drag handle remain on the same line, while
+       description/date/action cells break to a new full-width row below. */
+    tr.expanded {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.25rem 0.3rem;
+    }
+
+    /* Default cell layout inside expanded row: keep title and drag inline, make details full-width */
+    tr.expanded td {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.12rem 0.25rem;
+        border: none;
+        vertical-align: middle;
+    }
+
+    /* Make the description, date and action cells occupy full width below the title row */
+    tr.expanded td.desc-column,
+    tr.expanded td.date-added,
+    tr.expanded td[data-label="Status"],
+    tr.expanded td[data-label="Delete"] {
+        display: block;
+        flex-basis: 100%;
+        width: 100%;
+        padding-top: 0.5rem;
+    }
+
+    /* Ensure the title and drag columns stay together on one line */
+    tr.expanded td.title-column,
+    tr.expanded td.drag-column {
+        flex: 0 1 auto;
+    }
+
+    /* hide the injected labels for action/date cells when expanded to avoid duplicate text */
+    tr.expanded td[data-label="Status"]::before,
+    tr.expanded td[data-label="Delete"]::before,
+    tr.expanded td.date-added::before {
+        display: none;
+    }
+    /* also hide description label when expanded */
+    tr.expanded td.desc-column::before {
+        display: none;
+    }
+
+    /* add spacing above action buttons in expanded state */
+    tr.expanded .status-column,
+    tr.expanded .delete-column {
+        margin-top: 0.5rem;
+    }
+
+    /* Make action buttons full-width and larger when a row is expanded for easier touch targets */
+    tr.expanded .status-column,
+    tr.expanded .delete-column {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 0.5rem 0.6rem;
+        font-size: 0.92rem;
+        text-align: center;
+        margin-left: 0;
+    }
+
+        /* Stronger override to ensure Bootstrap or other styles don't prevent full-width behavior */
+        tbody tr.expanded td .status-column,
+        tbody tr.expanded td .delete-column {
+            display: block !important;
+            width: 100% !important;
+            padding: 0.5rem 0.6rem !important;
+            font-size: 0.92rem !important;
+            text-align: center !important;
+            margin-left: 0 !important;
+        }
+
+    /* Favorite button and title inline alignment */
+    .title-column .favorite-btn {
+        margin-right: 0.45rem;
+        padding: 0;
+        line-height: 1;
+        vertical-align: middle;
+    }
+
+    .title-column .title-text {
+        display: inline-block;
+        font-weight: 700;
+        font-size: 0.98rem;
+        color: var(--text-color);
+        text-align: left;
+        vertical-align: middle;
+        cursor: pointer;
+    }
+
+    /* Remove extra link/button styles for compact title toggle */
+    .task-toggle {
+        background: transparent;
+        border: none;
+        padding: 0;
+        margin: 0;
+        text-decoration: none;
+        color: inherit;
+    }
+
+    /* Drag column: keep compact and centered */
+    .drag-column {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        min-width: 28px;
+        padding: 0 0.25rem;
+    }
+
+    /* Reduce icon sizes for compactness */
+    .drag-handle i, .description-column .bi {
+        font-size: 0.9rem;
+    }
+
+    /* Make badges smaller inside cards */
+    .badge {
+        padding: 0.18rem 0.35rem;
+        font-size: 0.72rem;
+    }
+}
+
+/* Touch & Tablet: ensure iPads and other touch devices use mobile-friendly layout
+   Apply primarily by viewport width; limit aggressive feature queries so tablets
+   in wide landscape don't get overly compact styles. */
+@media (max-width: 1024px), (pointer: coarse) and (max-width: 1366px) {
+    /* Make search form and add button scale nicely */
+    /* Ensure the header controls can wrap instead of overlapping */
+    .d-flex.justify-content-between.mb-4 {
+        display: flex !important;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    #search-form {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        width: 100%;
+        flex: 1 1 auto;
+        min-width: 0; /* allow shrinking */
+    }
+
+    #search-form .search-input,
+    #search-form .form-control.search-input {
+        flex: 1 1 auto;
+        min-width: 0; /* allows input to shrink inside flex */
+        max-width: 100%;
+        font-size: 0.98rem;
+        padding: 0.45rem 0.6rem;
+    }
+
+    /* Keep the small search button and sidebar button compact */
+    #search-form button {
+        flex: 0 0 auto;
+        padding: 0.35rem 0.55rem;
+        font-size: 0.95rem;
+        white-space: nowrap;
+    }
+
+    /* Cap the Add button so it doesn't expand to fill the row unexpectedly */
+    #openSidebar {
+        flex: 0 0 auto;
+        max-width: 220px;
+        padding: 0.45rem 0.8rem;
+        white-space: nowrap;
+        margin-left: 0.25rem;
+    }
+
+    /* Slightly reduce icon sizes for compactness */
+    #search-form .bi,
+    #openSidebar .bi {
+        font-size: 1rem;
+    }
+
+}
+
+/* Very narrow screens: stack search input and add button vertically */
+@media (max-width: 420px) {
+    #search-form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        align-items: stretch;
+    }
+    #search-form .search-input { width: 100%; }
+    #search-form button { width: 100%; }
+    #openSidebar { width: 100%; max-width: none; }
+}
+
+/* Tablet / touch devices: apply accordion/card table layout for iPads and similar */
+@media (max-width: 1024px), (pointer: coarse) and (max-width: 1366px) {
+    table { width: 100%; }
+    thead { display: none; }
+
+    tbody tr {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 0.6rem;
+        margin-bottom: 0.7rem;
+        background-color: var(--box-bg);
+        border: 1px solid var(--box-border);
+        border-radius: 6px;
+        padding: 0.5rem;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.06);
+    }
+
+    td {
+        display: inline-block;
+        padding: 0.18rem 0.35rem;
+        position: relative;
+        text-align: left;
+        border: none;
+        vertical-align: middle;
+    }
+
+    td::before {
+        content: attr(data-label);
+        display: block;
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+        color: #6c757d;
+        font-size: 0.84rem;
+    }
+
+    [data-theme="dark"] td::before { color: #adb5bd; }
+
+    .description-column { font-size: 1rem; font-weight: 700; }
+
+    .description-column > .btn, .description-column > .btn-link {
+        vertical-align: middle; display: inline-flex; align-items: center; padding: 0; margin-right: 0.35rem;
+    }
+
+    .date-added { font-size: 0.85rem; color: #6c757d; }
+    [data-theme="dark"] .date-added { color: #adb5bd; }
+
+    td[data-label="Status"], td[data-label="Delete"] { text-align: right; }
+
+    .status-column, .delete-column { display: inline-block; margin-left: 0.35rem; padding: 0.28rem 0.5rem; font-size: 0.82rem; border-radius: 0.35rem; }
+
+    .drag-column { display: inline-flex; align-items: center; justify-content: center; width: 32px; min-width: 32px; padding: 0 0.25rem; }
+
+    .drag-handle { margin-right: 0.35rem; }
+
+    /* COLLAPSED: hide details by default */
+    td.desc-column, td.date-added, td[data-label="Status"], td[data-label="Delete"] { display: none; }
+
+    td.title-column { display: inline-block; flex: 1 1 auto; }
+    td.title-column::before { display: none; }
+
+    /* Expanded state: show details below while keeping title+drag inline */
+    tr.expanded { display: flex; flex-wrap: wrap; align-items: center; }
+    tr.expanded td { display: inline-flex; align-items: center; }
+    tr.expanded td.desc-column, tr.expanded td.date-added, tr.expanded td[data-label="Status"], tr.expanded td[data-label="Delete"] { display: block; flex-basis: 100%; width: 100%; padding-top: 0.5rem; }
+    tr.expanded td.desc-column::before, tr.expanded td.date-added::before, tr.expanded td[data-label="Status"]::before, tr.expanded td[data-label="Delete"]::before { display: none; }
+
+    /* Ensure expanded-state buttons on tablets also get full width */
+    tbody tr.expanded td .status-column,
+    tbody tr.expanded td .delete-column {
+        display: block !important;
+        width: 100% !important;
+        padding: 0.5rem 0.6rem !important;
+        font-size: 0.92rem !important;
+        text-align: center !important;
+        margin-left: 0 !important;
     }
 }
 
