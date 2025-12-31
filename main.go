@@ -17,6 +17,8 @@ func main() {
 	storage.MigrateUsersAddTimezone() // Ensure timezone column exists
 	storage.MigrateUsersAddName()
 	storage.MigrateUsersAddItemsPerPage()
+	storage.MigrateTasksAddIsFavorite()
+	storage.MigrateTasksAddPosition()
 
 	// The following is just for modifying columns during testing
 	/**

@@ -217,6 +217,8 @@ func CreateTasksTable() error {
 		"description TEXT",
 		"completed BOOLEAN DEFAULT FALSE",
 		"time_stamp TIMESTAMP DEFAULT NOW()",
+		"is_favorite BOOLEAN DEFAULT FALSE",
+		"position INTEGER DEFAULT 0",
 		"user_id INTEGER",
 	}
 	return CreateTable("tasks", columns)
@@ -240,6 +242,36 @@ func MigrateTasksTable() error {
 	_, err = pool.Exec(context.Background(), "ALTER TABLE tasks ADD CONSTRAINT fk_tasks_users FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE")
 	if err != nil {
 		return fmt.Errorf("failed to add foreign key constraint to tasks table: %v", err)
+	}
+	return nil
+}
+
+// MigrateTasksAddIsFavorite adds is_favorite boolean column to tasks table
+func MigrateTasksAddIsFavorite() error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return fmt.Errorf("failed to open database: %v", err)
+	}
+	defer CloseDatabase(pool)
+
+	_, err = pool.Exec(context.Background(), "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_favorite BOOLEAN DEFAULT FALSE")
+	if err != nil {
+		return fmt.Errorf("failed to add is_favorite column to tasks table: %v", err)
+	}
+	return nil
+}
+
+// MigrateTasksAddPosition adds position integer column to tasks table
+func MigrateTasksAddPosition() error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return fmt.Errorf("failed to open database: %v", err)
+	}
+	defer CloseDatabase(pool)
+
+	_, err = pool.Exec(context.Background(), "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS position INTEGER DEFAULT 0")
+	if err != nil {
+		return fmt.Errorf("failed to add position column to tasks table: %v", err)
 	}
 	return nil
 }

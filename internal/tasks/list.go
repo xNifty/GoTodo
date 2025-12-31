@@ -110,8 +110,9 @@ func ReturnPaginationForUser(page, pageSize int, userID *int, timezone string) (
 	var tasks []Task
 	offset := (page - 1) * pageSize
 
+	// We'll fetch favorites separately so we can always show up to 5 favorites first on page 1
 	query := `SELECT id, title, description, completed, 
-		TO_CHAR((time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $3, 'YYYY/MM/DD HH:MI AM') AS date_added 
+		TO_CHAR((time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $3, 'YYYY/MM/DD HH:MI AM') AS date_added, COALESCE(position,0) 
 		FROM tasks `
 
 	var countQuery string
@@ -126,28 +127,71 @@ func ReturnPaginationForUser(page, pageSize int, userID *int, timezone string) (
 		return tasks, 0, nil
 	}
 
-	// Logged in - filter by user_id
-	query += `WHERE user_id = $4 ORDER BY id LIMIT $1 OFFSET $2`
-	rows, err = pool.Query(context.Background(), query, pageSize, offset, timezone, *userID)
+	// Logged in - show favorites first (up to 5) on page 1
+	// Fetch favorite tasks
+	favRows, err := pool.Query(context.Background(), `SELECT id, title, description, completed, TO_CHAR((time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM') AS date_added, COALESCE(is_favorite,false), COALESCE(position,0) FROM tasks WHERE user_id = $1 AND is_favorite = true ORDER BY position LIMIT 5`, *userID, timezone)
 	if err != nil {
 		return nil, 0, err
 	}
-	countQuery = "SELECT COUNT(*) FROM tasks WHERE user_id = $1"
-	defer rows.Close()
-
-	for rows.Next() {
-		var task Task
-		if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed, &task.DateAdded); err != nil {
+	defer favRows.Close()
+	favs := make([]Task, 0)
+	for favRows.Next() {
+		var t Task
+		if err := favRows.Scan(&t.ID, &t.Title, &t.Description, &t.Completed, &t.DateAdded, &t.IsFavorite, &t.Position); err != nil {
 			return nil, 0, err
 		}
-		tasks = append(tasks, task)
+		favs = append(favs, t)
 	}
 
-	// Fetch total task count for pagination controls
+	// Count total tasks
 	var totalTasks int
+	countQuery = "SELECT COUNT(*) FROM tasks WHERE user_id = $1"
 	err = pool.QueryRow(context.Background(), countQuery, *userID).Scan(&totalTasks)
 	if err != nil {
 		return nil, 0, err
+	}
+
+	// Calculate how many favorites to show on this page
+	favCount := len(favs)
+	if page == 1 && favCount > 0 {
+		// Need to fetch non-favorites to fill remaining slots on page 1
+		remaining := pageSize - favCount
+		if remaining < 0 {
+			remaining = 0
+		}
+		rows, err = pool.Query(context.Background(), query+`WHERE user_id = $4 AND (is_favorite IS NULL OR is_favorite = false) ORDER BY position LIMIT $1 OFFSET $2`, remaining, 0, timezone, *userID)
+		if err != nil {
+			return nil, 0, err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var task Task
+			if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed, &task.DateAdded, &task.Position); err != nil {
+				return nil, 0, err
+			}
+			tasks = append(tasks, task)
+		}
+		// prepend favorites
+		tasks = append(favs, tasks...)
+	} else {
+		// For pages >1, skip favorites in the offset calculation
+		// Compute offset among non-favorite items
+		offsetNonFav := offset - favCount
+		if offsetNonFav < 0 {
+			offsetNonFav = 0
+		}
+		rows, err = pool.Query(context.Background(), query+`WHERE user_id = $4 AND (is_favorite IS NULL OR is_favorite = false) ORDER BY position LIMIT $1 OFFSET $2`, pageSize, offsetNonFav, timezone, *userID)
+		if err != nil {
+			return nil, 0, err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var task Task
+			if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed, &task.DateAdded, &task.Position); err != nil {
+				return nil, 0, err
+			}
+			tasks = append(tasks, task)
+		}
 	}
 	return tasks, totalTasks, nil
 }
@@ -175,13 +219,13 @@ func SearchTasksForUser(page, pageSize int, searchQuery string, userID *int, tim
 
 	rows, err := pool.Query(context.Background(),
 		`SELECT id,
-			title, 
-			description,
-			completed, 
-			TO_CHAR((time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MM AM')  as date_added
+		    title, 
+		    description,
+		    completed, 
+		    TO_CHAR((time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MM AM')  as date_added, COALESCE(position,0)
 		 FROM tasks 
 		 WHERE (title ILIKE $1 OR description ILIKE $1) AND user_id = $4
-		 ORDER BY id 
+		 ORDER BY position 
 		 LIMIT $3 OFFSET $5`,
 		searchPattern, timezone, pageSize, *userID, offset)
 
@@ -194,7 +238,7 @@ func SearchTasksForUser(page, pageSize int, searchQuery string, userID *int, tim
 
 	for rows.Next() {
 		var task Task
-		if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed, &task.DateAdded); err != nil {
+		if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed, &task.DateAdded, &task.Position); err != nil {
 			return nil, 0, err
 		}
 		totalTasks++

@@ -115,9 +115,16 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Set the Page field for each task
+	// Split into favorites and non-favorites for separate sortable lists
+	favs := make([]tasks.Task, 0)
+	nonFavs := make([]tasks.Task, 0)
 	for i := range taskList {
 		taskList[i].Page = page
+		if taskList[i].IsFavorite {
+			favs = append(favs, taskList[i])
+		} else {
+			nonFavs = append(nonFavs, taskList[i])
+		}
 	}
 
 	// Avoid dereferencing nil userID; use 0 for anonymous users
@@ -132,7 +139,8 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 
 	// Create a context for the tasks and pagination
 	context := map[string]interface{}{
-		"Tasks":            taskList,
+		"FavoriteTasks":    favs,
+		"Tasks":            nonFavs,
 		"PreviousPage":     pagination.PreviousPage,
 		"NextPage":         pagination.NextPage,
 		"CurrentPage":      pagination.CurrentPage,

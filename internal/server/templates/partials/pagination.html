@@ -7,8 +7,10 @@
             <span id="completed-tasks-badge" class="badge bg-success me-2">Completed: {{.CompletedTasks}}</span>
             <span id="incomplete-tasks-badge" class="badge bg-warning text-dark">Incomplete: {{.IncompleteTasks}}</span>
         <table class="table table-striped table-bordered w-100 mb-3">
+            <input type="hidden" name="currentPage" value="{{.CurrentPage}}" />
             <thead>
                 <tr>
+                    <th style="width: 32px"></th>
                     <th class="description-column">Title</th>
                     <th class="description-column">Description</th>
                     <th class="date-added">Date Added</th>
@@ -16,6 +18,9 @@
                     <th class="delete-column">Delete</th>
                 </tr>
             </thead>
+            <tbody id="favorite-task-list">
+                {{with .FavoriteTasks}}{{range .}} {{template "todo.html" .}} {{end}}{{end}}
+            </tbody>
             <tbody id="task-list">
                 {{range .Tasks}} {{template "todo.html" .}} {{end}}
             </tbody>

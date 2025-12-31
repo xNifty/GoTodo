@@ -42,6 +42,8 @@ func StartServer() error {
 	http.HandleFunc("/api/delete-task", handlers.APIDeleteTask)
 	http.HandleFunc("/api/get-next-item", handlers.APIGetNextItem)
 	http.HandleFunc("/api/update-status", handlers.APIUpdateTaskStatus)
+	http.HandleFunc("/api/toggle-favorite", handlers.APIToggleFavorite)
+	http.HandleFunc("/api/reorder-tasks", handlers.APIReorderTasks)
 	http.HandleFunc("/about", handlers.AboutHandler)
 	http.HandleFunc("/search", handlers.SearchHandler)
 

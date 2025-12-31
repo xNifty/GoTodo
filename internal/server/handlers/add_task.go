@@ -86,8 +86,17 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Insert the new task into the database with user_id
-	_, err = db.Exec(context.Background(), "INSERT INTO tasks (title, description, completed, user_id, time_stamp) VALUES ($1, $2, $3, $4, NOW() AT TIME ZONE 'UTC')", title, description, false, userID)
+	// Determine next position within non-favorite group for this user
+	var nextPos int
+	err = db.QueryRow(context.Background(), "SELECT COALESCE(MAX(position),0) + 1 FROM tasks WHERE user_id = $1 AND (is_favorite IS NULL OR is_favorite = false)", userID).Scan(&nextPos)
+	if err != nil {
+		fmt.Printf("Error determining next position: %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Insert the new task into the database with user_id and position
+	_, err = db.Exec(context.Background(), "INSERT INTO tasks (title, description, completed, user_id, time_stamp, position) VALUES ($1, $2, $3, $4, NOW() AT TIME ZONE 'UTC', $5)", title, description, false, userID, nextPos)
 	if err != nil {
 		fmt.Println("We failed to insert into the database.")
 		fmt.Println("Failed values:", title, description, false)
@@ -163,14 +172,22 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 
 	nextPage := page + 1
 
-	// Set the page number for each task
+	// Split into favorites and non-favorites for rendering and allow separate sortable containers
+	favs := make([]tasks.Task, 0)
+	nonFavs := make([]tasks.Task, 0)
 	for i := range taskList {
 		taskList[i].Page = page
+		if taskList[i].IsFavorite {
+			favs = append(favs, taskList[i])
+		} else {
+			nonFavs = append(nonFavs, taskList[i])
+		}
 	}
 
 	// Create a context for rendering pagination.html
 	context := map[string]interface{}{
-		"Tasks":            taskList,
+		"FavoriteTasks":    favs,
+		"Tasks":            nonFavs,
 		"PreviousPage":     prevPage,
 		"NextPage":         nextPage,
 		"CurrentPage":      page,

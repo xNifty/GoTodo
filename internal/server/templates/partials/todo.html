@@ -1,5 +1,21 @@
 <tr id="task-{{.ID}}">
-    <td class="description-column">{{safeHTML .Title}}</td>
+    <td class="text-center align-middle drag-column">
+        <span class="drag-handle" style="cursor:move;">
+            <i class="fa-solid fa-grip-lines"></i>
+        </span>
+    </td>
+    <td class="description-column">
+        <button class="btn btn-link p-0 me-2" style="text-decoration:none;" 
+            hx-get="{{basePath}}/api/toggle-favorite?id={{.ID}}&page={{.Page}}"
+            hx-target="#task-container" hx-swap="innerHTML" aria-label="Toggle favorite">
+            {{if .IsFavorite}}
+                <i class="fa-solid fa-star" style="color:gold;"></i>
+            {{else}}
+                <i class="fa-regular fa-star"></i>
+            {{end}}
+        </button>
+        {{safeHTML .Title}}
+    </td>
     <td class="description-column">{{safeHTML .Description}}</td>
     <td class="date-added">{{.DateAdded}}</td>
     <td>

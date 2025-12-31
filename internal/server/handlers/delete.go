@@ -124,9 +124,16 @@ func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Set the page number for each task
+	// Split into favorites and non-favorites and set page number
+	favs := make([]tasks.Task, 0)
+	nonFavs := make([]tasks.Task, 0)
 	for i := range taskList {
 		taskList[i].Page = reloadPage
+		if taskList[i].IsFavorite {
+			favs = append(favs, taskList[i])
+		} else {
+			nonFavs = append(nonFavs, taskList[i])
+		}
 	}
 
 	// Get pagination data
@@ -134,7 +141,8 @@ func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
 
 	// Create context for rendering
 	context := map[string]interface{}{
-		"Tasks":            taskList,
+		"FavoriteTasks":    favs,
+		"Tasks":            nonFavs,
 		"PreviousPage":     pagination.PreviousPage,
 		"NextPage":         pagination.NextPage,
 		"CurrentPage":      pagination.CurrentPage,
