@@ -38,10 +38,11 @@
                 </div>
             {{else}}
                 <div class="card text-center" style="padding: 3rem;">
-                <div class="card-body">
-                    <i class="bi bi-clipboard-check" style="font-size: 4rem; color: #6c757d;"></i>
-                    <!-- <h3 class="mt-3">Add your first Todo!</h3> -->
-                    <p class="text-muted">No results found</p>
+                    <div class="card-body">
+                        <i class="bi bi-clipboard-check" style="font-size: 4rem; color: #6c757d;"></i>
+                        <!-- <h3 class="mt-3">Add your first Todo!</h3> -->
+                        <p class="text-muted">No results found</p>
+                    </div>
                 </div>
             {{end}}
         </div>
@@ -127,14 +128,7 @@
                 {{template "sidebar_form.html" .}}
             </div>
         </div>
-        <!-- Modal -->
-        <div id="modal" class="modal fade" tabindex="-1" role="dialog">
-            <div class="modal-dialog" role="document">
-                <div class="modal-content">
-                    <!-- Modal content dynamically loaded -->
-                </div>
-            </div>
-        </div>
+        <!-- Modal is provided globally in index.html to avoid duplication during HTMX swaps -->
         {{end}}
     </div>
 </div>

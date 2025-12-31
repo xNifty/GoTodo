@@ -55,14 +55,15 @@ func APIUpdateTaskStatus(w http.ResponseWriter, r *http.Request) {
 	basePath := utils.GetBasePath()
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	// Include the status-column class so mobile styles remain consistent after HTMX swaps
 	fmt.Fprintf(w, `<button 
-        class="badge %s"
-        hx-get="`+basePath+`/api/update-status?id=%s" 
-        hx-target="#task-%s .badge" 
-        hx-swap="outerHTML"
-        style="cursor: pointer;">
-        %s
-    </button>`,
+		class="badge %s status-column"
+		hx-get="`+basePath+`/api/update-status?id=%s" 
+		hx-target="#task-%s .badge" 
+		hx-swap="outerHTML"
+		style="cursor: pointer;">
+		%s
+	</button>`,
 		map[bool]string{true: "bg-success", false: "bg-danger"}[updatedStatus],
 		id,
 		id,
