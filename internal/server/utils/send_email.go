@@ -44,6 +44,7 @@ func SendEmail(subject, message, toEmail string) error {
 
 	_, err := mg.Send(ctx, m)
 	if err != nil {
+		fmt.Println("Email send error:", err)
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 	return nil
