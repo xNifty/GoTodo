@@ -532,6 +532,73 @@ td.delete-column {
     #openSidebar { width: 100%; max-width: none; }
 }
 
+/* Align Add button and Search box exactly on very small screens */
+@media (max-width: 420px) {
+    #search-form, #openSidebar {
+        width: 100%;
+        box-sizing: border-box;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+    /* Ensure button visuals use full width and matching paddings */
+    #search-form button, #openSidebar {
+        width: 100% !important;
+        padding-left: 0.6rem !important;
+        padding-right: 0.6rem !important;
+    }
+}
+
+/* Profile page: stack action buttons on small screens to match search/add layout */
+@media (max-width: 420px) {
+    body.profile-page .d-flex.gap-2 {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 0.5rem !important;
+        align-items: stretch !important;
+    }
+    body.profile-page .d-flex.gap-2 .btn,
+    body.profile-page .d-flex.gap-2 a {
+        width: 100% !important;
+        box-sizing: border-box !important;
+        padding-left: 0.6rem !important;
+        padding-right: 0.6rem !important;
+    }
+}
+
+/* Make profile card and form fields expand to full width on very small screens */
+@media (max-width: 420px) {
+    body.profile-page .container {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+    body.profile-page .row.justify-content-center {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+    body.profile-page .col-md-6 {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+    body.profile-page .card {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        margin: 0 auto !important;
+    }
+    body.profile-page .form-control,
+    body.profile-page .form-select,
+    body.profile-page .form-control-plaintext {
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    /* Slightly reduce the top margin on very small screens to keep content visible */
+    body.profile-page .container.mt-5 { margin-top: 1.5rem !important; }
+}
+
 /* Tablet / touch devices: apply accordion/card table layout for iPads and similar */
 @media (max-width: 1024px), (pointer: coarse) and (max-width: 1366px) {
     table { width: 100%; }
@@ -797,6 +864,56 @@ textarea {
 
 [data-theme="dark"] .bi-moon-fill {
     color: #f8f9fa;
+}
+
+/* Ensure navbar controls wrap and don't overflow on compact screens */
+.navbar .container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.navbar .navbar-brand {
+    flex: 0 0 auto;
+}
+.navbar .navbar-collapse.collapse.show {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 0; /* allow children to shrink */
+}
+.navbar .navbar-nav {
+    flex: 0 0 auto;
+}
+.navbar .navbar-collapse > .d-flex {
+    flex: 0 1 auto;
+    min-width: 0;
+    flex-wrap: wrap; /* allow profile/logout to wrap to next line */
+    gap: 0.35rem;
+    justify-content: flex-end;
+}
+.navbar .text-muted {
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+}
+
+/* When viewport is very narrow, move profile/logout onto their own row */
+@media (max-width: 520px) {
+    .navbar .navbar-collapse {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.35rem;
+    }
+    .navbar .navbar-collapse > .d-flex {
+        justify-content: flex-start;
+        width: 100%;
+    }
+    .navbar .navbar-collapse .btn {
+        flex: 0 0 auto;
+    }
 }
 
 /* Dark mode overrides for form controls */
