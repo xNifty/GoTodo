@@ -409,6 +409,38 @@ td.delete-column {
         color: inherit;
     }
 
+    /* Make the task title look like a control in compact mode (no underline),
+       with a chevron indicator that flips when expanded. */
+    .task-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        cursor: pointer;
+        border-radius: 4px;
+        padding: 0.08rem 0.18rem;
+        transition: background-color 0.15s ease, transform 0.15s ease;
+    }
+
+    .task-toggle:hover,
+    .task-toggle:focus {
+        background-color: rgba(0,0,0,0.04);
+        outline: none;
+    }
+
+    .task-toggle::after {
+        content: '\25BE'; /* down-pointing triangle */
+        font-size: 0.85rem;
+        line-height: 1;
+        transition: transform 160ms ease;
+        color: var(--text-color);
+        opacity: 0.85;
+        transform-origin: center;
+    }
+
+    tr.expanded .task-toggle::after {
+        transform: rotate(180deg);
+    }
+
     /* Drag column: keep compact and centered */
     .drag-column {
         display: inline-flex;
@@ -568,6 +600,46 @@ td.delete-column {
     tr.expanded td.desc-column::before, tr.expanded td.date-added::before, tr.expanded td[data-label="Status"]::before, tr.expanded td[data-label="Delete"]::before { display: none; }
 
     /* Ensure expanded-state buttons on tablets also get full width */
+/* Global task title toggle styling (all sizes) - remove link look and add affordance */
+button.task-toggle, .task-toggle.btn, .task-toggle.btn-link, .task-toggle {
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    text-decoration: none !important;
+    color: inherit !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    font: inherit !important;
+    line-height: inherit !important;
+    padding: 0.08rem 0.18rem !important;
+    margin: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0.4rem !important;
+    cursor: pointer !important;
+    border-radius: 4px !important;
+}
+
+button.task-toggle:hover, .task-toggle:hover, button.task-toggle:focus, .task-toggle:focus {
+    background-color: rgba(0,0,0,0.04) !important;
+    outline: none !important;
+}
+
+/* Chevron indicator for expansion on all sizes */
+.task-toggle::after {
+    content: '\25BE';
+    font-size: 0.85rem;
+    line-height: 1;
+    transition: transform 160ms ease;
+    color: var(--text-color);
+    opacity: 0.85;
+    transform-origin: center;
+}
+
+tr.expanded .task-toggle::after {
+    transform: rotate(180deg);
+}
+
     tbody tr.expanded td .status-column,
     tbody tr.expanded td .delete-column {
         display: block !important;

@@ -640,6 +640,24 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (e) {}
   });
 
+  // Support keyboard activation (Enter/Space) for the task-toggle spans
+  document.body.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter" && e.key !== " " && e.key !== "Spacebar") return;
+    const toggle =
+      e.target && e.target.closest && e.target.closest(".task-toggle");
+    if (!toggle) return;
+    // Prevent page scrolling on Space
+    e.preventDefault();
+    // Don't toggle when favorite button has focus
+    if (toggle.classList.contains("favorite-btn")) return;
+    const tr = toggle.closest("tr");
+    if (!tr) return;
+    const expanded = tr.classList.toggle("expanded");
+    try {
+      toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+    } catch (e) {}
+  });
+
   // Note: Logout now uses HX-Redirect in the handler, so no event listener needed
 
   // Re-initialize character counter and theme toggle after HTMX swaps if sidebar is active

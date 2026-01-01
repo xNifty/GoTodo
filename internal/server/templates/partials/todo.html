@@ -15,9 +15,9 @@
                     <i class="bi bi-star"></i>
                 {{end}}
             </button>
-            <button type="button" class="task-toggle btn btn-link p-0 title-text" aria-expanded="false">
+            <span role="button" tabindex="0" class="task-toggle title-text p-0" aria-expanded="false">
                 {{safeHTML .Title}}
-            </button>
+            </span>
         </div>
     </td>
     <td class="desc-column" data-label="Description">{{safeHTML .Description}}</td>
