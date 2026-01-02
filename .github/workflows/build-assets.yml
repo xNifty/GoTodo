@@ -41,7 +41,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add internal/server/public/js/site.js internal/server/public/css/site.css internal/server/public/.asset_version || true
+          git add internal/server/public/js/site.min.js internal/server/public/css/site.min.css internal/server/public/.asset_version || true
           if ! git diff --staged --quiet; then
             git commit -m "ci: build assets and write .asset_version ($ASSET_VERSION)"
             git push

@@ -8,7 +8,7 @@ Install dev dependencies:
 npm install
 ```
 
-Build assets (minifies in-place):
+Build assets (outputs `.min` files next to sources):
 
 ```powershell
 npm run build:assets
@@ -16,7 +16,7 @@ npm run build:assets
 
 Notes:
 
-- Scripts overwrite `internal/server/public/js/site.js` and `internal/server/public/css/site.css` with minified output so template includes don't need changing.
+- Scripts now write `internal/server/public/js/site.min.js` and `internal/server/public/css/site.min.css` next to the source files.
 - Bump `ASSET_VERSION` (or set via env/CI) to force client cache refresh.
 
 CI integration:

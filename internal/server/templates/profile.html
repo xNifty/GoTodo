@@ -18,7 +18,7 @@
             href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css"
             rel="stylesheet"
         />
-        <link rel="stylesheet" href="{{basePath}}/public/css/site.css?v={{.AssetVersion}}" />
+        <link rel="stylesheet" href="{{basePath}}/public/css/{{if .UseMinifiedAssets}}site.min.css{{else}}site.css{{end}}?v={{.AssetVersion}}" />
         <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
     </head>
     <body class="profile-page">
@@ -104,7 +104,7 @@
         <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.min.js"></script>
         <script src="https://unpkg.com/htmx.org@2.0.3"></script>
-        <script src="{{basePath}}/public/js/site.js?v={{.AssetVersion}}"></script>
+        <script src="{{basePath}}/public/js/{{if .UseMinifiedAssets}}site.min.js{{else}}site.js{{end}}?v={{.AssetVersion}}"></script>
 
         <script>
             document.addEventListener('DOMContentLoaded', function() {

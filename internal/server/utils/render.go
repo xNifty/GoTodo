@@ -55,17 +55,20 @@ func InitializeTemplates() error {
 
 // RenderTemplate renders templates and injects AssetVersion and optional theme from cookie.
 func RenderTemplate(w http.ResponseWriter, r *http.Request, tmpl string, data interface{}) error {
-	assetVersion := os.Getenv("ASSET_VERSION")
-	if assetVersion == "" {
-		// Try a file written by CI: internal/server/public/.asset_version
-		if b, err := os.ReadFile("internal/server/public/.asset_version"); err == nil {
-			if v := strings.TrimSpace(string(b)); v != "" {
-				assetVersion = v
-			}
+	envAsset := os.Getenv("ASSET_VERSION")
+	fileAsset := ""
+	if b, err := os.ReadFile("internal/server/public/.asset_version"); err == nil {
+		if v := strings.TrimSpace(string(b)); v != "" {
+			fileAsset = v
 		}
 	}
+
+	// assetVersion preference: env -> .asset_version file -> config -> default
+	assetVersion := envAsset
 	if assetVersion == "" {
-		// fallback to config asset version
+		assetVersion = fileAsset
+	}
+	if assetVersion == "" {
 		if config.Cfg.AssetVersion != "" {
 			assetVersion = config.Cfg.AssetVersion
 		} else {
@@ -73,10 +76,26 @@ func RenderTemplate(w http.ResponseWriter, r *http.Request, tmpl string, data in
 		}
 	}
 
+	// Use minified assets only when an explicit env or .asset_version file is present
+	// and the minified files actually exist next to the sources. This prevents
+	// accidentally serving .min files on dev if they were committed or missing.
+	useMinified := false
+	if envAsset != "" {
+		useMinified = true
+	} else if fileAsset != "" {
+		// Check that both minified outputs exist before enabling.
+		if _, errJs := os.Stat("internal/server/public/js/site.min.js"); errJs == nil {
+			if _, errCss := os.Stat("internal/server/public/css/site.min.css"); errCss == nil {
+				useMinified = true
+			}
+		}
+	}
+
 	var execErr error
 	// If data is a map, inject AssetVersion and theme
 	if ctx, ok := data.(map[string]interface{}); ok {
 		ctx["AssetVersion"] = assetVersion
+		ctx["UseMinifiedAssets"] = useMinified
 		// Inject theme from cookie if present
 		if r != nil {
 			if c, err := r.Cookie("theme"); err == nil {
@@ -86,8 +105,9 @@ func RenderTemplate(w http.ResponseWriter, r *http.Request, tmpl string, data in
 		execErr = Templates.ExecuteTemplate(w, tmpl, ctx)
 	} else {
 		ctx := map[string]interface{}{
-			"Data":         data,
-			"AssetVersion": assetVersion,
+			"Data":              data,
+			"AssetVersion":      assetVersion,
+			"UseMinifiedAssets": useMinified,
 		}
 		if r != nil {
 			if c, err := r.Cookie("theme"); err == nil {
