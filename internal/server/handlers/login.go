@@ -65,6 +65,16 @@ func APILogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if user is banned before proceeding
+	isBanned, errBan := storage.IsUserBanned(email)
+	if errBan == nil && isBanned {
+		w.Header().Set("HX-Retarget", "#login-error")
+		w.Header().Set("HX-Reswap", "innerHTML")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "This account has been banned.")
+		return
+	}
+
 	permissions, err := storage.GetPermissionsByRoleID(roleID)
 	if err != nil {
 		fmt.Printf("Error fetching permissions: %v\n", err)

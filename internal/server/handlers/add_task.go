@@ -73,6 +73,16 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Prevent banned users from performing actions
+	if isBanned, err := storage.IsUserBanned(email); err == nil && isBanned {
+		sessionstore.ClearSessionCookie(w, r)
+		basePath := utils.GetBasePath()
+		w.Header().Set("HX-Redirect", basePath)
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, " ")
+		return
+	}
+
 	var userID int
 	if uid := utils.GetSessionUserID(r); uid != nil {
 		userID = *uid

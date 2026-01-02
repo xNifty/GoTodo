@@ -363,6 +363,22 @@ func GetUserByEmail(email string) (*User, error) {
 	return &user, nil
 }
 
+// IsUserBanned returns true if the user with the given email has is_banned = true
+func IsUserBanned(email string) (bool, error) {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return false, err
+	}
+	defer CloseDatabase(pool)
+
+	var isB bool
+	err = pool.QueryRow(context.Background(), "SELECT COALESCE(is_banned, FALSE) FROM users WHERE email = $1", email).Scan(&isB)
+	if err != nil {
+		return false, err
+	}
+	return isB, nil
+}
+
 func GetPermissionsByRoleID(roleID int) ([]string, error) {
 	pool, err := OpenDatabase()
 	if err != nil {

@@ -33,6 +33,16 @@ func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Prevent banned users from performing actions
+	if isBanned, err := storage.IsUserBanned(email); err == nil && isBanned {
+		sessionstore.ClearSessionCookie(w, r)
+		basePath := utils.GetBasePath()
+		w.Header().Set("HX-Redirect", basePath)
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, " ")
+		return
+	}
+
 	db, err := storage.OpenDatabase()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)

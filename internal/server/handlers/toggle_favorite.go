@@ -6,6 +6,7 @@ import (
 	"GoTodo/internal/storage"
 	"GoTodo/internal/tasks"
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 )
@@ -28,6 +29,16 @@ func APIToggleFavorite(w http.ResponseWriter, r *http.Request) {
 	email, _, _, timezone, loggedIn, _ := utils.GetSessionUserWithTimezone(r)
 	if !loggedIn {
 		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	// Prevent banned users from performing actions
+	if isBanned, err := storage.IsUserBanned(email); err == nil && isBanned {
+		sessionstore.ClearSessionCookie(w, r)
+		basePath := utils.GetBasePath()
+		w.Header().Set("HX-Redirect", basePath)
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, " ")
 		return
 	}
 

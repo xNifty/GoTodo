@@ -2,8 +2,11 @@ package handlers
 
 import (
 	"GoTodo/internal/server/utils"
+	"GoTodo/internal/sessionstore"
 	"GoTodo/internal/storage"
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 )
@@ -12,6 +15,21 @@ func APIUpdateTaskStatus(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	if id == "" {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	// Require logged-in user and enforce ban check + ownership
+	email, _, _, loggedIn := utils.GetSessionUser(r)
+	if !loggedIn {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	if isBanned, err := storage.IsUserBanned(email); err == nil && isBanned {
+		sessionstore.ClearSessionCookie(w, r)
+		basePath := utils.GetBasePath()
+		w.Header().Set("HX-Redirect", basePath)
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, " ")
 		return
 	}
 
@@ -25,10 +43,31 @@ func APIUpdateTaskStatus(w http.ResponseWriter, r *http.Request) {
 
 	var completed bool
 
-	err = db.QueryRow(context.Background(), "SELECT completed FROM tasks WHERE id = $1", id).Scan(&completed)
-
+	// Ensure task exists and belongs to the current user
+	var ownerID int
+	err = db.QueryRow(context.Background(), "SELECT completed, user_id FROM tasks WHERE id = $1", id).Scan(&completed, &ownerID)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Task not found.", http.StatusNotFound)
+			return
+		}
 		http.Error(w, "Task not found.", http.StatusInternalServerError)
+		return
+	}
+
+	// Verify ownership
+	var userID int
+	if uid := utils.GetSessionUserID(r); uid != nil {
+		userID = *uid
+	} else {
+		err = db.QueryRow(context.Background(), "SELECT id FROM users WHERE email = $1", email).Scan(&userID)
+		if err != nil {
+			http.Error(w, "Error getting user ID", http.StatusInternalServerError)
+			return
+		}
+	}
+	if ownerID != userID {
+		http.Error(w, "Not authorized to update this task.", http.StatusForbidden)
 		return
 	}
 
@@ -41,8 +80,6 @@ func APIUpdateTaskStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fetch updated counts for the task's owner so the UI badges can be refreshed
-	var ownerID int
 	if err := db.QueryRow(context.Background(), "SELECT user_id FROM tasks WHERE id = $1", id).Scan(&ownerID); err == nil {
 		var completedCount int
 		var incompleteCount int

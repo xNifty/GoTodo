@@ -2,6 +2,7 @@ package utils
 
 import (
 	"GoTodo/internal/sessionstore"
+	"GoTodo/internal/storage"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -161,10 +162,20 @@ func GetSessionUserWithTimezone(r *http.Request) (email string, roleID int, perm
 // RequireAuth is a middleware that checks if a user is logged in
 func RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		_, _, _, loggedIn := GetSessionUser(r)
+		email, _, _, loggedIn := GetSessionUser(r)
 		if !loggedIn {
 			http.Redirect(w, r, "/", http.StatusUnauthorized)
 			return
+		}
+
+		// If the user has been banned since their session was created, clear session and force logout
+		if email != "" {
+			if isBanned, err := storage.IsUserBanned(email); err == nil && isBanned {
+				// Clear session cookie and redirect to home
+				sessionstore.ClearSessionCookie(w, r)
+				http.Redirect(w, r, "/", http.StatusUnauthorized)
+				return
+			}
 		}
 		next(w, r)
 	}
@@ -173,10 +184,19 @@ func RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 // RequirePermission is a middleware that checks if a user has a specific permission
 func RequirePermission(permission string, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		_, _, permissions, loggedIn := GetSessionUser(r)
+		email, _, permissions, loggedIn := GetSessionUser(r)
 		if !loggedIn {
 			http.Redirect(w, r, "/", http.StatusUnauthorized)
 			return
+		}
+
+		// If the user has been banned since their session was created, clear session and force logout
+		if email != "" {
+			if isBanned, err := storage.IsUserBanned(email); err == nil && isBanned {
+				sessionstore.ClearSessionCookie(w, r)
+				http.Redirect(w, r, "/", http.StatusUnauthorized)
+				return
+			}
 		}
 
 		hasPermission := false
