@@ -57,6 +57,14 @@ func InitializeTemplates() error {
 func RenderTemplate(w http.ResponseWriter, r *http.Request, tmpl string, data interface{}) error {
 	assetVersion := os.Getenv("ASSET_VERSION")
 	if assetVersion == "" {
+		// Try a file written by CI: internal/server/public/.asset_version
+		if b, err := os.ReadFile("internal/server/public/.asset_version"); err == nil {
+			if v := strings.TrimSpace(string(b)); v != "" {
+				assetVersion = v
+			}
+		}
+	}
+	if assetVersion == "" {
 		// fallback to config asset version
 		if config.Cfg.AssetVersion != "" {
 			assetVersion = config.Cfg.AssetVersion

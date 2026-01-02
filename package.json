@@ -1,0 +1,13 @@
+{
+  "name": "gotodo-assets",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build:js": "esbuild internal/server/public/js/site.js --bundle --minify --outfile=internal/server/public/js/site.js --allow-overwrite",
+    "build:css": "esbuild internal/server/public/css/site.css --minify --outfile=internal/server/public/css/site.css --allow-overwrite",
+    "build:assets": "npm run build:js && npm run build:css"
+  },
+  "devDependencies": {
+    "esbuild": "^0.19.0"
+  }
+}
