@@ -1,1 +1,728 @@
-(()=>{window.apiPath=function(i){return"./"+(i.startsWith("/")?i.slice(1):i)};document.addEventListener("DOMContentLoaded",()=>{let i=document.getElementById("sidebar"),w=document.getElementById("openSidebar"),q=document.getElementById("closeSidebar"),x=document.getElementById("description"),l=document.getElementById("char-count"),u=null;(function(){try{let t=document.querySelector("footer");t&&(u=t.outerHTML)}catch{}})();function C(){try{if(!document.querySelector("footer")&&u){let e=document.getElementById("task-container");if(e&&e.parentNode){let t=document.createElement("div");t.innerHTML=u,e.nextSibling?e.parentNode.insertBefore(t.firstElementChild,e.nextSibling):e.parentNode.appendChild(t.firstElementChild)}else{let t=document.createElement("div");t.innerHTML=u,document.body.appendChild(t.firstElementChild)}}}catch{}}x&&l&&x.addEventListener("input",function(){let e=this.value.length;l.textContent=e,e>90?l.classList.add("text-warning"):l.classList.remove("text-warning"),e>95?l.classList.add("text-danger"):l.classList.remove("text-danger")});function E(){let e=document.getElementById("theme-toggle"),n=document.documentElement.getAttribute("data-theme")||localStorage.getItem("theme")||"light";document.documentElement.setAttribute("data-theme",n),n==="dark"?e&&e.classList.add("active"):e&&e.classList.remove("active")}function b(){let t=(document.documentElement.getAttribute("data-theme")||"light")==="light"?"dark":"light",n=document.getElementById("theme-toggle");document.documentElement.setAttribute("data-theme",t),localStorage.setItem("theme",t);try{document.cookie="theme="+t+"; path=/; max-age=31536000; SameSite=Lax"}catch{}t==="dark"?n&&n.classList.add("active"):n&&n.classList.remove("active")}E();let k=document.getElementById("theme-toggle");k&&k.addEventListener("click",b);function I(){i=document.getElementById("sidebar"),i&&i.classList.add("active")}function v(){i=document.getElementById("sidebar"),i&&i.classList.remove("active")}function f(){let e=document.getElementById("openSidebar"),t=document.getElementById("closeSidebar");e&&(e.removeEventListener("click",I),e.addEventListener("click",I)),t&&(t.removeEventListener("click",v),t.addEventListener("click",v));let n=document.getElementById("theme-toggle");n&&(n.removeEventListener("click",b),n.addEventListener("click",b))}f(),document.body.addEventListener("htmx:afterSettle",e=>{e.target.id==="task-container"&&(f(),i=document.getElementById("sidebar"),i&&i.classList.contains("htmx-added")&&i.classList.add("active"))});function L(){try{if(typeof Sortable>"u")return;let e=document.getElementById("favorite-task-list"),t=document.getElementById("task-list"),n=(o,a)=>{if(o){if(o._sortable)try{o._sortable.destroy()}catch{}o._sortable=Sortable.create(o,{handle:".drag-handle",animation:150,onEnd:function(r){let s=Array.from(r.to.children).map(d=>(d.id||"").replace("task-","")).filter(Boolean).join(","),c=new URLSearchParams;c.append("order",s),c.append("is_favorite",a?"true":"false");let m=document.querySelector('#task-container [name="currentPage"]');m&&m.value&&c.append("page",m.value),fetch("/api/reorder-tasks",{method:"POST",body:c}).then(d=>{if(d.ok)return d.text();throw new Error("Failed to save order")}).then(d=>{let p=document.getElementById("task-container");if(p){p.innerHTML=d;try{typeof htmx<"u"&&htmx.process(p)}catch{}try{L()}catch{}try{typeof f=="function"&&f()}catch{}try{typeof h=="function"&&h()}catch{}try{C()}catch{}}}).catch(d=>{console.error("Reorder failed",d)})}})}};n(e,!0),n(t,!1)}catch{}}L(),document.body.addEventListener("htmx:afterSwap",function(e){if(e.target.id==="task-container"){try{M(),T()}catch{}L()}});function T(){let e=document.getElementById("task-container");if(!e)return;let t=e.querySelector("table");if(!t)return;["table","table-striped","table-bordered","w-100","mb-3"].forEach(o=>{t.classList.contains(o)||t.classList.add(o)})}function M(){let e=document.getElementById("task-container");if(!e||e.querySelector("table"))return;let t=e.querySelector("#favorite-task-list"),n=e.querySelector("#task-list"),o=[];if(t&&o.push(t),n&&o.push(n),o.length===0){let c=Array.from(e.querySelectorAll(":scope > tr"));c.length&&o.push(...c)}if(o.length===0)return;let a=document.createElement("table");a.className="table table-striped table-bordered w-100 mb-3";let r=e.querySelector("thead");if(r){a.appendChild(r.cloneNode(!0));try{r.remove()}catch{}}let s=document.createElement("tbody");o.forEach(c=>{s.appendChild(c)}),a.appendChild(s),e.insertBefore(a,e.firstChild)}let B=document.getElementById("newTaskForm");B&&B.addEventListener("htmx:afterRequest",e=>{let t=!1;try{let n=e.detail&&e.detail.xhr,o=n&&n.getResponseHeader?n.getResponseHeader("X-Validation-Error"):null;(o&&o.toLowerCase()==="true"||e.detail&&e.detail.triggerSpec&&e.detail.triggerSpec.trigger==="description-error")&&(t=!0)}catch{}if(e.detail.successful&&!t){v();let n=document.getElementById("title");n&&(n.value="");let o=document.getElementById("description");o&&(o.value="");let a=document.getElementById("char-count");a&&(a.textContent="0");let r=document.getElementById("description-error");r&&(r.innerHTML="")}else if(t)return});let g=document.getElementById("modal");g&&(g.addEventListener("hide.bs.modal",()=>{document.activeElement instanceof HTMLElement&&document.activeElement.blur()}),g.addEventListener("hidden.bs.modal",()=>{g.setAttribute("aria-hidden","true")}));function h(){let e=document.getElementById("modal");if(e){e.classList.contains("modal-listeners-initialized")||(e.addEventListener("hide.bs.modal",()=>{document.activeElement instanceof HTMLElement&&document.activeElement.blur()}),e.addEventListener("hidden.bs.modal",()=>{e.setAttribute("aria-hidden","true")}),e.classList.add("modal-listeners-initialized"));try{typeof bootstrap<"u"&&bootstrap.Modal&&typeof bootstrap.Modal.getOrCreateInstance=="function"&&bootstrap.Modal.getOrCreateInstance(e)}catch{}}}h(),function(){try{if(!new URLSearchParams(window.location.search).get("cssdebug"))return;let n={"max-420":"(max-width: 420px)","max-600":"(max-width: 600px)","max-768":"(max-width: 768px)","max-1024":"(max-width: 1024px)","pointer-coarse":"(pointer: coarse)","hover-none":"(hover: none)"};console.groupCollapsed("CSS Debug \u2014 media query matches"),Object.entries(n).forEach(([o,a])=>{try{let r=window.matchMedia(a);console.log(a+":",r.matches)}catch{console.log(a+": error")}}),console.log("navigator.maxTouchPoints:",navigator.maxTouchPoints),console.log("ontouchstart in window:","ontouchstart"in window),console.groupEnd()}catch{}}(),document.body.addEventListener("taskDeleted",function(e){let t=document.querySelectorAll("#task-container span"),n=1;for(let r of t){let s=r.textContent.match(/Page\s+(\d+)\s+of\s+(\d+)/);if(s){n=parseInt(s[1]);break}}let o=`/api/fetch-tasks?page=${n}`,a=document.getElementById("search");a&&a.value&&(o+=`&search=${encodeURIComponent(a.value)}`),htmx.ajax("GET",o,{target:"#task-container",swap:"innerHTML"})}),document.body.addEventListener("reloadPage",function(e){let n=`/api/fetch-tasks?page=${e.detail.page||1}`,o=document.getElementById("search");o&&o.value&&(n+=`&search=${encodeURIComponent(o.value)}`),htmx.ajax("GET",n,{target:"#task-container",swap:"innerHTML"})}),document.body.addEventListener("reload-previous-page",function(e){let t=document.querySelectorAll("#task-container span"),n=1;for(let c of t){let m=c.textContent.match(/Page\s+(\d+)\s+of\s+(\d+)/);if(m){n=parseInt(m[1]);break}}let o=Math.max(n-1,1),a=document.getElementById("search"),r=a?a.value:"",s=`/api/fetch-tasks?page=${o}`;r&&(s+=`&search=${encodeURIComponent(r)}`),htmx.ajax("GET",s,{target:"#task-container",swap:"innerHTML"})}),document.body.addEventListener("login-success",function(e){let t=bootstrap.Modal.getInstance(document.getElementById("modal"));t&&t.hide(),window.location.reload()}),document.body.addEventListener("taskCountsChanged",function(e){try{let t=e.detail||{};if(typeof t.completed<"u"){let n=document.getElementById("completed-tasks-badge");n&&(n.textContent=`Completed: ${t.completed}`)}if(typeof t.incomplete<"u"){let n=document.getElementById("incomplete-tasks-badge");n&&(n.textContent=`Incomplete: ${t.incomplete}`)}if(typeof t.completed<"u"&&typeof t.incomplete<"u"){let n=document.getElementById("total-tasks-badge");n&&(n.textContent=`Total Tasks: ${t.completed+t.incomplete}`)}}catch{}});function A(){let e=document.querySelector(".app-toast-container");return e||(e=document.createElement("div"),e.className="app-toast-container",document.body.appendChild(e)),e}function S(e,t){t=t||{};let n=A(),o=document.createElement("div");o.className="app-toast"+(t.error?" app-toast--error":""),o.setAttribute("role","status"),o.setAttribute("aria-live","polite"),o.textContent=e,n.appendChild(o),requestAnimationFrame(()=>{o.classList.add("show")});let a=typeof t.duration=="number"?t.duration:3500,r=()=>{o.classList.remove("show"),setTimeout(()=>{try{o.remove()}catch{}},220)},s=setTimeout(r,a);o.addEventListener("click",function(){clearTimeout(s),r()})}document.body.addEventListener("favorite-limit-reached",function(e){try{let t=e&&e.detail&&e.detail.message||"You can only favorite up to 5 tasks";S(t,{error:!0})}catch{S("You can only favorite up to 5 tasks",{error:!0})}}),document.body.addEventListener("click",function(e){let t=e.target.closest&&e.target.closest(".task-toggle");if(!t||t.classList.contains("favorite-btn"))return;let n=t.closest("tr");if(!n)return;let o=n.classList.toggle("expanded");try{t.setAttribute("aria-expanded",o?"true":"false")}catch{}}),document.body.addEventListener("keydown",function(e){if(e.key!=="Enter"&&e.key!==" "&&e.key!=="Spacebar")return;let t=e.target&&e.target.closest&&e.target.closest(".task-toggle");if(!t||(e.preventDefault(),t.classList.contains("favorite-btn")))return;let n=t.closest("tr");if(!n)return;let o=n.classList.toggle("expanded");try{t.setAttribute("aria-expanded",o?"true":"false")}catch{}}),document.body.addEventListener("htmx:afterSwap",e=>{let t=document.getElementById("sidebar");if(t&&t.classList.contains("active")){let n=document.getElementById("description"),o=document.getElementById("char-count");n&&o&&(o.textContent=n.value.length,n.classList.contains("char-count-listener-added")||(n.addEventListener("input",function(){let a=this.value.length;o.textContent=a,a>90?o.classList.add("text-warning"):o.classList.remove("text-warning"),a>95?o.classList.add("text-danger"):o.classList.remove("text-danger")}),n.classList.add("char-count-listener-added"))),typeof E=="function"&&E()}}),document.body.addEventListener("htmx:afterSwap",function(e){if(e.target&&e.target.id==="task-container")try{h()}catch{}})});})();
+// Helper to build correct API URLs that work on both localhost and subpaths
+window.apiPath = function (endpoint) {
+  // Remove leading slash if present
+  const path = endpoint.startsWith("/") ? endpoint.slice(1) : endpoint;
+  // Use relative path with dot prefix so HTMX resolves it relative to current location
+  return "./" + path;
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+  let sidebar = document.getElementById("sidebar");
+  let openSidebarBtn = document.getElementById("openSidebar");
+  let closeSidebarBtn = document.getElementById("closeSidebar");
+  let description = document.getElementById("description");
+  let charCount = document.getElementById("char-count");
+
+  // Save original footer HTML so we can restore it if an HTMX swap accidentally removes it
+  let __originalFooterHTML = null;
+  (function captureFooter() {
+    try {
+      const f = document.querySelector("footer");
+      if (f) __originalFooterHTML = f.outerHTML;
+    } catch (e) {}
+  })();
+
+  function restoreFooterIfMissing() {
+    try {
+      if (!document.querySelector("footer") && __originalFooterHTML) {
+        // Insert footer after the main container if present, otherwise append to body
+        const container = document.getElementById("task-container");
+        if (container && container.parentNode) {
+          // Create a temporary node and insert
+          const temp = document.createElement("div");
+          temp.innerHTML = __originalFooterHTML;
+          // append after container
+          if (container.nextSibling) {
+            container.parentNode.insertBefore(
+              temp.firstElementChild,
+              container.nextSibling
+            );
+          } else {
+            container.parentNode.appendChild(temp.firstElementChild);
+          }
+        } else {
+          const temp = document.createElement("div");
+          temp.innerHTML = __originalFooterHTML;
+          document.body.appendChild(temp.firstElementChild);
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+  // Character counter for description
+  if (description && charCount) {
+    description.addEventListener("input", function () {
+      const length = this.value.length;
+      charCount.textContent = length;
+
+      // Add visual feedback when approaching limit
+      if (length > 90) {
+        charCount.classList.add("text-warning");
+      } else {
+        charCount.classList.remove("text-warning");
+      }
+      if (length > 95) {
+        charCount.classList.add("text-danger");
+      } else {
+        charCount.classList.remove("text-danger");
+      }
+    });
+  }
+
+  // Theme toggle functionality
+  function initTheme() {
+    const themeToggle = document.getElementById("theme-toggle");
+    // Prefer an existing data-theme (may be set server-side), fall back to localStorage, then default to light
+    const existing = document.documentElement.getAttribute("data-theme");
+    const saved = existing || localStorage.getItem("theme") || "light";
+    document.documentElement.setAttribute("data-theme", saved);
+    if (saved === "dark") {
+      if (themeToggle) themeToggle.classList.add("active");
+    } else {
+      if (themeToggle) themeToggle.classList.remove("active");
+    }
+  }
+
+  function toggleTheme() {
+    const currentTheme =
+      document.documentElement.getAttribute("data-theme") || "light";
+    const newTheme = currentTheme === "light" ? "dark" : "light";
+    const themeToggle = document.getElementById("theme-toggle");
+
+    document.documentElement.setAttribute("data-theme", newTheme);
+    localStorage.setItem("theme", newTheme);
+
+    // Persist to cookie so server-side rendering can pick it up as a fallback
+    try {
+      document.cookie =
+        "theme=" + newTheme + "; path=/; max-age=31536000; SameSite=Lax";
+    } catch (e) {
+      // ignore
+    }
+
+    if (newTheme === "dark") {
+      if (themeToggle) themeToggle.classList.add("active");
+    } else {
+      if (themeToggle) themeToggle.classList.remove("active");
+    }
+  }
+
+  // Initialize theme on page load
+  initTheme();
+
+  // Set up theme toggle event listener
+  const themeToggle = document.getElementById("theme-toggle");
+  if (themeToggle) {
+    themeToggle.addEventListener("click", toggleTheme);
+  }
+
+  function openSidebar() {
+    sidebar = document.getElementById("sidebar"); // Refetch in case HTMX replaced this element
+    if (sidebar) {
+      sidebar.classList.add("active");
+    }
+  }
+
+  function closeSidebar() {
+    sidebar = document.getElementById("sidebar"); // Refetch in case HTMX replaced this element
+    if (sidebar) {
+      sidebar.classList.remove("active");
+    }
+  }
+
+  function initializeSidebarEventListeners() {
+    // Re-query buttons in case HTMX replaced the DOM inside #task-container
+    const openBtn = document.getElementById("openSidebar");
+    const closeBtn = document.getElementById("closeSidebar");
+
+    if (openBtn) {
+      openBtn.removeEventListener("click", openSidebar); // Prevent duplicate bindings
+      openBtn.addEventListener("click", openSidebar);
+    }
+
+    if (closeBtn) {
+      closeBtn.removeEventListener("click", closeSidebar); // Prevent duplicate bindings
+      closeBtn.addEventListener("click", closeSidebar);
+    }
+
+    // Reattach theme toggle if needed
+    const themeToggle = document.getElementById("theme-toggle");
+    if (themeToggle) {
+      themeToggle.removeEventListener("click", toggleTheme);
+      themeToggle.addEventListener("click", toggleTheme);
+    }
+  }
+
+  // Attach initial event listeners
+  initializeSidebarEventListeners();
+
+  // Reattach event listeners after HTMX swaps
+  document.body.addEventListener("htmx:afterSettle", (event) => {
+    if (event.target.id === "task-container") {
+      initializeSidebarEventListeners();
+
+      // Reapply the active class if necessary
+      sidebar = document.getElementById("sidebar"); // Refetch updated sidebar
+      if (sidebar && sidebar.classList.contains("htmx-added")) {
+        sidebar.classList.add("active");
+      }
+    }
+  });
+
+  // Initialize Sortable on favorite and regular task lists to allow drag-and-drop
+  function initSortable() {
+    try {
+      if (typeof Sortable === "undefined") return;
+
+      const favList = document.getElementById("favorite-task-list");
+      const regList = document.getElementById("task-list");
+
+      const createSortable = (el, isFav) => {
+        if (!el) return;
+        // Destroy existing Sortable instance if present
+        if (el._sortable) {
+          try {
+            el._sortable.destroy();
+          } catch (e) {}
+        }
+        el._sortable = Sortable.create(el, {
+          handle: ".drag-handle",
+          animation: 150,
+          onEnd: function (evt) {
+            // Build order of ids
+            const ids = Array.from(evt.to.children)
+              .map((row) => {
+                const id = row.id || "";
+                return id.replace("task-", "");
+              })
+              .filter(Boolean)
+              .join(",");
+
+            // Post new order to server
+            const form = new URLSearchParams();
+            form.append("order", ids);
+            form.append("is_favorite", isFav ? "true" : "false");
+            // include current page if present
+            const pageEl = document.querySelector(
+              '#task-container [name="currentPage"]'
+            );
+            if (pageEl && pageEl.value) form.append("page", pageEl.value);
+
+            fetch("/api/reorder-tasks", { method: "POST", body: form })
+              .then((resp) => {
+                if (resp.ok) return resp.text();
+                throw new Error("Failed to save order");
+              })
+              .then((html) => {
+                // Replace task container with returned HTML
+                const container = document.getElementById("task-container");
+                if (container) {
+                  container.innerHTML = html;
+                  // Let HTMX process any hx-* attributes in the newly inserted content
+                  try {
+                    if (typeof htmx !== "undefined") htmx.process(container);
+                  } catch (e) {}
+                  // Reinitialize sortable after DOM update
+                  try {
+                    initSortable();
+                  } catch (e) {}
+                  // Reattach sidebar and modal listeners which may have been lost
+                  try {
+                    if (typeof initializeSidebarEventListeners === "function") {
+                      initializeSidebarEventListeners();
+                    }
+                  } catch (e) {}
+                  try {
+                    if (typeof initializeModalEventListeners === "function") {
+                      initializeModalEventListeners();
+                    }
+                  } catch (e) {}
+                  // Ensure footer still exists after manual replacement
+                  try {
+                    restoreFooterIfMissing();
+                  } catch (e) {}
+                }
+              })
+              .catch((err) => {
+                console.error("Reorder failed", err);
+              });
+          },
+        });
+      };
+
+      createSortable(favList, true);
+      createSortable(regList, false);
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // Initialize sortable on initial load and after HTMX swaps
+  initSortable();
+  document.body.addEventListener("htmx:afterSwap", function (evt) {
+    if (evt.target.id === "task-container") {
+      // Ensure table retains expected Bootstrap classes after HTMX replaces content
+      try {
+        ensureTableStructure();
+        ensureTableClasses();
+      } catch (e) {}
+
+      initSortable();
+    }
+  });
+
+  // Ensure table element inside #task-container has expected classes
+  function ensureTableClasses() {
+    const container = document.getElementById("task-container");
+    if (!container) return;
+    const table = container.querySelector("table");
+    if (!table) return;
+    const classes = [
+      "table",
+      "table-striped",
+      "table-bordered",
+      "w-100",
+      "mb-3",
+    ];
+    classes.forEach((c) => {
+      if (!table.classList.contains(c)) table.classList.add(c);
+    });
+  }
+
+  // If HTMX returned rows or tbody elements without a surrounding table, wrap them
+  function ensureTableStructure() {
+    const container = document.getElementById("task-container");
+    if (!container) return;
+    // If a table already exists, nothing to do
+    if (container.querySelector("table")) return;
+
+    // Look for tbody elements or lists that should be wrapped
+    const fav = container.querySelector("#favorite-task-list");
+    const reg = container.querySelector("#task-list");
+
+    const nodesToWrap = [];
+    if (fav) nodesToWrap.push(fav);
+    if (reg) nodesToWrap.push(reg);
+
+    // If there are no known tbody containers, look for direct <tr> children
+    if (nodesToWrap.length === 0) {
+      const trs = Array.from(container.querySelectorAll(":scope > tr"));
+      if (trs.length) {
+        nodesToWrap.push(...trs);
+      }
+    }
+
+    if (nodesToWrap.length === 0) return;
+
+    // Build a table structure and move the nodes into it
+    const table = document.createElement("table");
+    table.className = "table table-striped table-bordered w-100 mb-3";
+
+    // If there's a thead elsewhere in the container, move it into the table
+    const thead = container.querySelector("thead");
+    if (thead) {
+      table.appendChild(thead.cloneNode(true));
+      try {
+        thead.remove();
+      } catch (e) {}
+    }
+
+    // Append each node into a tbody. If node is already a tbody, append directly.
+    const tbody = document.createElement("tbody");
+    nodesToWrap.forEach((n) => {
+      tbody.appendChild(n);
+    });
+    table.appendChild(tbody);
+
+    // Insert the table at the top of the container
+    container.insertBefore(table, container.firstChild);
+  }
+
+  // Optional: Close sidebar after form submission
+  const taskForm = document.getElementById("newTaskForm");
+  if (taskForm) {
+    taskForm.addEventListener("htmx:afterRequest", (event) => {
+      // Only close sidebar if the request was successful and not a validation error
+      // event.detail.successful will be true for a 200 status code response, even with HX-Trigger/HX-Retarget
+      // Check for a validation header set by the server (preferred) or fall back to triggerSpec for compatibility
+      let isValidationError = false;
+      try {
+        const xhr = event.detail && event.detail.xhr;
+        const header =
+          xhr && xhr.getResponseHeader
+            ? xhr.getResponseHeader("X-Validation-Error")
+            : null;
+        if (header && header.toLowerCase() === "true") {
+          isValidationError = true;
+        } else if (
+          event.detail &&
+          event.detail.triggerSpec &&
+          event.detail.triggerSpec.trigger === "description-error"
+        ) {
+          // Backwards compat: if older handlers used triggerSpec, respect that too
+          isValidationError = true;
+        }
+      } catch (e) {
+        // ignore and treat as not a validation error
+      }
+
+      if (event.detail.successful && !isValidationError) {
+        closeSidebar();
+        // Clear the form fields on successful submission
+        const tEl = document.getElementById("title");
+        if (tEl) tEl.value = "";
+        const dEl = document.getElementById("description");
+        if (dEl) dEl.value = "";
+        // Reset character counter
+        let charCount = document.getElementById("char-count");
+        if (charCount) charCount.textContent = "0";
+        // Clear any old validation message
+        let errorDiv = document.getElementById("description-error");
+        if (errorDiv) errorDiv.innerHTML = "";
+      } else if (isValidationError) {
+        // Keep the sidebar open and show the error (HTMX will swap the error message into #description-error due to HX-Retarget)
+        // The form fields and char counter are retained automatically by the browser
+        return; // Stop further processing so sidebar remains open
+      }
+      // Note: For network errors (non-2xx status), event.detail.successful will be false,
+      // and this handler will not close the sidebar, which is the desired behavior.
+    });
+  }
+
+  const modalElement = document.getElementById("modal");
+
+  if (modalElement) {
+    modalElement.addEventListener("hide.bs.modal", () => {
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+    });
+
+    // Optional: Set aria-hidden to true when the modal is hidden (if necessary)
+    modalElement.addEventListener("hidden.bs.modal", () => {
+      modalElement.setAttribute("aria-hidden", "true");
+    });
+  }
+
+  // Modal initialization helper - re-attach listeners after HTMX swaps
+  function initializeModalEventListeners() {
+    const modalEl = document.getElementById("modal");
+    if (!modalEl) return;
+    if (!modalEl.classList.contains("modal-listeners-initialized")) {
+      modalEl.addEventListener("hide.bs.modal", () => {
+        if (document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+      });
+      modalEl.addEventListener("hidden.bs.modal", () => {
+        modalEl.setAttribute("aria-hidden", "true");
+      });
+      modalEl.classList.add("modal-listeners-initialized");
+    }
+    // ensure bootstrap modal instance exists so data-bs-dismiss works
+    try {
+      if (
+        typeof bootstrap !== "undefined" &&
+        bootstrap.Modal &&
+        typeof bootstrap.Modal.getOrCreateInstance === "function"
+      ) {
+        bootstrap.Modal.getOrCreateInstance(modalEl);
+      }
+    } catch (e) {}
+  }
+
+  // Call once on initial load
+  initializeModalEventListeners();
+
+  // Debug helper: when ?cssdebug=1 is present in the URL, log which media queries match.
+  (function cssDebugHelper() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (!params.get("cssdebug")) return;
+
+      const queries = {
+        "max-420": "(max-width: 420px)",
+        "max-600": "(max-width: 600px)",
+        "max-768": "(max-width: 768px)",
+        "max-1024": "(max-width: 1024px)",
+        "pointer-coarse": "(pointer: coarse)",
+        "hover-none": "(hover: none)",
+      };
+
+      console.groupCollapsed("CSS Debug — media query matches");
+      Object.entries(queries).forEach(([k, q]) => {
+        try {
+          const m = window.matchMedia(q);
+          console.log(q + ":", m.matches);
+        } catch (e) {
+          console.log(q + ": error");
+        }
+      });
+      // Also log touch-capability and maxTouchPoints
+      console.log("navigator.maxTouchPoints:", navigator.maxTouchPoints);
+      console.log("ontouchstart in window:", "ontouchstart" in window);
+      console.groupEnd();
+    } catch (e) {}
+  })();
+
+  // Handle task deletion
+  document.body.addEventListener("taskDeleted", function (evt) {
+    // Get the current page from the page number display
+    // Find the pagination span that contains "Page X of Y"
+    const spans = document.querySelectorAll("#task-container span");
+    let currentPage = 1;
+    for (let span of spans) {
+      const match = span.textContent.match(/Page\s+(\d+)\s+of\s+(\d+)/);
+      if (match) {
+        currentPage = parseInt(match[1]);
+        break;
+      }
+    }
+
+    // Reload the current page
+    let url = `/api/fetch-tasks?page=${currentPage}`;
+    const searchInput = document.getElementById("search");
+    if (searchInput && searchInput.value) {
+      url += `&search=${encodeURIComponent(searchInput.value)}`;
+    }
+    htmx.ajax("GET", url, { target: "#task-container", swap: "innerHTML" });
+  });
+
+  // Handle reload with specific page number
+  document.body.addEventListener("reloadPage", function (evt) {
+    const page = evt.detail.page || 1;
+    let url = `/api/fetch-tasks?page=${page}`;
+    const searchInput = document.getElementById("search");
+    if (searchInput && searchInput.value) {
+      url += `&search=${encodeURIComponent(searchInput.value)}`;
+    }
+    htmx.ajax("GET", url, { target: "#task-container", swap: "innerHTML" });
+  });
+
+  document.body.addEventListener("reload-previous-page", function (evt) {
+    // Get the current page from the page number display
+    // Find the pagination span that contains "Page X of Y"
+    const spans = document.querySelectorAll("#task-container span");
+    let currentPage = 1;
+    for (let span of spans) {
+      const match = span.textContent.match(/Page\s+(\d+)\s+of\s+(\d+)/);
+      if (match) {
+        currentPage = parseInt(match[1]);
+        break;
+      }
+    }
+    const prevPage = Math.max(currentPage - 1, 1);
+
+    // Optionally, preserve search query if present
+    const searchInput = document.getElementById("search");
+    const searchQuery = searchInput ? searchInput.value : "";
+
+    // Build the URL for the previous page
+    let url = `/api/fetch-tasks?page=${prevPage}`;
+    if (searchQuery) {
+      url += `&search=${encodeURIComponent(searchQuery)}`;
+    }
+
+    // Use HTMX to load the previous page into the task container
+    htmx.ajax("GET", url, { target: "#task-container", swap: "innerHTML" });
+  });
+
+  // Handle login success
+  document.body.addEventListener("login-success", function (evt) {
+    // Close the login modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById("modal"));
+    if (modal) {
+      modal.hide();
+    }
+
+    // Optionally reload the page to show logged-in state
+    window.location.reload();
+  });
+
+  // Update completed/incomplete badges when server notifies via HX-Trigger
+  document.body.addEventListener("taskCountsChanged", function (evt) {
+    try {
+      const d = evt.detail || {};
+      if (typeof d.completed !== "undefined") {
+        const el = document.getElementById("completed-tasks-badge");
+        if (el) el.textContent = `Completed: ${d.completed}`;
+      }
+      if (typeof d.incomplete !== "undefined") {
+        const el2 = document.getElementById("incomplete-tasks-badge");
+        if (el2) el2.textContent = `Incomplete: ${d.incomplete}`;
+      }
+      // update total if both present
+      if (
+        typeof d.completed !== "undefined" &&
+        typeof d.incomplete !== "undefined"
+      ) {
+        const totalEl = document.getElementById("total-tasks-badge");
+        if (totalEl)
+          totalEl.textContent = `Total Tasks: ${d.completed + d.incomplete}`;
+      }
+    } catch (e) {
+      // ignore
+    }
+  });
+
+  // Toast helper: create container and show transient toasts matching theme
+  function ensureToastContainer() {
+    let c = document.querySelector(".app-toast-container");
+    if (!c) {
+      c = document.createElement("div");
+      c.className = "app-toast-container";
+      document.body.appendChild(c);
+    }
+    return c;
+  }
+
+  function showToast(message, opts) {
+    opts = opts || {};
+    const container = ensureToastContainer();
+    const t = document.createElement("div");
+    t.className = "app-toast" + (opts.error ? " app-toast--error" : "");
+    t.setAttribute("role", "status");
+    t.setAttribute("aria-live", "polite");
+    t.textContent = message;
+    container.appendChild(t);
+
+    // ensure next frame for animation
+    requestAnimationFrame(() => {
+      t.classList.add("show");
+    });
+
+    const timeout = typeof opts.duration === "number" ? opts.duration : 3500;
+    const remove = () => {
+      t.classList.remove("show");
+      setTimeout(() => {
+        try {
+          t.remove();
+        } catch (e) {}
+      }, 220);
+    };
+
+    // Auto-remove
+    const to = setTimeout(remove, timeout);
+
+    // Allow manual dismissal on click
+    t.addEventListener("click", function () {
+      clearTimeout(to);
+      remove();
+    });
+  }
+
+  // Listen for favorite-limit-reached HTMX trigger (server sets HX-Trigger header)
+  document.body.addEventListener("favorite-limit-reached", function (evt) {
+    try {
+      // If server provided a detail.message, prefer that, otherwise default text
+      const msg =
+        (evt && evt.detail && evt.detail.message) ||
+        "You can only favorite up to 5 tasks";
+      showToast(msg, { error: true });
+    } catch (e) {
+      showToast("You can only favorite up to 5 tasks", { error: true });
+    }
+  });
+
+  // Delegate clicks on task title toggles to expand/collapse details on mobile
+  document.body.addEventListener("click", function (e) {
+    const toggle = e.target.closest && e.target.closest(".task-toggle");
+    if (!toggle) return;
+    // Don't toggle when favorite button was the click target
+    if (toggle.classList.contains("favorite-btn")) return;
+    const tr = toggle.closest("tr");
+    if (!tr) return;
+    const expanded = tr.classList.toggle("expanded");
+    // update aria-expanded
+    try {
+      toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+    } catch (e) {}
+  });
+
+  // Support keyboard activation (Enter/Space) for the task-toggle spans
+  document.body.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter" && e.key !== " " && e.key !== "Spacebar") return;
+    const toggle =
+      e.target && e.target.closest && e.target.closest(".task-toggle");
+    if (!toggle) return;
+    // Prevent page scrolling on Space
+    e.preventDefault();
+    // Don't toggle when favorite button has focus
+    if (toggle.classList.contains("favorite-btn")) return;
+    const tr = toggle.closest("tr");
+    if (!tr) return;
+    const expanded = tr.classList.toggle("expanded");
+    try {
+      toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+    } catch (e) {}
+  });
+
+  // Note: Logout now uses HX-Redirect in the handler, so no event listener needed
+
+  // Re-initialize character counter and theme toggle after HTMX swaps if sidebar is active
+  document.body.addEventListener("htmx:afterSwap", (event) => {
+    // Check if the sidebar element exists and is currently active
+    const sidebarElement = document.getElementById("sidebar");
+    if (sidebarElement && sidebarElement.classList.contains("active")) {
+      // Re-initialize character counter if elements are present
+      let description = document.getElementById("description");
+      let charCount = document.getElementById("char-count");
+      if (description && charCount) {
+        // Ensure we don't add duplicate listeners
+        // You might need a more robust way to handle this if HTMX swaps parts of the sidebar body frequently.
+        // For now, re-setting innerHTML for #description-error means the textarea and char-count span themselves are usually not replaced unless the whole form is swapped.
+        // Let's re-attach the listener defensively.
+
+        // Remove any existing listener before adding a new one to prevent duplicates
+        // (Requires storing the listener function reference if we want to remove specifically, or rely on HTMX replacing element)
+        // Since HTMX often replaces the element, a simpler approach is to just re-add the listener.
+        // If the textarea element itself is *not* replaced by the swap (only content around it),
+        // you might get duplicate listeners. However, given the hx-swap="innerHTML" on the form,
+        // the textarea and char-count span should be new elements, making this approach okay.
+
+        charCount.textContent = description.value.length; // Initialize count
+
+        // It's safer to check if a listener already exists or if the element was replaced.
+        // A simpler way for now is to rely on the element being replaced on form swap.
+        // For robustness, consider using htmx.onLoad or a mutation observer if needed.
+
+        // For now, re-attach the input listener assuming the element might be new.
+        // This listener might be added multiple times if the description element isn't fully replaced,
+        // but HTMX swap="innerHTML" on the form usually replaces the whole form content.
+        // Let's add a check to see if the element has a marker class indicating listener already added.
+        if (!description.classList.contains("char-count-listener-added")) {
+          description.addEventListener("input", function () {
+            const length = this.value.length;
+            charCount.textContent = length;
+            // Add visual feedback when approaching limit
+            if (length > 90) {
+              charCount.classList.add("text-warning");
+            } else {
+              charCount.classList.remove("text-warning");
+            }
+            if (length > 95) {
+              charCount.classList.add("text-danger");
+            } else {
+              charCount.classList.remove("text-danger");
+            }
+          });
+          description.classList.add("char-count-listener-added"); // Mark as having listener
+        }
+      }
+      // Re-initialize theme toggle if needed
+      if (typeof initTheme === "function") {
+        initTheme(); // This function should be idempotent or handle re-running safely
+      }
+    }
+  });
+
+  // Reattach modal listeners after HTMX swaps that replace task container
+  document.body.addEventListener("htmx:afterSwap", function (evt) {
+    if (evt.target && evt.target.id === "task-container") {
+      try {
+        initializeModalEventListeners();
+      } catch (e) {}
+    }
+  });
+});
