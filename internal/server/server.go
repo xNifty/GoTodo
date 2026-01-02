@@ -59,6 +59,10 @@ func StartServer() error {
 	http.HandleFunc("/api/invites", utils.RequirePermission("createinvites", handlers.APIGetInvites))
 	http.HandleFunc("/api/confirm-invite-delete", utils.RequirePermission("createinvites", handlers.APIConfirmDeleteInvite))
 
+	// Ban/unban user actions (admin only)
+	http.HandleFunc("/api/ban-user", utils.RequirePermission("createinvites", handlers.APIBanUser))
+	http.HandleFunc("/api/unban-user", utils.RequirePermission("createinvites", handlers.APIUnbanUser))
+
 	// Handle PUT and DELETE for invites with path parameters
 	http.HandleFunc("/api/invite/", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {

@@ -167,12 +167,28 @@ func CreateUsersTable() error {
 		"email VARCHAR(255) UNIQUE NOT NULL",
 		"password VARCHAR(255) NOT NULL",
 		"role_id INTEGER NOT NULL",
+		"is_banned BOOLEAN DEFAULT FALSE",
 		"items_per_page INTEGER DEFAULT 15",
 		"created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
 		"updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
 	}
 
 	return CreateTable("users", columns)
+}
+
+// MigrateUsersAddIsBanned adds is_banned boolean column to users table
+func MigrateUsersAddIsBanned() error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return fmt.Errorf("failed to open database: %v", err)
+	}
+	defer CloseDatabase(pool)
+
+	_, err = pool.Exec(context.Background(), "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE")
+	if err != nil {
+		return fmt.Errorf("failed to add is_banned column to users table: %v", err)
+	}
+	return nil
 }
 
 func CreateInvitesTable() error {

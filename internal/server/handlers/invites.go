@@ -20,6 +20,7 @@ type Invite struct {
 	Email      string
 	Token      string
 	InviteUsed int
+	IsBanned   bool
 }
 
 // CreateInvitePageHandler renders the create invite page
@@ -56,6 +57,10 @@ func CreateInvitePageHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fmt.Printf("Warning: Could not migrate invites table: %v\n", err)
 	}
+	// Ensure users table has is_banned column for future ban/unban support
+	if err := storage.MigrateUsersAddIsBanned(); err != nil {
+		fmt.Printf("Warning: Could not migrate users table (is_banned): %v\n", err)
+	}
 
 	rows, err := pool.Query(context.Background(), "SELECT id, email, token, inviteused FROM invites ORDER BY id DESC")
 	if err != nil {
@@ -70,6 +75,23 @@ func CreateInvitePageHandler(w http.ResponseWriter, r *http.Request) {
 		err := rows.Scan(&invite.ID, &invite.Email, &invite.Token, &invite.InviteUsed)
 		if err != nil {
 			continue
+		}
+		// If a user exists with this email, consider the invite used; also check ban status
+		var uid int
+		errUser := pool.QueryRow(context.Background(), "SELECT id FROM users WHERE email = $1", invite.Email).Scan(&uid)
+		if errUser == nil {
+			invite.InviteUsed = 1
+			// populate ban status
+			var isB bool
+			err = pool.QueryRow(context.Background(), "SELECT is_banned FROM users WHERE email = $1", invite.Email).Scan(&isB)
+			if err == nil {
+				invite.IsBanned = isB
+			} else {
+				invite.IsBanned = false
+			}
+		} else {
+			// no user found, mark as not used and ensure ban false
+			invite.IsBanned = false
 		}
 		invites = append(invites, invite)
 	}
@@ -299,29 +321,123 @@ func APIGetInvites(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			continue
 		}
+		// populate is_banned for API responses as well
+		var uid int
+		errUser := pool.QueryRow(context.Background(), "SELECT id FROM users WHERE email = $1", invite.Email).Scan(&uid)
+		if errUser == nil {
+			invite.InviteUsed = 1
+			var isB bool
+			err = pool.QueryRow(context.Background(), "SELECT is_banned FROM users WHERE email = $1", invite.Email).Scan(&isB)
+			if err == nil {
+				invite.IsBanned = isB
+			} else {
+				invite.IsBanned = false
+			}
+		} else {
+			invite.IsBanned = false
+		}
 		invites = append(invites, invite)
 	}
 
-	// Return as HTML table rows for HTMX
+	// Return as HTML table rows for HTMX. For invites that have been used, show Active/Banned and ban/unban actions.
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	for _, invite := range invites {
-		usedStatus := "No"
+		// Determine status badge: Pending when unused, Active/Banned when used
+		statusBadge := "<span class=\"badge bg-warning\">Pending</span>"
 		if invite.InviteUsed == 1 {
-			usedStatus = "Yes"
+			if invite.IsBanned {
+				statusBadge = "<span class=\"badge bg-danger\">Banned</span>"
+			} else {
+				statusBadge = "<span class=\"badge bg-success\">Active</span>"
+			}
 		}
-		fmt.Fprintf(w, `<tr>
-			<td>%d</td>
-			<td>%s</td>
-			<td><code>%s</code></td>
-			<td>%s</td>
-			<td>`, invite.ID, invite.Email, invite.Token, usedStatus)
+
+		// Render the title cell with matching markup to the template so HTMX swaps keep behavior
 		if invite.InviteUsed == 0 {
-			fmt.Fprintf(w, `<button class="btn btn-sm btn-warning" hx-put="/api/invite/%d" hx-target="#invite-error" hx-swap="innerHTML" hx-include="[name='email-%d']">Edit</button>
-				<button class="btn btn-sm btn-danger" hx-delete="/api/invite/%d" hx-confirm="Are you sure you want to delete this invite?" hx-target="#invite-error" hx-swap="innerHTML">Delete</button>`, invite.ID, invite.ID, invite.ID)
+			fmt.Fprintf(w, `<tr>
+			<td class="title-column" data-label="Email">
+				<form id="edit-invite-%d" style="display:inline; width:100%;">
+					<input type="email" class="form-control form-control-sm" name="email-%d" value="%s" style="display:block; width:100%%;" />
+				</form>
+				<button type="button" class="task-toggle btn btn-link d-md-none" aria-expanded="false" title="Show invite details"></button>
+			</td>
+			<td class="desc-column" data-label="Token"><code>%s</code></td>
+			<td class="status-column" data-label="Status">%s</td>
+			<td class="delete-column" data-label="Delete">`, invite.ID, invite.ID, invite.Email, invite.Token, statusBadge)
+		} else {
+			fmt.Fprintf(w, `<tr>
+			<td class="title-column" data-label="Email"><span class="task-toggle" aria-expanded="false" aria-label="Invite %d details">%s</span></td>
+			<td class="desc-column" data-label="Token"><code>%s</code></td>
+			<td class="status-column" data-label="Status">%s</td>
+			<td class="delete-column" data-label="Delete">`, invite.ID, invite.Email, invite.Token, statusBadge)
+		}
+
+		if invite.InviteUsed == 0 {
+			fmt.Fprintf(w, `<button class="btn btn-sm btn-warning me-1" hx-put="/api/invite/%d" hx-target="#invite-error" hx-swap="innerHTML" hx-include="[name='email-%d']" title="Edit invite" aria-label="Edit invite %d"><i class=\"bi bi-pencil\"></i></button>
+				<button class="btn btn-sm btn-danger" hx-get="/api/confirm-invite-delete?id=%d" hx-target="#modal .modal-content" hx-trigger="click" data-bs-toggle="modal" data-bs-target="#modal" title="Delete invite" aria-label="Delete invite %d"><i class=\"bi bi-trash\"></i></button>`, invite.ID, invite.ID, invite.ID, invite.ID, invite.ID)
+		} else {
+			// For used invites, show Ban or Unban depending on is_banned (icon-only buttons with tooltips)
+			if invite.IsBanned {
+				fmt.Fprintf(w, `<button class="btn btn-sm btn-success me-1" hx-post="/api/unban-user?email=%s" hx-trigger="click" hx-swap="none" title="Unban User?" aria-label="Unban user %s"><i class=\"bi bi-person-check\"></i></button>`, invite.Email, invite.Email)
+			} else {
+				fmt.Fprintf(w, `<button class="btn btn-sm btn-danger me-1" hx-post="/api/ban-user?email=%s" hx-trigger="click" hx-swap="none" title="Ban User?" aria-label="Ban user %s"><i class=\"bi bi-slash-circle\"></i></button>`, invite.Email, invite.Email)
+			}
 		}
 		fmt.Fprint(w, `</td>
 		</tr>`)
 	}
+}
+
+// APIBanUser sets is_banned=true for the user with the provided email (if exists)
+func APIBanUser(w http.ResponseWriter, r *http.Request) {
+	email := r.URL.Query().Get("email")
+	basePath := utils.GetBasePath()
+	if email == "" {
+		http.Error(w, "email is required", http.StatusBadRequest)
+		return
+	}
+	pool, err := storage.OpenDatabase()
+	if err != nil {
+		http.Error(w, "Error opening database", http.StatusInternalServerError)
+		return
+	}
+	defer storage.CloseDatabase(pool)
+
+	_, err = pool.Exec(context.Background(), "UPDATE users SET is_banned = TRUE WHERE email = $1", email)
+	if err != nil {
+		http.Error(w, "Error banning user", http.StatusInternalServerError)
+		return
+	}
+	// Redirect to reload the page and show updated status
+	w.Header().Set("HX-Redirect", basePath+"/createinvite")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprint(w, " ")
+}
+
+// APIUnbanUser sets is_banned=false for the user with the provided email (if exists)
+func APIUnbanUser(w http.ResponseWriter, r *http.Request) {
+	email := r.URL.Query().Get("email")
+	basePath := utils.GetBasePath()
+	if email == "" {
+		http.Error(w, "email is required", http.StatusBadRequest)
+		return
+	}
+	pool, err := storage.OpenDatabase()
+	if err != nil {
+		http.Error(w, "Error opening database", http.StatusInternalServerError)
+		return
+	}
+	defer storage.CloseDatabase(pool)
+
+	_, err = pool.Exec(context.Background(), "UPDATE users SET is_banned = FALSE WHERE email = $1", email)
+	if err != nil {
+		http.Error(w, "Error unbanning user", http.StatusInternalServerError)
+		return
+	}
+	// Redirect to reload the page and show updated status
+	w.Header().Set("HX-Redirect", basePath+"/createinvite")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprint(w, " ")
 }
 
 // APIUpdateInvite handles updating an invite (only email can be updated, and only if unused)

@@ -184,6 +184,181 @@ td.delete-column {
     }
 }
 
+/* Touch-device override: ensure on phones and touch devices the invite details
+   remain hidden unless expanded, and emails are left-aligned. Placed late
+   to outrank earlier tablet/desktop rules. */
+@media (pointer: coarse) {
+    .invite-list-card tbody tr:not(.expanded) td.desc-column,
+    .invite-list-card tbody tr:not(.expanded) td.status-column,
+    .invite-list-card tbody tr:not(.expanded) td.delete-column {
+        display: none !important;
+    }
+    .invite-list-card tbody tr td.title-column {
+        display: block !important;
+        width: 100% !important;
+        text-align: left !important;
+    }
+    .invite-list-card .title-column .form-control,
+    .invite-list-card .title-column span.task-toggle {
+        text-align: left !important;
+    }
+    /* Ensure the chevron remains at the right of the title row */
+    .invite-list-card .title-column { position: relative; }
+    .invite-list-card .title-column .task-toggle {
+        position: absolute !important;
+        right: 0.5rem !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+    }
+}
+
+/* Match profile's phone layout for create-invite page at 420px and below */
+@media (max-width: 420px) {
+    body.create-invite-page .container {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+    body.create-invite-page .card {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        margin: 0 auto !important;
+    }
+    body.create-invite-page .form-control,
+    body.create-invite-page .form-select,
+    body.create-invite-page .form-control-plaintext {
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Force invite list rows to be full-width blocks like profile card rows */
+    .invite-list-card tbody tr {
+        display: block !important;
+        width: 100% !important;
+        margin-bottom: 0.6rem !important;
+        padding: 0.6rem !important;
+    }
+
+    /* Ensure title/email left-aligned and occupying full width */
+    .invite-list-card .title-column,
+    .invite-list-card .title-column .form-control,
+    .invite-list-card .title-column span.task-toggle {
+        text-align: left !important;
+        display: block !important;
+        width: 100% !important;
+    }
+
+    /* Reposition chevron to the far right inside the title row */
+    .invite-list-card .title-column { position: relative; }
+    .invite-list-card .title-column .task-toggle::after {
+        position: absolute !important;
+        right: 0.6rem !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+    }
+
+    /* Hide details by default unless expanded */
+    .invite-list-card tbody tr:not(.expanded) .desc-column,
+    .invite-list-card tbody tr:not(.expanded) .status-column,
+    .invite-list-card tbody tr:not(.expanded) .delete-column {
+        display: none !important;
+    }
+
+    /* Reveal details when expanded */
+    .invite-list-card tbody tr.expanded .desc-column,
+    .invite-list-card tbody tr.expanded .status-column,
+    .invite-list-card tbody tr.expanded .delete-column {
+        display: block !important;
+    }
+}
+
+/* Polished styling for expanded invite accordion content */
+.invite-list-card tbody tr.expanded {
+    padding-bottom: 0.8rem !important;
+}
+.invite-list-card tbody tr.expanded .desc-column {
+    margin-top: 0.6rem;
+    padding: 0.6rem 0.75rem;
+    background: rgba(0,0,0,0.06);
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.03);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Courier New", monospace;
+    font-size: 0.95rem;
+    word-break: break-all;
+}
+.invite-list-card tbody tr.expanded .status-column {
+    margin-top: 0.6rem;
+    display: inline-block;
+}
+.invite-list-card tbody tr.expanded .delete-column {
+    margin-top: 0.6rem;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.invite-list-card tbody tr.expanded .delete-column .btn {
+    min-width: 44px;
+}
+
+/* Ensure action buttons are compact and icon-centered when icon-only */
+.invite-list-card .delete-column .btn i {
+    font-size: 1.05rem;
+}
+.invite-list-card .delete-column .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.45rem 0.55rem;
+}
+
+/* On wider screens, keep action buttons compact and side-by-side */
+@media (min-width: 421px) {
+    .invite-list-card tbody tr.expanded .delete-column {
+        display: flex;
+        justify-content: flex-start;
+        gap: 0.5rem;
+        align-items: center;
+    }
+    .invite-list-card tbody tr.expanded .status-column {
+        margin-right: 1rem;
+    }
+}
+
+/* Add subtle separators for readability */
+.invite-list-card tbody tr + tr { margin-top: 0.45rem; }
+
+/* Ensure create-invite page uses full-width cards like profile on small screens */
+@media (max-width: 600px) {
+    body.create-invite-page .container {
+        padding-left: 0.6rem !important;
+        padding-right: 0.6rem !important;
+    }
+    body.create-invite-page .card {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    /* Ensure each invite title (email) is full-width and left-aligned */
+    .invite-list-card .title-column span.task-toggle {
+        display: block !important;
+        width: 100% !important;
+        text-align: left !important;
+        padding-right: 2.2rem !important; /* avoid overlap with chevron */
+    }
+    .invite-list-card .title-column .form-control {
+        text-align: left !important;
+    }
+    /* Make chevron sit at the far right inside the title row */
+    .invite-list-card .title-column .task-toggle::after {
+        position: absolute !important;
+        right: 0.6rem !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+    }
+}
+
 /* Compact card-style for small/medium screens */
 @media (max-width: 768px) {
     /* Make each row a compact horizontal card when collapsed (flex),
@@ -567,6 +742,124 @@ td.delete-column {
     }
 }
 
+/* Invite-list card polishing for small screens */
+@media (max-width: 1024px) {
+    .invite-list-card .table { border: none; }
+    .invite-list-card .table td, .invite-list-card .table th { border: none; }
+    .invite-list-card tbody tr {
+        padding: 0.6rem 0.75rem;
+        background: transparent;
+        border-radius: 6px;
+        box-shadow: none;
+    }
+    .invite-list-card .title-column {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        width: 100%;
+    }
+    .invite-list-card .title-column .form-control {
+        flex: 1 1 auto;
+        min-width: 0;
+        margin: 0;
+        background: var(--form-control-bg);
+        color: var(--form-control-text);
+        border: 1px solid var(--box-border);
+        padding: 0.35rem 0.5rem;
+    }
+    .invite-list-card .title-column .task-toggle {
+        margin-left: 0.25rem;
+        padding: 0;
+        background: transparent;
+        border: none;
+        color: var(--text-color);
+        opacity: 0.95;
+    }
+    .invite-list-card .title-column .task-toggle::after {
+        content: '\25BE';
+        display: inline-block;
+        margin-left: 0.25rem;
+        transform-origin: center;
+        transition: transform 150ms ease;
+    }
+    tr.expanded .invite-list-card .title-column .task-toggle::after { transform: rotate(180deg); }
+    .invite-list-card .status-column, .invite-list-card .delete-column { display: inline-block; vertical-align: middle; }
+    .invite-list-card .card-body .btn { margin-bottom: 0.35rem; }
+}
+
+/* Strong mobile (phones) adjustments to stack invite rows cleanly */
+@media (max-width: 600px) {
+    .invite-list-card .table { border: none; }
+    .invite-list-card thead { display: none; }
+    .invite-list-card tbody tr {
+        display: block !important;
+        padding: 0.6rem !important;
+        margin-bottom: 0.6rem;
+        background: var(--box-bg) !important;
+        border: 1px solid var(--box-border) !important;
+        border-radius: 6px !important;
+        box-shadow: none !important;
+    }
+
+    /* Make each cell a block with its label above the value */
+    .invite-list-card tbody tr td {
+        display: block !important;
+        width: 100% !important;
+        padding: 0.35rem 0.45rem !important;
+        border: none !important;
+    }
+
+    /* Hide details by default on very small screens; reveal when row is expanded.
+       Use a more specific selector and !important so tablet/desktop rules don't override it. */
+    .invite-list-card tbody tr:not(.expanded) .desc-column,
+    .invite-list-card tbody tr:not(.expanded) .status-column,
+    .invite-list-card tbody tr:not(.expanded) .delete-column {
+        display: none !important;
+    }
+
+    .invite-list-card .title-column {
+        display: block !important;
+        width: 100% !important;
+    }
+    .invite-list-card .title-column .form-control {
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Keep the toggle chevron aligned right on the same row as the email */
+    .invite-list-card .title-column { position: relative; }
+    .invite-list-card .title-column .task-toggle {
+        position: absolute;
+        right: 0.5rem;
+        top: 50%;
+        transform: translateY(-50%);
+        padding: 0.15rem 0.35rem;
+        background: transparent;
+    }
+
+    /* Token and status/actions stack below neatly */
+    .invite-list-card .desc-column { margin-top: 0.45rem; word-break: break-all; }
+    /* Reveal when expanded */
+    .invite-list-card tbody tr.expanded .desc-column,
+    .invite-list-card tbody tr.expanded .status-column,
+    .invite-list-card tbody tr.expanded .delete-column {
+        display: block !important;
+        width: 100% !important;
+        margin-top: 0.5rem !important;
+    }
+
+    /* Make action buttons full-width and touch-friendly */
+    .invite-list-card .card-body .btn {
+        width: 100% !important;
+        padding: 0.6rem 0.8rem !important;
+        box-sizing: border-box !important;
+        margin-bottom: 0.4rem !important;
+    }
+
+    /* Reduce the token font slightly to avoid overflow */
+    .invite-list-card .desc-column code { font-size: 0.92rem; }
+}
+
 /* Make profile card and form fields expand to full width on very small screens */
 @media (max-width: 420px) {
     body.profile-page .container {
@@ -685,6 +978,18 @@ button.task-toggle, .task-toggle.btn, .task-toggle.btn-link, .task-toggle {
     gap: 0.4rem !important;
     cursor: pointer !important;
     border-radius: 4px !important;
+}
+
+/* Final override: ensure on narrow phones the invite details remain hidden unless expanded.
+   Placed at the end to outrank earlier tablet rules. */
+@media (max-width: 600px) {
+    .invite-list-card tbody tr:not(.expanded) td.desc-column,
+    .invite-list-card tbody tr:not(.expanded) td.status-column,
+    .invite-list-card tbody tr:not(.expanded) td.delete-column {
+        display: none !important;
+    }
+    /* ensure the email/title row uses full width */
+    .invite-list-card tbody tr td.title-column { display: block !important; width: 100% !important; }
 }
 
 button.task-toggle:hover, .task-toggle:hover, button.task-toggle:focus, .task-toggle:focus {
@@ -950,6 +1255,31 @@ textarea {
 [data-theme="dark"] .modal-content {
     background-color: var(--sidebar-bg);
     color: var(--text-color);
+}
+
+/* Ensure inline email inputs in invite rows are readable and accessible
+   when using the compact/accordion layout (title-column). */
+.title-column .form-control,
+.title-column input[type="email"] {
+    background-color: var(--form-control-bg);
+    color: var(--form-control-text);
+    border: 1px solid var(--box-border);
+    padding: 0.25rem 0.45rem;
+}
+
+.title-column .form-control::placeholder,
+.title-column input[type="email"]::placeholder {
+    color: rgba(0,0,0,0.45);
+}
+
+[data-theme="dark"] .title-column .form-control::placeholder,
+[data-theme="dark"] .title-column input[type="email"]::placeholder {
+    color: #adb5bd;
+}
+
+/* Give a little breathing room between the input and the compact toggle */
+.title-column .task-toggle {
+    margin-left: 0.5rem;
 }
 
 [data-theme="dark"] .card {
