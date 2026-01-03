@@ -356,7 +356,7 @@ func APIGetInvites(w http.ResponseWriter, r *http.Request) {
 		if invite.InviteUsed == 0 {
 			fmt.Fprintf(w, `<tr>
 			<td class="title-column" data-label="Email">
-				<form id="edit-invite-%d" style="display:inline; width:100%;">
+				<form id="edit-invite-%d" style="display:inline; width:100%%;">
 					<input type="email" class="form-control form-control-sm" name="email-%d" value="%s" style="display:block; width:100%%;" />
 				</form>
 				<button type="button" class="task-toggle btn btn-link d-md-none" aria-expanded="false" title="Show invite details"></button>
