@@ -444,20 +444,72 @@ document.addEventListener("DOMContentLoaded", () => {
         '<div class="text-center text-muted">No changelog entries available.</div>';
       return;
     }
-    // Build HTML
+    // Build HTML with collapsible entries (collapsed by default).
     const out = document.createElement("div");
     out.className = "changelog-list";
     const MAX_MODAL = 5;
     const recent = entries.slice(0, MAX_MODAL);
-    recent.forEach((e) => {
+    recent.forEach((e, idx) => {
       const card = document.createElement("div");
-      card.className = "mb-3";
-      // If server provided rendered HTML (from GitHub markdown), insert it
-      // and then attach the date/prerelease badge to the first heading.
+      card.className = "card mb-3";
+      const cardBody = document.createElement("div");
+      cardBody.className = "card-body";
+
+      // Header button with caret and badge (shows version, title, tag, date)
+      const headerBtn = document.createElement("button");
+      headerBtn.type = "button";
+      headerBtn.className =
+        "btn btn-link text-start w-100 p-0 d-flex align-items-center";
+      headerBtn.style.textDecoration = "none";
+
+      const arrow = document.createElement("span");
+      arrow.className = "chev me-2";
+      arrow.textContent = "►";
+      headerBtn.appendChild(arrow);
+
+      const titleWrap = document.createElement("div");
+      titleWrap.className = "flex-grow-1 text-start";
+      const strong = document.createElement("strong");
+      strong.textContent = e.title || "";
+      titleWrap.appendChild(strong);
+
+      const span = document.createElement("span");
+      span.className =
+        "badge releasetag ms-3 " +
+        (e.prerelease ? "bg-warning text-dark" : "bg-success");
+      span.textContent =
+        (e.prerelease ? "Prerelease" : "Release") + " • " + (e.date || "");
+      titleWrap.appendChild(span);
+
+      headerBtn.appendChild(titleWrap);
+      cardBody.appendChild(headerBtn);
+
+      const collapseDiv = document.createElement("div");
+      collapseDiv.id = `changelog-modal-${idx}-${Date.now()}`;
+      collapseDiv.className = "collapse mt-2";
+
+      // Body content
       if (e.html) {
         const bodyDiv = document.createElement("div");
-        bodyDiv.className = "changelog-entry-body mt-2";
-        bodyDiv.innerHTML = e.html; // server-rendered and controlled
+        bodyDiv.className = "changelog-entry-body";
+        bodyDiv.innerHTML = e.html;
+
+        // If the rendered HTML includes a heading with an anchor/permalink,
+        // shorten that anchor's visible text to only the release title so the
+        // clickable area doesn't show the entire breadcrumb.
+        try {
+          const heading = bodyDiv.querySelector("h1,h2,h3,h4,h5,h6");
+          if (heading) {
+            const anchor = heading.querySelector("a");
+            if (anchor) {
+              anchor.textContent =
+                e.title ||
+                anchor.getAttribute("title") ||
+                anchor.textContent ||
+                "";
+            }
+          }
+        } catch (err) {}
 
         // Remove any leading paragraph/div that duplicates the version/date
         const first = bodyDiv.firstElementChild;
@@ -481,32 +533,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         } catch (err) {}
 
-        // Append badge to the first heading inside the rendered HTML
-        const heading = bodyDiv.querySelector("h1,h2,h3,h4,h5,h6");
-        if (heading) {
-          const span = document.createElement("span");
-          span.className =
-            "badge releasetag ms-3 " +
-            (e.prerelease ? "bg-warning text-dark" : "bg-success");
-          span.textContent =
-            (e.prerelease ? "Prerelease" : "Release") + " • " + (e.date || "");
-          heading.appendChild(span);
-        } else {
-          // Fallback: if no heading, show a compact header above the body
-          const hdr = document.createElement("div");
-          hdr.className = "fw-bold mb-1";
-          hdr.textContent = `${e.version} — ${e.title}`;
-          const span = document.createElement("span");
-          span.className =
-            "badge releasetag ms-2 " +
-            (e.prerelease ? "bg-warning text-dark" : "bg-success");
-          span.textContent =
-            (e.prerelease ? "Prerelease" : "Release") + " • " + (e.date || "");
-          hdr.appendChild(span);
-          card.appendChild(hdr);
-        }
-
-        card.appendChild(bodyDiv);
+        collapseDiv.appendChild(bodyDiv);
       } else {
         const ul = document.createElement("ul");
         if (Array.isArray(e.notes)) {
@@ -516,22 +543,21 @@ document.addEventListener("DOMContentLoaded", () => {
             ul.appendChild(li);
           });
         }
-        // Add compact header for non-markdown entries
-        const hdr = document.createElement("div");
-        hdr.className = "fw-bold mb-1";
-        hdr.textContent = `${e.version} — ${e.title}`;
-        const span = document.createElement("span");
-        span.className =
-          "badge releasetag ms-2 " +
-          (e.prerelease ? "bg-warning text-dark" : "bg-success");
-        span.textContent =
-          (e.prerelease ? "Prerelease" : "Release") + " • " + (e.date || "");
-        hdr.appendChild(span);
-        card.appendChild(hdr);
-        card.appendChild(ul);
+        collapseDiv.appendChild(ul);
       }
+
+      // Toggle behavior: open/close collapse and swap arrow
+      headerBtn.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        const opened = collapseDiv.classList.toggle("show");
+        arrow.textContent = opened ? "▼" : "►";
+      });
+
+      cardBody.appendChild(collapseDiv);
+      card.appendChild(cardBody);
       out.appendChild(card);
     });
+
     // If there are more entries, add a link to view the full changelog page
     if (entries.length > recent.length) {
       const more = document.createElement("div");

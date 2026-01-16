@@ -4,6 +4,7 @@
 GoTodo
 nodemon.json
 config.json
+RELEASE_NOTES_DRAFT.md
 
 # Node/npm
 node_modules/

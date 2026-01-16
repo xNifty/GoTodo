@@ -3,21 +3,26 @@
 <div class="container mt-4">
   <h1>Change Log</h1>
   {{if .Entries}}
-    {{range .Entries}}
+    {{range $i, $e := .Entries}}
       <div class="card mb-3">
         <div class="card-body">
-          <h5 class="card-title d-flex align-items-center">{{.Version}} — {{.Title}}
-            <span class="badge releasetag ms-3 {{if .Prerelease}}bg-warning text-dark{{else}}bg-success{{end}}">{{if .Prerelease}}Prerelease{{else}}Release{{end}} • {{.Date}}</span>
-          </h5>
-          {{if .Html}}
-            {{safeHTML .Html}}
-          {{else if .Notes}}
-            <ul>
-            {{range .Notes}}
-              <li>{{.}}</li>
+          <button type="button" class="btn btn-link text-start w-100 p-0 d-flex align-items-center" data-bs-toggle="collapse" data-bs-target="#changelog-{{$i}}" aria-expanded="false" aria-controls="changelog-{{$i}}">
+            <span class="chev me-2">►</span>
+            <div class="flex-grow-1 text-start"><strong>{{$e.Version}} — {{$e.Title}}</strong>
+              <span class="badge releasetag ms-3 {{if $e.Prerelease}}bg-warning text-dark{{else}}bg-success{{end}}">{{if $e.Prerelease}}Prerelease{{else}}Release{{end}} • {{$e.Date}}</span>
+            </div>
+          </button>
+          <div id="changelog-{{$i}}" class="collapse mt-2">
+            {{if $e.Html}}
+              {{safeHTML $e.Html}}
+            {{else if $e.Notes}}
+              <ul>
+              {{range $e.Notes}}
+                <li>{{.}}</li>
+              {{end}}
+              </ul>
             {{end}}
-            </ul>
-          {{end}}
+          </div>
         </div>
       </div>
     {{end}}
