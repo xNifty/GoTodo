@@ -435,6 +435,94 @@ document.addEventListener("DOMContentLoaded", () => {
   // Call once on initial load
   initializeModalEventListeners();
 
+  // Changelog modal: fetch and render entries when opened
+  function renderChangelog(entries) {
+    const container = document.getElementById("changelog-body");
+    if (!container) return;
+    if (!entries || !entries.length) {
+      container.innerHTML =
+        '<div class="text-center text-muted">No changelog entries available.</div>';
+      return;
+    }
+    // Build HTML
+    const out = document.createElement("div");
+    out.className = "changelog-list";
+    const MAX_MODAL = 5;
+    const recent = entries.slice(0, MAX_MODAL);
+    recent.forEach((e) => {
+      const card = document.createElement("div");
+      card.className = "mb-3";
+      const header = document.createElement("div");
+      header.className = "fw-bold";
+      header.textContent = `${e.version} — ${e.title} (${e.date})`;
+      card.appendChild(header);
+      // If server provided rendered HTML (from GitHub markdown), use it.
+      if (e.html) {
+        const bodyDiv = document.createElement("div");
+        bodyDiv.className = "changelog-entry-body mt-2";
+        bodyDiv.innerHTML = e.html; // server-rendered and sanitized/controlled
+        card.appendChild(bodyDiv);
+      } else {
+        const ul = document.createElement("ul");
+        if (Array.isArray(e.notes)) {
+          e.notes.forEach((n) => {
+            const li = document.createElement("li");
+            li.textContent = n;
+            ul.appendChild(li);
+          });
+        }
+        card.appendChild(ul);
+      }
+      out.appendChild(card);
+    });
+    // If there are more entries, add a link to view the full changelog page
+    if (entries.length > recent.length) {
+      const more = document.createElement("div");
+      more.className = "text-center mt-3";
+      const a = document.createElement("a");
+      a.href = "/changelog/page";
+      a.target = "_blank";
+      a.textContent = "View full changelog";
+      more.appendChild(a);
+      out.appendChild(more);
+    }
+    container.innerHTML = "";
+    container.appendChild(out);
+  }
+
+  function loadChangelog() {
+    const container = document.getElementById("changelog-body");
+    if (container)
+      container.innerHTML =
+        '<div class="text-center text-muted">Loading...</div>';
+    fetch("/changelog")
+      .then((res) => {
+        if (!res.ok) throw new Error("failed to load changelog");
+        return res.json();
+      })
+      .then((data) => {
+        renderChangelog(data);
+      })
+      .catch((err) => {
+        const container = document.getElementById("changelog-body");
+        if (container)
+          container.innerHTML =
+            '<div class="text-danger">Unable to load changelog.</div>';
+        console.error(err);
+      });
+  }
+
+  const changelogModalEl = document.getElementById("changelogModal");
+  if (changelogModalEl) {
+    try {
+      changelogModalEl.addEventListener("show.bs.modal", loadChangelog);
+    } catch (e) {
+      // If bootstrap isn't present or event fails, attempt to load on click of link
+      const link = document.querySelector('[data-bs-target="#changelogModal"]');
+      if (link) link.addEventListener("click", loadChangelog);
+    }
+  }
+
   // Debug helper: when ?cssdebug=1 is present in the URL, log which media queries match.
   (function cssDebugHelper() {
     try {

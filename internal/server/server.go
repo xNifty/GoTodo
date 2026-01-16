@@ -31,6 +31,11 @@ func StartServer() error {
 		fmt.Printf("Warning: Redis init failed: %v\n", err)
 	}
 
+	// Preload changelog from GitHub at startup to avoid runtime API calls
+	if err := handlers.PreloadChangelog(); err != nil {
+		fmt.Printf("Warning: Preloading changelog failed: %v\n", err)
+	}
+
 	fs := http.FileServer(http.Dir("internal/server/public"))
 	http.Handle("/public/", http.StripPrefix("/public/", fs))
 
@@ -52,6 +57,8 @@ func StartServer() error {
 	http.HandleFunc("/api/toggle-favorite", handlers.APIToggleFavorite)
 	http.HandleFunc("/api/reorder-tasks", handlers.APIReorderTasks)
 	http.HandleFunc("/about", handlers.AboutHandler)
+	http.HandleFunc("/changelog", handlers.ChangelogHandler)
+	http.HandleFunc("/changelog/page", handlers.ChangelogPageHandler)
 	http.HandleFunc("/search", handlers.SearchHandler)
 
 	// Profile routes

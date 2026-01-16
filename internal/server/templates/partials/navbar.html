@@ -13,6 +13,9 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{{basePath}}/about">About</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#changelogModal">Changelog</a>
+                    </li>
                     {{if and .LoggedIn (hasPermission .Permissions "createinvites")}}
                     <li class="nav-item">
                         <a class="nav-link" href="{{basePath}}/createinvite">Create Invite</a>
@@ -48,3 +51,4 @@
             </div>
         </div>
     </nav>
+    {{template "changelog.html" .}}

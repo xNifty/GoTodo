@@ -1,0 +1,27 @@
+{{define "changelog_page.html"}}
+{{template "navbar.html" .}}
+<div class="container mt-4">
+  <h1>Change Log</h1>
+  {{if .Entries}}
+    {{range .Entries}}
+      <div class="card mb-3">
+        <div class="card-body">
+          <h5 class="card-title">{{.Version}} — {{.Title}}</h5>
+          <h6 class="card-subtitle mb-2 text-muted">{{.Date}}</h6>
+          {{if .Html}}
+            {{safeHTML .Html}}
+          {{else if .Notes}}
+            <ul>
+            {{range .Notes}}
+              <li>{{.}}</li>
+            {{end}}
+            </ul>
+          {{end}}
+        </div>
+      </div>
+    {{end}}
+  {{else}}
+    <div class="text-muted">No changelog entries available.</div>
+  {{end}}
+</div>
+{{end}}
