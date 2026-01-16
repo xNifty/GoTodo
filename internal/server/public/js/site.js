@@ -452,15 +452,60 @@ document.addEventListener("DOMContentLoaded", () => {
     recent.forEach((e) => {
       const card = document.createElement("div");
       card.className = "mb-3";
-      const header = document.createElement("div");
-      header.className = "fw-bold";
-      header.textContent = `${e.version} — ${e.title} (${e.date})`;
-      card.appendChild(header);
-      // If server provided rendered HTML (from GitHub markdown), use it.
+      // If server provided rendered HTML (from GitHub markdown), insert it
+      // and then attach the date/prerelease badge to the first heading.
       if (e.html) {
         const bodyDiv = document.createElement("div");
         bodyDiv.className = "changelog-entry-body mt-2";
-        bodyDiv.innerHTML = e.html; // server-rendered and sanitized/controlled
+        bodyDiv.innerHTML = e.html; // server-rendered and controlled
+
+        // Remove any leading paragraph/div that duplicates the version/date
+        const first = bodyDiv.firstElementChild;
+        try {
+          if (
+            first &&
+            (first.tagName === "P" ||
+              first.tagName === "DIV" ||
+              first.tagName === "PRE")
+          ) {
+            const txt = (first.textContent || "").trim().toLowerCase();
+            const v = (e.version || "").toLowerCase();
+            const d = (e.date || "").toLowerCase();
+            if (
+              (v && txt.includes(v)) ||
+              (d && txt.includes(d)) ||
+              txt.includes(" - ")
+            ) {
+              first.remove();
+            }
+          }
+        } catch (err) {}
+
+        // Append badge to the first heading inside the rendered HTML
+        const heading = bodyDiv.querySelector("h1,h2,h3,h4,h5,h6");
+        if (heading) {
+          const span = document.createElement("span");
+          span.className =
+            "badge releasetag ms-3 " +
+            (e.prerelease ? "bg-warning text-dark" : "bg-success");
+          span.textContent =
+            (e.prerelease ? "Prerelease" : "Release") + " • " + (e.date || "");
+          heading.appendChild(span);
+        } else {
+          // Fallback: if no heading, show a compact header above the body
+          const hdr = document.createElement("div");
+          hdr.className = "fw-bold mb-1";
+          hdr.textContent = `${e.version} — ${e.title}`;
+          const span = document.createElement("span");
+          span.className =
+            "badge releasetag ms-2 " +
+            (e.prerelease ? "bg-warning text-dark" : "bg-success");
+          span.textContent =
+            (e.prerelease ? "Prerelease" : "Release") + " • " + (e.date || "");
+          hdr.appendChild(span);
+          card.appendChild(hdr);
+        }
+
         card.appendChild(bodyDiv);
       } else {
         const ul = document.createElement("ul");
@@ -471,6 +516,18 @@ document.addEventListener("DOMContentLoaded", () => {
             ul.appendChild(li);
           });
         }
+        // Add compact header for non-markdown entries
+        const hdr = document.createElement("div");
+        hdr.className = "fw-bold mb-1";
+        hdr.textContent = `${e.version} — ${e.title}`;
+        const span = document.createElement("span");
+        span.className =
+          "badge releasetag ms-2 " +
+          (e.prerelease ? "bg-warning text-dark" : "bg-success");
+        span.textContent =
+          (e.prerelease ? "Prerelease" : "Release") + " • " + (e.date || "");
+        hdr.appendChild(span);
+        card.appendChild(hdr);
         card.appendChild(ul);
       }
       out.appendChild(card);

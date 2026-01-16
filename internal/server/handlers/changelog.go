@@ -21,11 +21,12 @@ import (
 
 // ChangelogEntry is the public structure returned to the client
 type ChangelogEntry struct {
-	Version string   `json:"version"`
-	Date    string   `json:"date"`
-	Title   string   `json:"title"`
-	Notes   []string `json:"notes"`
-	Html    string   `json:"html,omitempty"`
+	Version    string   `json:"version"`
+	Date       string   `json:"date"`
+	Title      string   `json:"title"`
+	Notes      []string `json:"notes"`
+	Html       string   `json:"html,omitempty"`
+	Prerelease bool     `json:"prerelease,omitempty"`
 }
 
 // In-memory fallback cache
@@ -89,6 +90,10 @@ func ChangelogHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				v[i].Html = renderMarkdown(md)
 			}
+		}
+		// Attempt to normalize/remove any leading breadcrumb-like block
+		if v[i].Html != "" {
+			v[i].Html = normalizeReleaseHTML(v[i].Html, v[i].Version, v[i].Title, v[i].Date)
 		}
 	}
 	respondJSON(w, v)
@@ -227,12 +232,18 @@ func fetchFromGitHub(repo string) ([]ChangelogEntry, error) {
 		// Render the full markdown body from GitHub releases to HTML
 		notes := parseNotesFromBody(r.Body)
 		html := renderMarkdown(r.Body)
+		// Normalize out leading breadcrumb-like paragraphs that duplicate the
+		// release/version line (many release bodies include a short one-line
+		// breadcrumb before the actual heading). Remove that leading block
+		// when it contains the tag/version or the published date.
+		html = normalizeReleaseHTML(html, r.TagName, title, date)
 		out = append(out, ChangelogEntry{
-			Version: r.TagName,
-			Date:    date,
-			Title:   title,
-			Notes:   notes,
-			Html:    html,
+			Version:    r.TagName,
+			Date:       date,
+			Title:      title,
+			Notes:      notes,
+			Html:       html,
+			Prerelease: r.Prerelease,
 		})
 	}
 
@@ -293,6 +304,72 @@ func renderMarkdown(md string) string {
 	return buf.String()
 }
 
+// stripTags removes any HTML tags from s (naive) and returns plain text.
+func stripTags(s string) string {
+	var b strings.Builder
+	inTag := false
+	for _, r := range s {
+		if r == '<' {
+			inTag = true
+			continue
+		}
+		if r == '>' {
+			inTag = false
+			continue
+		}
+		if !inTag {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// normalizeReleaseHTML attempts to remove a leading breadcrumb-like block
+// (commonly a short paragraph or div that repeats the version and date)
+// from the rendered HTML. It only strips the first block when it appears to
+// contain the version or date to avoid removing legitimate headings.
+func normalizeReleaseHTML(htmlStr, version, title, date string) string {
+	s := strings.TrimSpace(htmlStr)
+	if s == "" {
+		return htmlStr
+	}
+	lower := strings.ToLower(s)
+	// only consider removing when the first token is a paragraph/div/pre
+	if !(strings.HasPrefix(lower, "<p") || strings.HasPrefix(lower, "<div") || strings.HasPrefix(lower, "<pre")) {
+		return htmlStr
+	}
+	// find end of opening tag
+	openEnd := strings.Index(s, ">")
+	if openEnd == -1 {
+		return htmlStr
+	}
+	openTag := s[1:openEnd]
+	tagName := strings.Fields(openTag)[0]
+	if tagName == "" {
+		return htmlStr
+	}
+	closeTag := "</" + tagName + ">"
+	closeIdx := strings.Index(strings.ToLower(s), strings.ToLower(closeTag))
+	if closeIdx == -1 {
+		return htmlStr
+	}
+	inner := s[openEnd+1 : closeIdx]
+	innerText := strings.TrimSpace(stripTags(inner))
+	if innerText == "" {
+		// empty block — strip it
+		return strings.TrimSpace(s[closeIdx+len(closeTag):])
+	}
+	lowInner := strings.ToLower(innerText)
+	v := strings.ToLower(strings.TrimSpace(version))
+	d := strings.ToLower(strings.TrimSpace(date))
+	t := strings.ToLower(strings.TrimSpace(title))
+	// remove if the inner block contains the version or the date or looks like a breadcrumb (contains ' - ' and the version)
+	if (v != "" && strings.Contains(lowInner, v)) || (d != "" && strings.Contains(lowInner, d)) || (t != "" && strings.Contains(lowInner, t) && strings.Contains(lowInner, v)) || strings.Contains(lowInner, " - ") {
+		return strings.TrimSpace(s[closeIdx+len(closeTag):])
+	}
+	return htmlStr
+}
+
 // PreloadChangelog attempts to fetch releases once (used at startup)
 // It populates the Redis or in-memory cache via fetchFromGitHub.
 func PreloadChangelog() error {
@@ -335,6 +412,7 @@ func ChangelogPageHandler(w http.ResponseWriter, r *http.Request) {
 							md += "- " + n + "\n"
 						}
 						entries[i].Html = renderMarkdown(md)
+						entries[i].Html = normalizeReleaseHTML(entries[i].Html, entries[i].Version, entries[i].Title, entries[i].Date)
 					}
 				}
 			}

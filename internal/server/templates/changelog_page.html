@@ -6,8 +6,9 @@
     {{range .Entries}}
       <div class="card mb-3">
         <div class="card-body">
-          <h5 class="card-title">{{.Version}} — {{.Title}}</h5>
-          <h6 class="card-subtitle mb-2 text-muted">{{.Date}}</h6>
+          <h5 class="card-title d-flex align-items-center">{{.Version}} — {{.Title}}
+            <span class="badge releasetag ms-3 {{if .Prerelease}}bg-warning text-dark{{else}}bg-success{{end}}">{{if .Prerelease}}Prerelease{{else}}Release{{end}} • {{.Date}}</span>
+          </h5>
           {{if .Html}}
             {{safeHTML .Html}}
           {{else if .Notes}}
