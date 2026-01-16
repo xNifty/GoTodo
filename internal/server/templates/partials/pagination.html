@@ -27,6 +27,7 @@
                 {{range .Tasks}} {{template "todo.html" .}} {{end}}
             </tbody>
         </table>
+        </div>
         {{else if .LoggedIn}}
             {{if not .IsSearching}}
                 <div class="card text-center" style="padding: 3rem;">
