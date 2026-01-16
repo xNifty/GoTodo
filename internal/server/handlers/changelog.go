@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	htmlpkg "html"
 	"io"
 	"net/http"
 	"os"
@@ -84,7 +83,11 @@ func ChangelogHandler(w http.ResponseWriter, r *http.Request) {
 	for i := range v {
 		if v[i].Html == "" {
 			if len(v[i].Notes) > 0 {
-				v[i].Html = renderNotesAsHTML(v[i].Notes)
+				md := ""
+				for _, n := range v[i].Notes {
+					md += "- " + n + "\n"
+				}
+				v[i].Html = renderMarkdown(md)
 			}
 		}
 	}
@@ -221,8 +224,9 @@ func fetchFromGitHub(repo string) ([]ChangelogEntry, error) {
 		if title == "" {
 			title = r.TagName
 		}
+		// Render the full markdown body from GitHub releases to HTML
 		notes := parseNotesFromBody(r.Body)
-		html := renderNotesAsHTML(notes)
+		html := renderMarkdown(r.Body)
 		out = append(out, ChangelogEntry{
 			Version: r.TagName,
 			Date:    date,
@@ -289,25 +293,6 @@ func renderMarkdown(md string) string {
 	return buf.String()
 }
 
-// renderNotesAsHTML safely renders a slice of note strings into an HTML unordered list.
-func renderNotesAsHTML(notes []string) string {
-	if len(notes) == 0 {
-		return ""
-	}
-	var b bytes.Buffer
-	b.WriteString("<ul>")
-	for _, n := range notes {
-		if strings.TrimSpace(n) == "" {
-			continue
-		}
-		b.WriteString("<li>")
-		b.WriteString(htmlpkg.EscapeString(n))
-		b.WriteString("</li>")
-	}
-	b.WriteString("</ul>")
-	return b.String()
-}
-
 // PreloadChangelog attempts to fetch releases once (used at startup)
 // It populates the Redis or in-memory cache via fetchFromGitHub.
 func PreloadChangelog() error {
@@ -344,7 +329,12 @@ func ChangelogPageHandler(w http.ResponseWriter, r *http.Request) {
 			for i := range entries {
 				if entries[i].Html == "" {
 					if len(entries[i].Notes) > 0 {
-						entries[i].Html = renderNotesAsHTML(entries[i].Notes)
+						// Join notes into markdown list and render to HTML so local entries match GitHub rendering
+						md := ""
+						for _, n := range entries[i].Notes {
+							md += "- " + n + "\n"
+						}
+						entries[i].Html = renderMarkdown(md)
 					}
 				}
 			}
