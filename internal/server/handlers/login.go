@@ -35,6 +35,20 @@ func APILogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check per-account failed-login lockout (threshold 5 attempts)
+	blocked, err := utils.IsLoginBlocked(r.Context(), email, 5)
+	if err != nil {
+		fmt.Printf("Error checking login block: %v\n", err)
+	}
+	fmt.Println("Blocked status:", blocked)
+	if blocked {
+		w.Header().Set("HX-Retarget", "#login-error")
+		w.Header().Set("HX-Reswap", "innerHTML")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "Too many login attempts; please try again later")
+		return
+	}
+
 	db, err := storage.OpenDatabase()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -49,6 +63,10 @@ func APILogin(w http.ResponseWriter, r *http.Request) {
 	row := db.QueryRow(context.Background(), "SELECT password, role_id, COALESCE(timezone, 'America/New_York') FROM users WHERE email = $1", email)
 	err = row.Scan(&hashedPassword, &roleID, &timezone)
 	if err != nil {
+		// Increment failed-login counter for this email
+		if _, incErr := utils.IncrementFailedLogin(r.Context(), email, 900); incErr != nil {
+			fmt.Printf("Error incrementing failed-login counter: %v\n", incErr)
+		}
 		w.Header().Set("HX-Retarget", "#login-error")
 		w.Header().Set("HX-Reswap", "innerHTML")
 		w.WriteHeader(http.StatusOK)
@@ -58,6 +76,10 @@ func APILogin(w http.ResponseWriter, r *http.Request) {
 
 	err = bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
 	if err != nil {
+		// Increment failed-login counter for this email
+		if _, incErr := utils.IncrementFailedLogin(r.Context(), email, 900); incErr != nil {
+			fmt.Printf("Error incrementing failed-login counter: %v\n", incErr)
+		}
 		w.Header().Set("HX-Retarget", "#login-error")
 		w.Header().Set("HX-Reswap", "innerHTML")
 		w.WriteHeader(http.StatusOK)
@@ -117,6 +139,11 @@ func APILogin(w http.ResponseWriter, r *http.Request) {
 	session.Values["role_id"] = roleID
 	session.Values["permissions"] = permissions
 	session.Values["timezone"] = timezone
+
+	// Successful login — clear failed-login counter
+	if clearErr := utils.ClearFailedLogin(r.Context(), email); clearErr != nil {
+		fmt.Printf("Error clearing failed-login counter: %v\n", clearErr)
+	}
 
 	err = session.Save(r, w)
 	if err != nil {

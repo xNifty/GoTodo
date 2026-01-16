@@ -4,32 +4,43 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"strings"
 )
 
 type Config struct {
-	BasePath     string `json:"basePath"`
-	UseHTTPS     bool   `json:"useHttps"`
-	AssetVersion string `json:"assetVersion,omitempty"`
-	FromEmail    string `json:"from_email,omitempty"`
+	BasePath      string `json:"basePath"`
+	UseHTTPS      bool   `json:"useHttps"`
+	AssetVersion  string `json:"assetVersion,omitempty"`
+	FromEmail     string `json:"from_email,omitempty"`
+	ShowChangelog bool   `json:"showChangelog,omitempty"`
 }
 
 var Cfg Config
 
 func Load() {
 	// Try to open repo config file first
-	f, err := os.Open("config/config.json")
+	data, err := os.ReadFile("config/config.json")
 	if err != nil {
 		log.Printf("config: config file not found or unreadable: %v; falling back to env/defaults", err)
 		loadFromEnv()
 		return
 	}
-	defer f.Close()
-
-	dec := json.NewDecoder(f)
-	if err := dec.Decode(&Cfg); err != nil {
+	if err := json.Unmarshal(data, &Cfg); err != nil {
 		log.Printf("config: error decoding config file: %v; falling back to env/defaults", err)
 		loadFromEnv()
 		return
+	}
+
+	// If the config file doesn't explicitly include showChangelog, allow env or default
+	if !strings.Contains(string(data), "\"showChangelog\"") {
+		if os.Getenv("SHOW_CHANGELOG") == "false" {
+			Cfg.ShowChangelog = false
+		} else if os.Getenv("SHOW_CHANGELOG") == "true" {
+			Cfg.ShowChangelog = true
+		} else {
+			// default to true when not specified
+			Cfg.ShowChangelog = true
+		}
 	}
 
 	// Fill from env where fields are missing
@@ -74,5 +85,11 @@ func loadFromEnv() {
 		Cfg.UseHTTPS = true
 	} else {
 		Cfg.UseHTTPS = false
+	}
+	// Default show changelog to true unless explicitly disabled
+	if os.Getenv("SHOW_CHANGELOG") == "false" {
+		Cfg.ShowChangelog = false
+	} else {
+		Cfg.ShowChangelog = true
 	}
 }

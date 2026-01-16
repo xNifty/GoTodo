@@ -435,6 +435,151 @@ document.addEventListener("DOMContentLoaded", () => {
   // Call once on initial load
   initializeModalEventListeners();
 
+  // Changelog modal: fetch and render entries when opened
+  function renderChangelog(entries) {
+    const container = document.getElementById("changelog-body");
+    if (!container) return;
+    if (!entries || !entries.length) {
+      container.innerHTML =
+        '<div class="text-center text-muted">No changelog entries available.</div>';
+      return;
+    }
+    // Build HTML
+    const out = document.createElement("div");
+    out.className = "changelog-list";
+    const MAX_MODAL = 5;
+    const recent = entries.slice(0, MAX_MODAL);
+    recent.forEach((e) => {
+      const card = document.createElement("div");
+      card.className = "mb-3";
+      // If server provided rendered HTML (from GitHub markdown), insert it
+      // and then attach the date/prerelease badge to the first heading.
+      if (e.html) {
+        const bodyDiv = document.createElement("div");
+        bodyDiv.className = "changelog-entry-body mt-2";
+        bodyDiv.innerHTML = e.html; // server-rendered and controlled
+
+        // Remove any leading paragraph/div that duplicates the version/date
+        const first = bodyDiv.firstElementChild;
+        try {
+          if (
+            first &&
+            (first.tagName === "P" ||
+              first.tagName === "DIV" ||
+              first.tagName === "PRE")
+          ) {
+            const txt = (first.textContent || "").trim().toLowerCase();
+            const v = (e.version || "").toLowerCase();
+            const d = (e.date || "").toLowerCase();
+            if (
+              (v && txt.includes(v)) ||
+              (d && txt.includes(d)) ||
+              txt.includes(" - ")
+            ) {
+              first.remove();
+            }
+          }
+        } catch (err) {}
+
+        // Append badge to the first heading inside the rendered HTML
+        const heading = bodyDiv.querySelector("h1,h2,h3,h4,h5,h6");
+        if (heading) {
+          const span = document.createElement("span");
+          span.className =
+            "badge releasetag ms-3 " +
+            (e.prerelease ? "bg-warning text-dark" : "bg-success");
+          span.textContent =
+            (e.prerelease ? "Prerelease" : "Release") + " • " + (e.date || "");
+          heading.appendChild(span);
+        } else {
+          // Fallback: if no heading, show a compact header above the body
+          const hdr = document.createElement("div");
+          hdr.className = "fw-bold mb-1";
+          hdr.textContent = `${e.version} — ${e.title}`;
+          const span = document.createElement("span");
+          span.className =
+            "badge releasetag ms-2 " +
+            (e.prerelease ? "bg-warning text-dark" : "bg-success");
+          span.textContent =
+            (e.prerelease ? "Prerelease" : "Release") + " • " + (e.date || "");
+          hdr.appendChild(span);
+          card.appendChild(hdr);
+        }
+
+        card.appendChild(bodyDiv);
+      } else {
+        const ul = document.createElement("ul");
+        if (Array.isArray(e.notes)) {
+          e.notes.forEach((n) => {
+            const li = document.createElement("li");
+            li.textContent = n;
+            ul.appendChild(li);
+          });
+        }
+        // Add compact header for non-markdown entries
+        const hdr = document.createElement("div");
+        hdr.className = "fw-bold mb-1";
+        hdr.textContent = `${e.version} — ${e.title}`;
+        const span = document.createElement("span");
+        span.className =
+          "badge releasetag ms-2 " +
+          (e.prerelease ? "bg-warning text-dark" : "bg-success");
+        span.textContent =
+          (e.prerelease ? "Prerelease" : "Release") + " • " + (e.date || "");
+        hdr.appendChild(span);
+        card.appendChild(hdr);
+        card.appendChild(ul);
+      }
+      out.appendChild(card);
+    });
+    // If there are more entries, add a link to view the full changelog page
+    if (entries.length > recent.length) {
+      const more = document.createElement("div");
+      more.className = "text-center mt-3";
+      const a = document.createElement("a");
+      a.href = "/changelog/page";
+      a.target = "_blank";
+      a.textContent = "View full changelog";
+      more.appendChild(a);
+      out.appendChild(more);
+    }
+    container.innerHTML = "";
+    container.appendChild(out);
+  }
+
+  function loadChangelog() {
+    const container = document.getElementById("changelog-body");
+    if (container)
+      container.innerHTML =
+        '<div class="text-center text-muted">Loading...</div>';
+    fetch("/changelog")
+      .then((res) => {
+        if (!res.ok) throw new Error("failed to load changelog");
+        return res.json();
+      })
+      .then((data) => {
+        renderChangelog(data);
+      })
+      .catch((err) => {
+        const container = document.getElementById("changelog-body");
+        if (container)
+          container.innerHTML =
+            '<div class="text-danger">Unable to load changelog.</div>';
+        console.error(err);
+      });
+  }
+
+  const changelogModalEl = document.getElementById("changelogModal");
+  if (changelogModalEl) {
+    try {
+      changelogModalEl.addEventListener("show.bs.modal", loadChangelog);
+    } catch (e) {
+      // If bootstrap isn't present or event fails, attempt to load on click of link
+      const link = document.querySelector('[data-bs-target="#changelogModal"]');
+      if (link) link.addEventListener("click", loadChangelog);
+    }
+  }
+
   // Debug helper: when ?cssdebug=1 is present in the URL, log which media queries match.
   (function cssDebugHelper() {
     try {

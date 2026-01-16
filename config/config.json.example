@@ -3,4 +3,5 @@
   "useHttps": false,
   "assetVersion": "20251212v2"
   ,"from_email": "no-reply@example.com"
+  ,"showChangelog": true
 }

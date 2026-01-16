@@ -26,6 +26,16 @@ func StartServer() error {
 
 	addr := fmt.Sprintf(":%s", port)
 
+	// Initialize Redis client for rate limiting (optional)
+	if err := utils.InitRedis(); err != nil {
+		fmt.Printf("Warning: Redis init failed: %v\n", err)
+	}
+
+	// Preload changelog from GitHub at startup to avoid runtime API calls
+	if err := handlers.PreloadChangelog(); err != nil {
+		fmt.Printf("Warning: Preloading changelog failed: %v\n", err)
+	}
+
 	fs := http.FileServer(http.Dir("internal/server/public"))
 	http.Handle("/public/", http.StripPrefix("/public/", fs))
 
@@ -33,19 +43,22 @@ func StartServer() error {
 	http.HandleFunc("/favicon.ico", doNothing)
 	http.HandleFunc("/signup", handlers.SignupPageHandler)
 	http.HandleFunc("/register", handlers.RegisterHandler)
-	http.HandleFunc("/api/signup", handlers.APISignup)
-	http.HandleFunc("/api/login", handlers.APILogin)
+	// Apply Redis-backed rate limiting to sensitive endpoints
+	http.HandleFunc("/api/signup", utils.RateLimitMiddleware(5, 0.05, 900, utils.KeyByIP)(handlers.APISignup))
+	http.HandleFunc("/api/login", utils.RateLimitMiddleware(10, 1.0, 60, utils.KeyByIP)(handlers.APILogin))
 	http.HandleFunc("/api/logout", handlers.APILogout)
 	http.HandleFunc("/api/fetch-tasks", handlers.APIReturnTasks)
 	http.HandleFunc("/partials/login", handlers.APIGetLoginPartial)
-	http.HandleFunc("/api/add-task", handlers.APIAddTask)
+	http.HandleFunc("/api/add-task", utils.RateLimitMiddleware(60, 1.0, 60, utils.KeyByUser)(handlers.APIAddTask))
 	http.HandleFunc("/api/confirm", handlers.APIConfirmDelete)
-	http.HandleFunc("/api/delete-task", handlers.APIDeleteTask)
+	http.HandleFunc("/api/delete-task", utils.RateLimitMiddleware(60, 1.0, 60, utils.KeyByUser)(handlers.APIDeleteTask))
 	http.HandleFunc("/api/get-next-item", handlers.APIGetNextItem)
 	http.HandleFunc("/api/update-status", handlers.APIUpdateTaskStatus)
 	http.HandleFunc("/api/toggle-favorite", handlers.APIToggleFavorite)
 	http.HandleFunc("/api/reorder-tasks", handlers.APIReorderTasks)
 	http.HandleFunc("/about", handlers.AboutHandler)
+	http.HandleFunc("/changelog", handlers.ChangelogHandler)
+	http.HandleFunc("/changelog/page", handlers.ChangelogPageHandler)
 	http.HandleFunc("/search", handlers.SearchHandler)
 
 	// Profile routes

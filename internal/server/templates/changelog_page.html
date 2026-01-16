@@ -1,0 +1,28 @@
+{{define "changelog_page.html"}}
+{{template "navbar.html" .}}
+<div class="container mt-4">
+  <h1>Change Log</h1>
+  {{if .Entries}}
+    {{range .Entries}}
+      <div class="card mb-3">
+        <div class="card-body">
+          <h5 class="card-title d-flex align-items-center">{{.Version}} — {{.Title}}
+            <span class="badge releasetag ms-3 {{if .Prerelease}}bg-warning text-dark{{else}}bg-success{{end}}">{{if .Prerelease}}Prerelease{{else}}Release{{end}} • {{.Date}}</span>
+          </h5>
+          {{if .Html}}
+            {{safeHTML .Html}}
+          {{else if .Notes}}
+            <ul>
+            {{range .Notes}}
+              <li>{{.}}</li>
+            {{end}}
+            </ul>
+          {{end}}
+        </div>
+      </div>
+    {{end}}
+  {{else}}
+    <div class="text-muted">No changelog entries available.</div>
+  {{end}}
+</div>
+{{end}}

@@ -1,0 +1,12 @@
+[
+  {
+    "version": "0.1.0",
+    "date": "2026-01-16",
+    "title": "Initial changelog",
+    "notes": [
+      "Added changelog modal UI",
+      "Changelog entries are stored in config/changelog.json and served at /changelog",
+      "Optionally, changelog can be fetched from GitHub releases if GITHUB_REPO is set in .env"
+    ]
+  }
+]
