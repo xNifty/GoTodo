@@ -537,7 +537,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const more = document.createElement("div");
       more.className = "text-center mt-3";
       const a = document.createElement("a");
-      a.href = "/changelog/page";
+      a.href = apiPath("/changelog/page");
       a.target = "_blank";
       a.textContent = "View full changelog";
       more.appendChild(a);
@@ -552,7 +552,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (container)
       container.innerHTML =
         '<div class="text-center text-muted">Loading...</div>';
-    fetch("/changelog")
+    fetch(apiPath("/changelog"))
       .then((res) => {
         if (!res.ok) throw new Error("failed to load changelog");
         return res.json();
