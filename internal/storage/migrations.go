@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 )
 
@@ -58,8 +59,63 @@ func RunMigrations() error {
 		errCount++
 	}
 
+	// Ensure 'admin' permission exists on the admin role
+	if err := MigrateEnsureAdminPermission(); err != nil {
+		fmt.Printf("migration: MigrateEnsureAdminPermission failed: %v\n", err)
+		errCount++
+	}
+
 	if errCount == 0 {
 		return nil
 	}
 	return fmt.Errorf("migrations completed with %d errors (see logs)", errCount)
+}
+
+// MigrateEnsureAdminPermission ensures the roles table contains an 'admin' role
+// and that its permissions array includes the "admin" permission.
+func MigrateEnsureAdminPermission() error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return fmt.Errorf("failed to open database: %v", err)
+	}
+	defer CloseDatabase(pool)
+
+	// Required permissions for admin role
+	required := []string{"add", "edit", "delete", "viewall", "createinvites", "admin"}
+
+	// Try to read existing permissions for role 'admin'
+	var perms []string
+	err = pool.QueryRow(context.Background(), "SELECT permissions FROM roles WHERE name = 'admin'").Scan(&perms)
+	if err != nil {
+		// Role doesn't exist (or other error) — attempt to create it with full permission set
+		_, insErr := pool.Exec(context.Background(), "INSERT INTO roles (name, permissions) VALUES ($1, $2)", "admin", required)
+		if insErr != nil {
+			return fmt.Errorf("failed to create admin role: %v (scan error: %v)", insErr, err)
+		}
+		return nil
+	}
+
+	// Compute missing permissions and append them individually to avoid duplicates
+	have := map[string]bool{}
+	for _, p := range perms {
+		have[p] = true
+	}
+	missing := make([]string, 0)
+	for _, r := range required {
+		if !have[r] {
+			missing = append(missing, r)
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+
+	for _, m := range missing {
+		// Append only if not present (WHERE clause protects against duplicates)
+		_, err = pool.Exec(context.Background(), "UPDATE roles SET permissions = array_append(permissions, $1) WHERE name = 'admin' AND NOT (permissions @> $2)", m, []string{m})
+		if err != nil {
+			return fmt.Errorf("failed to append permission %s: %v", m, err)
+		}
+	}
+	return nil
 }
