@@ -15,6 +15,10 @@ import (
 
 	"GoTodo/internal/config"
 	srvutils "GoTodo/internal/server/utils"
+	"GoTodo/internal/storage"
+	"GoTodo/internal/version"
+
+	"golang.org/x/mod/semver"
 
 	"github.com/yuin/goldmark"
 )
@@ -50,16 +54,24 @@ func ChangelogHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Respect config toggle
-	if !config.Cfg.ShowChangelog {
+	// Respect toggle: prefer DB-backed setting, fall back to config.Cfg
+	showChangelog := config.Cfg.ShowChangelog
+	if s, err := storage.GetSiteSettings(); err == nil && s != nil {
+		showChangelog = s.ShowChangelog
+	}
+	if !showChangelog {
 		http.NotFound(w, r)
 		return
 	}
+
+	// Site version for filtering is always the baked-in binary version
+	siteVersion := version.Version
 
 	// If GITHUB_REPO is configured, try fetching releases
 	repo := strings.TrimSpace(os.Getenv("GITHUB_REPO"))
 	if repo != "" {
 		if entries, err := fetchFromGitHub(repo); err == nil {
+			entries = filterEntriesBySiteVersionWithSiteVersion(entries, siteVersion)
 			respondJSON(w, entries)
 			return
 		}
@@ -96,7 +108,46 @@ func ChangelogHandler(w http.ResponseWriter, r *http.Request) {
 			v[i].Html = normalizeReleaseHTML(v[i].Html, v[i].Version, v[i].Title, v[i].Date)
 		}
 	}
+	// Filter out releases that are newer than the current site version (baked-in)
+	v = filterEntriesBySiteVersionWithSiteVersion(v, siteVersion)
 	respondJSON(w, v)
+}
+
+// filterEntriesBySiteVersion removes any changelog entries with versions greater than current site version
+func filterEntriesBySiteVersionWithSiteVersion(entries []ChangelogEntry, siteVersion string) []ChangelogEntry {
+	sv := siteVersion
+	if sv == "" {
+		return entries
+	}
+	if !strings.HasPrefix(sv, "v") {
+		sv = "v" + sv
+	}
+	// if site version isn't a valid semver, don't filter
+	if !semver.IsValid(sv) {
+		return entries
+	}
+
+	out := make([]ChangelogEntry, 0, len(entries))
+	for _, e := range entries {
+		ev := e.Version
+		if ev == "" {
+			out = append(out, e)
+			continue
+		}
+		if !strings.HasPrefix(ev, "v") {
+			ev = "v" + ev
+		}
+		if !semver.IsValid(ev) {
+			// keep entries we can't parse
+			out = append(out, e)
+			continue
+		}
+		// include if entry version is less than or equal to site version
+		if semver.Compare(ev, sv) <= 0 {
+			out = append(out, e)
+		}
+	}
+	return out
 }
 
 func respondJSON(w http.ResponseWriter, v interface{}) {
@@ -386,7 +437,12 @@ func PreloadChangelog() error {
 
 // ChangelogPageHandler renders a full HTML page showing all changelog entries
 func ChangelogPageHandler(w http.ResponseWriter, r *http.Request) {
-	if !config.Cfg.ShowChangelog {
+	// Respect toggle: prefer DB-backed setting, fall back to config.Cfg
+	showChangelog := config.Cfg.ShowChangelog
+	if s, err := storage.GetSiteSettings(); err == nil && s != nil {
+		showChangelog = s.ShowChangelog
+	}
+	if !showChangelog {
 		http.NotFound(w, r)
 		return
 	}
@@ -419,6 +475,9 @@ func ChangelogPageHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Filter entries by the baked-in site version so we don't show releases newer than the running site
+	siteVersion := version.Version
+	entries = filterEntriesBySiteVersionWithSiteVersion(entries, siteVersion)
 	ctx := map[string]interface{}{"Entries": entries}
 	_ = srvutils.RenderTemplate(w, r, "changelog_page.html", ctx)
 }

@@ -8,11 +8,14 @@ import (
 )
 
 type Config struct {
-	BasePath      string `json:"basePath"`
-	UseHTTPS      bool   `json:"useHttps"`
-	AssetVersion  string `json:"assetVersion,omitempty"`
-	FromEmail     string `json:"from_email,omitempty"`
-	ShowChangelog bool   `json:"showChangelog,omitempty"`
+	BasePath        string `json:"basePath"`
+	UseHTTPS        bool   `json:"useHttps"`
+	AssetVersion    string `json:"assetVersion,omitempty"`
+	FromEmail       string `json:"from_email,omitempty"`
+	ShowChangelog   bool   `json:"showChangelog,omitempty"`
+	SiteName        string `json:"siteName,omitempty"`
+	SiteVersion     string `json:"siteVersion,omitempty"`
+	DefaultTimezone string `json:"defaultTimezone,omitempty"`
 }
 
 var Cfg Config
@@ -69,6 +72,33 @@ func Load() {
 	if os.Getenv("USE_HTTPS") == "true" {
 		Cfg.UseHTTPS = true
 	}
+
+	// SiteName default
+	if Cfg.SiteName == "" {
+		if v := os.Getenv("SITE_NAME"); v != "" {
+			Cfg.SiteName = v
+		} else {
+			Cfg.SiteName = "GoTodo"
+		}
+	}
+
+	// DefaultTimezone default
+	if Cfg.DefaultTimezone == "" {
+		if v := os.Getenv("DEFAULT_TIMEZONE"); v != "" {
+			Cfg.DefaultTimezone = v
+		} else {
+			Cfg.DefaultTimezone = "America/New_York"
+		}
+	}
+
+	// SiteVersion default
+	if Cfg.SiteVersion == "" {
+		if v := os.Getenv("SITE_VERSION"); v != "" {
+			Cfg.SiteVersion = v
+		} else {
+			Cfg.SiteVersion = "v0.0.0"
+		}
+	}
 }
 
 func loadFromEnv() {
@@ -91,5 +121,20 @@ func loadFromEnv() {
 		Cfg.ShowChangelog = false
 	} else {
 		Cfg.ShowChangelog = true
+	}
+	if v := os.Getenv("SITE_NAME"); v != "" {
+		Cfg.SiteName = v
+	} else {
+		Cfg.SiteName = "GoTodo"
+	}
+	if v := os.Getenv("DEFAULT_TIMEZONE"); v != "" {
+		Cfg.DefaultTimezone = v
+	} else {
+		Cfg.DefaultTimezone = "America/New_York"
+	}
+	if v := os.Getenv("SITE_VERSION"); v != "" {
+		Cfg.SiteVersion = v
+	} else {
+		Cfg.SiteVersion = "v0.0.0"
 	}
 }

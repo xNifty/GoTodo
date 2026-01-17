@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"GoTodo/internal/config"
+	"GoTodo/internal/storage"
+	"GoTodo/internal/version"
 )
 
 var Templates *template.Template
@@ -96,6 +98,21 @@ func RenderTemplate(w http.ResponseWriter, r *http.Request, tmpl string, data in
 	if ctx, ok := data.(map[string]interface{}); ok {
 		ctx["AssetVersion"] = assetVersion
 		ctx["UseMinifiedAssets"] = useMinified
+		// Inject site config values. Prefer DB-backed settings when available.
+		ctx["SiteName"] = config.Cfg.SiteName
+		ctx["DefaultTimezone"] = config.Cfg.DefaultTimezone
+		ctx["ShowChangelog"] = config.Cfg.ShowChangelog
+		// Site version comes only from the baked-in binary; never from DB
+		ctx["SiteVersion"] = version.Version
+		if s, err := storage.GetSiteSettings(); err == nil && s != nil {
+			if s.SiteName != "" {
+				ctx["SiteName"] = s.SiteName
+			}
+			if s.DefaultTimezone != "" {
+				ctx["DefaultTimezone"] = s.DefaultTimezone
+			}
+			ctx["ShowChangelog"] = s.ShowChangelog
+		}
 		// Inject theme from cookie if present
 		if r != nil {
 			if c, err := r.Cookie("theme"); err == nil {
@@ -108,6 +125,20 @@ func RenderTemplate(w http.ResponseWriter, r *http.Request, tmpl string, data in
 			"Data":              data,
 			"AssetVersion":      assetVersion,
 			"UseMinifiedAssets": useMinified,
+		}
+		// Inject site config values. Prefer DB for mutable fields; site version is baked-in only.
+		ctx["SiteName"] = config.Cfg.SiteName
+		ctx["DefaultTimezone"] = config.Cfg.DefaultTimezone
+		ctx["ShowChangelog"] = config.Cfg.ShowChangelog
+		ctx["SiteVersion"] = version.Version
+		if s, err := storage.GetSiteSettings(); err == nil && s != nil {
+			if s.SiteName != "" {
+				ctx["SiteName"] = s.SiteName
+			}
+			if s.DefaultTimezone != "" {
+				ctx["DefaultTimezone"] = s.DefaultTimezone
+			}
+			ctx["ShowChangelog"] = s.ShowChangelog
 		}
 		if r != nil {
 			if c, err := r.Cookie("theme"); err == nil {

@@ -3,6 +3,7 @@ package server
 import (
 	"GoTodo/internal/server/handlers"
 	"GoTodo/internal/server/utils"
+	"GoTodo/internal/storage"
 	"fmt"
 	"net/http"
 	"os"
@@ -29,6 +30,11 @@ func StartServer() error {
 	// Initialize Redis client for rate limiting (optional)
 	if err := utils.InitRedis(); err != nil {
 		fmt.Printf("Warning: Redis init failed: %v\n", err)
+	}
+
+	// Run DB migrations (create tables / add columns as needed)
+	if err := storage.RunMigrations(); err != nil {
+		fmt.Printf("Warning: migrations completed with errors: %v\n", err)
 	}
 
 	// Preload changelog from GitHub at startup to avoid runtime API calls
@@ -77,6 +83,11 @@ func StartServer() error {
 	// Ban/unban user actions (admin only)
 	http.HandleFunc("/api/ban-user", utils.RequirePermission("createinvites", handlers.APIBanUser))
 	http.HandleFunc("/api/unban-user", utils.RequirePermission("createinvites", handlers.APIUnbanUser))
+
+	// Admin panel (admin permission required). Register both /admin and /admin/ to handle trailing slash.
+	http.HandleFunc("/admin", utils.RequirePermission("admin", handlers.AdminPageHandler))
+	http.HandleFunc("/admin/", utils.RequirePermission("admin", handlers.AdminPageHandler))
+	http.HandleFunc("/api/admin/update-settings", utils.RequirePermission("admin", handlers.APIUpdateSiteSettings))
 
 	// Handle PUT and DELETE for invites with path parameters
 	http.HandleFunc("/api/invite/", func(w http.ResponseWriter, r *http.Request) {
