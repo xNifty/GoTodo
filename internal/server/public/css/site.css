@@ -298,6 +298,37 @@ td.delete-column {
     align-items: center;
     flex-wrap: wrap;
 }
+
+/* Actions column alignment and spacing */
+.actions-column {
+    text-align: left; /* ensure left alignment */
+}
+.actions-column .status-column,
+.actions-column .delete-column,
+.actions-column .edit-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+/* Make the status toggle visually wider and more toggle-like */
+.actions-column .status-column {
+    min-width: 64px; /* give it enough horizontal space */
+    height: 34px; /* pill-like height */
+    padding: 0 12px; /* horizontal padding for pill shape */
+    border-radius: 20px; /* rounded pill */
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+}
+.actions-column .status-column .bi {
+    font-size: 1.15rem; /* slightly larger icon */
+}
+
+/* Increase contrast on danger buttons to ensure icon visibility */
+.actions-column .status-column.bg-danger {
+    color: #fff; /* ensure icon/text are visible */
+}
 .invite-list-card tbody tr.expanded .delete-column .btn {
     min-width: 44px;
 }

@@ -17,6 +17,7 @@ func APIUpdateTaskStatus(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
 		return
 	}
+	page := r.URL.Query().Get("page")
 
 	// Require logged-in user and enforce ban check + ownership
 	email, _, _, loggedIn := utils.GetSessionUser(r)
@@ -93,17 +94,36 @@ func APIUpdateTaskStatus(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	// Include the status-column class so mobile styles remain consistent after HTMX swaps
-	fmt.Fprintf(w, `<button 
-		class="badge %s status-column"
-		hx-get="`+basePath+`/api/update-status?id=%s" 
-		hx-target="#task-%s .badge" 
-		hx-swap="outerHTML"
-		style="cursor: pointer;">
-		%s
-	</button>`,
-		map[bool]string{true: "bg-success", false: "bg-danger"}[updatedStatus],
+	icons := map[bool]string{
+		true:  `<i class="bi bi-toggle-on"></i>`,
+		false: `<i class="bi bi-toggle-off"></i>`,
+	}
+	labels := map[bool]string{true: "Complete", false: "Incomplete"}
+
+	// Build the actions column (status toggle + optional edit + delete)
+	// Include an off-screen label for accessibility
+	editBtn := ""
+	if !updatedStatus {
+		// only show edit when task is incomplete
+		editBtn = fmt.Sprintf(`<button class="btn btn-link p-0 mx-2 edit-btn" style="text-decoration:none;" hx-get="%s/api/edit?id=%s&page=%s" hx-target="#sidebar .sidebar-body" hx-swap="innerHTML" aria-label="Edit task"><i class="bi bi-pencil"></i></button>`, basePath, id, page)
+	}
+
+	deleteBtn := fmt.Sprintf(`<button hx-get="%s/api/confirm?id=%s&page=%s" hx-target="#modal .modal-content" hx-trigger="click" data-bs-toggle="modal" data-bs-target="#modal" class="btn btn-link p-0 delete-column" aria-label="Delete task" style="text-decoration:none;"><i class="bi bi-trash text-danger"></i></button>`, basePath, id, page)
+
+	// status button (icon + visible label)
+	statusBtn := fmt.Sprintf(`<button class="badge %s status-column" hx-get="%s/api/update-status?id=%s&page=%s" hx-target="#task-%s .actions-column" hx-swap="outerHTML" aria-label="Toggle complete" style="cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding:.35rem; gap:.4rem;">%s %s</button>`,
+		map[bool]string{true: "bg-success", false: "bg-danger text-white"}[updatedStatus],
+		basePath,
 		id,
+		page,
 		id,
-		map[bool]string{true: "Complete", false: "Incomplete"}[updatedStatus],
+		icons[updatedStatus],
+		labels[updatedStatus],
 	)
+
+	// Wrap into a td matching the template so HTMX can replace it cleanly
+	actionsHTML := fmt.Sprintf(`<td class="actions-column" data-label="Actions"><div class="d-flex align-items-center gap-2 justify-content-start">%s%s%s</div></td>`, statusBtn, editBtn, deleteBtn)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	fmt.Fprint(w, actionsHTML)
 }

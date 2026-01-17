@@ -1,0 +1,285 @@
+package handlers
+
+import (
+	"GoTodo/internal/server/utils"
+	"GoTodo/internal/sessionstore"
+	"GoTodo/internal/storage"
+	"GoTodo/internal/tasks"
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+)
+
+// APIEditTaskForm renders the sidebar edit form populated with the task data
+func APIEditTaskForm(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "Task ID is required", http.StatusBadRequest)
+		return
+	}
+
+	page := r.URL.Query().Get("page")
+	if page == "" {
+		page = "1"
+	}
+
+	email, _, _, loggedIn := utils.GetSessionUser(r)
+	if !loggedIn {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	db, err := storage.OpenDatabase()
+	if err != nil {
+		http.Error(w, "Failed to open database", http.StatusInternalServerError)
+		return
+	}
+	defer db.Close()
+
+	var title, description string
+	var completed bool
+	var ownerID int
+	err = db.QueryRow(context.Background(), "SELECT title, description, completed, user_id FROM tasks WHERE id = $1", id).Scan(&title, &description, &completed, &ownerID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Task not found.", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Error fetching task.", http.StatusInternalServerError)
+		return
+	}
+
+	// Only allow editing incomplete tasks
+	if completed {
+		http.Error(w, "Cannot edit a completed task.", http.StatusForbidden)
+		return
+	}
+
+	var userID int
+	if uid := utils.GetSessionUserID(r); uid != nil {
+		userID = *uid
+	} else {
+		err = db.QueryRow(context.Background(), "SELECT id FROM users WHERE email = $1", email).Scan(&userID)
+		if err != nil {
+			http.Error(w, "Error getting user ID", http.StatusInternalServerError)
+			return
+		}
+	}
+	if ownerID != userID {
+		http.Error(w, "Not authorized to edit this task.", http.StatusForbidden)
+		return
+	}
+
+	data := struct {
+		Title        string
+		Description  string
+		CurrentPage  string
+		ID           string
+		FormAction   string
+		SubmitText   string
+		SidebarTitle string
+		Error        string
+	}{
+		Title:        strings.TrimSpace(title),
+		Description:  strings.TrimSpace(description),
+		CurrentPage:  page,
+		ID:           id,
+		FormAction:   utils.GetBasePath() + "/api/edit-task",
+		SubmitText:   "Save Changes",
+		SidebarTitle: "Edit Task",
+		Error:        "",
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	// Render only the form fragment so HTMX can swap it into the existing sidebar body
+	if err := utils.Templates.ExecuteTemplate(w, "sidebar_form.html", data); err != nil {
+		http.Error(w, "Error rendering sidebar form: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+// APIEditTask handles saving edits to an existing task
+func APIEditTask(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	id := strings.TrimSpace(r.FormValue("id"))
+	title := strings.TrimSpace(r.FormValue("title"))
+	description := strings.TrimSpace(r.FormValue("description"))
+	pageStr := strings.TrimSpace(r.FormValue("currentPage"))
+
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page <= 0 {
+		page = 1
+	}
+
+	if len(description) > MaxDescriptionLength {
+		w.Header().Set("X-Validation-Error", "true")
+		w.Header().Set("HX-Trigger", "description-error")
+		w.Header().Set("HX-Retarget", "#description-error")
+		w.Header().Set("HX-Reswap", "innerHTML")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, "Description must be %d characters or less", MaxDescriptionLength)
+		return
+	}
+
+	if title == "" {
+		w.Header().Set("X-Validation-Error", "true")
+		w.Header().Set("HX-Trigger", "description-error")
+		w.Header().Set("HX-Retarget", "#description-error")
+		w.Header().Set("HX-Reswap", "innerHTML")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "Title is required")
+		return
+	}
+
+	db, err := storage.OpenDatabase()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	defer db.Close()
+
+	email, _, _, timezone, loggedIn, _ := utils.GetSessionUserWithTimezone(r)
+	if !loggedIn {
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprint(w, "Please log in to edit tasks.")
+		return
+	}
+
+	if isBanned, err := storage.IsUserBanned(email); err == nil && isBanned {
+		sessionstore.ClearSessionCookie(w, r)
+		basePath := utils.GetBasePath()
+		w.Header().Set("HX-Redirect", basePath)
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, " ")
+		return
+	}
+
+	// Verify task exists and ownership + not completed
+	var ownerID int
+	var completed bool
+	err = db.QueryRow(context.Background(), "SELECT completed, user_id FROM tasks WHERE id = $1", id).Scan(&completed, &ownerID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Task not found.", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Error fetching task.", http.StatusInternalServerError)
+		return
+	}
+	if completed {
+		http.Error(w, "Cannot edit a completed task.", http.StatusForbidden)
+		return
+	}
+
+	var userID int
+	if uid := utils.GetSessionUserID(r); uid != nil {
+		userID = *uid
+	} else {
+		err = db.QueryRow(context.Background(), "SELECT id FROM users WHERE email = $1", email).Scan(&userID)
+		if err != nil {
+			http.Error(w, "Error getting user ID", http.StatusInternalServerError)
+			return
+		}
+	}
+	if ownerID != userID {
+		http.Error(w, "Not authorized to edit this task.", http.StatusForbidden)
+		return
+	}
+
+	// Perform update
+	_, err = db.Exec(context.Background(), "UPDATE tasks SET title = $1, description = $2 WHERE id = $3", title, description, id)
+	if err != nil {
+		http.Error(w, "Failed to update task.", http.StatusInternalServerError)
+		return
+	}
+
+	// Re-render pagination like add_task does
+	// Determine page size
+	pageSize := utils.AppConstants.PageSize
+	if sess, err := sessionstore.Store.Get(r, "session"); err == nil && sess != nil {
+		if val, ok := sess.Values["items_per_page"]; ok {
+			switch tv := val.(type) {
+			case int:
+				if tv > 0 {
+					pageSize = tv
+				}
+			case int64:
+				if int(tv) > 0 {
+					pageSize = int(tv)
+				}
+			case float64:
+				if int(tv) > 0 {
+					pageSize = int(tv)
+				}
+			case string:
+				if v, err := strconv.Atoi(tv); err == nil && v > 0 {
+					pageSize = v
+				}
+			}
+		}
+	}
+
+	taskList, totalTasks, err := tasks.ReturnPaginationForUser(page, pageSize, &userID, timezone)
+	if err != nil {
+		http.Error(w, "Error fetching tasks after edit: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	prevDisabled := ""
+	if page == 1 {
+		prevDisabled = "disabled"
+	}
+	nextDisabled := ""
+	if page*pageSize >= totalTasks {
+		nextDisabled = "disabled"
+	}
+	prevPage := page - 1
+	if prevPage < 1 {
+		prevPage = 1
+	}
+	nextPage := page + 1
+
+	favs := make([]tasks.Task, 0)
+	nonFavs := make([]tasks.Task, 0)
+	for i := range taskList {
+		taskList[i].Page = page
+		if taskList[i].IsFavorite {
+			favs = append(favs, taskList[i])
+		} else {
+			nonFavs = append(nonFavs, taskList[i])
+		}
+	}
+
+	context := map[string]interface{}{
+		"FavoriteTasks":    favs,
+		"Tasks":            nonFavs,
+		"PreviousPage":     prevPage,
+		"NextPage":         nextPage,
+		"CurrentPage":      page,
+		"PrevDisabled":     prevDisabled,
+		"NextDisabled":     nextDisabled,
+		"TotalTasks":       totalTasks,
+		"LoggedIn":         true,
+		"TotalPages":       (totalTasks + pageSize - 1) / pageSize,
+		"Pages":            utils.GetPaginationData(page, pageSize, totalTasks, userID).Pages,
+		"HasRightEllipsis": utils.GetPaginationData(page, pageSize, totalTasks, userID).HasRightEllipsis,
+		"CompletedTasks":   utils.GetCompletedTasksCount(&userID),
+		"IncompleteTasks":  utils.GetIncompleteTasksCount(&userID),
+		"PerPage":          pageSize,
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("HX-Trigger", "task-edited")
+	if err := utils.RenderTemplate(w, r, "pagination.html", context); err != nil {
+		http.Error(w, "Error rendering tasks after edit: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+}

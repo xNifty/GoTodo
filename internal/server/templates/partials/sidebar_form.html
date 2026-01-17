@@ -1,12 +1,12 @@
 <form
-    hx-post="{{basePath}}/api/add-task"
+    hx-post="{{if .FormAction}}{{.FormAction}}{{else}}{{basePath}}/api/add-task{{end}}"
     hx-include="#newTaskForm"
     method="post"
     id="newTaskForm"
     enctype="multipart/form-data"
     hx-target="#task-container"
     hx-swap="innerHTML"
->
+    >
     <div class="form-group">
         <label for="title">Title:</label>
         <input
@@ -15,7 +15,7 @@
             name="title"
             class="form-control"
             required
-            value=""
+            value="{{.Title}}"
             placeholder="Your Task Title"
         />
     </div>
@@ -37,8 +37,11 @@
         <div id="description-error" class="invalid-feedback d-block"></div>
         {{end}}
     </div>
+    {{if .ID}}
+    <input type="hidden" name="id" value="{{.ID}}" />
+    {{end}}
     <input type="hidden" name="currentPage" value="{{.CurrentPage}}" />
     <button type="submit" class="btn btn-primary w-100 mt-3">
-        Add Task
+        {{if .SubmitText}}{{.SubmitText}}{{else}}Add Task{{end}}
     </button>
 </form> 

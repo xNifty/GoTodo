@@ -152,6 +152,45 @@ document.addEventListener("DOMContentLoaded", () => {
       themeToggle.removeEventListener("click", toggleTheme);
       themeToggle.addEventListener("click", toggleTheme);
     }
+
+    // Reattach task form submit listener so dynamically swapped forms behave the same
+    try {
+      const tf = document.getElementById("newTaskForm");
+      if (tf && !tf.classList.contains("task-form-initialized")) {
+        tf.addEventListener("htmx:afterRequest", (event) => {
+          let isValidationError = false;
+          try {
+            const xhr = event.detail && event.detail.xhr;
+            const header =
+              xhr && xhr.getResponseHeader
+                ? xhr.getResponseHeader("X-Validation-Error")
+                : null;
+            if (header && header.toLowerCase() === "true") {
+              isValidationError = true;
+            } else if (
+              event.detail &&
+              event.detail.triggerSpec &&
+              event.detail.triggerSpec.trigger === "description-error"
+            ) {
+              isValidationError = true;
+            }
+          } catch (e) {}
+
+          if (event.detail.successful && !isValidationError) {
+            closeSidebar();
+            const tEl = document.getElementById("title");
+            if (tEl) tEl.value = "";
+            const dEl = document.getElementById("description");
+            if (dEl) dEl.value = "";
+            const charCount = document.getElementById("char-count");
+            if (charCount) charCount.textContent = "0";
+            const errorDiv = document.getElementById("description-error");
+            if (errorDiv) errorDiv.innerHTML = "";
+          }
+        });
+        tf.classList.add("task-form-initialized");
+      }
+    } catch (e) {}
   }
 
   // Attach initial event listeners
@@ -337,57 +376,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Insert the table at the top of the container
     container.insertBefore(table, container.firstChild);
-  }
-
-  // Optional: Close sidebar after form submission
-  const taskForm = document.getElementById("newTaskForm");
-  if (taskForm) {
-    taskForm.addEventListener("htmx:afterRequest", (event) => {
-      // Only close sidebar if the request was successful and not a validation error
-      // event.detail.successful will be true for a 200 status code response, even with HX-Trigger/HX-Retarget
-      // Check for a validation header set by the server (preferred) or fall back to triggerSpec for compatibility
-      let isValidationError = false;
-      try {
-        const xhr = event.detail && event.detail.xhr;
-        const header =
-          xhr && xhr.getResponseHeader
-            ? xhr.getResponseHeader("X-Validation-Error")
-            : null;
-        if (header && header.toLowerCase() === "true") {
-          isValidationError = true;
-        } else if (
-          event.detail &&
-          event.detail.triggerSpec &&
-          event.detail.triggerSpec.trigger === "description-error"
-        ) {
-          // Backwards compat: if older handlers used triggerSpec, respect that too
-          isValidationError = true;
-        }
-      } catch (e) {
-        // ignore and treat as not a validation error
-      }
-
-      if (event.detail.successful && !isValidationError) {
-        closeSidebar();
-        // Clear the form fields on successful submission
-        const tEl = document.getElementById("title");
-        if (tEl) tEl.value = "";
-        const dEl = document.getElementById("description");
-        if (dEl) dEl.value = "";
-        // Reset character counter
-        let charCount = document.getElementById("char-count");
-        if (charCount) charCount.textContent = "0";
-        // Clear any old validation message
-        let errorDiv = document.getElementById("description-error");
-        if (errorDiv) errorDiv.innerHTML = "";
-      } else if (isValidationError) {
-        // Keep the sidebar open and show the error (HTMX will swap the error message into #description-error due to HX-Retarget)
-        // The form fields and char counter are retained automatically by the browser
-        return; // Stop further processing so sidebar remains open
-      }
-      // Note: For network errors (non-2xx status), event.detail.successful will be false,
-      // and this handler will not close the sidebar, which is the desired behavior.
-    });
   }
 
   const modalElement = document.getElementById("modal");
@@ -811,6 +799,26 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (e) {}
   });
 
+  // When an edit button is clicked, open the sidebar immediately so the user sees the form loading
+  document.body.addEventListener("click", function (e) {
+    try {
+      const btn = e.target && e.target.closest && e.target.closest(".edit-btn");
+      if (!btn) return;
+      const sb = document.getElementById("sidebar");
+      if (sb) sb.classList.add("active");
+    } catch (e) {}
+  });
+
+  // Delegated close button handler: works even if the sidebar markup was swapped
+  document.body.addEventListener("click", function (e) {
+    try {
+      const close =
+        e.target && e.target.closest && e.target.closest("#closeSidebar");
+      if (!close) return;
+      closeSidebar();
+    } catch (e) {}
+  });
+
   // Support keyboard activation (Enter/Space) for the task-toggle spans
   document.body.addEventListener("keydown", function (e) {
     if (e.key !== "Enter" && e.key !== " " && e.key !== "Spacebar") return;
@@ -886,6 +894,63 @@ document.addEventListener("DOMContentLoaded", () => {
         initTheme(); // This function should be idempotent or handle re-running safely
       }
     }
+  });
+
+  // If HTMX swapped the sidebar, ensure it's opened and listeners attached
+  document.body.addEventListener("htmx:afterSwap", function (evt) {
+    try {
+      const target =
+        evt.detail && evt.detail.target ? evt.detail.target : evt.target;
+      if (target && target.id === "sidebar") {
+        try {
+          initializeSidebarEventListeners();
+        } catch (e) {}
+        const sb = document.getElementById("sidebar");
+        if (sb) sb.classList.add("active");
+      }
+    } catch (e) {}
+  });
+
+  // Also handle cases where we replace only the sidebar body via innerHTML
+  document.body.addEventListener("htmx:afterSwap", function (evt) {
+    try {
+      const detail = evt && evt.detail;
+      // If the swapped target is the sidebar body (selector used by edit button), open the sidebar
+      const swapped = detail && detail.target ? detail.target : evt.target;
+      if (swapped && swapped.id === "sidebar") return; // handled above
+      // when swapping innerHTML into '#sidebar .sidebar-body', the event target will be that element
+      if (
+        swapped &&
+        swapped.classList &&
+        swapped.classList.contains("sidebar-body")
+      ) {
+        try {
+          initializeSidebarEventListeners();
+        } catch (e) {}
+        const sb = document.getElementById("sidebar");
+        if (sb) sb.classList.add("active");
+      }
+    } catch (e) {}
+  });
+
+  // Additionally, respond to edit requests specifically: if an HTMX request to /api/edit succeeded,
+  // open the sidebar (covers cases where server returns a fragment without a clear swapped target)
+  document.body.addEventListener("htmx:afterRequest", function (evt) {
+    try {
+      const xhr = evt && evt.detail && evt.detail.xhr;
+      if (!xhr || !xhr.responseURL) return;
+      if (xhr.responseURL.includes("/api/edit")) {
+        // Only open on success (2xx)
+        const status = xhr.status || 0;
+        if (status >= 200 && status < 300) {
+          try {
+            initializeSidebarEventListeners();
+          } catch (e) {}
+          const sb = document.getElementById("sidebar");
+          if (sb) sb.classList.add("active");
+        }
+      }
+    } catch (e) {}
   });
 
   // Reattach modal listeners after HTMX swaps that replace task container

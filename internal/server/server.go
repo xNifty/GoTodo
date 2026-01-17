@@ -50,6 +50,8 @@ func StartServer() error {
 	http.HandleFunc("/api/fetch-tasks", handlers.APIReturnTasks)
 	http.HandleFunc("/partials/login", handlers.APIGetLoginPartial)
 	http.HandleFunc("/api/add-task", utils.RateLimitMiddleware(60, 1.0, 60, utils.KeyByUser)(handlers.APIAddTask))
+	http.HandleFunc("/api/edit", handlers.APIEditTaskForm)
+	http.HandleFunc("/api/edit-task", utils.RateLimitMiddleware(60, 1.0, 60, utils.KeyByUser)(handlers.APIEditTask))
 	http.HandleFunc("/api/confirm", handlers.APIConfirmDelete)
 	http.HandleFunc("/api/delete-task", utils.RateLimitMiddleware(60, 1.0, 60, utils.KeyByUser)(handlers.APIDeleteTask))
 	http.HandleFunc("/api/get-next-item", handlers.APIGetNextItem)

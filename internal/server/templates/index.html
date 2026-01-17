@@ -141,6 +141,7 @@
         <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
         <script src="{{basePath}}/public/js/{{if .UseMinifiedAssets}}site.min.js{{else}}site.js{{end}}?v={{.AssetVersion}}"></script>
+        <script src="{{basePath}}/public/js/site.extra.js?v={{.AssetVersion}}"></script>
 
         <script>
             // Fade out feedback messages after 5 seconds

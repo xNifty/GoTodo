@@ -15,6 +15,7 @@
                     <i class="bi bi-star"></i>
                 {{end}}
             </button>
+            
             <span role="button" tabindex="0" class="task-toggle title-text p-0" aria-expanded="false">
                 {{safeHTML .Title}}
             </span>
@@ -22,26 +23,45 @@
     </td>
     <td class="desc-column" data-label="Description">{{safeHTML .Description}}</td>
     <td class="date-added" data-label="Date Added">{{.DateAdded}}</td>
-    <td data-label="Status">
-        <button 
-            class="badge bg-{{if .Completed}}success{{else}}danger{{end}} status-column"
-            hx-get="{{basePath}}/api/update-status?id={{.ID}}"
-            hx-target="#task-{{.ID}} .badge"
-            hx-swap="outerHTML"
-            style="cursor: pointer;">
-            {{if .Completed}}Complete{{else}}Incomplete{{end}}
-        </button>
-    </td>
-    <td data-label="Delete">
-        <button 
-            hx-get="{{basePath}}/api/confirm?id={{.ID}}&page={{.Page}}"
-            hx-target="#modal .modal-content"
-            hx-trigger="click"
-            data-bs-toggle="modal"
-            data-bs-target="#modal"
-            class="badge bg-danger delete-column">
-            Delete
-        </button>
+    <td class="actions-column" data-label="Actions">
+        <div class="d-flex align-items-center gap-2 justify-content-start">
+            <!-- Status checkbox (uses existing update-status endpoint which returns a badge/button) -->
+            <button
+                class="badge bg-{{if .Completed}}success{{else}}danger text-white{{end}} status-column"
+                hx-get="{{basePath}}/api/update-status?id={{.ID}}&page={{.Page}}"
+                hx-target="#task-{{.ID}} .actions-column"
+                hx-swap="outerHTML"
+                aria-label="Toggle complete"
+                style="cursor: pointer; border: none;">
+                {{if .Completed}}
+                    <i class="bi bi-toggle-on"></i>
+                    Complete
+                {{else}}
+                    <i class="bi bi-toggle-off"></i>
+                    Incomplete
+                {{end}}
+            </button>
+
+            {{if not .Completed}}
+            <button class="btn btn-link p-0 mx-2 edit-btn" style="text-decoration:none;" 
+                hx-get="{{basePath}}/api/edit?id={{.ID}}&page={{.Page}}"
+                hx-target="#sidebar .sidebar-body" hx-swap="innerHTML" aria-label="Edit task">
+                <i class="bi bi-pencil"></i>
+            </button>
+            {{end}}
+
+            <button 
+                hx-get="{{basePath}}/api/confirm?id={{.ID}}&page={{.Page}}"
+                hx-target="#modal .modal-content"
+                hx-trigger="click"
+                data-bs-toggle="modal"
+                data-bs-target="#modal"
+                class="btn btn-link p-0 delete-column"
+                aria-label="Delete task"
+                style="text-decoration:none;">
+                <i class="bi bi-trash text-danger"></i>
+            </button>
+        </div>
     </td>
 </tr>
 
