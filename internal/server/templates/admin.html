@@ -42,10 +42,7 @@
                                     <input class="form-control" name="default_timezone" value="{{.DefaultTimezone}}" required />
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">Site Version</label>
-                                    <div>
-                                        <div class="form-control-plaintext">{{.SiteVersion}}</div>
-                                    </div>
+                                    <label class="form-label">Site Version: {{.SiteVersion}}</label>
                                 </div>
                                 <div class="form-check mb-3">
                                     <input class="form-check-input" type="checkbox" id="showChangelog" name="show_changelog" {{if .ShowChangelog}}checked{{end}} />
