@@ -188,11 +188,8 @@ td.delete-column {
    remain hidden unless expanded, and emails are left-aligned. Placed late
    to outrank earlier tablet/desktop rules. */
 @media (pointer: coarse) {
-    .invite-list-card tbody tr:not(.expanded) td.desc-column,
-    .invite-list-card tbody tr:not(.expanded) td.status-column,
-    .invite-list-card tbody tr:not(.expanded) td.delete-column {
-        display: none !important;
-    }
+    /* Touch devices: keep title left-aligned but do not hide details —
+       show the full 3-row layout (drag/title, description, actions). */
     .invite-list-card tbody tr td.title-column {
         display: block !important;
         width: 100% !important;
@@ -201,14 +198,7 @@ td.delete-column {
     .invite-list-card .title-column .form-control,
     .invite-list-card .title-column span.task-toggle {
         text-align: left !important;
-    }
-    /* Ensure the chevron remains at the right of the title row */
-    .invite-list-card .title-column { position: relative; }
-    .invite-list-card .title-column .task-toggle {
-        position: absolute !important;
-        right: 0.5rem !important;
-        top: 50% !important;
-        transform: translateY(-50%) !important;
+        position: static !important;
     }
 }
 
@@ -397,6 +387,7 @@ td.delete-column {
     tbody tr {
         display: flex;
         flex-direction: row;
+        flex-wrap: wrap;
         align-items: center;
         gap: 0.5rem;
         margin-bottom: 0.6rem;
@@ -418,13 +409,9 @@ td.delete-column {
         vertical-align: middle;
     }
 
+    /* Hide injected labels on small screens — rows are explicit (title, desc, actions) */
     td::before {
-        content: attr(data-label);
-        display: block;
-        font-weight: 600;
-        margin-bottom: 0.2rem;
-        color: #6c757d;
-        font-size: 0.78rem;
+        display: none;
     }
 
     [data-theme="dark"] td::before {
@@ -492,13 +479,15 @@ td.delete-column {
         vertical-align: middle;
     }
 
-    /* COLLAPSED MOBILE: show only title, favorite and drag icon */
-    /* Hide description/date/buttons by default on compact mobile */
+    /* MOBILE: always show description/date/actions; present as full-width rows */
     td.desc-column,
     td.date-added,
     td[data-label="Status"],
     td[data-label="Delete"] {
-        display: none; /* hidden in collapsed */
+        display: block;
+        flex-basis: 100%;
+        width: 100%;
+        padding-top: 0.4rem;
     }
 
     /* Keep title visible */
@@ -605,6 +594,27 @@ td.delete-column {
         cursor: pointer;
     }
 
+    /* Ensure drag handle and title sit on the first line while description/actions
+       occupy full-width rows below on mobile */
+    .drag-column {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        width: 32px;
+        min-width: 32px;
+        padding: 0 0.25rem;
+        box-sizing: border-box;
+    }
+
+    td.title-column {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
     /* Remove extra link/button styles for compact title toggle */
     .task-toggle {
         background: transparent;
@@ -634,7 +644,8 @@ td.delete-column {
     }
 
     .task-toggle::after {
-        content: '\25BE'; /* down-pointing triangle */
+        /* remove collapse chevron now that rows are always expanded on mobile */
+        content: none;
         font-size: 0.85rem;
         line-height: 1;
         transition: transform 160ms ease;
@@ -1055,6 +1066,74 @@ tr.expanded .task-toggle::after {
 }
 
 /* Expandable box styles */
+
+/* Strong override for mobile/tablet: force non-collapsible three-row layout
+   for task/invite rows. This will ensure the Drag+Favorite+Title appear on
+   the first row, Description on the second, and Actions on the third. It
+   also removes the chevron indicator on small screens. Placed at the end
+   so it outranks earlier accordion/collapse rules. */
+@media (max-width: 900px) {
+    /* remove chevron indicator everywhere on small screens */
+    .task-toggle::after { content: none !important; display: none !important; }
+
+    /* Ensure rows wrap so first line contains drag + title, others full width */
+    tbody tr {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
+    }
+
+    /* Title row: drag + favorite + title inline */
+    td.drag-column { display: inline-flex !important; flex: 0 0 auto !important; }
+    td.title-column { display: inline-flex !important; align-items: center !important; gap: 0.5rem !important; flex: 1 1 auto !important; min-width: 0 !important; }
+
+    /* Make description, date and actions occupy full-width rows below */
+    td.desc-column, td.date-added, td.actions-column, td[data-label="Status"], td[data-label="Delete"], .status-column, .delete-column {
+        display: block !important;
+        width: 100% !important;
+        flex-basis: 100% !important;
+        padding-top: 0.35rem !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Ensure invite-list-card specific selectors also show details */
+    .invite-list-card tbody tr:not(.expanded) .desc-column,
+    .invite-list-card tbody tr:not(.expanded) .status-column,
+    .invite-list-card tbody tr:not(.expanded) .delete-column {
+        display: block !important;
+        width: 100% !important;
+    }
+
+    /* Tidy up action buttons spacing on small screens */
+    .actions-column .d-flex, .actions-column .d-inline-flex {
+        gap: 0.5rem !important;
+        align-items: center !important;
+    }
+
+    .status-column, .delete-column {
+        display: inline-flex !important;
+        padding: 0.35rem 0.5rem !important;
+        margin: 0 !important;
+        font-size: 0.9rem !important;
+        border-radius: 6px !important;
+    }
+}
+
+/* Remove injected cell titles/labels on mobile and touch devices so each
+   task row shows only the structured rows (drag+title, description, actions). */
+@media (max-width: 900px), (pointer: coarse) {
+    /* Hide content generated from data-label (td::before) across task/invite tables */
+    table tbody tr td::before,
+    .invite-list-card tbody tr td::before,
+    td::before {
+        display: none !important;
+        content: none !important;
+    }
+
+    /* Also hide any .task-toggle pseudo-content used as chevrons */
+    .task-toggle::after { display: none !important; content: none !important; }
+}
 .expandable-box {
     border: 1px solid var(--box-border);
     border-radius: 8px;

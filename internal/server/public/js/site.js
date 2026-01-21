@@ -35,7 +35,7 @@ document.addEventListener("DOMContentLoaded", () => {
           if (container.nextSibling) {
             container.parentNode.insertBefore(
               temp.firstElementChild,
-              container.nextSibling
+              container.nextSibling,
             );
           } else {
             container.parentNode.appendChild(temp.firstElementChild);
@@ -244,7 +244,7 @@ document.addEventListener("DOMContentLoaded", () => {
             form.append("is_favorite", isFav ? "true" : "false");
             // include current page if present
             const pageEl = document.querySelector(
-              '#task-container [name="currentPage"]'
+              '#task-container [name="currentPage"]',
             );
             if (pageEl && pageEl.value) form.append("page", pageEl.value);
 
@@ -784,20 +784,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Delegate clicks on task title toggles to expand/collapse details on mobile
-  document.body.addEventListener("click", function (e) {
-    const toggle = e.target.closest && e.target.closest(".task-toggle");
-    if (!toggle) return;
-    // Don't toggle when favorite button was the click target
-    if (toggle.classList.contains("favorite-btn")) return;
-    const tr = toggle.closest("tr");
-    if (!tr) return;
-    const expanded = tr.classList.toggle("expanded");
-    // update aria-expanded
-    try {
-      toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
-    } catch (e) {}
-  });
+  // Mobile accordion behavior removed: task titles no longer toggle rows.
+  // Previous click handler intentionally removed to make all task details visible on mobile.
 
   // When an edit button is clicked, open the sidebar immediately so the user sees the form loading
   document.body.addEventListener("click", function (e) {
@@ -819,23 +807,8 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (e) {}
   });
 
-  // Support keyboard activation (Enter/Space) for the task-toggle spans
-  document.body.addEventListener("keydown", function (e) {
-    if (e.key !== "Enter" && e.key !== " " && e.key !== "Spacebar") return;
-    const toggle =
-      e.target && e.target.closest && e.target.closest(".task-toggle");
-    if (!toggle) return;
-    // Prevent page scrolling on Space
-    e.preventDefault();
-    // Don't toggle when favorite button has focus
-    if (toggle.classList.contains("favorite-btn")) return;
-    const tr = toggle.closest("tr");
-    if (!tr) return;
-    const expanded = tr.classList.toggle("expanded");
-    try {
-      toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
-    } catch (e) {}
-  });
+  // Keyboard activation for task-toggle no longer toggles expansion;
+  // task rows are always expanded on mobile so no JS toggle is needed.
 
   // Note: Logout now uses HX-Redirect in the handler, so no event listener needed
 
