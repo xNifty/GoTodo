@@ -105,8 +105,24 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Insert the new task into the database with user_id and position
-	_, err = db.Exec(context.Background(), "INSERT INTO tasks (title, description, completed, user_id, time_stamp, position) VALUES ($1, $2, $3, $4, NOW() AT TIME ZONE 'UTC', $5)", title, description, false, userID, nextPos)
+	// Handle optional project association
+	projectIDStr := strings.TrimSpace(r.FormValue("project_id"))
+	if projectIDStr == "" {
+		// Insert without project_id (NULL)
+		_, err = db.Exec(context.Background(), "INSERT INTO tasks (title, description, completed, user_id, time_stamp, position) VALUES ($1, $2, $3, $4, NOW() AT TIME ZONE 'UTC', $5)", title, description, false, userID, nextPos)
+	} else {
+		pid, errConv := strconv.Atoi(projectIDStr)
+		if errConv != nil {
+			http.Error(w, "Invalid project id", http.StatusBadRequest)
+			return
+		}
+		// Ensure project belongs to this user
+		if _, errP := storage.GetProjectByID(pid, userID); errP != nil {
+			http.Error(w, "Invalid project selection", http.StatusBadRequest)
+			return
+		}
+		_, err = db.Exec(context.Background(), "INSERT INTO tasks (title, description, completed, user_id, time_stamp, position, project_id) VALUES ($1, $2, $3, $4, NOW() AT TIME ZONE 'UTC', $5, $6)", title, description, false, userID, nextPos, pid)
+	}
 	if err != nil {
 		fmt.Println("We failed to insert into the database.")
 		fmt.Println("Failed values:", title, description, false)

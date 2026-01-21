@@ -75,7 +75,7 @@
                 <div class="d-flex align-items-center gap-2">
                     <button class="btn btn-outline-primary btn-sm" type="button" 
                         title="Go to first page" aria-label="Go to first page"
-                        hx-get="{{basePath}}/api/fetch-tasks?page=1&search={{$ctx.SearchQuery}}"
+                        hx-get="{{basePath}}/api/fetch-tasks?page=1&search={{$ctx.SearchQuery}}&project={{$ctx.ProjectFilter}}"
                         hx-target="#task-container" hx-swap="innerHTML" {{if eq $ctx.CurrentPage 1}}disabled{{end}}>&laquo;</button>
 
                     {{range $idx, $p := $ctx.Pages}}
@@ -83,7 +83,7 @@
                             <button class="btn btn-primary btn-sm" type="button" aria-current="page" disabled>{{$p}}</button>
                         {{else}}
                             <button class="btn btn-outline-primary btn-sm" type="button"
-                                hx-get="{{basePath}}/api/fetch-tasks?page={{$p}}&search={{$ctx.SearchQuery}}"
+                                hx-get="{{basePath}}/api/fetch-tasks?page={{$p}}&search={{$ctx.SearchQuery}}&project={{$ctx.ProjectFilter}}"
                                 hx-target="#task-container" hx-swap="innerHTML">{{$p}}</button>
                         {{end}}
                     {{end}}
@@ -92,13 +92,13 @@
                         <span class="text-muted">&hellip;</span>
                         <button class="btn btn-outline-primary btn-sm" type="button"
                             title="Go to last page" aria-label="Go to last page"
-                            hx-get="{{basePath}}/api/fetch-tasks?page={{$ctx.TotalPages}}&search={{$ctx.SearchQuery}}"
+                            hx-get="{{basePath}}/api/fetch-tasks?page={{$ctx.TotalPages}}&search={{$ctx.SearchQuery}}&project={{$ctx.ProjectFilter}}"
                             hx-target="#task-container" hx-swap="innerHTML">{{$ctx.TotalPages}}</button>
                     {{end}}
 
                     <button class="btn btn-outline-primary btn-sm" type="button"
                         title="Go to last page" aria-label="Go to last page"
-                        hx-get="{{basePath}}/api/fetch-tasks?page={{$ctx.TotalPages}}&search={{$ctx.SearchQuery}}"
+                        hx-get="{{basePath}}/api/fetch-tasks?page={{$ctx.TotalPages}}&search={{$ctx.SearchQuery}}&project={{$ctx.ProjectFilter}}"
                         hx-target="#task-container" hx-swap="innerHTML" {{if eq $ctx.CurrentPage $ctx.TotalPages}}disabled{{end}}>&raquo;</button>
                 </div>
             </div>

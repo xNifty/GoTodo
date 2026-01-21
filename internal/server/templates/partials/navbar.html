@@ -13,6 +13,11 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{{basePath}}/about">About</a>
                     </li>
+                    {{if .LoggedIn}}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{basePath}}/projects">Projects</a>
+                    </li>
+                    {{end}}
                     {{if .ShowChangelog}}
                     <li class="nav-item">
                         <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#changelogModal">Changelog</a>

@@ -3,6 +3,7 @@ package tasks
 import (
 	"GoTodo/internal/storage"
 	"context"
+	"database/sql"
 	"fmt"
 )
 
@@ -63,9 +64,9 @@ func ReturnPaginationForUser(page, pageSize int, userID *int, timezone string) (
 	offset := (page - 1) * pageSize
 
 	// We'll fetch favorites separately so we can always show up to 5 favorites first on page 1
-	query := `SELECT id, title, description, completed, 
-		TO_CHAR((time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $3, 'YYYY/MM/DD HH:MI AM') AS date_added, COALESCE(position,0) 
-		FROM tasks `
+	query := `SELECT t.id, t.title, t.description, t.completed, 
+		TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $3, 'YYYY/MM/DD HH:MI AM') AS date_added, COALESCE(t.position,0), t.project_id, COALESCE(p.name,'')
+		FROM tasks t LEFT JOIN projects p ON t.project_id = p.id `
 
 	var countQuery string
 	var rows interface {
@@ -81,7 +82,7 @@ func ReturnPaginationForUser(page, pageSize int, userID *int, timezone string) (
 
 	// Logged in - show favorites first (up to 5) on page 1
 	// Fetch favorite tasks
-	favRows, err := pool.Query(context.Background(), `SELECT id, title, description, completed, TO_CHAR((time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM') AS date_added, COALESCE(is_favorite,false), COALESCE(position,0) FROM tasks WHERE user_id = $1 AND is_favorite = true ORDER BY position LIMIT 5`, *userID, timezone)
+	favRows, err := pool.Query(context.Background(), `SELECT t.id, t.title, t.description, t.completed, TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM') AS date_added, COALESCE(t.is_favorite,false), COALESCE(t.position,0), t.project_id, COALESCE(p.name,'') FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE t.user_id = $1 AND t.is_favorite = true ORDER BY t.position LIMIT 5`, *userID, timezone)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -89,9 +90,17 @@ func ReturnPaginationForUser(page, pageSize int, userID *int, timezone string) (
 	favs := make([]Task, 0)
 	for favRows.Next() {
 		var t Task
-		if err := favRows.Scan(&t.ID, &t.Title, &t.Description, &t.Completed, &t.DateAdded, &t.IsFavorite, &t.Position); err != nil {
+		var pid sql.NullInt64
+		var pname sql.NullString
+		if err := favRows.Scan(&t.ID, &t.Title, &t.Description, &t.Completed, &t.DateAdded, &t.IsFavorite, &t.Position, &pid, &pname); err != nil {
 			return nil, 0, err
 		}
+		if pid.Valid {
+			t.ProjectID = int(pid.Int64)
+		} else {
+			t.ProjectID = 0
+		}
+		t.ProjectName = pname.String
 		favs = append(favs, t)
 	}
 
@@ -111,16 +120,24 @@ func ReturnPaginationForUser(page, pageSize int, userID *int, timezone string) (
 		if remaining < 0 {
 			remaining = 0
 		}
-		rows, err = pool.Query(context.Background(), query+`WHERE user_id = $4 AND (is_favorite IS NULL OR is_favorite = false) ORDER BY position LIMIT $1 OFFSET $2`, remaining, 0, timezone, *userID)
+		rows, err = pool.Query(context.Background(), query+`WHERE t.user_id = $4 AND (t.is_favorite IS NULL OR t.is_favorite = false) ORDER BY t.position LIMIT $1 OFFSET $2`, remaining, 0, timezone, *userID)
 		if err != nil {
 			return nil, 0, err
 		}
 		defer rows.Close()
 		for rows.Next() {
 			var task Task
-			if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed, &task.DateAdded, &task.Position); err != nil {
+			var pid sql.NullInt64
+			var pname sql.NullString
+			if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed, &task.DateAdded, &task.Position, &pid, &pname); err != nil {
 				return nil, 0, err
 			}
+			if pid.Valid {
+				task.ProjectID = int(pid.Int64)
+			} else {
+				task.ProjectID = 0
+			}
+			task.ProjectName = pname.String
 			tasks = append(tasks, task)
 		}
 		// prepend favorites
@@ -132,16 +149,145 @@ func ReturnPaginationForUser(page, pageSize int, userID *int, timezone string) (
 		if offsetNonFav < 0 {
 			offsetNonFav = 0
 		}
-		rows, err = pool.Query(context.Background(), query+`WHERE user_id = $4 AND (is_favorite IS NULL OR is_favorite = false) ORDER BY position LIMIT $1 OFFSET $2`, pageSize, offsetNonFav, timezone, *userID)
+		rows, err = pool.Query(context.Background(), query+`WHERE t.user_id = $4 AND (t.is_favorite IS NULL OR t.is_favorite = false) ORDER BY t.position LIMIT $1 OFFSET $2`, pageSize, offsetNonFav, timezone, *userID)
 		if err != nil {
 			return nil, 0, err
 		}
 		defer rows.Close()
 		for rows.Next() {
 			var task Task
-			if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed, &task.DateAdded, &task.Position); err != nil {
+			var pid sql.NullInt64
+			var pname sql.NullString
+			if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed, &task.DateAdded, &task.Position, &pid, &pname); err != nil {
 				return nil, 0, err
 			}
+			if pid.Valid {
+				task.ProjectID = int(pid.Int64)
+			} else {
+				task.ProjectID = 0
+			}
+			task.ProjectName = pname.String
+			tasks = append(tasks, task)
+		}
+	}
+	return tasks, totalTasks, nil
+}
+
+// ReturnPaginationForUserWithProject behaves like ReturnPaginationForUser but filters tasks by project.
+// If projectFilter is nil, all projects are returned. If *projectFilter == 0, only tasks with no project are returned.
+func ReturnPaginationForUserWithProject(page, pageSize int, userID *int, timezone string, projectFilter *int) ([]Task, int, error) {
+	pool, err := storage.OpenDatabase()
+	if err != nil {
+		return nil, 0, err
+	}
+	defer storage.CloseDatabase(pool)
+
+	var tasks []Task
+	offset := (page - 1) * pageSize
+
+	projectCond := ""
+	if projectFilter != nil {
+		if *projectFilter == 0 {
+			projectCond = " AND (project_id IS NULL)"
+		} else {
+			projectCond = fmt.Sprintf(" AND (project_id = %d)", *projectFilter)
+		}
+	}
+
+	query := `SELECT t.id, t.title, t.description, t.completed, 
+		TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $3, 'YYYY/MM/DD HH:MI AM') AS date_added, COALESCE(t.position,0), t.project_id, COALESCE(p.name,'')
+		FROM tasks t LEFT JOIN projects p ON t.project_id = p.id `
+
+	var countQuery string
+	var rows interface {
+		Next() bool
+		Scan(...interface{}) error
+		Close()
+	}
+
+	if userID == nil {
+		return tasks, 0, nil
+	}
+
+	favRows, err := pool.Query(context.Background(), `SELECT t.id, t.title, t.description, t.completed, TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM') AS date_added, COALESCE(t.is_favorite,false), COALESCE(t.position,0), t.project_id, COALESCE(p.name,'') FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE t.user_id = $1 AND t.is_favorite = true`+projectCond+` ORDER BY t.position LIMIT 5`, *userID, timezone)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer favRows.Close()
+	favs := make([]Task, 0)
+	for favRows.Next() {
+		var t Task
+		var pid sql.NullInt64
+		var pname sql.NullString
+		if err := favRows.Scan(&t.ID, &t.Title, &t.Description, &t.Completed, &t.DateAdded, &t.IsFavorite, &t.Position, &pid, &pname); err != nil {
+			return nil, 0, err
+		}
+		if pid.Valid {
+			t.ProjectID = int(pid.Int64)
+		} else {
+			t.ProjectID = 0
+		}
+		t.ProjectName = pname.String
+		favs = append(favs, t)
+	}
+
+	var totalTasks int
+	countQuery = "SELECT COUNT(*) FROM tasks WHERE user_id = $1" + projectCond
+	err = pool.QueryRow(context.Background(), countQuery, *userID).Scan(&totalTasks)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	favCount := len(favs)
+	if page == 1 && favCount > 0 {
+		remaining := pageSize - favCount
+		if remaining < 0 {
+			remaining = 0
+		}
+		rows, err = pool.Query(context.Background(), query+`WHERE t.user_id = $4 AND (t.is_favorite IS NULL OR t.is_favorite = false)`+projectCond+` ORDER BY t.position LIMIT $1 OFFSET $2`, remaining, 0, timezone, *userID)
+		if err != nil {
+			return nil, 0, err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var task Task
+			var pid sql.NullInt64
+			var pname sql.NullString
+			if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed, &task.DateAdded, &task.Position, &pid, &pname); err != nil {
+				return nil, 0, err
+			}
+			if pid.Valid {
+				task.ProjectID = int(pid.Int64)
+			} else {
+				task.ProjectID = 0
+			}
+			task.ProjectName = pname.String
+			tasks = append(tasks, task)
+		}
+		tasks = append(favs, tasks...)
+	} else {
+		offsetNonFav := offset - favCount
+		if offsetNonFav < 0 {
+			offsetNonFav = 0
+		}
+		rows, err = pool.Query(context.Background(), query+`WHERE t.user_id = $4 AND (t.is_favorite IS NULL OR t.is_favorite = false)`+projectCond+` ORDER BY t.position LIMIT $1 OFFSET $2`, pageSize, offsetNonFav, timezone, *userID)
+		if err != nil {
+			return nil, 0, err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var task Task
+			var pid sql.NullInt64
+			var pname sql.NullString
+			if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed, &task.DateAdded, &task.Position, &pid, &pname); err != nil {
+				return nil, 0, err
+			}
+			if pid.Valid {
+				task.ProjectID = int(pid.Int64)
+			} else {
+				task.ProjectID = 0
+			}
+			task.ProjectName = pname.String
 			tasks = append(tasks, task)
 		}
 	}

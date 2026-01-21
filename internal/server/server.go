@@ -69,6 +69,12 @@ func StartServer() error {
 	http.HandleFunc("/changelog/page", handlers.ChangelogPageHandler)
 	http.HandleFunc("/search", handlers.SearchHandler)
 
+	// Projects management (simple CRUD for user-owned projects)
+	http.HandleFunc("/projects", utils.RequireAuth(handlers.ProjectsPageHandler))
+	http.HandleFunc("/api/projects/create", utils.RequireAuth(handlers.APICreateProject))
+	http.HandleFunc("/api/projects/delete", utils.RequireAuth(handlers.APIDeleteProject))
+	http.HandleFunc("/api/projects/json", utils.RequireAuth(handlers.APIProjectsJSON))
+
 	// Profile routes
 	http.HandleFunc("/profile", handlers.ProfilePage)
 	http.HandleFunc("/api/update-timezone", handlers.APIUpdateTimezone)

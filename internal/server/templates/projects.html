@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en" {{if .Theme}}data-theme="{{.Theme}}"{{end}}>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Projects - {{.SiteName}}</title>
+        <link
+            href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="{{basePath}}/public/css/{{if .UseMinifiedAssets}}site.min.css{{else}}site.css{{end}}?v={{.AssetVersion}}" />
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    </head>
+    <body>
+        {{template "navbar.html" .}}
+
+        <div class="container mt-4">
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="mb-0">Your Projects</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted">Create projects to organize your tasks. Deleting a project will unassign tasks from it.</p>
+                            <div id="projects-list">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th style="width:120px">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {{range .Projects}}
+                                        <tr>
+                                            <td>{{.Name}}</td>
+                                            <td>
+                                                <form method="post" action="{{basePath}}/api/projects/delete" hx-post="{{basePath}}/api/projects/delete" hx-target="#projects-list" hx-swap="innerHTML" style="display:inline;">
+                                                    <input type="hidden" name="id" value="{{.ID}}" />
+                                                    <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                        {{else}}
+                                        <tr><td colspan="2" class="text-muted">No projects yet.</td></tr>
+                                        {{end}}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Create Project</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="post" action="{{basePath}}/api/projects/create" hx-post="{{basePath}}/api/projects/create" hx-target="#projects-list" hx-swap="innerHTML" id="createProjectForm">
+                                <div class="mb-3">
+                                    <label class="form-label">Project Name</label>
+                                    <input class="form-control" name="name" required />
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-primary" type="submit">Create</button>
+                                    <a class="btn btn-secondary" href="{{basePath}}">Cancel</a>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{template "footer.html" .}}
+
+        <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.min.js"></script>
+        <script src="https://unpkg.com/htmx.org@2.0.3"></script>
+        <script src="{{basePath}}/public/js/{{if .UseMinifiedAssets}}site.min.js{{else}}site.js{{end}}?v={{.AssetVersion}}"></script>
+    </body>
+</html>

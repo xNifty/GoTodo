@@ -146,6 +146,17 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 		"IncompleteTasks":  utils.GetIncompleteTasksCount(userID),
 	}
 
+	// Include user's projects for the sidebar project select
+	if loggedIn && userID != nil {
+		if projs, err := storage.GetProjectsForUser(*userID); err == nil {
+			projList := make([]map[string]interface{}, 0)
+			for _, p := range projs {
+				projList = append(projList, map[string]interface{}{"ID": p.ID, "Name": p.Name, "Selected": false})
+			}
+			context["Projects"] = projList
+		}
+	}
+
 	// Render the tasks and pagination controls
 	if err := utils.RenderTemplate(w, r, "index.html", context); err != nil {
 		if w.Header().Get("Content-Type") == "" {

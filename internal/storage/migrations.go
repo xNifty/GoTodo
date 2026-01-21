@@ -26,6 +26,11 @@ func RunMigrations() error {
 		fmt.Printf("migration: CreateTasksTable failed: %v\n", err)
 		errCount++
 	}
+	// Ensure projects table exists
+	if err := CreateProjectsTable(); err != nil {
+		fmt.Printf("migration: CreateProjectsTable failed: %v\n", err)
+		errCount++
+	}
 
 	// Non-breaking column migrations
 	if err := MigrateUsersAddTimezone(); err != nil {
@@ -50,6 +55,11 @@ func RunMigrations() error {
 	}
 	if err := MigrateTasksAddPosition(); err != nil {
 		fmt.Printf("migration: MigrateTasksAddPosition failed: %v\n", err)
+		errCount++
+	}
+	// Add project_id column to tasks (nullable)
+	if err := MigrateTasksAddProjectID(); err != nil {
+		fmt.Printf("migration: MigrateTasksAddProjectID failed: %v\n", err)
 		errCount++
 	}
 

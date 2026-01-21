@@ -1684,3 +1684,33 @@ a {
     box-shadow: none;
 }
 
+/* Theme-aware dropdown (select) styling to match light/dark mode */
+.form-select,
+select.form-select {
+    background-color: var(--form-control-bg);
+    color: var(--form-control-text);
+    border: 1px solid var(--box-border);
+    transition: background-color var(--transition-time), color var(--transition-time), border-color var(--transition-time), box-shadow var(--transition-time);
+}
+
+.form-select:focus,
+select.form-select:focus {
+    outline: none;
+    border-color: var(--table-header-bg);
+    box-shadow: 0 0 0 0.2rem rgba(13,110,253,0.18);
+}
+
+/* Slightly darker placeholder in dark mode for contrast */
+::placeholder {
+    color: rgba(0,0,0,0.45);
+}
+[data-theme="dark"] ::placeholder {
+    color: rgba(255,255,255,0.55);
+}
+
+/* Ensure select caret and appearance remain native on different platforms */
+.form-select {
+    -webkit-appearance: menulist-button;
+    appearance: menulist-button;
+}
+

@@ -146,6 +146,8 @@ document.addEventListener("DOMContentLoaded", () => {
             if (titleEl) titleEl.value = "";
             const descEl = tf.querySelector("#description");
             if (descEl) descEl.value = "";
+            const projEl = tf.querySelector("#project_id");
+            if (projEl) projEl.value = "";
             const idInput = tf.querySelector('input[name="id"]');
             if (idInput) idInput.remove();
             const submit = tf.querySelector('button[type="submit"]');
@@ -950,6 +952,59 @@ document.addEventListener("DOMContentLoaded", () => {
           if (sb) sb.classList.add("active");
         }
       }
+      // Clear create-project form after successful HTMX create
+      if (xhr.responseURL.includes("/api/projects/create")) {
+        const status = xhr.status || 0;
+        if (status >= 200 && status < 300) {
+          try {
+            const form = document.getElementById("createProjectForm");
+            if (form) {
+              const nameInput = form.querySelector('input[name="name"]');
+              if (nameInput) nameInput.value = "";
+            }
+            if (typeof showToast === "function") showToast("Project created.");
+          } catch (e) {}
+        }
+      }
+
+      // When server notifies projects changed, refresh project selects
+      try {
+        if (
+          xhr &&
+          xhr.getResponseHeader &&
+          xhr.getResponseHeader("HX-Trigger")
+        ) {
+          const trig = xhr.getResponseHeader("HX-Trigger");
+          if (trig && trig.indexOf("projects-changed") !== -1) {
+            fetch(apiPath("/api/projects/json"))
+              .then((res) => res.json())
+              .then((data) => {
+                try {
+                  // Update all selects with id project_id
+                  const selects =
+                    document.querySelectorAll("select#project_id");
+                  selects.forEach((sel) => {
+                    // preserve current value
+                    const cur = sel.value;
+                    // clear existing options
+                    while (sel.options.length > 1) sel.remove(1);
+                    data.forEach((p) => {
+                      const opt = document.createElement("option");
+                      opt.value = p.id;
+                      opt.textContent = p.name;
+                      sel.appendChild(opt);
+                    });
+                    // restore value if still present
+                    try {
+                      sel.value = cur;
+                    } catch (e) {}
+                  });
+                } catch (e) {}
+              })
+              .catch(() => {});
+          }
+        }
+      } catch (e) {}
     } catch (e) {}
   });
 

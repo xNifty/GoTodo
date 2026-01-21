@@ -43,7 +43,8 @@ func APIEditTaskForm(w http.ResponseWriter, r *http.Request) {
 	var title, description string
 	var completed bool
 	var ownerID int
-	err = db.QueryRow(context.Background(), "SELECT title, description, completed, user_id FROM tasks WHERE id = $1", id).Scan(&title, &description, &completed, &ownerID)
+	var projectID sql.NullInt64
+	err = db.QueryRow(context.Background(), "SELECT title, description, completed, user_id, project_id FROM tasks WHERE id = $1", id).Scan(&title, &description, &completed, &ownerID, &projectID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			http.Error(w, "Task not found.", http.StatusNotFound)
@@ -74,6 +75,20 @@ func APIEditTaskForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Fetch projects for this user so the form can render the select
+	projectsList := make([]map[string]interface{}, 0)
+	if uid := utils.GetSessionUserID(r); uid != nil {
+		if projs, perr := storage.GetProjectsForUser(*uid); perr == nil {
+			for _, p := range projs {
+				sel := false
+				if projectID.Valid && int(projectID.Int64) == p.ID {
+					sel = true
+				}
+				projectsList = append(projectsList, map[string]interface{}{"ID": p.ID, "Name": p.Name, "Selected": sel})
+			}
+		}
+	}
+
 	data := struct {
 		FormTitle    string
 		Description  string
@@ -83,6 +98,7 @@ func APIEditTaskForm(w http.ResponseWriter, r *http.Request) {
 		SubmitText   string
 		SidebarTitle string
 		Error        string
+		Projects     []map[string]interface{}
 	}{
 		FormTitle:    strings.TrimSpace(title),
 		Description:  strings.TrimSpace(description),
@@ -92,6 +108,7 @@ func APIEditTaskForm(w http.ResponseWriter, r *http.Request) {
 		SubmitText:   "Save Changes",
 		SidebarTitle: "Edit Task",
 		Error:        "",
+		Projects:     projectsList,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -194,11 +211,31 @@ func APIEditTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Perform update
-	_, err = db.Exec(context.Background(), "UPDATE tasks SET title = $1, description = $2 WHERE id = $3", title, description, id)
-	if err != nil {
-		http.Error(w, "Failed to update task.", http.StatusInternalServerError)
-		return
+	// Handle optional project association
+	projectIDStr := strings.TrimSpace(r.FormValue("project_id"))
+	if projectIDStr == "" {
+		// Clear project association
+		_, err = db.Exec(context.Background(), "UPDATE tasks SET title = $1, description = $2, project_id = NULL WHERE id = $3", title, description, id)
+		if err != nil {
+			http.Error(w, "Failed to update task.", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		pid, errConv := strconv.Atoi(projectIDStr)
+		if errConv != nil {
+			http.Error(w, "Invalid project id", http.StatusBadRequest)
+			return
+		}
+		// Validate ownership of chosen project
+		if _, perr := storage.GetProjectByID(pid, userID); perr != nil {
+			http.Error(w, "Invalid project selection", http.StatusBadRequest)
+			return
+		}
+		_, err = db.Exec(context.Background(), "UPDATE tasks SET title = $1, description = $2, project_id = $3 WHERE id = $4", title, description, pid, id)
+		if err != nil {
+			http.Error(w, "Failed to update task.", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// Re-render pagination like add_task does

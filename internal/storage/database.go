@@ -240,6 +240,18 @@ func CreateTasksTable() error {
 	return CreateTable("tasks", columns)
 }
 
+// CreateProjectsTable creates the projects table for organizing tasks
+func CreateProjectsTable() error {
+	columns := []string{
+		"id SERIAL PRIMARY KEY",
+		"user_id INTEGER NOT NULL",
+		"name TEXT NOT NULL",
+		"created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+		"updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+	}
+	return CreateTable("projects", columns)
+}
+
 // MigrateTasksTable adds a user_id column and a foreign key constraint to the tasks table
 func MigrateTasksTable() error {
 	pool, err := OpenDatabase()
@@ -288,6 +300,29 @@ func MigrateTasksAddPosition() error {
 	_, err = pool.Exec(context.Background(), "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS position INTEGER DEFAULT 0")
 	if err != nil {
 		return fmt.Errorf("failed to add position column to tasks table: %v", err)
+	}
+	return nil
+}
+
+// MigrateTasksAddProjectID adds a nullable project_id column to tasks
+func MigrateTasksAddProjectID() error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return fmt.Errorf("failed to open database: %v", err)
+	}
+	defer CloseDatabase(pool)
+
+	// Add project_id column
+	_, err = pool.Exec(context.Background(), "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS project_id INTEGER")
+	if err != nil {
+		return fmt.Errorf("failed to add project_id column to tasks table: %v", err)
+	}
+
+	// Add foreign key constraint to projects (ON DELETE SET NULL so tasks remain)
+	_, err = pool.Exec(context.Background(), "ALTER TABLE tasks ADD CONSTRAINT fk_tasks_projects FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE SET NULL")
+	if err != nil {
+		// If the constraint already exists or projects table not yet present this may fail; return error to be logged by caller
+		return fmt.Errorf("failed to add foreign key constraint to tasks.project_id: %v", err)
 	}
 	return nil
 }

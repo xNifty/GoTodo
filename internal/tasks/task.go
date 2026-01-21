@@ -14,6 +14,8 @@ type Task struct {
 	Page        int
 	IsFavorite  bool
 	Position    int
+	ProjectID   int
+	ProjectName string
 }
 
 type TaskManager struct {
