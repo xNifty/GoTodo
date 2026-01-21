@@ -75,7 +75,7 @@ func APIEditTaskForm(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := struct {
-		Title        string
+		FormTitle    string
 		Description  string
 		CurrentPage  string
 		ID           string
@@ -84,7 +84,7 @@ func APIEditTaskForm(w http.ResponseWriter, r *http.Request) {
 		SidebarTitle string
 		Error        string
 	}{
-		Title:        strings.TrimSpace(title),
+		FormTitle:    strings.TrimSpace(title),
 		Description:  strings.TrimSpace(description),
 		CurrentPage:  page,
 		ID:           id,

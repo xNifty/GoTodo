@@ -138,7 +138,34 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (openBtn) {
       openBtn.removeEventListener("click", openSidebar); // Prevent duplicate bindings
-      openBtn.addEventListener("click", openSidebar);
+      openBtn.addEventListener("click", function (ev) {
+        try {
+          const tf = document.getElementById("newTaskForm");
+          if (tf) {
+            const titleEl = tf.querySelector("#title");
+            if (titleEl) titleEl.value = "";
+            const descEl = tf.querySelector("#description");
+            if (descEl) descEl.value = "";
+            const idInput = tf.querySelector('input[name="id"]');
+            if (idInput) idInput.remove();
+            const submit = tf.querySelector('button[type="submit"]');
+            if (submit) submit.textContent = "Add Task";
+            // Ensure the form posts to the add endpoint
+            try {
+              tf.setAttribute("hx-post", apiPath("/api/add-task"));
+            } catch (e) {}
+            const cp = tf.querySelector('input[name="currentPage"]');
+            if (cp) cp.value = "1";
+            const sbTitle = document.querySelector(
+              "#sidebar .sidebar-header h5",
+            );
+            if (sbTitle) sbTitle.textContent = "Add Task";
+            const charCount = document.getElementById("char-count");
+            if (charCount) charCount.textContent = "0";
+          }
+        } catch (e) {}
+        openSidebar();
+      });
     }
 
     if (closeBtn) {
