@@ -275,7 +275,7 @@ document.addEventListener("DOMContentLoaded", () => {
             );
             if (pageEl && pageEl.value) form.append("page", pageEl.value);
 
-            fetch("/api/reorder-tasks", { method: "POST", body: form })
+            fetch(apiPath("/api/reorder-tasks"), { method: "POST", body: form })
               .then((resp) => {
                 if (resp.ok) return resp.text();
                 throw new Error("Failed to save order");
