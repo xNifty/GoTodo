@@ -68,22 +68,7 @@ func APIToggleFavorite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If setting to favorite, ensure user has fewer than 5 favorites
-	if !isFav {
-		var favCount int
-		err = db.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND is_favorite = true", userID).Scan(&favCount)
-		if err != nil {
-			http.Error(w, "Error checking favorites", http.StatusInternalServerError)
-			return
-		}
-		if favCount >= 5 {
-			// Trigger client-side event via HTMX without returning an error status
-			// Provide a small JSON payload so the client can show a custom message
-			w.Header().Set("HX-Trigger", `{"favorite-limit-reached":{"message":"You can only favorite up to 5 tasks"}}`)
-			w.WriteHeader(http.StatusNoContent) // 204 prevents HTMX from swapping content
-			return
-		}
-	}
+	// No favorite limit enforced: allow toggling freely
 
 	// Toggle favorite
 	_, err = db.Exec(context.Background(), "UPDATE tasks SET is_favorite = NOT COALESCE(is_favorite,false) WHERE id = $1 AND user_id = $2", id, userID)

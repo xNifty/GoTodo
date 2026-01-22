@@ -82,7 +82,7 @@ func ReturnPaginationForUser(page, pageSize int, userID *int, timezone string) (
 
 	// Logged in - show favorites first (up to 5) on page 1
 	// Fetch favorite tasks
-	favRows, err := pool.Query(context.Background(), `SELECT t.id, t.title, t.description, t.completed, TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM') AS date_added, COALESCE(t.is_favorite,false), COALESCE(t.position,0), t.project_id, COALESCE(p.name,'') FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE t.user_id = $1 AND t.is_favorite = true ORDER BY t.position LIMIT 5`, *userID, timezone)
+	favRows, err := pool.Query(context.Background(), `SELECT t.id, t.title, t.description, t.completed, TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM') AS date_added, COALESCE(t.is_favorite,false), COALESCE(t.position,0), t.project_id, COALESCE(p.name,'') FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE t.user_id = $1 AND t.is_favorite = true ORDER BY t.position`, *userID, timezone)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -209,7 +209,7 @@ func ReturnPaginationForUserWithProject(page, pageSize int, userID *int, timezon
 		return tasks, 0, nil
 	}
 
-	favRows, err := pool.Query(context.Background(), `SELECT t.id, t.title, t.description, t.completed, TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM') AS date_added, COALESCE(t.is_favorite,false), COALESCE(t.position,0), t.project_id, COALESCE(p.name,'') FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE t.user_id = $1 AND t.is_favorite = true`+projectCond+` ORDER BY t.position LIMIT 5`, *userID, timezone)
+	favRows, err := pool.Query(context.Background(), `SELECT t.id, t.title, t.description, t.completed, TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM') AS date_added, COALESCE(t.is_favorite,false), COALESCE(t.position,0), t.project_id, COALESCE(p.name,'') FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE t.user_id = $1 AND t.is_favorite = true`+projectCond+` ORDER BY t.position`, *userID, timezone)
 	if err != nil {
 		return nil, 0, err
 	}
