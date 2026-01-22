@@ -1,4 +1,4 @@
 package version
 
 // Version is set at build time via -ldflags. Default is a placeholder.
-var Version = "v0.7.3-beta"
+var Version = "v0.8.0-beta"
