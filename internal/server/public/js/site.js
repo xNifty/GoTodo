@@ -158,6 +158,19 @@ document.addEventListener("DOMContentLoaded", () => {
             } catch (e) {}
             const cp = tf.querySelector('input[name="currentPage"]');
             if (cp) cp.value = "1";
+            // Ensure the form carries the current toolbar project filter so server can decide refresh
+            try {
+              let projField = tf.querySelector('input[name="project"]');
+              const toolbar = document.querySelector("select#project-filter");
+              const toolbarVal = toolbar ? toolbar.value : "";
+              if (!projField) {
+                projField = document.createElement("input");
+                projField.type = "hidden";
+                projField.name = "project";
+                tf.appendChild(projField);
+              }
+              projField.value = toolbarVal;
+            } catch (e) {}
             const sbTitle = document.querySelector(
               "#sidebar .sidebar-header h5",
             );
@@ -186,6 +199,26 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const tf = document.getElementById("newTaskForm");
       if (tf && !tf.classList.contains("task-form-initialized")) {
+        // Ensure hidden project field exists and is kept up-to-date before submit
+        try {
+          let projField = tf.querySelector('input[name="project"]');
+          const toolbar = document.querySelector("select#project-filter");
+          const toolbarVal = toolbar ? toolbar.value : "";
+          if (!projField) {
+            projField = document.createElement("input");
+            projField.type = "hidden";
+            projField.name = "project";
+            tf.appendChild(projField);
+          }
+          projField.value = toolbarVal;
+          // Update it on submit in case toolbar changed while form open
+          tf.addEventListener("submit", function () {
+            try {
+              const tb = document.querySelector("select#project-filter");
+              if (tb) projField.value = tb.value;
+            } catch (e) {}
+          });
+        } catch (e) {}
         tf.addEventListener("htmx:afterRequest", (event) => {
           let isValidationError = false;
           try {
@@ -276,6 +309,14 @@ document.addEventListener("DOMContentLoaded", () => {
               '#task-container [name="currentPage"]',
             );
             if (pageEl && pageEl.value) form.append("page", pageEl.value);
+            // include current toolbar project filter so server can respect scoped reorder
+            try {
+              const toolbar = document.querySelector("select#project-filter");
+              const toolbarVal = toolbar ? toolbar.value : "";
+              if (typeof toolbarVal !== "undefined" && toolbarVal !== null) {
+                form.append("project", toolbarVal);
+              }
+            } catch (e) {}
 
             fetch(apiPath("/api/reorder-tasks"), { method: "POST", body: form })
               .then((resp) => {
@@ -1002,6 +1043,31 @@ document.addEventListener("DOMContentLoaded", () => {
                 } catch (e) {}
               })
               .catch(() => {});
+          }
+          // If server asked to reset the toolbar project filter, do that too
+          if (trig && trig.indexOf("reset-project-filter") !== -1) {
+            try {
+              const pf = document.querySelector("select#project-filter");
+              if (pf) {
+                pf.value = "";
+                // dispatch change so HTMX will fetch the full task list
+                pf.dispatchEvent(new Event("change", { bubbles: true }));
+              }
+            } catch (e) {}
+          }
+          // If server requested setting the toolbar project filter, apply it
+          if (trig && trig.indexOf("set-project-filter") !== -1) {
+            try {
+              const m = trig.match(/set-project-filter:([^\s]+)/);
+              if (m && m[1] !== undefined) {
+                const val = m[1];
+                const pf = document.querySelector("select#project-filter");
+                if (pf) {
+                  pf.value = val;
+                  // Do not dispatch change here — server already returned the correct view
+                }
+              }
+            } catch (e) {}
           }
         }
       } catch (e) {}

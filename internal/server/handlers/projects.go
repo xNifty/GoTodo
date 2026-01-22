@@ -81,7 +81,8 @@ func APICreateProject(w http.ResponseWriter, r *http.Request) {
 			"Projects": projects,
 		}
 		// Notify client that projects changed so JS can refresh selects
-		w.Header().Set("HX-Trigger", "projects-changed")
+		// Also instruct client to reset the project filter to All Projects
+		w.Header().Set("HX-Trigger", "projects-changed reset-project-filter")
 		utils.RenderTemplate(w, r, "projects_list.html", ctx)
 		return
 	}

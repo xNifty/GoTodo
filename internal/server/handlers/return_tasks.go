@@ -126,10 +126,18 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 				taskList[i].Description = highlightMatches(task.Description, searchQuery)
 			}
 		} else {
-			taskList, totalTasks, err = tasks.ReturnPaginationForUser(page, pageSize, userID, timezone)
-			if err != nil {
-				http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
-				return
+			if projectFilter != nil {
+				taskList, totalTasks, err = tasks.ReturnPaginationForUserWithProject(page, pageSize, userID, timezone, projectFilter)
+				if err != nil {
+					http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
+					return
+				}
+			} else {
+				taskList, totalTasks, err = tasks.ReturnPaginationForUser(page, pageSize, userID, timezone)
+				if err != nil {
+					http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
+					return
+				}
 			}
 		}
 	}
@@ -195,6 +203,24 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create a context for the tasks and pagination
+	// Fetch projects for this user so the sidebar form can render the select
+	projectsList := make([]map[string]interface{}, 0)
+	if userID != nil {
+		if projs, perr := storage.GetProjectsForUser(*userID); perr == nil {
+			for _, p := range projs {
+				sel := false
+				if projectFilter != nil {
+					switch *projectFilter {
+					case 0:
+						// nothing selected (no project)
+					case p.ID:
+						sel = true
+					}
+				}
+				projectsList = append(projectsList, map[string]interface{}{"ID": p.ID, "Name": p.Name, "Selected": sel})
+			}
+		}
+	}
 	context := map[string]interface{}{
 		"FavoriteTasks":    favs,
 		"Tasks":            nonFavs,
@@ -214,6 +240,7 @@ func APIReturnTasks(w http.ResponseWriter, r *http.Request) {
 		"CompletedTasks":   completedCount,
 		"IncompleteTasks":  incompleteCount,
 		"ProjectFilter":    projectParam,
+		"Projects":         projectsList,
 	}
 
 	if err := utils.RenderTemplate(w, r, "pagination.html", context); err != nil {

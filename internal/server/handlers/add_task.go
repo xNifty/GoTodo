@@ -107,6 +107,7 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 
 	// Handle optional project association
 	projectIDStr := strings.TrimSpace(r.FormValue("project_id"))
+	var newTaskProject *int
 	if projectIDStr == "" {
 		// Insert without project_id (NULL)
 		_, err = db.Exec(context.Background(), "INSERT INTO tasks (title, description, completed, user_id, time_stamp, position) VALUES ($1, $2, $3, $4, NOW() AT TIME ZONE 'UTC', $5)", title, description, false, userID, nextPos)
@@ -122,6 +123,9 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_, err = db.Exec(context.Background(), "INSERT INTO tasks (title, description, completed, user_id, time_stamp, position, project_id) VALUES ($1, $2, $3, $4, NOW() AT TIME ZONE 'UTC', $5, $6)", title, description, false, userID, nextPos, pid)
+		if err == nil {
+			newTaskProject = &pid
+		}
 	}
 	if err != nil {
 		fmt.Println("We failed to insert into the database.")
@@ -156,8 +160,37 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Open a new DB connection to count total tasks (or reuse db if possible)
+	// Determine active project filter (from form or query) so we can decide whether to refresh the current view
+	activeProject := strings.TrimSpace(r.FormValue("project"))
+	if activeProject == "" {
+		activeProject = strings.TrimSpace(r.URL.Query().Get("project"))
+	}
+
+	var projectFilterPtr *int
+	if activeProject != "" {
+		if activeProject == "none" || activeProject == "0" {
+			zero := 0
+			projectFilterPtr = &zero
+		} else if v, errc := strconv.Atoi(activeProject); errc == nil {
+			projectFilterPtr = &v
+		}
+	}
+
 	var totalTasks int
-	err = db.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1", userID).Scan(&totalTasks)
+	// Count tasks scoped to project if filter is active, otherwise count all
+	if projectFilterPtr == nil {
+		err = db.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1", userID).Scan(&totalTasks)
+	} else {
+		projectCond := ""
+		args := []interface{}{userID}
+		if *projectFilterPtr == 0 {
+			projectCond = " AND project_id IS NULL"
+		} else {
+			projectCond = " AND project_id = $2"
+			args = append(args, *projectFilterPtr)
+		}
+		err = db.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1"+projectCond, args...).Scan(&totalTasks)
+	}
 	if err != nil {
 		http.Error(w, "Error counting tasks after add: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -174,7 +207,12 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 		page = lastPage
 	}
 
-	taskList, totalTasks, err := tasks.ReturnPaginationForUser(page, pageSize, &userID, timezone)
+	var taskList []tasks.Task
+	if projectFilterPtr != nil {
+		taskList, totalTasks, err = tasks.ReturnPaginationForUserWithProject(page, pageSize, &userID, timezone, projectFilterPtr)
+	} else {
+		taskList, totalTasks, err = tasks.ReturnPaginationForUser(page, pageSize, &userID, timezone)
+	}
 	if err != nil {
 		http.Error(w, "Error fetching tasks after add: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -210,8 +248,26 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Decide whether to refresh the current view: only refresh if we're on All projects OR
+	// the new task's project matches the active project filter.
+	shouldRefresh := false
+	if projectFilterPtr == nil {
+		// viewing All projects -> always refresh
+		shouldRefresh = true
+	} else {
+		// viewing a specific project or 'No project'
+		if *projectFilterPtr == 0 {
+			// viewing No project; refresh only if new task has no project
+			if newTaskProject == nil {
+				shouldRefresh = true
+			}
+		} else if newTaskProject != nil && *newTaskProject == *projectFilterPtr {
+			shouldRefresh = true
+		}
+	}
+
 	// Create a context for rendering pagination.html
-	context := map[string]interface{}{
+	tmplCtx := map[string]interface{}{
 		"FavoriteTasks":    favs,
 		"Tasks":            nonFavs,
 		"PreviousPage":     prevPage,
@@ -230,14 +286,139 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Set headers for successful addition
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("HX-Trigger", "task-added") // Signal JS to close sidebar and clear form
 
-	// Render the updated task list into the main task-container
-	if err := utils.RenderTemplate(w, r, "pagination.html", context); err != nil {
-		http.Error(w, "Error rendering tasks after add: "+err.Error(), http.StatusInternalServerError)
+	if shouldRefresh {
+		// Render the updated task list into the main task-container
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := utils.RenderTemplate(w, r, "pagination.html", tmplCtx); err != nil {
+			http.Error(w, "Error rendering tasks after add: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 		return
 	}
 
-	// Success response (HTMX will handle the swap due to hx-target and hx-swap on the form)
+	// The new task belongs to a different project than the current filter.
+	// Instead of returning nothing, render the view for the project the task was added to
+	// and instruct the client to set the toolbar filter to that project.
+	// Determine the target filter (new task's project or "No project")
+	var targetFilterPtr *int
+	var targetFilterParam string
+	if newTaskProject == nil {
+		zero := 0
+		targetFilterPtr = &zero
+		targetFilterParam = "0"
+	} else {
+		targetFilterPtr = newTaskProject
+		targetFilterParam = strconv.Itoa(*newTaskProject)
+	}
+
+	// Count tasks scoped to target project
+	var totalTasksTarget int
+	projectCond := ""
+	args := []interface{}{userID}
+	if *targetFilterPtr == 0 {
+		projectCond = " AND project_id IS NULL"
+	} else {
+		projectCond = " AND project_id = $2"
+		args = append(args, *targetFilterPtr)
+	}
+	if err := db.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1"+projectCond, args...).Scan(&totalTasksTarget); err != nil {
+		http.Error(w, "Error counting tasks for new project: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Recalculate page for target list
+	lastPageTarget := (totalTasksTarget + pageSize - 1) / pageSize
+	if lastPageTarget < 1 {
+		lastPageTarget = 1
+	}
+	if page > lastPageTarget {
+		page = lastPageTarget
+	}
+
+	// Fetch tasks for the target project and page
+	taskListTarget, totalTasksTarget, err := tasks.ReturnPaginationForUserWithProject(page, pageSize, &userID, timezone, targetFilterPtr)
+	if err != nil {
+		http.Error(w, "Error fetching tasks for new project: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Build pagination state for target
+	prevDisabledT := ""
+	if page == 1 {
+		prevDisabledT = "disabled"
+	}
+	nextDisabledT := ""
+	if page*pageSize >= totalTasksTarget {
+		nextDisabledT = "disabled"
+	}
+	prevPageT := page - 1
+	if prevPageT < 1 {
+		prevPageT = 1
+	}
+	nextPageT := page + 1
+
+	favsT := make([]tasks.Task, 0)
+	nonFavsT := make([]tasks.Task, 0)
+	for i := range taskListTarget {
+		taskListTarget[i].Page = page
+		if taskListTarget[i].IsFavorite {
+			favsT = append(favsT, taskListTarget[i])
+		} else {
+			nonFavsT = append(nonFavsT, taskListTarget[i])
+		}
+	}
+
+	// Compute completed/incomplete counts for target
+	completedCountT := 0
+	incompleteCountT := 0
+	if db != nil {
+		if err := db.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND completed = true"+projectCond, args...).Scan(&completedCountT); err != nil {
+			completedCountT = 0
+		}
+		if err := db.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND (completed IS NULL OR completed = false)"+projectCond, args...).Scan(&incompleteCountT); err != nil {
+			incompleteCountT = 0
+		}
+	}
+
+	// Fetch projects and mark selected for toolbar
+	projectsList := make([]map[string]interface{}, 0)
+	if projs, perr := storage.GetProjectsForUser(userID); perr == nil {
+		for _, p := range projs {
+			sel := false
+			if targetFilterPtr != nil && *targetFilterPtr == p.ID {
+				sel = true
+			}
+			projectsList = append(projectsList, map[string]interface{}{"ID": p.ID, "Name": p.Name, "Selected": sel})
+		}
+	}
+
+	ctxT := map[string]interface{}{
+		"FavoriteTasks":    favsT,
+		"Tasks":            nonFavsT,
+		"PreviousPage":     prevPageT,
+		"NextPage":         nextPageT,
+		"CurrentPage":      page,
+		"PrevDisabled":     prevDisabledT,
+		"NextDisabled":     nextDisabledT,
+		"TotalTasks":       totalTasksTarget,
+		"LoggedIn":         true,
+		"TotalPages":       (totalTasksTarget + pageSize - 1) / pageSize,
+		"Pages":            utils.GetPaginationData(page, pageSize, totalTasksTarget, userID).Pages,
+		"HasRightEllipsis": utils.GetPaginationData(page, pageSize, totalTasksTarget, userID).HasRightEllipsis,
+		"CompletedTasks":   completedCountT,
+		"IncompleteTasks":  incompleteCountT,
+		"PerPage":          pageSize,
+		"Projects":         projectsList,
+		"ProjectFilter":    targetFilterParam,
+	}
+
+	// Instruct client to set toolbar filter to target project and render that project's view
+	w.Header().Set("HX-Trigger", "task-added set-project-filter:"+targetFilterParam)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := utils.RenderTemplate(w, r, "pagination.html", ctxT); err != nil {
+		http.Error(w, "Error rendering tasks after add: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 }

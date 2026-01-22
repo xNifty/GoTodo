@@ -128,10 +128,10 @@
                 <div>
                     {{if .Projects}}
                     <select id="project-filter" name="project" class="form-select" style="width:220px;" hx-get="{{basePath}}/api/fetch-tasks" hx-trigger="change" hx-target="#task-container" hx-swap="innerHTML">
-                        <option value="">All projects</option>
-                        <option value="0">No project</option>
+                        <option value="" {{if eq .ProjectFilter ""}}selected{{end}}>All projects</option>
+                        <option value="0" {{if or (eq .ProjectFilter "0") (eq .ProjectFilter "none")}}selected{{end}}>No project</option>
                         {{range .Projects}}
-                        <option value="{{.ID}}">{{.Name}}</option>
+                        <option value="{{.ID}}" {{if .Selected}}selected{{end}}>{{.Name}}</option>
                         {{end}}
                     </select>
                     {{end}}
@@ -142,6 +142,22 @@
             </div>
             {{end}}
         </div>
+
+        <script>
+            // Ensure the project filter select reflects the server-side filter on full page load.
+            // This overrides browser form-value restoration so the dropdown doesn't persist an old selection.
+            document.addEventListener('DOMContentLoaded', function() {
+                try {
+                    var pf = "{{.ProjectFilter}}";
+                    var sel = document.getElementById('project-filter');
+                    if (sel) {
+                        sel.value = pf;
+                    }
+                } catch (e) {
+                    // ignore
+                }
+            });
+        </script>
 
         <div id="task-container" class="container">
             {{template "pagination.html" .}}

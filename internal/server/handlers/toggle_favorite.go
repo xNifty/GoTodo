@@ -32,6 +32,20 @@ func APIToggleFavorite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Optional project filter
+	projectParam := r.URL.Query().Get("project")
+	var projectFilter *int
+	if projectParam != "" {
+		if projectParam == "none" || projectParam == "0" {
+			zero := 0
+			projectFilter = &zero
+		} else {
+			if pid, err := strconv.Atoi(projectParam); err == nil {
+				projectFilter = &pid
+			}
+		}
+	}
+
 	// Prevent banned users from performing actions
 	if isBanned, err := storage.IsUserBanned(email); err == nil && isBanned {
 		sessionstore.ClearSessionCookie(w, r)
@@ -104,7 +118,13 @@ func APIToggleFavorite(w http.ResponseWriter, r *http.Request) {
 
 	// Fetch updated tasks and render the pagination partial
 	userPtr := &userID
-	taskList, totalTasks, err := tasks.ReturnPaginationForUser(page, pageSize, userPtr, timezone)
+	var taskList []tasks.Task
+	var totalTasks int
+	if projectFilter != nil {
+		taskList, totalTasks, err = tasks.ReturnPaginationForUserWithProject(page, pageSize, userPtr, timezone, projectFilter)
+	} else {
+		taskList, totalTasks, err = tasks.ReturnPaginationForUser(page, pageSize, userPtr, timezone)
+	}
 	if err != nil {
 		http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -125,6 +145,42 @@ func APIToggleFavorite(w http.ResponseWriter, r *http.Request) {
 	uid := userID
 	pagination := utils.GetPaginationData(page, pageSize, totalTasks, uid)
 
+	// Compute completed/incomplete counts respecting project filter
+	completedCount := pagination.TotalCompletedTasks
+	incompleteCount := pagination.TotalIncompleteTasks
+	if projectFilter != nil {
+		pool, err := storage.OpenDatabase()
+		if err == nil {
+			defer storage.CloseDatabase(pool)
+			projectCond := ""
+			args := []interface{}{uid}
+			if *projectFilter == 0 {
+				projectCond = " AND project_id IS NULL"
+			} else {
+				projectCond = " AND project_id = $2"
+				args = append(args, *projectFilter)
+			}
+			if err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND completed = true"+projectCond, args...).Scan(&completedCount); err != nil {
+				completedCount = 0
+			}
+			if err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND (completed IS NULL OR completed = false)"+projectCond, args...).Scan(&incompleteCount); err != nil {
+				incompleteCount = 0
+			}
+		}
+	}
+
+	// Fetch projects for user and mark selected
+	projectsList := make([]map[string]interface{}, 0)
+	if projs, perr := storage.GetProjectsForUser(uid); perr == nil {
+		for _, p := range projs {
+			sel := false
+			if projectFilter != nil && *projectFilter == p.ID {
+				sel = true
+			}
+			projectsList = append(projectsList, map[string]interface{}{"ID": p.ID, "Name": p.Name, "Selected": sel})
+		}
+	}
+
 	context := map[string]interface{}{
 		"FavoriteTasks":    favs,
 		"Tasks":            nonFavs,
@@ -141,8 +197,10 @@ func APIToggleFavorite(w http.ResponseWriter, r *http.Request) {
 		"Pages":            pagination.Pages,
 		"HasRightEllipsis": pagination.HasRightEllipsis,
 		"PerPage":          pageSize,
-		"CompletedTasks":   pagination.TotalCompletedTasks,
-		"IncompleteTasks":  pagination.TotalIncompleteTasks,
+		"CompletedTasks":   completedCount,
+		"IncompleteTasks":  incompleteCount,
+		"Projects":         projectsList,
+		"ProjectFilter":    projectParam,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

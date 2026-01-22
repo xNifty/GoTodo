@@ -80,9 +80,35 @@ func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get total number of tasks for this user after deletion
+	// Determine active project filter
+	projectParam := r.URL.Query().Get("project")
+	var projectFilter *int
+	if projectParam != "" {
+		if projectParam == "none" || projectParam == "0" {
+			zero := 0
+			projectFilter = &zero
+		} else {
+			if pid, err := strconv.Atoi(projectParam); err == nil {
+				projectFilter = &pid
+			}
+		}
+	}
+
+	// Get total number of tasks for this user after deletion (scoped to project if filter active)
 	var totalTasks int
-	err = db.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1", userID).Scan(&totalTasks)
+	if projectFilter == nil {
+		err = db.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1", userID).Scan(&totalTasks)
+	} else {
+		projectCond := ""
+		args := []interface{}{userID}
+		if *projectFilter == 0 {
+			projectCond = " AND project_id IS NULL"
+		} else {
+			projectCond = " AND project_id = $2"
+			args = append(args, *projectFilter)
+		}
+		err = db.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1"+projectCond, args...).Scan(&totalTasks)
+	}
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, "Error counting tasks")
@@ -127,8 +153,13 @@ func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
 		reloadPage = 1
 	}
 
-	// Fetch tasks for the reload page
-	taskList, totalTasks, err := tasks.ReturnPaginationForUser(reloadPage, pageSize, &userID, timezone)
+	// Fetch tasks for the reload page (respect project filter)
+	var taskList []tasks.Task
+	if projectFilter != nil {
+		taskList, totalTasks, err = tasks.ReturnPaginationForUserWithProject(reloadPage, pageSize, &userID, timezone, projectFilter)
+	} else {
+		taskList, totalTasks, err = tasks.ReturnPaginationForUser(reloadPage, pageSize, &userID, timezone)
+	}
 	if err != nil {
 		http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -149,6 +180,42 @@ func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
 	// Get pagination data
 	pagination := utils.GetPaginationData(reloadPage, pageSize, totalTasks, userID)
 
+	// Compute completed/incomplete counts scoped to project if needed
+	completedCount := utils.GetCompletedTasksCount(&userID)
+	incompleteCount := utils.GetIncompleteTasksCount(&userID)
+	if projectFilter != nil {
+		pool, err := storage.OpenDatabase()
+		if err == nil {
+			defer storage.CloseDatabase(pool)
+			projectCond := ""
+			args := []interface{}{userID}
+			if *projectFilter == 0 {
+				projectCond = " AND project_id IS NULL"
+			} else {
+				projectCond = " AND project_id = $2"
+				args = append(args, *projectFilter)
+			}
+			if err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND completed = true"+projectCond, args...).Scan(&completedCount); err != nil {
+				completedCount = 0
+			}
+			if err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND (completed IS NULL OR completed = false)"+projectCond, args...).Scan(&incompleteCount); err != nil {
+				incompleteCount = 0
+			}
+		}
+	}
+
+	// Fetch projects and mark selected
+	projectsList := make([]map[string]interface{}, 0)
+	if projs, perr := storage.GetProjectsForUser(userID); perr == nil {
+		for _, p := range projs {
+			sel := false
+			if projectFilter != nil && *projectFilter == p.ID {
+				sel = true
+			}
+			projectsList = append(projectsList, map[string]interface{}{"ID": p.ID, "Name": p.Name, "Selected": sel})
+		}
+	}
+
 	// Create context for rendering
 	context := map[string]interface{}{
 		"FavoriteTasks":    favs,
@@ -164,8 +231,10 @@ func APIDeleteTask(w http.ResponseWriter, r *http.Request) {
 		"Pages":            pagination.Pages,
 		"HasRightEllipsis": pagination.HasRightEllipsis,
 		"PerPage":          pageSize,
-		"CompletedTasks":   utils.GetCompletedTasksCount(&userID),
-		"IncompleteTasks":  utils.GetIncompleteTasksCount(&userID),
+		"CompletedTasks":   completedCount,
+		"IncompleteTasks":  incompleteCount,
+		"Projects":         projectsList,
+		"ProjectFilter":    projectParam,
 	}
 
 	// Set response headers

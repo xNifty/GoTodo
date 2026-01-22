@@ -87,22 +87,64 @@ func APIReorderTasks(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Validate that all provided IDs belong to the user and match is_favorite
+	// Optional project filter (read early so validation and selection respect it)
+	projectParam := r.FormValue("project")
+	if projectParam == "" {
+		projectParam = r.URL.Query().Get("project")
+	}
+	var projectFilter *int
+	if projectParam != "" {
+		if projectParam == "none" || projectParam == "0" {
+			zero := 0
+			projectFilter = &zero
+		} else {
+			if pid, err := strconv.Atoi(projectParam); err == nil {
+				projectFilter = &pid
+			}
+		}
+	}
+
+	// Validate that all provided IDs belong to the user and match is_favorite and project (if provided)
 	for _, id := range ids {
 		var exists bool
-		err = db.QueryRow(context.Background(), "SELECT EXISTS(SELECT 1 FROM tasks WHERE id = $1 AND user_id = $2 AND COALESCE(is_favorite,false) = $3)", id, userID, isFav).Scan(&exists)
+		projectCond := ""
+		args := []interface{}{id, userID, isFav}
+		if projectFilter != nil {
+			if *projectFilter == 0 {
+				projectCond = " AND project_id IS NULL"
+			} else {
+				projectCond = " AND project_id = $4"
+				args = append(args, *projectFilter)
+			}
+		}
+		query := "SELECT EXISTS(SELECT 1 FROM tasks WHERE id = $1 AND user_id = $2 AND COALESCE(is_favorite,false) = $3" + projectCond + ")"
+		err = db.QueryRow(context.Background(), query, args...).Scan(&exists)
 		if err != nil {
 			http.Error(w, "Error validating tasks", http.StatusInternalServerError)
 			return
 		}
 		if !exists {
-			http.Error(w, "Task does not belong to user or mismatched favorite group", http.StatusBadRequest)
+			http.Error(w, "Task does not belong to user or mismatched favorite group/project", http.StatusBadRequest)
 			return
 		}
 	}
 
 	// Fetch all task IDs in this user's group ordered by position so we can renumber globally
-	rowsAll, err := db.Query(context.Background(), "SELECT id FROM tasks WHERE user_id = $1 AND COALESCE(is_favorite,false) = $2 ORDER BY position ASC, id ASC", userID, isFav)
+	projectCondAll := ""
+	argsAll := []interface{}{userID, isFav}
+	q := "SELECT id FROM tasks WHERE user_id = $1 AND COALESCE(is_favorite,false) = $2"
+	if projectFilter != nil {
+		if *projectFilter == 0 {
+			projectCondAll = " AND project_id IS NULL"
+			q += projectCondAll
+		} else {
+			projectCondAll = " AND project_id = $3"
+			q += projectCondAll
+			argsAll = append(argsAll, *projectFilter)
+		}
+	}
+	q += " ORDER BY position ASC, id ASC"
+	rowsAll, err := db.Query(context.Background(), q, argsAll...)
 	if err != nil {
 		http.Error(w, "Error fetching task list for reorder", http.StatusInternalServerError)
 		return
@@ -217,8 +259,17 @@ func APIReorderTasks(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Optional project filter
+	// (projectParam and projectFilter were parsed earlier)
+
 	userPtr := &userID
-	taskList, totalTasks, err := tasks.ReturnPaginationForUser(page, pageSize, userPtr, timezone)
+	var taskList []tasks.Task
+	var totalTasks int
+	if projectFilter != nil {
+		taskList, totalTasks, err = tasks.ReturnPaginationForUserWithProject(page, pageSize, userPtr, timezone, projectFilter)
+	} else {
+		taskList, totalTasks, err = tasks.ReturnPaginationForUser(page, pageSize, userPtr, timezone)
+	}
 	if err != nil {
 		http.Error(w, "Error fetching tasks: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -239,6 +290,42 @@ func APIReorderTasks(w http.ResponseWriter, r *http.Request) {
 	uid := userID
 	pagination := utils.GetPaginationData(page, pageSize, totalTasks, uid)
 
+	// Compute completed/incomplete counts respecting project filter
+	completedCount := pagination.TotalCompletedTasks
+	incompleteCount := pagination.TotalIncompleteTasks
+	if projectFilter != nil {
+		pool, err := storage.OpenDatabase()
+		if err == nil {
+			defer storage.CloseDatabase(pool)
+			projectCond := ""
+			args := []interface{}{uid}
+			if *projectFilter == 0 {
+				projectCond = " AND project_id IS NULL"
+			} else {
+				projectCond = " AND project_id = $2"
+				args = append(args, *projectFilter)
+			}
+			if err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND completed = true"+projectCond, args...).Scan(&completedCount); err != nil {
+				completedCount = 0
+			}
+			if err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND (completed IS NULL OR completed = false)"+projectCond, args...).Scan(&incompleteCount); err != nil {
+				incompleteCount = 0
+			}
+		}
+	}
+
+	// Fetch projects for user and mark selected
+	projectsList := make([]map[string]interface{}, 0)
+	if projs, perr := storage.GetProjectsForUser(uid); perr == nil {
+		for _, p := range projs {
+			sel := false
+			if projectFilter != nil && *projectFilter == p.ID {
+				sel = true
+			}
+			projectsList = append(projectsList, map[string]interface{}{"ID": p.ID, "Name": p.Name, "Selected": sel})
+		}
+	}
+
 	context := map[string]interface{}{
 		"FavoriteTasks":    favs,
 		"Tasks":            nonFavs,
@@ -255,8 +342,10 @@ func APIReorderTasks(w http.ResponseWriter, r *http.Request) {
 		"Pages":            pagination.Pages,
 		"HasRightEllipsis": pagination.HasRightEllipsis,
 		"PerPage":          pageSize,
-		"CompletedTasks":   pagination.TotalCompletedTasks,
-		"IncompleteTasks":  pagination.TotalIncompleteTasks,
+		"CompletedTasks":   completedCount,
+		"IncompleteTasks":  incompleteCount,
+		"Projects":         projectsList,
+		"ProjectFilter":    projectParam,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

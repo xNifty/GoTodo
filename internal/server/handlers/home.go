@@ -58,6 +58,19 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	searchQuery := r.URL.Query().Get("search")
+	// Optional project filter: empty = all, "0" or "none" = no project, numeric id = specific project
+	projectParam := r.URL.Query().Get("project")
+	var projectFilter *int
+	if projectParam != "" {
+		if projectParam == "none" || projectParam == "0" {
+			zero := 0
+			projectFilter = &zero
+		} else {
+			if pid, err := strconv.Atoi(projectParam); err == nil {
+				projectFilter = &pid
+			}
+		}
+	}
 
 	loggedOut := r.URL.Query().Get("logged_out") == "true"
 	accountCreated := r.URL.Query().Get("account_created") == "true"
@@ -83,7 +96,11 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	if searchQuery != "" {
 		taskList, totalTasks, err = tasks.SearchTasksForUser(page, pageSize, searchQuery, userID, timezone)
 	} else {
-		taskList, totalTasks, err = tasks.ReturnPaginationForUser(page, pageSize, userID, timezone)
+		if projectFilter != nil {
+			taskList, totalTasks, err = tasks.ReturnPaginationForUserWithProject(page, pageSize, userID, timezone, projectFilter)
+		} else {
+			taskList, totalTasks, err = tasks.ReturnPaginationForUser(page, pageSize, userID, timezone)
+		}
 	}
 
 	if err != nil {
@@ -121,8 +138,12 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	pagination := utils.GetPaginationData(page, pageSize, totalTasks, uid)
 
+	// Compute completed/incomplete counts (may be scoped to project below)
+	completedCount := utils.GetCompletedTasksCount(userID)
+	incompleteCount := utils.GetIncompleteTasksCount(userID)
+
 	// Create a context for the tasks and pagination
-	context := map[string]interface{}{
+	tplContext := map[string]interface{}{
 		"FavoriteTasks":    favs,
 		"Tasks":            nonFavs,
 		"CurrentPage":      page,
@@ -142,23 +163,62 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 		"TotalPages":       pagination.TotalPages,
 		"IsSearching":      isSearching,
 		"Title":            "GoTodo - Home",
-		"CompletedTasks":   utils.GetCompletedTasksCount(userID),
-		"IncompleteTasks":  utils.GetIncompleteTasksCount(userID),
+		"CompletedTasks":   completedCount,
+		"IncompleteTasks":  incompleteCount,
 	}
 
-	// Include user's projects for the sidebar project select
+	// Include user's projects for the sidebar project select and mark selected project
 	if loggedIn && userID != nil {
 		if projs, err := storage.GetProjectsForUser(*userID); err == nil {
 			projList := make([]map[string]interface{}, 0)
 			for _, p := range projs {
-				projList = append(projList, map[string]interface{}{"ID": p.ID, "Name": p.Name, "Selected": false})
+				sel := false
+				if projectFilter != nil {
+					if *projectFilter == p.ID {
+						sel = true
+					}
+				}
+				projList = append(projList, map[string]interface{}{"ID": p.ID, "Name": p.Name, "Selected": sel})
 			}
-			context["Projects"] = projList
+			tplContext["Projects"] = projList
+		}
+		// If projectFilter is set, compute completed/incomplete counts scoped to project
+		if projectFilter != nil {
+			pool, err := storage.OpenDatabase()
+			if err == nil {
+				defer storage.CloseDatabase(pool)
+				projectCond := ""
+				args := []interface{}{*userID}
+				if *projectFilter == 0 {
+					projectCond = " AND project_id IS NULL"
+				} else {
+					projectCond = " AND project_id = $2"
+					args = append(args, *projectFilter)
+				}
+				var ccount int
+				var icount int
+				if err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND completed = true"+projectCond, args...).Scan(&ccount); err == nil {
+					completedCount = ccount
+				} else {
+					completedCount = 0
+				}
+				if err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND (completed IS NULL OR completed = false)"+projectCond, args...).Scan(&icount); err == nil {
+					incompleteCount = icount
+				} else {
+					incompleteCount = 0
+				}
+				// update context values
+				tplContext["CompletedTasks"] = completedCount
+				tplContext["IncompleteTasks"] = incompleteCount
+			}
 		}
 	}
 
+	// Expose the active project filter to the template so the toolbar select can reflect it
+	tplContext["ProjectFilter"] = projectParam
+
 	// Render the tasks and pagination controls
-	if err := utils.RenderTemplate(w, r, "index.html", context); err != nil {
+	if err := utils.RenderTemplate(w, r, "index.html", tplContext); err != nil {
 		if w.Header().Get("Content-Type") == "" {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		}
