@@ -56,7 +56,8 @@ func AdminPageHandler(w http.ResponseWriter, r *http.Request) {
 // APIUpdateSiteSettings updates site-wide settings (only for admins)
 func APIUpdateSiteSettings(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		utils.SetFlash(w, r, "Invalid request method.")
+		http.Redirect(w, r, utils.GetBasePath()+"/admin", http.StatusSeeOther)
 		return
 	}
 
@@ -67,11 +68,13 @@ func APIUpdateSiteSettings(w http.ResponseWriter, r *http.Request) {
 	showChangelogStr := r.FormValue("show_changelog")
 
 	if siteName == "" {
-		http.Error(w, "Site name is required", http.StatusBadRequest)
+		utils.SetFlash(w, r, "Site name is required.")
+		http.Redirect(w, r, utils.GetBasePath()+"/admin", http.StatusSeeOther)
 		return
 	}
 	if defaultTz == "" {
-		http.Error(w, "Default timezone is required", http.StatusBadRequest)
+		utils.SetFlash(w, r, "Default timezone is required.")
+		http.Redirect(w, r, utils.GetBasePath()+"/admin", http.StatusSeeOther)
 		return
 	}
 
@@ -96,17 +99,20 @@ func APIUpdateSiteSettings(w http.ResponseWriter, r *http.Request) {
 		// fallback: persist to config file
 		out, err := json.MarshalIndent(config.Cfg, "", "  ")
 		if err != nil {
-			http.Error(w, "Failed to encode config: "+err.Error(), http.StatusInternalServerError)
+			utils.SetFlash(w, r, "Failed to save settings.")
+			http.Redirect(w, r, utils.GetBasePath()+"/admin", http.StatusSeeOther)
 			return
 		}
 		if err := os.WriteFile("config/config.json", out, 0644); err != nil {
-			http.Error(w, "Failed to write config file: "+err.Error(), http.StatusInternalServerError)
+			utils.SetFlash(w, r, "Failed to write config file.")
+			http.Redirect(w, r, utils.GetBasePath()+"/admin", http.StatusSeeOther)
 			return
 		}
 	}
 
 	// Redirect back to admin page
-	http.Redirect(w, r, utils.GetBasePath()+"/admin?status=success", http.StatusSeeOther)
+	utils.SetFlash(w, r, "Settings updated successfully.")
+	http.Redirect(w, r, utils.GetBasePath()+"/admin", http.StatusSeeOther)
 }
 
 // Note: bumping site version is intentionally disabled from within the site.
