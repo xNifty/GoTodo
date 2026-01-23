@@ -1708,9 +1708,17 @@ select.form-select:focus {
     color: rgba(255,255,255,0.55);
 }
 
-/* Ensure select caret and appearance remain native on different platforms */
 .form-select {
-    -webkit-appearance: menulist-button;
-    appearance: menulist-button;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right var(--bs-border-radius) center;
+    background-size: 16px 12px;
+    padding-right: 2.25rem;
+}
+
+/* make chevron show in dark theme */
+[data-theme="dark"] .form-select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23f1f3f5' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
 }
 
