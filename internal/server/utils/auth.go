@@ -208,7 +208,8 @@ func RequirePermission(permission string, next http.HandlerFunc) http.HandlerFun
 		}
 
 		if !hasPermission {
-			http.Error(w, "Forbidden: You don't have permission to access this resource", http.StatusForbidden)
+			SetFlash(w, r, "You don't have permission to access this.")
+			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 		}
 

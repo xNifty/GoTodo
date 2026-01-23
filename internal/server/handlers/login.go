@@ -40,7 +40,7 @@ func APILogin(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fmt.Printf("Error checking login block: %v\n", err)
 	}
-	fmt.Println("Blocked status:", blocked)
+
 	if blocked {
 		w.Header().Set("HX-Retarget", "#login-error")
 		w.Header().Set("HX-Reswap", "innerHTML")

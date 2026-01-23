@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"GoTodo/internal/config"
+	"GoTodo/internal/sessionstore"
 	"GoTodo/internal/storage"
 	"GoTodo/internal/version"
 )
@@ -119,6 +120,15 @@ func RenderTemplate(w http.ResponseWriter, r *http.Request, tmpl string, data in
 				ctx["Theme"] = c.Value
 			}
 		}
+		// Inject any flash messages from session
+		if r != nil {
+			if sess, err := sessionstore.Store.Get(r, "session"); err == nil && sess != nil {
+				if fl := sess.Flashes(); len(fl) > 0 {
+					ctx["Flashes"] = fl
+					_ = sess.Save(r, w)
+				}
+			}
+		}
 		execErr = Templates.ExecuteTemplate(w, tmpl, ctx)
 	} else {
 		ctx := map[string]interface{}{
@@ -143,6 +153,12 @@ func RenderTemplate(w http.ResponseWriter, r *http.Request, tmpl string, data in
 		if r != nil {
 			if c, err := r.Cookie("theme"); err == nil {
 				ctx["Theme"] = c.Value
+			}
+			if sess, err := sessionstore.Store.Get(r, "session"); err == nil && sess != nil {
+				if fl := sess.Flashes(); len(fl) > 0 {
+					ctx["Flashes"] = fl
+					_ = sess.Save(r, w)
+				}
 			}
 		}
 		execErr = Templates.ExecuteTemplate(w, tmpl, ctx)

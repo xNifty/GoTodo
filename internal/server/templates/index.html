@@ -59,7 +59,18 @@
     <body>
         {{template "navbar.html" .}}
 
-        {{if .LoggedOut}}
+        {{if .Flashes}}
+        {{range .Flashes}}
+        <div
+            class="container mt-3 status-notification alert alert-warning alert-dismissible fade show"
+            role="alert"
+            style="display: block;"
+        >
+            <i class="bi bi-exclamation-triangle"></i> {{.}}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {{end}}
+        {{else if .LoggedOut}}
         <div
             id="status"
             class="container mt-3 status-notification alert alert-success alert-dismissible fade show"

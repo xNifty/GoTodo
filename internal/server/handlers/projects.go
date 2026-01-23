@@ -13,13 +13,15 @@ import (
 func ProjectsPageHandler(w http.ResponseWriter, r *http.Request) {
 	_, _, _, loggedIn := utils.GetSessionUser(r)
 	if !loggedIn {
-		http.Redirect(w, r, "/", http.StatusUnauthorized)
+		utils.SetFlash(w, r, "You don't have permission to access this.")
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 
 	uidPtr := utils.GetSessionUserID(r)
 	if uidPtr == nil {
-		http.Redirect(w, r, "/", http.StatusUnauthorized)
+		utils.SetFlash(w, r, "You don't have permission to access this.")
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 
@@ -161,12 +163,16 @@ func APIDeleteProject(w http.ResponseWriter, r *http.Request) {
 func APIProjectsJSON(w http.ResponseWriter, r *http.Request) {
 	_, _, _, loggedIn := utils.GetSessionUser(r)
 	if !loggedIn {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"error":"Unauthorized"}`))
 		return
 	}
 	uidPtr := utils.GetSessionUserID(r)
 	if uidPtr == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"error":"Unauthorized"}`))
 		return
 	}
 	projects, err := storage.GetProjectsForUser(*uidPtr)

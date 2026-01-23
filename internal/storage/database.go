@@ -391,7 +391,8 @@ func GetUserByEmail(email string) (*User, error) {
 
 	var user User
 	// include items_per_page (use COALESCE to ensure default)
-	err = pool.QueryRow(context.Background(), "SELECT id, email, password, user_name, COALESCE(items_per_page, 15) FROM users WHERE email=$1", email).Scan(&user.ID, &user.Email, &user.Password, &user.UserName, &user.ItemsPerPage)
+	// Use COALESCE for user_name as well since it can be NULL for newly created users
+	err = pool.QueryRow(context.Background(), "SELECT id, email, password, COALESCE(user_name, ''), COALESCE(items_per_page, 15) FROM users WHERE email=$1", email).Scan(&user.ID, &user.Email, &user.Password, &user.UserName, &user.ItemsPerPage)
 	if err != nil {
 		return nil, err
 	}
