@@ -89,26 +89,31 @@ func APIEditTaskForm(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Get the current project filter from query string to pass to form
+	projectFilterParam := r.URL.Query().Get("project")
+
 	data := struct {
-		FormTitle    string
-		Description  string
-		CurrentPage  string
-		ID           string
-		FormAction   string
-		SubmitText   string
-		SidebarTitle string
-		Error        string
-		Projects     []map[string]interface{}
+		FormTitle     string
+		Description   string
+		CurrentPage   string
+		ID            string
+		FormAction    string
+		SubmitText    string
+		SidebarTitle  string
+		Error         string
+		Projects      []map[string]interface{}
+		ProjectFilter string
 	}{
-		FormTitle:    strings.TrimSpace(title),
-		Description:  strings.TrimSpace(description),
-		CurrentPage:  page,
-		ID:           id,
-		FormAction:   utils.GetBasePath() + "/api/edit-task",
-		SubmitText:   "Save Changes",
-		SidebarTitle: "Edit Task",
-		Error:        "",
-		Projects:     projectsList,
+		FormTitle:     strings.TrimSpace(title),
+		Description:   strings.TrimSpace(description),
+		CurrentPage:   page,
+		ID:            id,
+		FormAction:    utils.GetBasePath() + "/api/edit-task",
+		SubmitText:    "Save Changes",
+		SidebarTitle:  "Edit Task",
+		Error:         "",
+		Projects:      projectsList,
+		ProjectFilter: projectFilterParam,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -379,7 +384,12 @@ func APIEditTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("HX-Trigger", "task-edited")
+	// When editing, maintain the current project filter (don't follow the task to its new project)
+	if activeProject != "" {
+		w.Header().Set("HX-Trigger", "task-edited set-project-filter:"+activeProject)
+	} else {
+		w.Header().Set("HX-Trigger", "task-edited")
+	}
 	if err := utils.RenderTemplate(w, r, "pagination.html", context); err != nil {
 		http.Error(w, "Error rendering tasks after edit: "+err.Error(), http.StatusInternalServerError)
 		return

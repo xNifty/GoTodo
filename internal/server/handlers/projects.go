@@ -7,7 +7,10 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 )
+
+const MaxProjectNameLength = 50
 
 // ProjectsPageHandler shows the user's projects and a simple create form.
 func ProjectsPageHandler(w http.ResponseWriter, r *http.Request) {
@@ -60,9 +63,26 @@ func APICreateProject(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error parsing form", http.StatusBadRequest)
 		return
 	}
-	name := r.FormValue("name")
+	name := strings.TrimSpace(r.FormValue("name"))
+
+	// Validate project name length
+	if len(name) > MaxProjectNameLength {
+		w.Header().Set("X-Validation-Error", "true")
+		w.Header().Set("HX-Trigger", "project-name-error")
+		w.Header().Set("HX-Retarget", "#project-name-error")
+		w.Header().Set("HX-Reswap", "innerHTML")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, "Project name must be %d characters or less", MaxProjectNameLength)
+		return
+	}
+
 	if name == "" {
-		http.Error(w, "Project name is required", http.StatusBadRequest)
+		w.Header().Set("X-Validation-Error", "true")
+		w.Header().Set("HX-Trigger", "project-name-error")
+		w.Header().Set("HX-Retarget", "#project-name-error")
+		w.Header().Set("HX-Reswap", "innerHTML")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "Project name is required")
 		return
 	}
 

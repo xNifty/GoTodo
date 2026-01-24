@@ -1,4 +1,4 @@
-<tr id="task-{{.ID}}">
+<tr id="task-{{.Task.ID}}">
     <td class="text-center align-middle drag-column" data-label="">
         <span class="drag-handle" style="cursor:move;">
             <i class="bi bi-grip-vertical"></i>
@@ -7,9 +7,9 @@
     <td class="title-column" data-label="Title">
         <div class="d-flex align-items-center">
             <button class="btn btn-link p-0 me-2 favorite-btn" style="text-decoration:none;" 
-                hx-get="{{basePath}}/api/toggle-favorite?id={{.ID}}&page={{.Page}}"
+                hx-get="{{basePath}}/api/toggle-favorite?id={{.Task.ID}}&page={{.Task.Page}}"
                 hx-target="#task-container" hx-swap="innerHTML" aria-label="Toggle favorite">
-                {{if .IsFavorite}}
+                {{if .Task.IsFavorite}}
                     <i class="bi bi-star-fill" style="color:gold;"></i>
                 {{else}}
                     <i class="bi bi-star"></i>
@@ -17,23 +17,23 @@
             </button>
             
             <span role="button" tabindex="0" class="task-toggle title-text p-0" aria-expanded="false">
-                {{safeHTML .Title}}
+                {{safeHTML .Task.Title}}
             </span>
         </div>
     </td>
-    <td class="desc-column" data-label="Description">{{safeHTML .Description}}</td>
-    <td class="date-added" data-label="Date Added">{{.DateAdded}}</td>
+    <td class="desc-column" data-label="Description">{{safeHTML .Task.Description}}</td>
+    <td class="date-added" data-label="Date Added">{{.Task.DateAdded}}</td>
     <td class="actions-column" data-label="Actions">
         <div class="d-flex align-items-center gap-2 justify-content-start">
             <!-- Status checkbox (uses existing update-status endpoint which returns a badge/button) -->
             <button
-                class="badge bg-{{if .Completed}}success{{else}}danger text-white{{end}} status-column"
-                hx-get="{{basePath}}/api/update-status?id={{.ID}}&page={{.Page}}"
-                hx-target="#task-{{.ID}} .actions-column"
+                class="badge bg-{{if .Task.Completed}}success{{else}}danger text-white{{end}} status-column"
+                hx-get="{{basePath}}/api/update-status?id={{.Task.ID}}&page={{.Task.Page}}"
+                hx-target="#task-{{.Task.ID}} .actions-column"
                 hx-swap="outerHTML"
                 aria-label="Toggle complete"
                 style="cursor: pointer; border: none;">
-                {{if .Completed}}
+                {{if .Task.Completed}}
                     <i class="bi bi-toggle-on"></i>
                     Complete
                 {{else}}
@@ -42,16 +42,16 @@
                 {{end}}
             </button>
 
-            {{if not .Completed}}
+            {{if not .Task.Completed}}
             <button class="btn btn-link p-0 mx-2 edit-btn" style="text-decoration:none;" 
-                hx-get="{{basePath}}/api/edit?id={{.ID}}&page={{.Page}}"
+                hx-get="{{basePath}}/api/edit?id={{.Task.ID}}&page={{.Task.Page}}&project={{.ProjectFilter}}"
                 hx-target="#sidebar .sidebar-body" hx-swap="innerHTML" aria-label="Edit task">
                 <i class="bi bi-pencil"></i>
             </button>
             {{end}}
 
             <button 
-                hx-get="{{basePath}}/api/confirm?id={{.ID}}&page={{.Page}}"
+                hx-get="{{basePath}}/api/confirm?id={{.Task.ID}}&page={{.Task.Page}}"
                 hx-target="#modal .modal-content"
                 hx-trigger="click"
                 data-bs-toggle="modal"
