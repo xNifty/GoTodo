@@ -18,18 +18,22 @@
             
             <span role="button" tabindex="0" class="task-toggle title-text p-0" aria-expanded="false">
                 {{safeHTML .Task.Title}}
+                <div class="custom-tooltip">
+                    <div>Created: {{.Task.DateCreated}}</div>
+                    {{if .Task.DateModified}}<div>Modified: {{.Task.DateModified}}</div>{{end}}
+                </div>
             </span>
         </div>
     </td>
     <td class="desc-column" data-label="Description">{{safeHTML .Task.Description}}</td>
-    <td class="date-added" data-label="Date Added">{{.Task.DateAdded}}</td>
+    <td class="date-added" data-label="Due Date">{{.Task.DueDate}}</td>
     <td class="actions-column" data-label="Actions">
         <div class="d-flex align-items-center gap-2 justify-content-start">
-            <!-- Status checkbox (uses existing update-status endpoint which returns a badge/button) -->
+            <!-- Status checkbox (uses existing update-status endpoint which returns complete row) -->
             <button
                 class="badge bg-{{if .Task.Completed}}success{{else}}danger text-white{{end}} status-column"
                 hx-get="{{basePath}}/api/update-status?id={{.Task.ID}}&page={{.Task.Page}}"
-                hx-target="#task-{{.Task.ID}} .actions-column"
+                hx-target="#task-{{.Task.ID}}"
                 hx-swap="outerHTML"
                 aria-label="Toggle complete"
                 style="cursor: pointer; border: none;">

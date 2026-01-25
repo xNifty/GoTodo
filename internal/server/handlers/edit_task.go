@@ -44,7 +44,8 @@ func APIEditTaskForm(w http.ResponseWriter, r *http.Request) {
 	var completed bool
 	var ownerID int
 	var projectID sql.NullInt64
-	err = db.QueryRow(context.Background(), "SELECT title, description, completed, user_id, project_id FROM tasks WHERE id = $1", id).Scan(&title, &description, &completed, &ownerID, &projectID)
+	var dueDate sql.NullString
+	err = db.QueryRow(context.Background(), "SELECT title, description, completed, user_id, project_id, COALESCE(CAST(due_date AS TEXT), '') FROM tasks WHERE id = $1", id).Scan(&title, &description, &completed, &ownerID, &projectID, &dueDate)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			http.Error(w, "Task not found.", http.StatusNotFound)
@@ -101,6 +102,7 @@ func APIEditTaskForm(w http.ResponseWriter, r *http.Request) {
 		SubmitText    string
 		SidebarTitle  string
 		Error         string
+		DueDate       string
 		Projects      []map[string]interface{}
 		ProjectFilter string
 	}{
@@ -112,6 +114,7 @@ func APIEditTaskForm(w http.ResponseWriter, r *http.Request) {
 		SubmitText:    "Save Changes",
 		SidebarTitle:  "Edit Task",
 		Error:         "",
+		DueDate:       dueDate.String,
 		Projects:      projectsList,
 		ProjectFilter: projectFilterParam,
 	}
@@ -134,6 +137,7 @@ func APIEditTask(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimSpace(r.FormValue("id"))
 	title := strings.TrimSpace(r.FormValue("title"))
 	description := strings.TrimSpace(r.FormValue("description"))
+	dueDate := strings.TrimSpace(r.FormValue("due_date"))
 	pageStr := strings.TrimSpace(r.FormValue("currentPage"))
 
 	page, err := strconv.Atoi(pageStr)
@@ -220,7 +224,13 @@ func APIEditTask(w http.ResponseWriter, r *http.Request) {
 	projectIDStr := strings.TrimSpace(r.FormValue("project_id"))
 	if projectIDStr == "" {
 		// Clear project association
-		_, err = db.Exec(context.Background(), "UPDATE tasks SET title = $1, description = $2, project_id = NULL WHERE id = $3", title, description, id)
+		var err2 error
+		if dueDate == "" {
+			_, err2 = db.Exec(context.Background(), "UPDATE tasks SET title = $1, description = $2, project_id = NULL, due_date = NULL, date_modified = NOW() AT TIME ZONE 'UTC' WHERE id = $3", title, description, id)
+		} else {
+			_, err2 = db.Exec(context.Background(), "UPDATE tasks SET title = $1, description = $2, project_id = NULL, due_date = $3, date_modified = NOW() AT TIME ZONE 'UTC' WHERE id = $4", title, description, dueDate, id)
+		}
+		err = err2
 		if err != nil {
 			http.Error(w, "Failed to update task.", http.StatusInternalServerError)
 			return
@@ -236,7 +246,13 @@ func APIEditTask(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid project selection", http.StatusBadRequest)
 			return
 		}
-		_, err = db.Exec(context.Background(), "UPDATE tasks SET title = $1, description = $2, project_id = $3 WHERE id = $4", title, description, pid, id)
+		var err2 error
+		if dueDate == "" {
+			_, err2 = db.Exec(context.Background(), "UPDATE tasks SET title = $1, description = $2, project_id = $3, due_date = NULL, date_modified = NOW() AT TIME ZONE 'UTC' WHERE id = $4", title, description, pid, id)
+		} else {
+			_, err2 = db.Exec(context.Background(), "UPDATE tasks SET title = $1, description = $2, project_id = $3, due_date = $4, date_modified = NOW() AT TIME ZONE 'UTC' WHERE id = $5", title, description, pid, dueDate, id)
+		}
+		err = err2
 		if err != nil {
 			http.Error(w, "Failed to update task.", http.StatusInternalServerError)
 			return

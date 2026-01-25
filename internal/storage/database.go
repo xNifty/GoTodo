@@ -327,6 +327,40 @@ func MigrateTasksAddProjectID() error {
 	return nil
 }
 
+// MigrateTasksAddDateModified adds date_modified timestamp column to tasks table
+func MigrateTasksAddDateModified() error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return fmt.Errorf("failed to open database: %v", err)
+	}
+	defer CloseDatabase(pool)
+
+	// Add date_modified column (nullable)
+	_, err = pool.Exec(context.Background(), "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS date_modified TIMESTAMP")
+	if err != nil {
+		return fmt.Errorf("failed to add date_modified column to tasks table: %v", err)
+	}
+
+	return nil
+}
+
+// MigrateTasksAddDueDate adds due_date column to tasks table
+func MigrateTasksAddDueDate() error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return fmt.Errorf("failed to open database: %v", err)
+	}
+	defer CloseDatabase(pool)
+
+	// Add due_date column, nullable
+	_, err = pool.Exec(context.Background(), "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS due_date DATE")
+	if err != nil {
+		return fmt.Errorf("failed to add due_date column to tasks table: %v", err)
+	}
+
+	return nil
+}
+
 // MigrateUsersAddTimezone adds timezone column to users table
 func MigrateUsersAddTimezone() error {
 	pool, err := OpenDatabase()

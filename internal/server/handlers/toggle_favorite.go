@@ -85,7 +85,7 @@ func APIToggleFavorite(w http.ResponseWriter, r *http.Request) {
 	// No favorite limit enforced: allow toggling freely
 
 	// Toggle favorite
-	_, err = db.Exec(context.Background(), "UPDATE tasks SET is_favorite = NOT COALESCE(is_favorite,false) WHERE id = $1 AND user_id = $2", id, userID)
+	_, err = db.Exec(context.Background(), "UPDATE tasks SET is_favorite = NOT COALESCE(is_favorite,false), date_modified = NOW() AT TIME ZONE 'UTC' WHERE id = $1 AND user_id = $2", id, userID)
 	if err != nil {
 		http.Error(w, "Error updating favorite", http.StatusInternalServerError)
 		return

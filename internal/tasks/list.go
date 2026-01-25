@@ -65,7 +65,11 @@ func ReturnPaginationForUser(page, pageSize int, userID *int, timezone string) (
 
 	// We'll fetch favorites separately so we can always show up to 5 favorites first on page 1
 	query := `SELECT t.id, t.title, t.description, t.completed, 
-		TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $3, 'YYYY/MM/DD HH:MI AM') AS date_added, COALESCE(t.position,0), t.project_id, COALESCE(p.name,'')
+		TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $3, 'YYYY/MM/DD HH:MI AM') AS date_added,
+		COALESCE(CAST(t.due_date AS TEXT), '') AS due_date,
+		TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $3, 'YYYY/MM/DD HH:MI AM') AS date_created,
+		COALESCE(TO_CHAR((t.date_modified AT TIME ZONE 'UTC') AT TIME ZONE $3, 'YYYY/MM/DD HH:MI AM'), '') AS date_modified,
+		COALESCE(t.position,0), t.project_id, COALESCE(p.name,'')
 		FROM tasks t LEFT JOIN projects p ON t.project_id = p.id `
 
 	var countQuery string
@@ -82,7 +86,7 @@ func ReturnPaginationForUser(page, pageSize int, userID *int, timezone string) (
 
 	// Logged in - show favorites first (up to 5) on page 1
 	// Fetch favorite tasks
-	favRows, err := pool.Query(context.Background(), `SELECT t.id, t.title, t.description, t.completed, TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM') AS date_added, COALESCE(t.is_favorite,false), COALESCE(t.position,0), t.project_id, COALESCE(p.name,'') FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE t.user_id = $1 AND t.is_favorite = true ORDER BY t.position`, *userID, timezone)
+	favRows, err := pool.Query(context.Background(), `SELECT t.id, t.title, t.description, t.completed, TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM') AS date_added, COALESCE(CAST(t.due_date AS TEXT), '') AS due_date, TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM') AS date_created, COALESCE(TO_CHAR((t.date_modified AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM'), '') AS date_modified, COALESCE(t.is_favorite,false), COALESCE(t.position,0), t.project_id, COALESCE(p.name,'') FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE t.user_id = $1 AND t.is_favorite = true ORDER BY t.position`, *userID, timezone)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -92,7 +96,7 @@ func ReturnPaginationForUser(page, pageSize int, userID *int, timezone string) (
 		var t Task
 		var pid sql.NullInt64
 		var pname sql.NullString
-		if err := favRows.Scan(&t.ID, &t.Title, &t.Description, &t.Completed, &t.DateAdded, &t.IsFavorite, &t.Position, &pid, &pname); err != nil {
+		if err := favRows.Scan(&t.ID, &t.Title, &t.Description, &t.Completed, &t.DateAdded, &t.DueDate, &t.DateCreated, &t.DateModified, &t.IsFavorite, &t.Position, &pid, &pname); err != nil {
 			return nil, 0, err
 		}
 		if pid.Valid {
@@ -129,7 +133,7 @@ func ReturnPaginationForUser(page, pageSize int, userID *int, timezone string) (
 			var task Task
 			var pid sql.NullInt64
 			var pname sql.NullString
-			if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed, &task.DateAdded, &task.Position, &pid, &pname); err != nil {
+			if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed, &task.DateAdded, &task.DueDate, &task.DateCreated, &task.DateModified, &task.Position, &pid, &pname); err != nil {
 				return nil, 0, err
 			}
 			if pid.Valid {
@@ -158,7 +162,7 @@ func ReturnPaginationForUser(page, pageSize int, userID *int, timezone string) (
 			var task Task
 			var pid sql.NullInt64
 			var pname sql.NullString
-			if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed, &task.DateAdded, &task.Position, &pid, &pname); err != nil {
+			if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed, &task.DateAdded, &task.DueDate, &task.DateCreated, &task.DateModified, &task.Position, &pid, &pname); err != nil {
 				return nil, 0, err
 			}
 			if pid.Valid {
@@ -195,7 +199,11 @@ func ReturnPaginationForUserWithProject(page, pageSize int, userID *int, timezon
 	}
 
 	query := `SELECT t.id, t.title, t.description, t.completed, 
-		TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $3, 'YYYY/MM/DD HH:MI AM') AS date_added, COALESCE(t.position,0), t.project_id, COALESCE(p.name,'')
+		TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $3, 'YYYY/MM/DD HH:MI AM') AS date_added,
+		COALESCE(CAST(t.due_date AS TEXT), '') AS due_date,
+		TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $3, 'YYYY/MM/DD HH:MI AM') AS date_created,
+		TO_CHAR((COALESCE(t.date_modified, t.time_stamp) AT TIME ZONE 'UTC') AT TIME ZONE $3, 'YYYY/MM/DD HH:MI AM') AS date_modified,
+		COALESCE(t.position,0), t.project_id, COALESCE(p.name,'')
 		FROM tasks t LEFT JOIN projects p ON t.project_id = p.id `
 
 	var countQuery string
@@ -209,7 +217,7 @@ func ReturnPaginationForUserWithProject(page, pageSize int, userID *int, timezon
 		return tasks, 0, nil
 	}
 
-	favRows, err := pool.Query(context.Background(), `SELECT t.id, t.title, t.description, t.completed, TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM') AS date_added, COALESCE(t.is_favorite,false), COALESCE(t.position,0), t.project_id, COALESCE(p.name,'') FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE t.user_id = $1 AND t.is_favorite = true`+projectCond+` ORDER BY t.position`, *userID, timezone)
+	favRows, err := pool.Query(context.Background(), `SELECT t.id, t.title, t.description, t.completed, TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM') AS date_added, COALESCE(CAST(t.due_date AS TEXT), '') AS due_date, TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM') AS date_created, COALESCE(TO_CHAR((t.date_modified AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM'), '') AS date_modified, COALESCE(t.is_favorite,false), COALESCE(t.position,0), t.project_id, COALESCE(p.name,'') FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE t.user_id = $1 AND t.is_favorite = true`+projectCond+` ORDER BY t.position`, *userID, timezone)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -253,7 +261,7 @@ func ReturnPaginationForUserWithProject(page, pageSize int, userID *int, timezon
 			var task Task
 			var pid sql.NullInt64
 			var pname sql.NullString
-			if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed, &task.DateAdded, &task.Position, &pid, &pname); err != nil {
+			if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed, &task.DateAdded, &task.DueDate, &task.DateCreated, &task.DateModified, &task.Position, &pid, &pname); err != nil {
 				return nil, 0, err
 			}
 			if pid.Valid {
@@ -279,7 +287,7 @@ func ReturnPaginationForUserWithProject(page, pageSize int, userID *int, timezon
 			var task Task
 			var pid sql.NullInt64
 			var pname sql.NullString
-			if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed, &task.DateAdded, &task.Position, &pid, &pname); err != nil {
+			if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed, &task.DateAdded, &task.DueDate, &task.DateCreated, &task.DateModified, &task.Position, &pid, &pname); err != nil {
 				return nil, 0, err
 			}
 			if pid.Valid {
@@ -320,7 +328,11 @@ func SearchTasksForUser(page, pageSize int, searchQuery string, userID *int, tim
 		    title, 
 		    description,
 		    completed, 
-		    TO_CHAR((time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MM AM')  as date_added, COALESCE(position,0)
+		    TO_CHAR((time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MM AM') as date_added,
+		    COALESCE(CAST(due_date AS TEXT), '') AS due_date,
+		    TO_CHAR((time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MM AM') AS date_created,
+		    COALESCE(TO_CHAR((date_modified AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MM AM'), '') AS date_modified,
+		    COALESCE(position,0)
 		 FROM tasks 
 		 WHERE (title ILIKE $1 OR description ILIKE $1) AND user_id = $4
 		 ORDER BY position 
@@ -336,7 +348,7 @@ func SearchTasksForUser(page, pageSize int, searchQuery string, userID *int, tim
 
 	for rows.Next() {
 		var task Task
-		if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed, &task.DateAdded, &task.Position); err != nil {
+		if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed, &task.DateAdded, &task.DueDate, &task.DateCreated, &task.DateModified, &task.Position); err != nil {
 			return nil, 0, err
 		}
 		totalTasks++

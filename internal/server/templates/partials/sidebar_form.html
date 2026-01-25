@@ -46,6 +46,16 @@
             {{end}}
         </select>
     </div>
+    <div class="form-group mt-2">
+        <label for="due_date">Due Date (optional):</label>
+        <input
+            type="date"
+            id="due_date"
+            name="due_date"
+            class="form-control"
+            value="{{.DueDate}}"
+        />
+    </div>
     {{if .ID}}
     <input type="hidden" name="id" value="{{.ID}}" />
     {{end}}

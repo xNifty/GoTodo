@@ -23,6 +23,7 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 
 	title := strings.TrimSpace(r.FormValue("title"))
 	description := strings.TrimSpace(r.FormValue("description"))
+	dueDate := strings.TrimSpace(r.FormValue("due_date"))
 	pageStr := strings.TrimSpace(r.FormValue("currentPage"))
 
 	page, err := strconv.Atoi(pageStr)
@@ -110,7 +111,13 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 	var newTaskProject *int
 	if projectIDStr == "" {
 		// Insert without project_id (NULL)
-		_, err = db.Exec(context.Background(), "INSERT INTO tasks (title, description, completed, user_id, time_stamp, position) VALUES ($1, $2, $3, $4, NOW() AT TIME ZONE 'UTC', $5)", title, description, false, userID, nextPos)
+		dueSQL := "NULL"
+		if dueDate != "" {
+			dueSQL = "$6"
+			_, err = db.Exec(context.Background(), "INSERT INTO tasks (title, description, completed, user_id, time_stamp, position, due_date, date_modified) VALUES ($1, $2, $3, $4, NOW() AT TIME ZONE 'UTC', $5, "+dueSQL+", NOW() AT TIME ZONE 'UTC')", title, description, false, userID, nextPos, dueDate)
+		} else {
+			_, err = db.Exec(context.Background(), "INSERT INTO tasks (title, description, completed, user_id, time_stamp, position, date_modified) VALUES ($1, $2, $3, $4, NOW() AT TIME ZONE 'UTC', $5, NOW() AT TIME ZONE 'UTC')", title, description, false, userID, nextPos)
+		}
 	} else {
 		pid, errConv := strconv.Atoi(projectIDStr)
 		if errConv != nil {
@@ -122,7 +129,11 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid project selection", http.StatusBadRequest)
 			return
 		}
-		_, err = db.Exec(context.Background(), "INSERT INTO tasks (title, description, completed, user_id, time_stamp, position, project_id) VALUES ($1, $2, $3, $4, NOW() AT TIME ZONE 'UTC', $5, $6)", title, description, false, userID, nextPos, pid)
+		if dueDate != "" {
+			_, err = db.Exec(context.Background(), "INSERT INTO tasks (title, description, completed, user_id, time_stamp, position, project_id, due_date, date_modified) VALUES ($1, $2, $3, $4, NOW() AT TIME ZONE 'UTC', $5, $6, $7, NOW() AT TIME ZONE 'UTC')", title, description, false, userID, nextPos, pid, dueDate)
+		} else {
+			_, err = db.Exec(context.Background(), "INSERT INTO tasks (title, description, completed, user_id, time_stamp, position, project_id, date_modified) VALUES ($1, $2, $3, $4, NOW() AT TIME ZONE 'UTC', $5, $6, NOW() AT TIME ZONE 'UTC')", title, description, false, userID, nextPos, pid)
+		}
 		if err == nil {
 			newTaskProject = &pid
 		}

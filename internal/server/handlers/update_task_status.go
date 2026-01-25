@@ -4,11 +4,13 @@ import (
 	"GoTodo/internal/server/utils"
 	"GoTodo/internal/sessionstore"
 	"GoTodo/internal/storage"
+	"GoTodo/internal/tasks"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 )
 
 func APIUpdateTaskStatus(w http.ResponseWriter, r *http.Request) {
@@ -74,12 +76,42 @@ func APIUpdateTaskStatus(w http.ResponseWriter, r *http.Request) {
 
 	updatedStatus := !completed
 
-	_, err = db.Exec(context.Background(), "UPDATE tasks SET completed = $1 WHERE id = $2", updatedStatus, id)
+	_, err = db.Exec(context.Background(), "UPDATE tasks SET completed = $1, date_modified = NOW() AT TIME ZONE 'UTC' WHERE id = $2", updatedStatus, id)
 
 	if err != nil {
 		http.Error(w, "Failed to update task status.", http.StatusInternalServerError)
 		return
 	}
+
+	// Fetch updated task data to render the complete row with updated timestamps
+	email, _, _, timezone, _, _ := utils.GetSessionUserWithTimezone(r)
+	var task tasks.Task
+	var projectID sql.NullInt64
+	var projectName sql.NullString
+	err = db.QueryRow(context.Background(),
+		`SELECT t.id, t.title, t.description, t.completed, 
+			TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM') AS date_added,
+			COALESCE(CAST(t.due_date AS TEXT), '') AS due_date,
+			TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM') AS date_created,
+			COALESCE(TO_CHAR((t.date_modified AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM'), '') AS date_modified,
+			COALESCE(t.is_favorite,false), COALESCE(t.position,0), t.project_id, COALESCE(p.name,'')
+		FROM tasks t LEFT JOIN projects p ON t.project_id = p.id 
+		WHERE t.id = $1`, id, timezone).Scan(
+		&task.ID, &task.Title, &task.Description, &task.Completed,
+		&task.DateAdded, &task.DueDate, &task.DateCreated, &task.DateModified,
+		&task.IsFavorite, &task.Position, &projectID, &projectName)
+
+	if err != nil {
+		http.Error(w, "Failed to fetch updated task", http.StatusInternalServerError)
+		return
+	}
+
+	if projectID.Valid {
+		task.ProjectID = int(projectID.Int64)
+	}
+	task.ProjectName = projectName.String
+	pageNum, _ := strconv.Atoi(page)
+	task.Page = pageNum
 
 	if err := db.QueryRow(context.Background(), "SELECT user_id FROM tasks WHERE id = $1", id).Scan(&ownerID); err == nil {
 		var completedCount int
@@ -93,37 +125,18 @@ func APIUpdateTaskStatus(w http.ResponseWriter, r *http.Request) {
 	basePath := utils.GetBasePath()
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	// Include the status-column class so mobile styles remain consistent after HTMX swaps
-	icons := map[bool]string{
-		true:  `<i class="bi bi-toggle-on"></i>`,
-		false: `<i class="bi bi-toggle-off"></i>`,
-	}
-	labels := map[bool]string{true: "Complete", false: "Incomplete"}
-
-	// Build the actions column (status toggle + optional edit + delete)
-	// Include an off-screen label for accessibility
-	editBtn := ""
-	if !updatedStatus {
-		// only show edit when task is incomplete
-		editBtn = fmt.Sprintf(`<button class="btn btn-link p-0 mx-2 edit-btn" style="text-decoration:none;" hx-get="%s/api/edit?id=%s&page=%s" hx-target="#sidebar .sidebar-body" hx-swap="innerHTML" aria-label="Edit task"><i class="bi bi-pencil"></i></button>`, basePath, id, page)
+	// Render the complete task row with updated data
+	data := struct {
+		Task          tasks.Task
+		BasePath      string
+		ProjectFilter string
+	}{
+		Task:     task,
+		BasePath: basePath,
 	}
 
-	deleteBtn := fmt.Sprintf(`<button hx-get="%s/api/confirm?id=%s&page=%s" hx-target="#modal .modal-content" hx-trigger="click" data-bs-toggle="modal" data-bs-target="#modal" class="btn btn-link p-0 delete-column" aria-label="Delete task" style="text-decoration:none;"><i class="bi bi-trash text-danger"></i></button>`, basePath, id, page)
-
-	// status button (icon + visible label)
-	statusBtn := fmt.Sprintf(`<button class="badge %s status-column" hx-get="%s/api/update-status?id=%s&page=%s" hx-target="#task-%s .actions-column" hx-swap="outerHTML" aria-label="Toggle complete" style="cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding:.35rem; gap:.4rem;">%s %s</button>`,
-		map[bool]string{true: "bg-success", false: "bg-danger text-white"}[updatedStatus],
-		basePath,
-		id,
-		page,
-		id,
-		icons[updatedStatus],
-		labels[updatedStatus],
-	)
-
-	// Wrap into a td matching the template so HTMX can replace it cleanly
-	actionsHTML := fmt.Sprintf(`<td class="actions-column" data-label="Actions"><div class="d-flex align-items-center gap-2 justify-content-start">%s%s%s</div></td>`, statusBtn, editBtn, deleteBtn)
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	fmt.Fprint(w, actionsHTML)
+	if err := utils.Templates.ExecuteTemplate(w, "todo.html", data); err != nil {
+		http.Error(w, "Error rendering task row: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 }

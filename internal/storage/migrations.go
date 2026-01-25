@@ -62,6 +62,16 @@ func RunMigrations() error {
 		fmt.Printf("migration: MigrateTasksAddProjectID failed: %v\n", err)
 		errCount++
 	}
+	// Add date_modified column to tasks
+	if err := MigrateTasksAddDateModified(); err != nil {
+		fmt.Printf("migration: MigrateTasksAddDateModified failed: %v\n", err)
+		errCount++
+	}
+	// Add due_date column to tasks
+	if err := MigrateTasksAddDueDate(); err != nil {
+		fmt.Printf("migration: MigrateTasksAddDueDate failed: %v\n", err)
+		errCount++
+	}
 
 	// Ensure site_settings table exists
 	if err := CreateSiteSettingsTable(); err != nil {
