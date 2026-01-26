@@ -227,7 +227,7 @@ func ReturnPaginationForUserWithProject(page, pageSize int, userID *int, timezon
 		var t Task
 		var pid sql.NullInt64
 		var pname sql.NullString
-		if err := favRows.Scan(&t.ID, &t.Title, &t.Description, &t.Completed, &t.DateAdded, &t.IsFavorite, &t.Position, &pid, &pname); err != nil {
+		if err := favRows.Scan(&t.ID, &t.Title, &t.Description, &t.Completed, &t.DateAdded, &t.DueDate, &t.DateCreated, &t.DateModified, &t.IsFavorite, &t.Position, &pid, &pname); err != nil {
 			return nil, 0, err
 		}
 		if pid.Valid {
