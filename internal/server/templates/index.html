@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en" {{if .Theme}}data-theme="{{.Theme}}"{{end}}>
     <head>
-        <script>
+        <script nonce="{{.CSPNonce}}">
             (function () {
                 try {
                     // Only set data-theme if not already set (server-side fallback)
@@ -154,7 +154,7 @@
             {{end}}
         </div>
 
-        <script>
+        <script nonce="{{.CSPNonce}}">
             // Ensure the project filter select reflects the server-side filter on full page load.
             // This overrides browser form-value restoration so the dropdown doesn't persist an old selection.
             document.addEventListener('DOMContentLoaded', function() {
@@ -195,7 +195,7 @@
         <script src="{{basePath}}/public/js/{{if .UseMinifiedAssets}}site.min.js{{else}}site.js{{end}}?v={{.AssetVersion}}"></script>
         <script src="{{basePath}}/public/js/site.extra.js?v={{.AssetVersion}}"></script>
 
-        <script>
+        <script nonce="{{.CSPNonce}}">
             // Fade out feedback messages after 5 seconds
             document.body.addEventListener("htmx:afterSwap", (event) => {
                 if (event.target.id === "status") {

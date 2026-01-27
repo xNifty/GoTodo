@@ -34,6 +34,9 @@ func InitializeTemplates() error {
 		"safeHTML": func(s string) template.HTML {
 			return template.HTML(s)
 		},
+		"cspNonce": func(r *http.Request) string {
+			return GetCSPNonce(r)
+		},
 		"hasPermission": func(permissions []string, permission string) bool {
 			for _, p := range permissions {
 				if p == permission {
@@ -113,6 +116,7 @@ func RenderTemplate(w http.ResponseWriter, r *http.Request, tmpl string, data in
 	if ctx, ok := data.(map[string]interface{}); ok {
 		ctx["AssetVersion"] = assetVersion
 		ctx["UseMinifiedAssets"] = useMinified
+		ctx["CSPNonce"] = GetCSPNonce(r)
 		// Inject site config values. Prefer DB-backed settings when available.
 		ctx["SiteName"] = config.Cfg.SiteName
 		ctx["DefaultTimezone"] = config.Cfg.DefaultTimezone
@@ -149,6 +153,7 @@ func RenderTemplate(w http.ResponseWriter, r *http.Request, tmpl string, data in
 			"Data":              data,
 			"AssetVersion":      assetVersion,
 			"UseMinifiedAssets": useMinified,
+			"CSPNonce":          GetCSPNonce(r),
 		}
 		// Inject site config values. Prefer DB for mutable fields; site version is baked-in only.
 		ctx["SiteName"] = config.Cfg.SiteName

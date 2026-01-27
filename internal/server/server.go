@@ -124,5 +124,5 @@ func StartServer() error {
 	})
 
 	fmt.Printf("Starting server on %s\n", addr)
-	return http.ListenAndServe(addr, nil)
+	return http.ListenAndServe(addr, utils.SecurityHeadersMiddleware(http.DefaultServeMux))
 }
