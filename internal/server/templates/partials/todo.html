@@ -7,7 +7,7 @@
     <td class="title-column" data-label="Title">
         <div class="d-flex align-items-center">
             <button class="btn btn-link p-0 me-2 favorite-btn" style="text-decoration:none;" 
-                hx-get="{{basePath}}/api/toggle-favorite?id={{.Task.ID}}&page={{.Task.Page}}"
+                hx-get="{{basePath}}/api/toggle-favorite?id={{.Task.ID}}&page={{.Task.Page}}&project={{.ProjectFilter}}"
                 hx-target="#task-container" hx-swap="innerHTML" aria-label="Toggle favorite">
                 {{if .Task.IsFavorite}}
                     <i class="bi bi-star-fill" style="color:gold;"></i>
