@@ -1684,6 +1684,16 @@ a {
     box-shadow: none;
 }
 
+/* Remove underline from changelog collapse buttons */
+button.btn-link {
+    text-decoration: none;
+}
+
+button.btn-link:hover,
+button.btn-link:focus {
+    text-decoration: none;
+}
+
 /* Theme-aware dropdown (select) styling to match light/dark mode */
 .form-select,
 select.form-select {

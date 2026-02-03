@@ -478,6 +478,16 @@ func ChangelogPageHandler(w http.ResponseWriter, r *http.Request) {
 	// Filter entries by the baked-in site version so we don't show releases newer than the running site
 	siteVersion := version.Version
 	entries = filterEntriesBySiteVersionWithSiteVersion(entries, siteVersion)
-	ctx := map[string]interface{}{"Entries": entries}
+
+	// Get session user info for navbar
+	email, _, permissions, loggedIn := srvutils.GetSessionUser(r)
+
+	ctx := map[string]interface{}{
+		"Entries":     entries,
+		"Title":       "GoTodo - Change Log",
+		"LoggedIn":    loggedIn,
+		"UserEmail":   email,
+		"Permissions": permissions,
+	}
 	_ = srvutils.RenderTemplate(w, r, "changelog_page.html", ctx)
 }

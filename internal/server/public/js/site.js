@@ -692,7 +692,7 @@ document.addEventListener("DOMContentLoaded", () => {
       more.className = "text-center mt-3";
       const a = document.createElement("a");
       a.href = apiPath("/changelog/page");
-      a.target = "_blank";
+      //a.target = "_blank";
       a.textContent = "View full changelog";
       more.appendChild(a);
       out.appendChild(more);

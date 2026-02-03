@@ -81,7 +81,7 @@ func StartServer() error {
 	http.HandleFunc("/partials/login", utils.RequireHTMX(handlers.APIGetLoginPartial))
 
 	// Changelog pagination
-	http.HandleFunc("/changelog/page", utils.RequireHTMX(handlers.ChangelogPageHandler))
+	http.HandleFunc("/changelog/page", handlers.ChangelogPageHandler)
 
 	// Projects API endpoints
 	http.HandleFunc("/api/projects/create", utils.RequireHTMX(utils.RequireAuth(handlers.APICreateProject)))
