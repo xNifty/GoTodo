@@ -1768,4 +1768,75 @@ select.form-select:focus {
     border-top-color: var(--box-border);
 }
 
+/* Projects table mobile layout - only apply card style on small phones */
+@media (max-width: 600px) {
+    .projects-table thead {
+        display: none;
+    }
+    
+    .projects-table tbody tr {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        background-color: var(--box-bg);
+        border: 1px solid var(--box-border);
+        border-radius: 8px;
+    }
+    
+    .projects-table td {
+        border: none !important;
+    }
+    
+    .projects-table td[data-label="Name"] {
+        flex: 1;
+        padding: 0 !important;
+        display: block !important;
+    }
+    
+    .projects-table td[data-label="Actions"] {
+        flex-shrink: 0;
+        padding: 0 !important;
+        display: block !important;
+    }
+    
+    .projects-table td::before {
+        display: none !important;
+    }
+    
+    .projects-table td[data-label="Actions"] form {
+        margin: 0;
+        display: block;
+    }
+}
+
+/* Keep projects table as normal table on tablets and larger */
+@media (min-width: 601px) {
+    .projects-table thead {
+        display: table-header-group !important;
+    }
+    
+    .projects-table tbody tr {
+        display: table-row !important;
+        flex-direction: unset !important;
+        padding: 0 !important;
+        margin-bottom: 0 !important;
+        border: none !important;
+        border-radius: 0 !important;
+        gap: 0 !important;
+    }
+    
+    .projects-table td {
+        display: table-cell !important;
+        padding: 12px 15px !important;
+        flex: unset !important;
+    }
+    
+    .projects-table td::before {
+        display: none !important;
+    }
+}
+
 
