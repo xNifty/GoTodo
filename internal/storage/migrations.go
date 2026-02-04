@@ -79,6 +79,12 @@ func RunMigrations() error {
 		errCount++
 	}
 
+	// Ensure password_reset table exists
+	if err := CreatePasswordResetTable(); err != nil {
+		fmt.Printf("migration: CreatePasswordResetTable failed: %v\n", err)
+		errCount++
+	}
+
 	// Ensure 'admin' permission exists on the admin role
 	if err := MigrateEnsureAdminPermission(); err != nil {
 		fmt.Printf("migration: MigrateEnsureAdminPermission failed: %v\n", err)

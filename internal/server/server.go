@@ -58,12 +58,16 @@ func StartServer() error {
 	http.HandleFunc("/createinvite", utils.RequirePermission("createinvites", handlers.CreateInvitePageHandler))
 	http.HandleFunc("/admin", utils.RequirePermission("admin", handlers.AdminPageHandler))
 	http.HandleFunc("/admin/", utils.RequirePermission("admin", handlers.AdminPageHandler))
+	http.HandleFunc("/forgot-password", handlers.ForgotPasswordPage)
+	http.HandleFunc("/password-reset", handlers.PasswordResetPage)
 
 	// API endpoints - all require HTMX header
 	// Auth endpoints with rate limiting
 	http.HandleFunc("/api/signup", utils.RequireHTMX(utils.RateLimitMiddleware(5, 0.05, 900, utils.KeyByIP)(handlers.APISignup)))
 	http.HandleFunc("/api/login", utils.RequireHTMX(utils.RateLimitMiddleware(10, 1.0, 60, utils.KeyByIP)(handlers.APILogin)))
 	http.HandleFunc("/api/logout", utils.RequireHTMX(handlers.APILogout))
+	http.HandleFunc("/api/forgot-password", utils.RequireHTMX(utils.RateLimitMiddleware(5, 0.05, 900, utils.KeyByIP)(handlers.APIForgotPassword)))
+	http.HandleFunc("/api/reset-password", utils.RequireHTMX(handlers.APIResetPassword))
 
 	// Task endpoints
 	http.HandleFunc("/api/fetch-tasks", utils.RequireHTMX(handlers.APIReturnTasks))

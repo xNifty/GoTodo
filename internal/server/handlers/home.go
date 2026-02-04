@@ -142,29 +142,33 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	completedCount := utils.GetCompletedTasksCount(userID)
 	incompleteCount := utils.GetIncompleteTasksCount(userID)
 
+	// Check for password reset success parameter
+	passwordResetSuccess := r.URL.Query().Get("password_reset") == "success"
+
 	// Create a context for the tasks and pagination
 	tplContext := map[string]interface{}{
-		"FavoriteTasks":    favs,
-		"Tasks":            nonFavs,
-		"CurrentPage":      page,
-		"PreviousPage":     pagination.PreviousPage,
-		"NextPage":         pagination.NextPage,
-		"PrevDisabled":     pagination.PrevDisabled,
-		"NextDisabled":     pagination.NextDisabled,
-		"Pages":            pagination.Pages,
-		"HasRightEllipsis": pagination.HasRightEllipsis,
-		"PerPage":          pageSize,
-		"LoggedIn":         loggedIn,
-		"UserEmail":        email,
-		"Permissions":      permissions,
-		"LoggedOut":        loggedOut,
-		"AccountCreated":   accountCreated,
-		"TotalTasks":       totalTasks,
-		"TotalPages":       pagination.TotalPages,
-		"IsSearching":      isSearching,
-		"Title":            "GoTodo - Home",
-		"CompletedTasks":   completedCount,
-		"IncompleteTasks":  incompleteCount,
+		"FavoriteTasks":        favs,
+		"Tasks":                nonFavs,
+		"CurrentPage":          page,
+		"PreviousPage":         pagination.PreviousPage,
+		"NextPage":             pagination.NextPage,
+		"PrevDisabled":         pagination.PrevDisabled,
+		"NextDisabled":         pagination.NextDisabled,
+		"Pages":                pagination.Pages,
+		"HasRightEllipsis":     pagination.HasRightEllipsis,
+		"PerPage":              pageSize,
+		"LoggedIn":             loggedIn,
+		"UserEmail":            email,
+		"Permissions":          permissions,
+		"LoggedOut":            loggedOut,
+		"AccountCreated":       accountCreated,
+		"TotalTasks":           totalTasks,
+		"TotalPages":           pagination.TotalPages,
+		"IsSearching":          isSearching,
+		"Title":                "GoTodo - Home",
+		"CompletedTasks":       completedCount,
+		"IncompleteTasks":      incompleteCount,
+		"PasswordResetSuccess": passwordResetSuccess,
 	}
 
 	// Include user's projects for the sidebar project select and mark selected project

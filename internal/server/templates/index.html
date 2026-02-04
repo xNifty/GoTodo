@@ -70,6 +70,16 @@
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
         {{end}}
+        {{else if .PasswordResetSuccess}}
+        <div
+            id="status"
+            class="container mt-3 status-notification alert alert-success alert-dismissible fade show"
+            role="alert"
+            style="display: block;"
+        >
+            <i class="bi bi-check-circle"></i> Password reset successfully! You can now log in with your new password.
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
         {{else if .LoggedOut}}
         <div
             id="status"
