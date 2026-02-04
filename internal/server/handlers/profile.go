@@ -5,9 +5,12 @@ import (
 	"GoTodo/internal/sessionstore"
 	"GoTodo/internal/storage"
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 // APIUpdateProfile updates the user's name and timezone
@@ -177,4 +180,87 @@ func APIUpdateTimezone(w http.ResponseWriter, r *http.Request) {
 	basePath := utils.GetBasePath()
 
 	http.Redirect(w, r, basePath+"/profile?status=success", http.StatusSeeOther)
+}
+
+// APIChangePassword allows a user to change their password
+func APIChangePassword(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	email, _, _, _, loggedIn, _ := utils.GetSessionUserWithTimezone(r)
+	if !loggedIn {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	currentPassword := r.FormValue("current_password")
+	newPassword := r.FormValue("new_password")
+	confirmPassword := r.FormValue("confirm_password")
+
+	// Validate all fields are provided
+	if currentPassword == "" || newPassword == "" || confirmPassword == "" {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "All password fields are required")
+		return
+	}
+
+	// Validate new passwords match
+	if newPassword != confirmPassword {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "New passwords do not match")
+		return
+	}
+
+	// Validate new password length
+	if len(newPassword) < 8 {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "New password must be at least 8 characters long")
+		return
+	}
+
+	db, err := storage.OpenDatabase()
+	if err != nil {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "Internal server error")
+		return
+	}
+	defer db.Close()
+
+	// Get user's current password hash
+	var currentHashedPassword string
+	err = db.QueryRow(context.Background(), "SELECT password FROM users WHERE email = $1", email).Scan(&currentHashedPassword)
+	if err != nil {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "Internal server error")
+		return
+	}
+
+	// Verify current password is correct
+	err = bcrypt.CompareHashAndPassword([]byte(currentHashedPassword), []byte(currentPassword))
+	if err != nil {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "Current password is incorrect")
+		return
+	}
+
+	// Hash the new password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "Internal server error")
+		return
+	}
+
+	// Update password in database
+	_, err = db.Exec(context.Background(), "UPDATE users SET password = $1 WHERE email = $2", string(hashedPassword), email)
+	if err != nil {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "Internal server error")
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprint(w, "success")
 }

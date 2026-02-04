@@ -91,6 +91,7 @@ func StartServer() error {
 	// Profile API endpoints
 	http.HandleFunc("/api/update-timezone", utils.RequireHTMX(handlers.APIUpdateTimezone))
 	http.HandleFunc("/api/update-profile", utils.RequireHTMX(handlers.APIUpdateProfile))
+	http.HandleFunc("/api/change-password", utils.RequireHTMX(handlers.APIChangePassword))
 
 	// Invite API endpoints
 	http.HandleFunc("/api/create-invite", utils.RequireHTMX(utils.RequirePermission("createinvites", handlers.APICreateInvite)))
