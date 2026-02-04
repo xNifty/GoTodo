@@ -67,7 +67,12 @@ func APIForgotPassword(w http.ResponseWriter, r *http.Request) {
 		basePath := utils.GetBasePath()
 		resetLink := fmt.Sprintf("%s/password-reset?token=%s&id=%s", basePath, resetToken.Token, resetToken.ID)
 
-		subject := "Password Reset Request"
+		siteName := "GoTodo"
+		if settings, err := storage.GetSiteSettings(); err == nil && settings != nil && settings.SiteName != "" {
+			siteName = settings.SiteName
+		}
+
+		subject := fmt.Sprintf("%s - Password Reset Request", siteName)
 		body := fmt.Sprintf(`Hello,
 
 You requested to reset your password. Click the link below to reset your password:
@@ -77,9 +82,6 @@ You requested to reset your password. Click the link below to reset your passwor
 This link will expire in 15 minutes.
 
 If you did not request this password reset, please ignore this email.
-
-Best regards,
-GoTodo Team
 `, resetLink, resetLink)
 
 		err = utils.SendEmail(subject, body, email)
@@ -205,6 +207,27 @@ func APIResetPassword(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprint(w, "Internal server error")
 		return
+	}
+
+	// Send password changed email
+	siteName := "GoTodo"
+	if settings, err := storage.GetSiteSettings(); err == nil && settings != nil && settings.SiteName != "" {
+		siteName = settings.SiteName
+	}
+	subject := fmt.Sprintf("%s - Password Changed", siteName)
+	body := fmt.Sprintf(`Hello,
+
+Your password has been changed for %s.
+
+If you did not request this, please reach out to support.
+
+This email cannot receive replies. Please do not reply to this email.
+`, siteName)
+
+	err = utils.SendEmail(subject, body, reset.Email)
+	if err != nil {
+		fmt.Printf("Warning: Failed to send password changed email to %s: %v\n", reset.Email, err)
+		// Continue anyway - password was updated successfully
 	}
 
 	// Delete the used reset token

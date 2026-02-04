@@ -261,6 +261,27 @@ func APIChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Send password changed email
+	siteName := "GoTodo"
+	if settings, err := storage.GetSiteSettings(); err == nil && settings != nil && settings.SiteName != "" {
+		siteName = settings.SiteName
+	}
+	subject := fmt.Sprintf("%s - Password Changed", siteName)
+	body := fmt.Sprintf(`Hello,
+
+Your password has been changed for %s
+
+If you did not request this, please reach out to support.
+
+This email cannot receive replies. Please do not reply to this email.
+`, siteName)
+
+	err = utils.SendEmail(subject, body, email)
+	if err != nil {
+		fmt.Printf("Warning: Failed to send password changed email to %s: %v\n", email, err)
+		// Continue anyway - password was updated successfully
+	}
+
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, "success")
 }
