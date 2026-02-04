@@ -78,6 +78,10 @@ func RunMigrations() error {
 		fmt.Printf("migration: CreateSiteSettingsTable failed: %v\n", err)
 		errCount++
 	}
+	if err := MigrateSiteSettingsAddRegistrationOptions(); err != nil {
+		fmt.Printf("migration: MigrateSiteSettingsAddRegistrationOptions failed: %v\n", err)
+		errCount++
+	}
 
 	// Ensure password_reset table exists
 	if err := CreatePasswordResetTable(); err != nil {

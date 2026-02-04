@@ -1454,11 +1454,14 @@ textarea {
     color: #155724;
     padding: 10px;
     margin-bottom: 10px;
-    border: 1px solid #c3e6cb;
+    border: 1px solid #000;
     border-radius: 4px;
     transition: background-color var(--transition-time), 
                 color var(--transition-time), 
                 border-color var(--transition-time);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 }
 
 [data-theme="dark"] .status-notification {
@@ -1850,3 +1853,6 @@ select.form-select:focus {
 }
 
 
+.alert-dismissible.fade.show button.btn-close {
+    padding: 1rem 1rem !important;
+}

@@ -107,7 +107,7 @@ func StartServer() error {
 	http.HandleFunc("/api/unban-user", utils.RequireHTMX(utils.RequirePermission("createinvites", handlers.APIUnbanUser)))
 
 	// Admin API endpoints
-	http.HandleFunc("/api/admin/update-settings", utils.RequireHTMX(utils.RequirePermission("admin", handlers.APIUpdateSiteSettings)))
+	http.HandleFunc("/api/admin/update-settings", utils.RequirePermission("admin", handlers.APIUpdateSiteSettings))
 
 	// Handle PUT and DELETE for invites with path parameters
 	http.HandleFunc("/api/invite/", func(w http.ResponseWriter, r *http.Request) {

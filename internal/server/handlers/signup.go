@@ -20,6 +20,20 @@ func SignupPageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	enableRegistration := true
+	if settings, err := storage.GetSiteSettings(); err == nil && settings != nil {
+		enableRegistration = settings.EnableRegistration
+	}
+	if !enableRegistration {
+		utils.SetFlash(w, r, "This site is currently not accepting new signups")
+		basePath := utils.GetBasePath()
+		if basePath == "/" {
+			basePath = ""
+		}
+		http.Redirect(w, r, basePath+"/", http.StatusSeeOther)
+		return
+	}
+
 	context := map[string]interface{}{
 		"LoggedIn":  false,
 		"UserEmail": email,
@@ -43,6 +57,20 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	enableRegistration := true
+	if settings, err := storage.GetSiteSettings(); err == nil && settings != nil {
+		enableRegistration = settings.EnableRegistration
+	}
+	if !enableRegistration {
+		utils.SetFlash(w, r, "This site is currently not accepting new signups")
+		basePath := utils.GetBasePath()
+		if basePath == "/" {
+			basePath = ""
+		}
+		http.Redirect(w, r, basePath+"/", http.StatusSeeOther)
+		return
+	}
+
 	token := r.URL.Query().Get("token")
 
 	context := map[string]interface{}{
@@ -59,6 +87,20 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 func APISignup(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	enableRegistration := true
+	inviteOnly := true
+	if settings, err := storage.GetSiteSettings(); err == nil && settings != nil {
+		enableRegistration = settings.EnableRegistration
+		inviteOnly = settings.InviteOnly
+	}
+	if !enableRegistration {
+		w.Header().Set("HX-Retarget", "#signup-error")
+		w.Header().Set("HX-Reswap", "innerHTML")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "This site is currently not accepting new signups")
 		return
 	}
 
@@ -82,7 +124,7 @@ func APISignup(w http.ResponseWriter, r *http.Request) {
 	confirmPassword := r.FormValue("confirm_password")
 	timezone := strings.TrimSpace(r.FormValue("timezone"))
 
-	if email == "" || token == "" || password == "" || confirmPassword == "" || timezone == "" {
+	if email == "" || password == "" || confirmPassword == "" || timezone == "" || (inviteOnly && token == "") {
 		w.Header().Set("HX-Retarget", "#signup-error")
 		w.Header().Set("HX-Reswap", "innerHTML")
 		w.WriteHeader(http.StatusOK)
@@ -109,10 +151,24 @@ func APISignup(w http.ResponseWriter, r *http.Request) {
 
 	var inviteID int
 	var inviteUsed int
-	fmt.Println("signup attempt:", email, token)
-	err = pool.QueryRow(context.Background(), "SELECT id, inviteused FROM invites WHERE email = $1 AND token = $2", email, token).Scan(&inviteID, &inviteUsed)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) || err.Error() == "no rows in result set" {
+	if inviteOnly {
+		fmt.Println("signup attempt:", email, token)
+		err = pool.QueryRow(context.Background(), "SELECT id, inviteused FROM invites WHERE email = $1 AND token = $2", email, token).Scan(&inviteID, &inviteUsed)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) || err.Error() == "no rows in result set" {
+				w.Header().Set("HX-Retarget", "#signup-error")
+				w.Header().Set("HX-Reswap", "innerHTML")
+				w.Header().Set("HX-Trigger", "clear-passwords")
+				w.WriteHeader(http.StatusOK)
+				fmt.Fprint(w, "Invalid email or invite token; please double check and try again")
+				return
+			}
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "Internal server error")
+			return
+		}
+
+		if inviteUsed == 1 {
 			w.Header().Set("HX-Retarget", "#signup-error")
 			w.Header().Set("HX-Reswap", "innerHTML")
 			w.Header().Set("HX-Trigger", "clear-passwords")
@@ -120,18 +176,6 @@ func APISignup(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprint(w, "Invalid email or invite token; please double check and try again")
 			return
 		}
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprint(w, "Internal server error")
-		return
-	}
-
-	if inviteUsed == 1 {
-		w.Header().Set("HX-Retarget", "#signup-error")
-		w.Header().Set("HX-Reswap", "innerHTML")
-		w.Header().Set("HX-Trigger", "clear-passwords")
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, "Invalid email or invite token; please double check and try again")
-		return
 	}
 
 	var existingUserID int
@@ -141,7 +185,11 @@ func APISignup(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("HX-Reswap", "innerHTML")
 		w.Header().Set("HX-Trigger", "clear-passwords")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, "Invalid email or invite token; please double check and try again")
+		if inviteOnly {
+			fmt.Fprint(w, "Invalid email or invite token; please double check and try again")
+		} else {
+			fmt.Fprint(w, "An account with this email already exists")
+		}
 		return
 	} else if err.Error() != "no rows in result set" && !errors.Is(err, sql.ErrNoRows) {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -179,11 +227,13 @@ func APISignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = tx.Exec(ctx, "UPDATE invites SET inviteused = 1 WHERE id = $1", inviteID)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprint(w, "Internal server error")
-		return
+	if inviteOnly {
+		_, err = tx.Exec(ctx, "UPDATE invites SET inviteused = 1 WHERE id = $1", inviteID)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "Internal server error")
+			return
+		}
 	}
 
 	err = tx.Commit(ctx)
