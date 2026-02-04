@@ -70,6 +70,76 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Character counter for project name
+  const projectNameInput = document.getElementById("project-name");
+  const projectNameCharCount = document.getElementById(
+    "project-name-char-count",
+  );
+  if (projectNameInput && projectNameCharCount) {
+    projectNameInput.addEventListener("input", function () {
+      const length = this.value.length;
+      projectNameCharCount.textContent = length;
+
+      // Add visual feedback when approaching limit
+      if (length > 40) {
+        projectNameCharCount.classList.add("text-warning");
+      } else {
+        projectNameCharCount.classList.remove("text-warning");
+      }
+      if (length > 45) {
+        projectNameCharCount.classList.add("text-danger");
+      } else {
+        projectNameCharCount.classList.remove("text-danger");
+      }
+    });
+  }
+
+  // Handle project form validation errors and clear error on input
+  function initializeProjectFormHandlers() {
+    const projectForm = document.getElementById("createProjectForm");
+    const projectNameInput = document.getElementById("project-name");
+    const projectNameError = document.getElementById("project-name-error");
+
+    if (projectForm && projectNameInput && projectNameError) {
+      // Clear error when user starts typing
+      projectNameInput.addEventListener("input", function () {
+        projectNameError.innerHTML = "";
+      });
+
+      // Handle validation errors from server
+      projectForm.addEventListener("htmx:afterRequest", function (event) {
+        let isValidationError = false;
+        try {
+          const xhr = event.detail && event.detail.xhr;
+          const header =
+            xhr && xhr.getResponseHeader
+              ? xhr.getResponseHeader("X-Validation-Error")
+              : null;
+          if (header && header.toLowerCase() === "true") {
+            isValidationError = true;
+          } else if (
+            event.detail &&
+            event.detail.triggerSpec &&
+            event.detail.triggerSpec.trigger === "project-name-error"
+          ) {
+            isValidationError = true;
+          }
+        } catch (e) {}
+
+        // Clear form on successful submission (not validation error)
+        if (event.detail.successful && !isValidationError) {
+          projectNameInput.value = "";
+          const charCount = document.getElementById("project-name-char-count");
+          if (charCount) charCount.textContent = "0";
+          projectNameError.innerHTML = "";
+        }
+      });
+    }
+  }
+
+  // Initialize project form handlers
+  initializeProjectFormHandlers();
+
   // Theme toggle functionality
   function initTheme() {
     const themeToggle = document.getElementById("theme-toggle");
@@ -622,7 +692,7 @@ document.addEventListener("DOMContentLoaded", () => {
       more.className = "text-center mt-3";
       const a = document.createElement("a");
       a.href = apiPath("/changelog/page");
-      a.target = "_blank";
+      //a.target = "_blank";
       a.textContent = "View full changelog";
       more.appendChild(a);
       out.appendChild(more);
@@ -996,13 +1066,26 @@ document.addEventListener("DOMContentLoaded", () => {
       // Clear create-project form after successful HTMX create
       if (xhr.responseURL.includes("/api/projects/create")) {
         const status = xhr.status || 0;
-        if (status >= 200 && status < 300) {
+        // Check if this is a validation error
+        const isValidationError =
+          xhr.getResponseHeader &&
+          xhr.getResponseHeader("X-Validation-Error") === "true";
+
+        if (status >= 200 && status < 300 && !isValidationError) {
           try {
             const form = document.getElementById("createProjectForm");
             if (form) {
               const nameInput = form.querySelector('input[name="name"]');
               if (nameInput) nameInput.value = "";
+              const charCount = document.getElementById(
+                "project-name-char-count",
+              );
+              if (charCount) charCount.textContent = "0";
+              const errorDiv = document.getElementById("project-name-error");
+              if (errorDiv) errorDiv.innerHTML = "";
             }
+            // Reinitialize project form handlers
+            initializeProjectFormHandlers();
             if (typeof showToast === "function") showToast("Project created.");
           } catch (e) {}
         }

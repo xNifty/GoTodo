@@ -1684,6 +1684,16 @@ a {
     box-shadow: none;
 }
 
+/* Remove underline from changelog collapse buttons */
+button.btn-link {
+    text-decoration: none;
+}
+
+button.btn-link:hover,
+button.btn-link:focus {
+    text-decoration: none;
+}
+
 /* Theme-aware dropdown (select) styling to match light/dark mode */
 .form-select,
 select.form-select {
@@ -1721,4 +1731,122 @@ select.form-select:focus {
 [data-theme="dark"] .form-select {
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23f1f3f5' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
 }
+
+/* Enhanced tooltip styling */
+.title-text {
+    position: relative;
+}
+
+.title-text:hover {
+    cursor: help;
+    border-bottom: 1px dotted currentColor;
+}
+
+/* Custom HTML tooltip */
+.custom-tooltip {
+    position: absolute;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: var(--box-bg);
+    color: var(--text-color);
+    padding: 8px 12px;
+    border: 1px solid var(--box-border);
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+    z-index: 1000;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    pointer-events: none;
+}
+
+.title-text:hover .custom-tooltip {
+    opacity: 1;
+    visibility: visible;
+}
+
+.custom-tooltip::before {
+    content: '';
+    position: absolute;
+    bottom: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: var(--box-border);
+}
+
+/* Projects table mobile layout - only apply card style on small phones */
+@media (max-width: 600px) {
+    .projects-table thead {
+        display: none;
+    }
+    
+    .projects-table tbody tr {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        background-color: var(--box-bg);
+        border: 1px solid var(--box-border);
+        border-radius: 8px;
+    }
+    
+    .projects-table td {
+        border: none !important;
+    }
+    
+    .projects-table td[data-label="Name"] {
+        flex: 1;
+        padding: 0 !important;
+        display: block !important;
+    }
+    
+    .projects-table td[data-label="Actions"] {
+        flex-shrink: 0;
+        padding: 0 !important;
+        display: block !important;
+    }
+    
+    .projects-table td::before {
+        display: none !important;
+    }
+    
+    .projects-table td[data-label="Actions"] form {
+        margin: 0;
+        display: block;
+    }
+}
+
+/* Keep projects table as normal table on tablets and larger */
+@media (min-width: 601px) {
+    .projects-table thead {
+        display: table-header-group !important;
+    }
+    
+    .projects-table tbody tr {
+        display: table-row !important;
+        flex-direction: unset !important;
+        padding: 0 !important;
+        margin-bottom: 0 !important;
+        border: none !important;
+        border-radius: 0 !important;
+        gap: 0 !important;
+    }
+    
+    .projects-table td {
+        display: table-cell !important;
+        padding: 12px 15px !important;
+        flex: unset !important;
+    }
+    
+    .projects-table td::before {
+        display: none !important;
+    }
+}
+
 

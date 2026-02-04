@@ -13,17 +13,17 @@
                     <th style="width: 32px"></th>
                     <th class="description-column">Title</th>
                     <th class="description-column">Description</th>
-                    <th class="date-added">Date Added</th>
+                    <th class="date-added">Due Date (if set)</th>
                     <th class="actions-column">Actions</th>
                 </tr>
             </thead>
             {{if eq .CurrentPage 1}}
             <tbody id="favorite-task-list">
-                {{with .FavoriteTasks}}{{range .}} {{template "todo.html" .}} {{end}}{{end}}
+                {{with .FavoriteTasks}}{{range .}} {{template "todo.html" (dict "Task" . "ProjectFilter" $.ProjectFilter)}} {{end}}{{end}}
             </tbody>
             {{end}}
             <tbody id="task-list">
-                {{range .Tasks}} {{template "todo.html" .}} {{end}}
+                {{range .Tasks}} {{template "todo.html" (dict "Task" . "ProjectFilter" $.ProjectFilter)}} {{end}}
             </tbody>
         </table>
         </div>
