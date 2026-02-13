@@ -1,3 +1,7 @@
+/* ========================================
+   CSS VARIABLES & BASE STYLES
+   ======================================== */
+
 html[data-theme="dark"] #email.form-control-plaintext {
     color: #fff !important;
 }
@@ -45,7 +49,10 @@ html[data-theme="light"] #email.form-control-plaintext {
     --form-control-text: #e9ecef;
 }
 
-/* Body styles */
+/* ========================================
+   BODY & GLOBAL STYLES
+   ======================================== */
+
 body {
     font-family: "Fira Code", monospace; /* Custom font */
     background-color: var(--body-bg);
@@ -54,7 +61,12 @@ body {
     transition: background-color var(--transition-time), color var(--transition-time);
 }
 
-/* Table styling */
+/* ========================================
+   TABLE STYLES (Light Mode)
+   Responsive layouts, drag/sort handlers,
+   task toggling, and mobile card views
+   ======================================== */
+
 table {
     border-collapse: collapse;
     box-shadow: 0 4px 8px var(--table-box-shadow);
@@ -1134,6 +1146,10 @@ tr.expanded .task-toggle::after {
     /* Also hide any .task-toggle pseudo-content used as chevrons */
     .task-toggle::after { display: none !important; content: none !important; }
 }
+/* ========================================
+   EXPANDABLE BOX STYLES (Accordion)
+   ======================================== */
+
 .expandable-box {
     border: 1px solid var(--box-border);
     border-radius: 8px;
@@ -1156,6 +1172,10 @@ tr.expanded .task-toggle::after {
     background-color: #0056b3; /* Matches Bootstrap's primary hover color */
 }
 
+/* ========================================
+   FORM STYLES
+   ======================================== */
+
 /* Form styling */
 .form-group {
     margin-bottom: 15px;
@@ -1165,6 +1185,10 @@ textarea {
     height: 80px;
     resize: none;
 }
+
+/* ========================================
+   BUTTON STYLES
+   ======================================== */
 
 /* Button styles */
 .btn-gradient {
@@ -1188,6 +1212,10 @@ textarea {
 .collapse {
     transition: height 0.3s ease-out;
 }
+
+/* ========================================
+   SIDEBAR & THEME TOGGLE STYLES
+   ======================================== */
 
 /* Sidebar Styles */
 #sidebar {
@@ -1331,6 +1359,10 @@ textarea {
     }
 }
 
+/* ========================================
+   DARK MODE OVERRIDES - FORM CONTROLS
+   ======================================== */
+
 /* Dark mode overrides for form controls */
 [data-theme="dark"] .form-control {
     background-color: var(--form-control-bg);
@@ -1417,6 +1449,10 @@ textarea {
     background-color: var(--container-bg);
 }
 
+/* ========================================
+   NAVBAR STYLES
+   ======================================== */
+
 /* Navbar styling */
 .navbar {
     background-color: var(--navbar-bg);
@@ -1470,6 +1506,10 @@ textarea {
     border-color: #3d5641;
 }
 
+/* ========================================
+   DARK MODE OVERRIDES - TABLES
+   ======================================== */
+
 /* Table overrides for dark mode */
 [data-theme="dark"] .table {
     color: var(--text-color);
@@ -1489,6 +1529,10 @@ textarea {
 [data-theme="dark"] .table-bordered td {
     border-color: #444;
 }
+
+/* ========================================
+   DARK MODE OVERRIDES - BUTTONS & MODALS
+   ======================================== */
 
 /* Button styling for dark mode */
 [data-theme="dark"] .btn-outline-primary {
@@ -1622,6 +1666,10 @@ mark {
 a {
     transition: color var(--transition-time);
 }
+
+/* ========================================
+   TOAST NOTIFICATIONS & STATUS MESSAGES
+   ======================================== */
 
 /* Toast notification styles */
 .app-toast-container {
@@ -1781,6 +1829,11 @@ select.form-select:focus {
     border-top-color: var(--box-border);
 }
 
+/* ========================================
+   PROJECTS TABLE STYLES
+   Mobile card layout, responsive design
+   ======================================== */
+
 /* Projects table mobile layout - only apply card style on small phones */
 @media (max-width: 600px) {
     .projects-table thead {
@@ -1851,6 +1904,13 @@ select.form-select:focus {
         display: none !important;
     }
 }
+
+
+/* ========================================
+   UTILITIES & MISCELLANEOUS STYLES
+   Tooltips, marks, links, theme-aware
+   dropdowns, and utility classes
+   ======================================== */
 
 
 .alert-dismissible.fade.show button.btn-close {

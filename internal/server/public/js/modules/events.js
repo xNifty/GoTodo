@@ -1,0 +1,312 @@
+import { apiPath } from "./utils.js";
+import {
+  initializeSidebarEventListeners,
+  closeSidebar,
+  attachEditButtonListeners,
+  attachContextualCloseSidebar,
+  handleSidebarAwareSettle,
+} from "./sidebar.js";
+import { initializeModalEventListeners } from "./modal.js";
+import {
+  initializeProjectFormHandlers,
+  initCharacterCounters,
+} from "./form-handlers.js";
+import { showToast } from "./notifications.js";
+
+export function attachTaskDeletedListener() {
+  document.body.addEventListener("taskDeleted", function (evt) {
+    // Get the current page from the page number display
+    // Find the pagination span that contains "Page X of Y"
+    const spans = document.querySelectorAll("#task-container span");
+    let currentPage = 1;
+    for (let span of spans) {
+      const match = span.textContent.match(/Page\s+(\d+)\s+of\s+(\d+)/);
+      if (match) {
+        currentPage = parseInt(match[1]);
+        break;
+      }
+    }
+
+    // Reload the current page
+    let url = `/api/fetch-tasks?page=${currentPage}`;
+    const searchInput = document.getElementById("search");
+    if (searchInput && searchInput.value) {
+      url += `&search=${encodeURIComponent(searchInput.value)}`;
+    }
+    htmx.ajax("GET", url, { target: "#task-container", swap: "innerHTML" });
+  });
+}
+
+export function attachReloadPageListener() {
+  document.body.addEventListener("reloadPage", function (evt) {
+    const page = evt.detail.page || 1;
+    let url = `/api/fetch-tasks?page=${page}`;
+    const searchInput = document.getElementById("search");
+    if (searchInput && searchInput.value) {
+      url += `&search=${encodeURIComponent(searchInput.value)}`;
+    }
+    htmx.ajax("GET", url, { target: "#task-container", swap: "innerHTML" });
+  });
+}
+
+export function attachReloadPreviousPageListener() {
+  document.body.addEventListener("reload-previous-page", function (evt) {
+    // Get the current page from the page number display
+    // Find the pagination span that contains "Page X of Y"
+    const spans = document.querySelectorAll("#task-container span");
+    let currentPage = 1;
+    for (let span of spans) {
+      const match = span.textContent.match(/Page\s+(\d+)\s+of\s+(\d+)/);
+      if (match) {
+        currentPage = parseInt(match[1]);
+        break;
+      }
+    }
+    const prevPage = Math.max(currentPage - 1, 1);
+
+    // Optionally, preserve search query if present
+    const searchInput = document.getElementById("search");
+    const searchQuery = searchInput ? searchInput.value : "";
+
+    // Build the URL for the previous page
+    let url = `/api/fetch-tasks?page=${prevPage}`;
+    if (searchQuery) {
+      url += `&search=${encodeURIComponent(searchQuery)}`;
+    }
+
+    // Use HTMX to load the previous page into the task container
+    htmx.ajax("GET", url, { target: "#task-container", swap: "innerHTML" });
+  });
+}
+
+export function attachLoginSuccessListener() {
+  document.body.addEventListener("login-success", function (evt) {
+    // Close the login modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById("modal"));
+    if (modal) {
+      modal.hide();
+    }
+
+    // Optionally reload the page to show logged-in state
+    window.location.reload();
+  });
+}
+
+export function attachTaskCountsChangedListener() {
+  document.body.addEventListener("taskCountsChanged", function (evt) {
+    try {
+      const d = evt.detail || {};
+      if (typeof d.completed !== "undefined") {
+        const el = document.getElementById("completed-tasks-badge");
+        if (el) el.textContent = `Completed: ${d.completed}`;
+      }
+      if (typeof d.incomplete !== "undefined") {
+        const el2 = document.getElementById("incomplete-tasks-badge");
+        if (el2) el2.textContent = `Incomplete: ${d.incomplete}`;
+      }
+      // update total if both present
+      if (
+        typeof d.completed !== "undefined" &&
+        typeof d.incomplete !== "undefined"
+      ) {
+        const totalEl = document.getElementById("total-tasks-badge");
+        if (totalEl)
+          totalEl.textContent = `Total Tasks: ${d.completed + d.incomplete}`;
+      }
+    } catch (e) {
+      // ignore
+    }
+  });
+}
+
+export function attachHTMXAfterRequestListener() {
+  document.body.addEventListener("htmx:afterRequest", function (evt) {
+    try {
+      const xhr = evt && evt.detail && evt.detail.xhr;
+      if (!xhr || !xhr.responseURL) return;
+
+      if (xhr.responseURL.includes("/api/edit")) {
+        // Only open on success (2xx)
+        const status = xhr.status || 0;
+        if (status >= 200 && status < 300) {
+          try {
+            initializeSidebarEventListeners();
+          } catch (e) {}
+          const sb = document.getElementById("sidebar");
+          if (sb) sb.classList.add("active");
+        }
+      }
+
+      // Clear create-project form after successful HTMX create
+      if (xhr.responseURL.includes("/api/projects/create")) {
+        const status = xhr.status || 0;
+        // Check if this is a validation error
+        const isValidationError =
+          xhr.getResponseHeader &&
+          xhr.getResponseHeader("X-Validation-Error") === "true";
+
+        if (status >= 200 && status < 300 && !isValidationError) {
+          try {
+            const form = document.getElementById("createProjectForm");
+            if (form) {
+              const nameInput = form.querySelector('input[name="name"]');
+              if (nameInput) nameInput.value = "";
+              const charCount = document.getElementById(
+                "project-name-char-count",
+              );
+              if (charCount) charCount.textContent = "0";
+              const errorDiv = document.getElementById("project-name-error");
+              if (errorDiv) errorDiv.innerHTML = "";
+            }
+            // Reinitialize project form handlers
+            initializeProjectFormHandlers();
+            if (typeof showToast === "function") showToast("Project created.");
+          } catch (e) {}
+        }
+      }
+
+      // When server notifies projects changed, refresh project selects
+      try {
+        if (
+          xhr &&
+          xhr.getResponseHeader &&
+          xhr.getResponseHeader("HX-Trigger")
+        ) {
+          const trig = xhr.getResponseHeader("HX-Trigger");
+          if (trig && trig.indexOf("projects-changed") !== -1) {
+            fetch(apiPath("/api/projects/json"))
+              .then((res) => res.json())
+              .then((data) => {
+                try {
+                  // Update all selects with id project_id
+                  const selects =
+                    document.querySelectorAll("select#project_id");
+                  selects.forEach((sel) => {
+                    // preserve current value
+                    const cur = sel.value;
+                    // clear existing options
+                    while (sel.options.length > 1) sel.remove(1);
+                    data.forEach((p) => {
+                      const opt = document.createElement("option");
+                      opt.value = p.id;
+                      opt.textContent = p.name;
+                      sel.appendChild(opt);
+                    });
+                    // restore value if still present
+                    try {
+                      sel.value = cur;
+                    } catch (e) {}
+                  });
+                } catch (e) {}
+              })
+              .catch(() => {});
+          }
+
+          // If server asked to reset the toolbar project filter, do that too
+          if (trig && trig.indexOf("reset-project-filter") !== -1) {
+            try {
+              const pf = document.querySelector("select#project-filter");
+              if (pf) {
+                pf.value = "";
+                // dispatch change so HTMX will fetch the full task list
+                pf.dispatchEvent(new Event("change", { bubbles: true }));
+              }
+            } catch (e) {}
+          }
+
+          // If server requested setting the toolbar project filter, apply it
+          if (trig && trig.indexOf("set-project-filter") !== -1) {
+            try {
+              const m = trig.match(/set-project-filter:([^\s]+)/);
+              if (m && m[1] !== undefined) {
+                const val = m[1];
+                const pf = document.querySelector("select#project-filter");
+                if (pf) {
+                  pf.value = val;
+                  // Do not dispatch change here — server already returned the correct view
+                }
+              }
+            } catch (e) {}
+          }
+        }
+      } catch (e) {}
+    } catch (e) {}
+  });
+}
+
+export function attachHTMXAfterSettleListener() {
+  document.body.addEventListener("htmx:afterSettle", (event) => {
+    if (event.target.id === "task-container") {
+      initializeSidebarEventListeners();
+
+      // Reapply the active class if necessary
+      const sidebar = document.getElementById("sidebar");
+      if (sidebar && sidebar.classList.contains("htmx-added")) {
+        sidebar.classList.add("active");
+      }
+    }
+  });
+}
+
+export function attachHTMXAfterSwapListeners() {
+  // Handle sidebar-aware HTMX swaps
+  handleSidebarAwareSettle();
+
+  // If HTMX swapped the sidebar, ensure it's opened and listeners attached
+  document.body.addEventListener("htmx:afterSwap", function (evt) {
+    try {
+      const target =
+        evt.detail && evt.detail.target ? evt.detail.target : evt.target;
+      if (target && target.id === "sidebar") {
+        try {
+          initializeSidebarEventListeners();
+        } catch (e) {}
+        const sb = document.getElementById("sidebar");
+        if (sb) sb.classList.add("active");
+      }
+    } catch (e) {}
+  });
+
+  // Also handle cases where we replace only the sidebar body via innerHTML
+  document.body.addEventListener("htmx:afterSwap", function (evt) {
+    try {
+      const detail = evt && evt.detail;
+      const swapped = detail && detail.target ? detail.target : evt.target;
+      if (swapped && swapped.id === "sidebar") return; // handled above
+      // when swapping innerHTML into '#sidebar .sidebar-body', the event target will be that element
+      if (
+        swapped &&
+        swapped.classList &&
+        swapped.classList.contains("sidebar-body")
+      ) {
+        try {
+          initializeSidebarEventListeners();
+        } catch (e) {}
+        const sb = document.getElementById("sidebar");
+        if (sb) sb.classList.add("active");
+      }
+    } catch (e) {}
+  });
+
+  // Reattach modal listeners after HTMX swaps that replace task container
+  document.body.addEventListener("htmx:afterSwap", function (evt) {
+    if (evt.target && evt.target.id === "task-container") {
+      try {
+        initializeModalEventListeners();
+      } catch (e) {}
+    }
+  });
+}
+
+export function attachAllEventListeners() {
+  attachTaskDeletedListener();
+  attachReloadPageListener();
+  attachReloadPreviousPageListener();
+  attachLoginSuccessListener();
+  attachTaskCountsChangedListener();
+  attachHTMXAfterRequestListener();
+  attachHTMXAfterSettleListener();
+  attachHTMXAfterSwapListeners();
+  attachEditButtonListeners();
+  attachContextualCloseSidebar();
+}
