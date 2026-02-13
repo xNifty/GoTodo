@@ -19,6 +19,7 @@ Requirements:
 
 - Go (1.20+)
 - PostgreSQL
+- Node.js + npm (for frontend assets)
 
 1. Copy the example env file to `.env` and edit values:
 
@@ -32,7 +33,14 @@ BASE_PATH=/         # optional
 ASSET_VERSION=20251130  # optional; bump to force client cache refresh
 ```
 
-2. Build and run:
+2. Install frontend dependencies and builds assets:
+
+```powershell
+npm ci
+npm run build:assets
+```
+
+3. Build and run:
 
 ```powershell
 go build -o app.exe main.go
