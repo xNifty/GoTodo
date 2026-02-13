@@ -52,9 +52,11 @@
                         <i class="bi bi-box-arrow-right"></i> Logout
                     </button>
                     {{else}}
+                    {{if .EnableRegistration}}
                     <a href="{{basePath}}/signup" class="btn btn-outline-secondary btn-sm me-2">
                         <i class="bi bi-person-plus"></i> Sign Up
                     </a>
+                    {{end}}
                     <button class="btn btn-outline-primary btn-sm" id="login-btn" data-bs-toggle="modal" data-bs-target="#loginmodal" hx-get="{{basePath}}/partials/login" hx-target="#loginmodal .modal-content" hx-swap="innerHTML">
                         <i class="bi bi-box-arrow-in-right"></i> Login
                     </button>

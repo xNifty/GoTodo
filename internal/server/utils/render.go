@@ -121,6 +121,8 @@ func RenderTemplate(w http.ResponseWriter, r *http.Request, tmpl string, data in
 		ctx["SiteName"] = config.Cfg.SiteName
 		ctx["DefaultTimezone"] = config.Cfg.DefaultTimezone
 		ctx["ShowChangelog"] = config.Cfg.ShowChangelog
+		ctx["EnableRegistration"] = true
+		ctx["InviteOnly"] = true
 		// Site version comes only from the baked-in binary; never from DB
 		ctx["SiteVersion"] = version.Version
 		if s, err := storage.GetSiteSettings(); err == nil && s != nil {
@@ -131,6 +133,8 @@ func RenderTemplate(w http.ResponseWriter, r *http.Request, tmpl string, data in
 				ctx["DefaultTimezone"] = s.DefaultTimezone
 			}
 			ctx["ShowChangelog"] = s.ShowChangelog
+			ctx["EnableRegistration"] = s.EnableRegistration
+			ctx["InviteOnly"] = s.InviteOnly
 		}
 		// Inject theme from cookie if present
 		if r != nil {
@@ -159,6 +163,8 @@ func RenderTemplate(w http.ResponseWriter, r *http.Request, tmpl string, data in
 		ctx["SiteName"] = config.Cfg.SiteName
 		ctx["DefaultTimezone"] = config.Cfg.DefaultTimezone
 		ctx["ShowChangelog"] = config.Cfg.ShowChangelog
+		ctx["EnableRegistration"] = true
+		ctx["InviteOnly"] = true
 		ctx["SiteVersion"] = version.Version
 		if s, err := storage.GetSiteSettings(); err == nil && s != nil {
 			if s.SiteName != "" {
@@ -168,6 +174,8 @@ func RenderTemplate(w http.ResponseWriter, r *http.Request, tmpl string, data in
 				ctx["DefaultTimezone"] = s.DefaultTimezone
 			}
 			ctx["ShowChangelog"] = s.ShowChangelog
+			ctx["EnableRegistration"] = s.EnableRegistration
+			ctx["InviteOnly"] = s.InviteOnly
 		}
 		if r != nil {
 			if c, err := r.Cookie("theme"); err == nil {

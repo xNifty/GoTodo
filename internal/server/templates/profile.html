@@ -92,6 +92,38 @@
                                     </a>
                                 </div>
                             </form>
+
+                            <!-- Password Change Section -->
+                            <div class="mt-4 pt-4 border-top">
+                                <h4 class="mb-3">Change Password</h4>
+                                <div id="passwordSuccessMessage" class="alert alert-success alert-dismissible fade d-none" role="alert" aria-live="polite" style="margin-bottom: 1rem;">
+                                    Password changed successfully!
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+                                <div id="passwordErrorMessage" class="alert alert-danger alert-dismissible fade" role="alert" style="display: none;">
+                                    <span id="passwordErrorText"></span>
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+
+                                <form id="passwordForm">
+                                    <div class="mb-3">
+                                        <label for="current_password" class="form-label fw-bold">Current Password</label>
+                                        <input type="password" id="current_password" name="current_password" class="form-control" required autocomplete="current-password" />
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="new_password" class="form-label fw-bold">New Password</label>
+                                        <input type="password" id="new_password" name="new_password" class="form-control" required autocomplete="new-password" minlength="8" />
+                                        <small class="form-text text-muted">Password must be at least 8 characters long.</small>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="confirm_password" class="form-label fw-bold">Confirm New Password</label>
+                                        <input type="password" id="confirm_password" name="confirm_password" class="form-control" required autocomplete="new-password" minlength="8" />
+                                    </div>
+                                    <button type="submit" class="btn btn-warning">
+                                        <i class="bi bi-key"></i> Change Password
+                                    </button>
+                                </form>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -122,6 +154,9 @@
                 try {
                     const response = await fetch('{{basePath}}/api/update-profile', {
                         method: 'POST',
+                        headers: {
+                            'HX-Request': 'true'
+                        },
                         body: formData
                     });
                     if (response.ok) {
@@ -144,6 +179,87 @@
                     console.error('Error:', error);
                     const errorMsg = document.getElementById('errorMessage');
                     document.getElementById('errorText').textContent = 'An error occurred. Please try again.';
+                    errorMsg.style.display = 'block';
+                }
+            });
+
+            document.getElementById('passwordForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const currentPassword = document.getElementById('current_password').value;
+                const newPassword = document.getElementById('new_password').value;
+                const confirmPassword = document.getElementById('confirm_password').value;
+
+                // Client-side validation: check if new passwords match
+                if (newPassword !== confirmPassword) {
+                    const errorMsg = document.getElementById('passwordErrorMessage');
+                    document.getElementById('passwordErrorText').textContent = 'New passwords do not match.';
+                    errorMsg.style.display = 'block';
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('current_password', currentPassword);
+                formData.append('new_password', newPassword);
+                formData.append('confirm_password', confirmPassword);
+
+                try {
+                    const response = await fetch('{{basePath}}/api/change-password', {
+                        method: 'POST',
+                        headers: {
+                            'HX-Request': 'true'
+                        },
+                        body: formData
+                    });
+
+                    if (response.ok) {
+                        const responseText = await response.text();
+                        
+                        if (responseText === 'success') {
+                            const successMsg = document.getElementById('passwordSuccessMessage');
+                            successMsg.classList.remove('d-none');
+                            successMsg.classList.add('show');
+                            
+                            // Hide error message if it was showing
+                            const errorMsg = document.getElementById('passwordErrorMessage');
+                            errorMsg.classList.remove('show');
+                            errorMsg.style.display = 'none';
+                            
+                            // Clear the form
+                            document.getElementById('passwordForm').reset();
+                            
+                            setTimeout(function() {
+                                successMsg.classList.remove('show');
+                                successMsg.classList.add('d-none');
+                            }, 3000);
+                        } else {
+                            // Response text contains error message
+                            const errorMsg = document.getElementById('passwordErrorMessage');
+                            document.getElementById('passwordErrorText').textContent = responseText;
+                            errorMsg.classList.add('show');
+                            errorMsg.style.display = 'block';
+                            
+                            // Hide success message if it was showing
+                            const successMsg = document.getElementById('passwordSuccessMessage');
+                            successMsg.classList.remove('show');
+                            successMsg.classList.add('d-none');
+                        }
+                    } else {
+                        const errorMsg = document.getElementById('passwordErrorMessage');
+                        document.getElementById('passwordErrorText').textContent = 'Error changing password. Please try again.';
+                        errorMsg.classList.add('show');
+                        errorMsg.style.display = 'block';
+                        
+                        // Hide success message if it was showing
+                        const successMsg = document.getElementById('passwordSuccessMessage');
+                        successMsg.classList.remove('show');
+                        successMsg.classList.add('d-none');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    const errorMsg = document.getElementById('passwordErrorMessage');
+                    document.getElementById('passwordErrorText').textContent = 'An error occurred. Please try again.';
+                    errorMsg.classList.add('show');
                     errorMsg.style.display = 'block';
                 }
             });

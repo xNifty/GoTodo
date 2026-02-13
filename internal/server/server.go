@@ -58,12 +58,16 @@ func StartServer() error {
 	http.HandleFunc("/createinvite", utils.RequirePermission("createinvites", handlers.CreateInvitePageHandler))
 	http.HandleFunc("/admin", utils.RequirePermission("admin", handlers.AdminPageHandler))
 	http.HandleFunc("/admin/", utils.RequirePermission("admin", handlers.AdminPageHandler))
+	http.HandleFunc("/forgot-password", handlers.ForgotPasswordPage)
+	http.HandleFunc("/password-reset", handlers.PasswordResetPage)
 
 	// API endpoints - all require HTMX header
 	// Auth endpoints with rate limiting
 	http.HandleFunc("/api/signup", utils.RequireHTMX(utils.RateLimitMiddleware(5, 0.05, 900, utils.KeyByIP)(handlers.APISignup)))
 	http.HandleFunc("/api/login", utils.RequireHTMX(utils.RateLimitMiddleware(10, 1.0, 60, utils.KeyByIP)(handlers.APILogin)))
 	http.HandleFunc("/api/logout", utils.RequireHTMX(handlers.APILogout))
+	http.HandleFunc("/api/forgot-password", utils.RequireHTMX(utils.RateLimitMiddleware(5, 0.05, 900, utils.KeyByIP)(handlers.APIForgotPassword)))
+	http.HandleFunc("/api/reset-password", utils.RequireHTMX(handlers.APIResetPassword))
 
 	// Task endpoints
 	http.HandleFunc("/api/fetch-tasks", utils.RequireHTMX(handlers.APIReturnTasks))
@@ -91,6 +95,7 @@ func StartServer() error {
 	// Profile API endpoints
 	http.HandleFunc("/api/update-timezone", utils.RequireHTMX(handlers.APIUpdateTimezone))
 	http.HandleFunc("/api/update-profile", utils.RequireHTMX(handlers.APIUpdateProfile))
+	http.HandleFunc("/api/change-password", utils.RequireHTMX(handlers.APIChangePassword))
 
 	// Invite API endpoints
 	http.HandleFunc("/api/create-invite", utils.RequireHTMX(utils.RequirePermission("createinvites", handlers.APICreateInvite)))
@@ -102,7 +107,7 @@ func StartServer() error {
 	http.HandleFunc("/api/unban-user", utils.RequireHTMX(utils.RequirePermission("createinvites", handlers.APIUnbanUser)))
 
 	// Admin API endpoints
-	http.HandleFunc("/api/admin/update-settings", utils.RequireHTMX(utils.RequirePermission("admin", handlers.APIUpdateSiteSettings)))
+	http.HandleFunc("/api/admin/update-settings", utils.RequirePermission("admin", handlers.APIUpdateSiteSettings))
 
 	// Handle PUT and DELETE for invites with path parameters
 	http.HandleFunc("/api/invite/", func(w http.ResponseWriter, r *http.Request) {

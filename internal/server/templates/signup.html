@@ -49,6 +49,7 @@
                                         placeholder="user@example.com"
                                     />
                                 </div>
+                                {{if .InviteOnly}}
                                 <div class="mb-3">
                                     <label for="token" class="form-label">Invite Token
                                         {{if .TokenLocked}}<span class="badge bg-secondary ms-2">Locked</span>{{end}}
@@ -67,6 +68,7 @@
                                         {{if .TokenLocked}}This token came from an invite link and is locked; you cannot change it.{{end}}
                                     </div> -->
                                 </div>
+                                {{end}}
                                 <div class="mb-3">
                                     <label for="password" class="form-label">Password</label>
                                     <input 

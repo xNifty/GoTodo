@@ -20,6 +20,7 @@ func APIUpdateTaskStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	page := r.URL.Query().Get("page")
+	projectParam := r.URL.Query().Get("project")
 
 	// Require logged-in user and enforce ban check + ownership
 	email, _, _, loggedIn := utils.GetSessionUser(r)
@@ -74,6 +75,19 @@ func APIUpdateTaskStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Optional project filter for counts + row links
+	var projectFilter *int
+	if projectParam != "" {
+		if projectParam == "none" || projectParam == "0" {
+			zero := 0
+			projectFilter = &zero
+		} else {
+			if pid, err := strconv.Atoi(projectParam); err == nil {
+				projectFilter = &pid
+			}
+		}
+	}
+
 	updatedStatus := !completed
 
 	_, err = db.Exec(context.Background(), "UPDATE tasks SET completed = $1, date_modified = NOW() AT TIME ZONE 'UTC' WHERE id = $2", updatedStatus, id)
@@ -116,8 +130,21 @@ func APIUpdateTaskStatus(w http.ResponseWriter, r *http.Request) {
 	if err := db.QueryRow(context.Background(), "SELECT user_id FROM tasks WHERE id = $1", id).Scan(&ownerID); err == nil {
 		var completedCount int
 		var incompleteCount int
-		_ = db.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND completed = true", ownerID).Scan(&completedCount)
-		_ = db.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND completed = false", ownerID).Scan(&incompleteCount)
+		if projectFilter == nil {
+			_ = db.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND completed = true", ownerID).Scan(&completedCount)
+			_ = db.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND (completed IS NULL OR completed = false)", ownerID).Scan(&incompleteCount)
+		} else {
+			projectCond := ""
+			args := []interface{}{ownerID}
+			if *projectFilter == 0 {
+				projectCond = " AND project_id IS NULL"
+			} else {
+				projectCond = " AND project_id = $2"
+				args = append(args, *projectFilter)
+			}
+			_ = db.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND completed = true"+projectCond, args...).Scan(&completedCount)
+			_ = db.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND (completed IS NULL OR completed = false)"+projectCond, args...).Scan(&incompleteCount)
+		}
 		// Emit HTMX trigger with counts payload so client can update badges
 		w.Header().Set("HX-Trigger", fmt.Sprintf(`{"taskCountsChanged":{"completed":%d,"incomplete":%d}}`, completedCount, incompleteCount))
 	}
@@ -131,8 +158,9 @@ func APIUpdateTaskStatus(w http.ResponseWriter, r *http.Request) {
 		BasePath      string
 		ProjectFilter string
 	}{
-		Task:     task,
-		BasePath: basePath,
+		Task:          task,
+		BasePath:      basePath,
+		ProjectFilter: projectParam,
 	}
 
 	if err := utils.Templates.ExecuteTemplate(w, "todo.html", data); err != nil {

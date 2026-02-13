@@ -32,7 +32,7 @@
             <!-- Status checkbox (uses existing update-status endpoint which returns complete row) -->
             <button
                 class="badge bg-{{if .Task.Completed}}success{{else}}danger text-white{{end}} status-column"
-                hx-get="{{basePath}}/api/update-status?id={{.Task.ID}}&page={{.Task.Page}}"
+                hx-get="{{basePath}}/api/update-status?id={{.Task.ID}}&page={{.Task.Page}}&project={{.ProjectFilter}}"
                 hx-target="#task-{{.Task.ID}}"
                 hx-swap="outerHTML"
                 aria-label="Toggle complete"

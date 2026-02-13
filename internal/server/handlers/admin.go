@@ -28,6 +28,8 @@ func AdminPageHandler(w http.ResponseWriter, r *http.Request) {
 	siteVersion := version.Version
 	defaultTz := config.Cfg.DefaultTimezone
 	showChangelog := config.Cfg.ShowChangelog
+	enableRegistration := true
+	inviteOnly := true
 	if s, err := storage.GetSiteSettings(); err == nil && s != nil {
 		if s.SiteName != "" {
 			siteName = s.SiteName
@@ -36,15 +38,19 @@ func AdminPageHandler(w http.ResponseWriter, r *http.Request) {
 			defaultTz = s.DefaultTimezone
 		}
 		showChangelog = s.ShowChangelog
+		enableRegistration = s.EnableRegistration
+		inviteOnly = s.InviteOnly
 	}
 
 	context := map[string]interface{}{
-		"LoggedIn":        loggedIn,
-		"Permissions":     permissions,
-		"SiteName":        siteName,
-		"SiteVersion":     siteVersion,
-		"DefaultTimezone": defaultTz,
-		"ShowChangelog":   showChangelog,
+		"LoggedIn":           loggedIn,
+		"Permissions":        permissions,
+		"SiteName":           siteName,
+		"SiteVersion":        siteVersion,
+		"DefaultTimezone":    defaultTz,
+		"ShowChangelog":      showChangelog,
+		"EnableRegistration": enableRegistration,
+		"InviteOnly":         inviteOnly,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -66,6 +72,8 @@ func APIUpdateSiteSettings(w http.ResponseWriter, r *http.Request) {
 	siteName := strings.TrimSpace(r.FormValue("site_name"))
 	defaultTz := strings.TrimSpace(r.FormValue("default_timezone"))
 	showChangelogStr := r.FormValue("show_changelog")
+	enableRegistrationStr := r.FormValue("enable_registration")
+	inviteOnlyStr := r.FormValue("invite_only")
 
 	if siteName == "" {
 		utils.SetFlash(w, r, "Site name is required.")
@@ -87,13 +95,18 @@ func APIUpdateSiteSettings(w http.ResponseWriter, r *http.Request) {
 		config.Cfg.ShowChangelog = false
 	}
 
+	enableRegistration := enableRegistrationStr == "true" || enableRegistrationStr == "on"
+	inviteOnly := inviteOnlyStr == "true" || inviteOnlyStr == "on"
+
 	// Persist to DB when possible; fall back to config file if DB unavailable
 	ss := storage.SiteSettings{
 		SiteName:        siteName,
 		DefaultTimezone: defaultTz,
 		ShowChangelog:   config.Cfg.ShowChangelog,
 		// Do NOT persist site version from the app; site version is baked into the binary only.
-		SiteVersion: "",
+		SiteVersion:        "",
+		EnableRegistration: enableRegistration,
+		InviteOnly:         inviteOnly,
 	}
 	if err := storage.UpsertSiteSettings(ss); err != nil {
 		// fallback: persist to config file
@@ -111,7 +124,7 @@ func APIUpdateSiteSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Redirect back to admin page
-	utils.SetFlash(w, r, "Settings updated successfully.")
+	utils.SetFlash(w, r, "Site Settings Saved")
 	http.Redirect(w, r, utils.GetBasePath()+"/admin", http.StatusSeeOther)
 }
 
