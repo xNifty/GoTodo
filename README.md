@@ -55,6 +55,22 @@ go run main.go
 
 Open the app in your browser (default from code: http://localhost:8080).
 
+## Frontend Assets
+
+The repository includes pre-built minified CSS/JS files (internal/server/public/css/site.min.css, internal/server/public/js/site.min.js) so a fresh clone works immediately.
+
+If you modify frontend source files (CSS/JS in internal/server/public/src/):
+
+```powershell
+npm ci
+npm run build:assets
+# update .asset_version if needed
+Get-Date -UFormat %Y%m%d%H%M%S | Out-File -FilePath "internal/server/public/.asset_version" -Encoding utf8
+git add internal/server/public/css/site.min.css internal/server/public/js/site.min.js internal/server/public/.asset_version
+git commit -m "Update frontend assets"
+
+```
+
 ## Database
 
 The app uses `github.com/jackc/pgx/v5/pgxpool`. There are helper/migration functions in `internal/storage/database.go` you can run or inspect.
