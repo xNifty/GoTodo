@@ -277,38 +277,6 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Create a context for rendering pagination.html
-	tmplCtx := map[string]interface{}{
-		"FavoriteTasks":    favs,
-		"Tasks":            nonFavs,
-		"PreviousPage":     prevPage,
-		"NextPage":         nextPage,
-		"CurrentPage":      page,
-		"PrevDisabled":     prevDisabled,
-		"NextDisabled":     nextDisabled,
-		"TotalTasks":       totalTasks,
-		"LoggedIn":         true,
-		"TotalPages":       (totalTasks + pageSize - 1) / pageSize,
-		"Pages":            utils.GetPaginationData(page, pageSize, totalTasks, userID).Pages,
-		"HasRightEllipsis": utils.GetPaginationData(page, pageSize, totalTasks, userID).HasRightEllipsis,
-		"CompletedTasks":   utils.GetCompletedTasksCount(&userID),
-		"IncompleteTasks":  utils.GetIncompleteTasksCount(&userID),
-		"PerPage":          pageSize,
-	}
-
-	// Set headers for successful addition
-	w.Header().Set("HX-Trigger", "task-added") // Signal JS to close sidebar and clear form
-
-	if shouldRefresh {
-		// Render the updated task list into the main task-container
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if err := utils.RenderTemplate(w, r, "pagination.html", tmplCtx); err != nil {
-			http.Error(w, "Error rendering tasks after add: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-		return
-	}
-
 	// The new task belongs to a different project than the current filter.
 	// Instead of returning nothing, render the view for the project the task was added to
 	// and instruct the client to set the toolbar filter to that project.
@@ -346,6 +314,51 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 	}
 	if page > lastPageTarget {
 		page = lastPageTarget
+	}
+
+	// Fetch projects and mark selected for toolbar
+	projectsList := make([]map[string]interface{}, 0)
+	if projs, perr := storage.GetProjectsForUser(userID); perr == nil {
+		for _, p := range projs {
+			sel := false
+			if targetFilterPtr != nil && *targetFilterPtr == p.ID {
+				sel = true
+			}
+			projectsList = append(projectsList, map[string]interface{}{"ID": p.ID, "Name": p.Name, "Selected": sel})
+		}
+	}
+
+	// Create a context for rendering pagination.html
+	tmplCtx := map[string]interface{}{
+		"FavoriteTasks":    favs,
+		"Tasks":            nonFavs,
+		"PreviousPage":     prevPage,
+		"NextPage":         nextPage,
+		"CurrentPage":      page,
+		"PrevDisabled":     prevDisabled,
+		"NextDisabled":     nextDisabled,
+		"TotalTasks":       totalTasks,
+		"LoggedIn":         true,
+		"TotalPages":       (totalTasks + pageSize - 1) / pageSize,
+		"Pages":            utils.GetPaginationData(page, pageSize, totalTasks, userID).Pages,
+		"HasRightEllipsis": utils.GetPaginationData(page, pageSize, totalTasks, userID).HasRightEllipsis,
+		"CompletedTasks":   utils.GetCompletedTasksCount(&userID),
+		"IncompleteTasks":  utils.GetIncompleteTasksCount(&userID),
+		"PerPage":          pageSize,
+		"Projects":         projectsList,
+	}
+
+	// Set headers for successful addition
+	w.Header().Set("HX-Trigger", "task-added") // Signal JS to close sidebar and clear form
+
+	if shouldRefresh {
+		// Render the updated task list into the main task-container
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := utils.RenderTemplate(w, r, "pagination.html", tmplCtx); err != nil {
+			http.Error(w, "Error rendering tasks after add: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		return
 	}
 
 	// Fetch tasks for the target project and page
@@ -390,18 +403,6 @@ func APIAddTask(w http.ResponseWriter, r *http.Request) {
 		}
 		if err := db.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND (completed IS NULL OR completed = false)"+projectCond, args...).Scan(&incompleteCountT); err != nil {
 			incompleteCountT = 0
-		}
-	}
-
-	// Fetch projects and mark selected for toolbar
-	projectsList := make([]map[string]interface{}, 0)
-	if projs, perr := storage.GetProjectsForUser(userID); perr == nil {
-		for _, p := range projs {
-			sel := false
-			if targetFilterPtr != nil && *targetFilterPtr == p.ID {
-				sel = true
-			}
-			projectsList = append(projectsList, map[string]interface{}{"ID": p.ID, "Name": p.Name, "Selected": sel})
 		}
 	}
 
