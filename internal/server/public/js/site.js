@@ -218,6 +218,8 @@ document.addEventListener("DOMContentLoaded", () => {
             if (descEl) descEl.value = "";
             const projEl = tf.querySelector("#project_id");
             if (projEl) projEl.value = "";
+            const dueEl = tf.querySelector("#due_date");
+            if (dueEl) dueEl.value = "";
             const idInput = tf.querySelector('input[name="id"]');
             if (idInput) idInput.remove();
             const submit = tf.querySelector('button[type="submit"]');
