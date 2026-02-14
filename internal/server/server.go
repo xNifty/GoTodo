@@ -43,7 +43,15 @@ func StartServer() error {
 	}
 
 	fs := http.FileServer(http.Dir("internal/server/public"))
-	http.Handle("/public/", http.StripPrefix("/public/", fs))
+	publicHandler := http.StripPrefix("/public/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Has("v") {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		} else {
+			w.Header().Set("Cache-Control", "public, max-age=3600")
+		}
+		fs.ServeHTTP(w, r)
+	}))
+	http.Handle("/public/", publicHandler)
 
 	// Regular page handlers (no HTMX requirement)
 	http.HandleFunc("/", handlers.HomeHandler)
