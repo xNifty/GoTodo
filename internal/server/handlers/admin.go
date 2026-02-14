@@ -30,6 +30,7 @@ func AdminPageHandler(w http.ResponseWriter, r *http.Request) {
 	showChangelog := config.Cfg.ShowChangelog
 	enableRegistration := true
 	inviteOnly := true
+	metaDescription := ""
 	if s, err := storage.GetSiteSettings(); err == nil && s != nil {
 		if s.SiteName != "" {
 			siteName = s.SiteName
@@ -40,6 +41,7 @@ func AdminPageHandler(w http.ResponseWriter, r *http.Request) {
 		showChangelog = s.ShowChangelog
 		enableRegistration = s.EnableRegistration
 		inviteOnly = s.InviteOnly
+		metaDescription = s.MetaDescription
 	}
 
 	context := map[string]interface{}{
@@ -51,6 +53,7 @@ func AdminPageHandler(w http.ResponseWriter, r *http.Request) {
 		"ShowChangelog":      showChangelog,
 		"EnableRegistration": enableRegistration,
 		"InviteOnly":         inviteOnly,
+		"MetaDescription":    metaDescription,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -71,6 +74,7 @@ func APIUpdateSiteSettings(w http.ResponseWriter, r *http.Request) {
 
 	siteName := strings.TrimSpace(r.FormValue("site_name"))
 	defaultTz := strings.TrimSpace(r.FormValue("default_timezone"))
+	metaDescription := strings.TrimSpace(r.FormValue("meta_description"))
 	showChangelogStr := r.FormValue("show_changelog")
 	enableRegistrationStr := r.FormValue("enable_registration")
 	inviteOnlyStr := r.FormValue("invite_only")
@@ -107,6 +111,7 @@ func APIUpdateSiteSettings(w http.ResponseWriter, r *http.Request) {
 		SiteVersion:        "",
 		EnableRegistration: enableRegistration,
 		InviteOnly:         inviteOnly,
+		MetaDescription:    metaDescription,
 	}
 	if err := storage.UpsertSiteSettings(ss); err != nil {
 		// fallback: persist to config file
