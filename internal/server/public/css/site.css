@@ -8,14 +8,6 @@ html[data-theme="dark"] #email.form-control-plaintext {
 html[data-theme="light"] #email.form-control-plaintext {
     color: #000 !important;
 }
-@import url("https://fonts.googleapis.com/css2?family=Fira+Code:wght@400&display=swap");
-
-@font-face {
-    font-family: "bootstrap-icons";
-    font-display: swap;
-    src: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/fonts/bootstrap-icons.woff2") format("woff2"),
-        url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/fonts/bootstrap-icons.woff") format("woff");
-}
 
 :root {
     /* Light mode (default) variables */
