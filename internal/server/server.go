@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 )
 
 // Literally just used to prevent favicon.ico from being requested
@@ -44,7 +45,7 @@ func StartServer() error {
 
 	fs := http.FileServer(http.Dir("internal/server/public"))
 	publicHandler := http.StripPrefix("/public/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Has("v") {
+		if r.URL.Query().Has("v") || strings.HasPrefix(r.URL.Path, "/vendor/") {
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		} else {
 			w.Header().Set("Cache-Control", "public, max-age=3600")
