@@ -1666,6 +1666,22 @@ a {
     transition: color var(--transition-time);
 }
 
+/* Footer contrast improvements (light/default theme) */
+html:not([data-theme="dark"]) .app-footer .text-muted {
+    color: #495057;
+}
+
+html:not([data-theme="dark"]) .app-footer a {
+    color: #0a58ca;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+html:not([data-theme="dark"]) .app-footer a:hover,
+html:not([data-theme="dark"]) .app-footer a:focus {
+    color: #084298;
+}
+
 /* ========================================
    TOAST NOTIFICATIONS & STATUS MESSAGES
    ======================================== */
