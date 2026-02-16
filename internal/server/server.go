@@ -45,7 +45,9 @@ func StartServer() error {
 
 	fs := http.FileServer(http.Dir("internal/server/public"))
 	publicHandler := http.StripPrefix("/public/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Has("v") || strings.HasPrefix(r.URL.Path, "/vendor/") {
+
+		if r.URL.Query().Has("v") || strings.HasPrefix(r.URL.Path, "vendor/") {
+			fmt.Println("Serving static file: ", r.URL.Path)
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		} else {
 			w.Header().Set("Cache-Control", "public, max-age=3600")
