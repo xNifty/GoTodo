@@ -58,6 +58,7 @@
     <body>
         {{template "navbar.html" .}}
 
+        <main>
         {{if .Flashes}}
         {{range .Flashes}}
         <div
@@ -189,6 +190,7 @@
                 </div>
             </div>
         </div>
+        </main>
         
         {{template "footer.html" .}}
 
