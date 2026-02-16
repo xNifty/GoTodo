@@ -1682,6 +1682,36 @@ html:not([data-theme="dark"]) .app-footer a:focus {
     color: #084298;
 }
 
+/* Button contrast improvements (light/default theme) */
+html:not([data-theme="dark"]) .btn-outline-primary {
+    color: #0a58ca;
+    border-color: #0a58ca;
+}
+
+html:not([data-theme="dark"]) .btn-outline-primary:hover:not([disabled]),
+html:not([data-theme="dark"]) .btn-outline-primary:focus:not([disabled]) {
+    color: #fff;
+    background-color: #0a58ca;
+    border-color: #0a58ca;
+}
+
+html:not([data-theme="dark"]) .btn-outline-secondary {
+    color: #495057;
+    border-color: #495057;
+}
+
+html:not([data-theme="dark"]) .btn-outline-secondary:hover:not([disabled]),
+html:not([data-theme="dark"]) .btn-outline-secondary:focus:not([disabled]) {
+    color: #fff;
+    background-color: #495057;
+    border-color: #495057;
+}
+
+/* Edit icon contrast improvement (light/default theme) */
+html:not([data-theme="dark"]) .bi-pencil {
+    color: #0a58ca;
+}
+
 /* ========================================
    TOAST NOTIFICATIONS & STATUS MESSAGES
    ======================================== */
