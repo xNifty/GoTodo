@@ -36,6 +36,11 @@ import {
   attachNotificationListeners,
 } from "./modules/notifications.js";
 import { attachAllEventListeners } from "./modules/events.js";
+import {
+  initGlobalAnnouncement,
+  dismissGlobalAnnouncement,
+} from "./modules/announcement.js";
+import { initAnnouncementCharCounter } from "./modules/admin.js";
 
 // Expose these to global scope for HTMX and other inline scripts
 window.apiPath = apiPath;
@@ -58,6 +63,8 @@ document.addEventListener("DOMContentLoaded", () => {
   attachChangelogListener();
   attachNotificationListeners();
   attachAllEventListeners();
+  initGlobalAnnouncement();
+  initAnnouncementCharCounter();
 
   // Debug helper: when ?cssdebug=1 is present in the URL, log which media queries match.
   (function cssDebugHelper() {

@@ -86,6 +86,10 @@ func RunMigrations() error {
 		fmt.Printf("migration: MigrateSiteSettingsAddMetaDescription failed: %v\n", err)
 		errCount++
 	}
+	if err := MigrateSiteSettingsAddGlobalAnnouncement(); err != nil {
+		fmt.Printf("migration: MigrateSiteSettingsAddGlobalAnnouncement failed: %v\n", err)
+		errCount++
+	}
 
 	// Ensure password_reset table exists
 	if err := CreatePasswordResetTable(); err != nil {

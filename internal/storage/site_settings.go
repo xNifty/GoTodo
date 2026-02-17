@@ -7,13 +7,15 @@ import (
 
 // SiteSettings represents site-wide settings stored in the database.
 type SiteSettings struct {
-	SiteName           string
-	DefaultTimezone    string
-	ShowChangelog      bool
-	SiteVersion        string
-	EnableRegistration bool
-	InviteOnly         bool
-	MetaDescription    string
+	SiteName                 string
+	DefaultTimezone          string
+	ShowChangelog            bool
+	SiteVersion              string
+	EnableRegistration       bool
+	InviteOnly               bool
+	MetaDescription          string
+	EnableGlobalAnnouncement bool
+	GlobalAnnouncementText   string
 }
 
 // CreateSiteSettingsTable ensures the site_settings table exists.
@@ -34,7 +36,9 @@ func CreateSiteSettingsTable() error {
 			site_version TEXT,
 			enable_registration BOOLEAN DEFAULT TRUE,
 			invite_only BOOLEAN DEFAULT TRUE,
-			meta_description TEXT
+			meta_description TEXT,
+			enable_global_announcement BOOLEAN DEFAULT FALSE,
+			global_announcement_text TEXT
         )
     `)
 	if err != nil {
@@ -52,8 +56,8 @@ func GetSiteSettings() (*SiteSettings, error) {
 	defer CloseDatabase(pool)
 
 	var s SiteSettings
-	row := pool.QueryRow(context.Background(), "SELECT site_name, default_timezone, show_changelog, site_version, enable_registration, invite_only, COALESCE(meta_description, '') FROM site_settings WHERE id = 1")
-	if err := row.Scan(&s.SiteName, &s.DefaultTimezone, &s.ShowChangelog, &s.SiteVersion, &s.EnableRegistration, &s.InviteOnly, &s.MetaDescription); err != nil {
+	row := pool.QueryRow(context.Background(), "SELECT site_name, default_timezone, show_changelog, site_version, enable_registration, invite_only, COALESCE(meta_description, ''), COALESCE(enable_global_announcement, FALSE), COALESCE(global_announcement_text, '') FROM site_settings WHERE id = 1")
+	if err := row.Scan(&s.SiteName, &s.DefaultTimezone, &s.ShowChangelog, &s.SiteVersion, &s.EnableRegistration, &s.InviteOnly, &s.MetaDescription, &s.EnableGlobalAnnouncement, &s.GlobalAnnouncementText); err != nil {
 		return nil, err
 	}
 	return &s, nil
@@ -68,8 +72,8 @@ func UpsertSiteSettings(s SiteSettings) error {
 	defer CloseDatabase(pool)
 
 	_, err = pool.Exec(context.Background(), `
-        INSERT INTO site_settings (id, site_name, default_timezone, show_changelog, site_version, enable_registration, invite_only, meta_description)
-        VALUES (1, $1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO site_settings (id, site_name, default_timezone, show_changelog, site_version, enable_registration, invite_only, meta_description, enable_global_announcement, global_announcement_text)
+        VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9)
         ON CONFLICT (id) DO UPDATE SET
             site_name = EXCLUDED.site_name,
             default_timezone = EXCLUDED.default_timezone,
@@ -77,8 +81,10 @@ func UpsertSiteSettings(s SiteSettings) error {
             site_version = EXCLUDED.site_version,
             enable_registration = EXCLUDED.enable_registration,
             invite_only = EXCLUDED.invite_only,
-            meta_description = EXCLUDED.meta_description
-    `, s.SiteName, s.DefaultTimezone, s.ShowChangelog, s.SiteVersion, s.EnableRegistration, s.InviteOnly, s.MetaDescription)
+            meta_description = EXCLUDED.meta_description,
+            enable_global_announcement = EXCLUDED.enable_global_announcement,
+            global_announcement_text = EXCLUDED.global_announcement_text
+    `, s.SiteName, s.DefaultTimezone, s.ShowChangelog, s.SiteVersion, s.EnableRegistration, s.InviteOnly, s.MetaDescription, s.EnableGlobalAnnouncement, s.GlobalAnnouncementText)
 	if err != nil {
 		return fmt.Errorf("failed to upsert site_settings: %v", err)
 	}
@@ -112,6 +118,23 @@ func MigrateSiteSettingsAddMetaDescription() error {
 
 	if _, err := pool.Exec(context.Background(), "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS meta_description TEXT"); err != nil {
 		return fmt.Errorf("failed to add meta_description column to site_settings: %v", err)
+	}
+	return nil
+}
+
+// MigrateSiteSettingsAddGlobalAnnouncement adds global announcement columns if they don't exist.
+func MigrateSiteSettingsAddGlobalAnnouncement() error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return err
+	}
+	defer CloseDatabase(pool)
+
+	if _, err := pool.Exec(context.Background(), "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS enable_global_announcement BOOLEAN DEFAULT FALSE"); err != nil {
+		return fmt.Errorf("failed to add enable_global_announcement column to site_settings: %v", err)
+	}
+	if _, err := pool.Exec(context.Background(), "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS global_announcement_text TEXT"); err != nil {
+		return fmt.Errorf("failed to add global_announcement_text column to site_settings: %v", err)
 	}
 	return nil
 }

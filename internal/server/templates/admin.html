@@ -87,6 +87,20 @@
                                     <input class="form-check-input" type="checkbox" id="inviteOnly" name="invite_only" {{if .InviteOnly}}checked{{end}} />
                                     <label class="form-check-label" for="inviteOnly">Invite only</label>
                                 </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="enableGlobalAnnouncement" name="enable_global_announcement" {{if .EnableGlobalAnnouncement}}checked{{end}} />
+                                    <label class="form-check-label" for="enableGlobalAnnouncement">Enable global announcement</label>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="global_announcement_text" class="form-label">Global Announcement Text</label>
+                                    <textarea class="form-control" id="global_announcement_text" name="global_announcement_text" rows="3" maxlength="500" placeholder="Enter a site-wide announcement message (max 500 characters)">{{.GlobalAnnouncementText}}</textarea>
+                                    <div class="d-flex justify-content-between align-items-center mt-1">
+                                        <small class="form-hint">Max 500 Characters</small>
+                                        <small class="text-muted"><span id="announcement-char-count">{{if .GlobalAnnouncementText}}{{len .GlobalAnnouncementText}}{{else}}0{{end}}</span>/500</small>
+                                    </div>
+                                    <div class="form-label">This message will appear at the top of all pages when enabled. Users can dismiss it.</div>
+                                    <div id="announcement-text-error" class="invalid-feedback d-block">{{.ValidationError}}</div>
+                                </div>
                                 <div class="d-flex gap-2">
                                     <button class="btn btn-primary" type="submit">Save</button>
                                     <a class="btn btn-secondary" href="{{basePath}}">Cancel</a>

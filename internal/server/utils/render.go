@@ -124,6 +124,8 @@ func RenderTemplate(w http.ResponseWriter, r *http.Request, tmpl string, data in
 		ctx["EnableRegistration"] = true
 		ctx["InviteOnly"] = true
 		ctx["MetaDescription"] = ""
+		ctx["EnableGlobalAnnouncement"] = false
+		ctx["GlobalAnnouncementText"] = ""
 		// Site version comes only from the baked-in binary; never from DB
 		ctx["SiteVersion"] = version.Version
 		if s, err := storage.GetSiteSettings(); err == nil && s != nil {
@@ -137,6 +139,8 @@ func RenderTemplate(w http.ResponseWriter, r *http.Request, tmpl string, data in
 			ctx["EnableRegistration"] = s.EnableRegistration
 			ctx["InviteOnly"] = s.InviteOnly
 			ctx["MetaDescription"] = s.MetaDescription
+			ctx["EnableGlobalAnnouncement"] = s.EnableGlobalAnnouncement
+			ctx["GlobalAnnouncementText"] = s.GlobalAnnouncementText
 		}
 		// Inject theme from cookie if present
 		if r != nil {
@@ -168,6 +172,8 @@ func RenderTemplate(w http.ResponseWriter, r *http.Request, tmpl string, data in
 		ctx["EnableRegistration"] = true
 		ctx["InviteOnly"] = true
 		ctx["MetaDescription"] = ""
+		ctx["EnableGlobalAnnouncement"] = false
+		ctx["GlobalAnnouncementText"] = ""
 		ctx["SiteVersion"] = version.Version
 		if s, err := storage.GetSiteSettings(); err == nil && s != nil {
 			if s.SiteName != "" {
@@ -180,6 +186,8 @@ func RenderTemplate(w http.ResponseWriter, r *http.Request, tmpl string, data in
 			ctx["EnableRegistration"] = s.EnableRegistration
 			ctx["InviteOnly"] = s.InviteOnly
 			ctx["MetaDescription"] = s.MetaDescription
+			ctx["EnableGlobalAnnouncement"] = s.EnableGlobalAnnouncement
+			ctx["GlobalAnnouncementText"] = s.GlobalAnnouncementText
 		}
 		if r != nil {
 			if c, err := r.Cookie("theme"); err == nil {
