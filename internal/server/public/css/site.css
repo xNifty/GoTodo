@@ -1550,7 +1550,7 @@ textarea {
     border-color: #444;
 }
 
-[data-theme="dark"] .btn-close {
+[data-theme="dark"] .btn-close:not(.no-invert) {
     filter: invert(1) grayscale(100%) brightness(200%);
 }
 
