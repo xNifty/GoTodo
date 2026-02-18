@@ -138,6 +138,9 @@ func StartServer() error {
 		}
 	})
 
+	// Dismiss announcement endpoint
+	http.HandleFunc("/api/dismiss-announcement", handlers.APIDismissAnnouncement)
+
 	fmt.Printf("Starting server on %s\n", addr)
 	return http.ListenAndServe(addr, utils.SecurityHeadersMiddleware(http.DefaultServeMux))
 }

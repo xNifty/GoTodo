@@ -69,21 +69,15 @@ func SecurityHeadersMiddleware(next http.Handler) http.Handler {
 			cspNonce = "'nonce-" + nonce + "' "
 		}
 
-		// CSP with specific whitelisted CDN resources
+		// CSP with local vendor files
 		w.Header().Set("Content-Security-Policy",
 			"default-src 'self'; "+
 				"base-uri 'self'; "+
 				"frame-ancestors 'none'; "+
-				"script-src 'self' "+cspNonce+
-				"https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js "+
-				"https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.min.js "+
-				"https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js "+
-				"https://unpkg.com/htmx.org@2.0.3; "+
-				"style-src 'self' 'unsafe-inline' "+
-				"https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css "+
-				"https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css; "+
+				"script-src 'self' "+cspNonce+"; "+
+				"style-src 'self' 'unsafe-inline'; "+
 				"img-src 'self' data:; "+
-				"font-src 'self' data: https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/fonts/; "+
+				"font-src 'self' data:; "+
 				"connect-src 'self'; "+
 				"object-src 'none'",
 		)

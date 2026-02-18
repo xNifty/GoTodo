@@ -142,6 +142,17 @@ func RenderTemplate(w http.ResponseWriter, r *http.Request, tmpl string, data in
 			ctx["EnableGlobalAnnouncement"] = s.EnableGlobalAnnouncement
 			ctx["GlobalAnnouncementText"] = s.GlobalAnnouncementText
 		}
+
+		if r != nil {
+			session, err := sessionstore.Store.Get(r, "session")
+			if err == nil && session != nil {
+				if dismissed, ok := session.Values["announcement_dismissed"].(bool); ok && dismissed {
+					// Override the DB setting - hide announcement for this session
+					ctx["EnableGlobalAnnouncement"] = false
+				}
+			}
+		}
+
 		// Inject theme from cookie if present
 		if r != nil {
 			if c, err := r.Cookie("theme"); err == nil {
