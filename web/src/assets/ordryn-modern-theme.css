@@ -1,0 +1,554 @@
+/* ==========================================================================
+   ORDRYN MODERN THEME SYSTEM
+   Multi-Theme tokens (Warm, Light, Dark), density utilities, badge styles,
+   card elevation, full-height layout, hover actions, and nesting support.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Theme Variable Definitions
+   -------------------------------------------------------------------------- */
+
+/* Theme: WARM (Mockup default) */
+:root,
+[data-theme="warm"] {
+  --ordryn-bg: #fffdf8;
+  --ordryn-sidebar-bg: #fff59d;
+  --ordryn-sidebar-text: #451a03;
+  --ordryn-sidebar-active-bg: #fef08a;
+  --ordryn-sidebar-border: #fde047;
+  --ordryn-header-bg: #ffffff;
+  --ordryn-header-border: #f3eed9;
+  --ordryn-card-bg: #ffffff;
+  --ordryn-card-border: #eee9d5;
+  --ordryn-card-shadow: 0 4px 12px rgba(180, 140, 60, 0.06);
+  --ordryn-card-hover-shadow: 0 6px 18px rgba(180, 140, 60, 0.12);
+  --ordryn-text: #1e293b;
+  --ordryn-muted: #64748b;
+  --ordryn-muted-bg: #f8f6ee;
+  --ordryn-accent: #f59e0b;
+  --ordryn-accent-light: #fef3c7;
+  
+  --badge-status-bg: #fed7aa;
+  --badge-status-text: #9a3412;
+  --badge-tag-bg: #ddd6fe;
+  --badge-tag-text: #5b21b6;
+  --badge-priority-low-bg: #e2e8f0;
+  --badge-priority-low-text: #475569;
+  --badge-priority-med-bg: #fef3c7;
+  --badge-priority-med-text: #92400e;
+  --badge-priority-high-bg: #fecdd3;
+  --badge-priority-high-text: #9f1239;
+  
+  --ordryn-input-bg: #ffffff;
+  --ordryn-input-border: #e2e8f0;
+  --ordryn-filter-active-bg: #1e293b;
+  --ordryn-filter-active-text: #ffffff;
+}
+
+/* Theme: LIGHT (Classic Light) */
+[data-theme="light"] {
+  --ordryn-bg: #f8fafc;
+  --ordryn-sidebar-bg: #ffffff;
+  --ordryn-sidebar-text: #1e293b;
+  --ordryn-sidebar-active-bg: #e2e8f0;
+  --ordryn-sidebar-border: #e2e8f0;
+  --ordryn-header-bg: #ffffff;
+  --ordryn-header-border: #e2e8f0;
+  --ordryn-card-bg: #ffffff;
+  --ordryn-card-border: #e2e8f0;
+  --ordryn-card-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --ordryn-card-hover-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  --ordryn-text: #0f172a;
+  --ordryn-muted: #64748b;
+  --ordryn-muted-bg: #f1f5f9;
+  --ordryn-accent: #2563eb;
+  --ordryn-accent-light: #dbeafe;
+  
+  --badge-status-bg: #ffedd5;
+  --badge-status-text: #c2410c;
+  --badge-tag-bg: #e0e7ff;
+  --badge-tag-text: #3730a3;
+  --badge-priority-low-bg: #f1f5f9;
+  --badge-priority-low-text: #475569;
+  --badge-priority-med-bg: #fef3c7;
+  --badge-priority-med-text: #92400e;
+  --badge-priority-high-bg: #ffe4e6;
+  --badge-priority-high-text: #9f1239;
+
+  --ordryn-input-bg: #ffffff;
+  --ordryn-input-border: #cbd5e1;
+  --ordryn-filter-active-bg: #2563eb;
+  --ordryn-filter-active-text: #ffffff;
+}
+
+/* Theme: DARK (Classic Dark) */
+[data-theme="dark"] {
+  --ordryn-bg: #0f172a;
+  --ordryn-sidebar-bg: #1e293b;
+  --ordryn-sidebar-text: #f8fafc;
+  --ordryn-sidebar-active-bg: #334155;
+  --ordryn-sidebar-border: #334155;
+  --ordryn-header-bg: #1e293b;
+  --ordryn-header-border: #334155;
+  --ordryn-card-bg: #1e293b;
+  --ordryn-card-border: #334155;
+  --ordryn-card-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --ordryn-card-hover-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  --ordryn-text: #f8fafc;
+  --ordryn-muted: #94a3b8;
+  --ordryn-muted-bg: #0f172a;
+  --ordryn-accent: #38bdf8;
+  --ordryn-accent-light: #075985;
+  
+  --badge-status-bg: #7c2d12;
+  --badge-status-text: #ffedd5;
+  --badge-tag-bg: #3730a3;
+  --badge-tag-text: #e0e7ff;
+  --badge-priority-low-bg: #334155;
+  --badge-priority-low-text: #cbd5e1;
+  --badge-priority-med-bg: #78350f;
+  --badge-priority-med-text: #fef3c7;
+  --badge-priority-high-bg: #881337;
+  --badge-priority-high-text: #ffe4e6;
+
+  --ordryn-input-bg: #0f172a;
+  --ordryn-input-border: #475569;
+  --ordryn-filter-active-bg: #38bdf8;
+  --ordryn-filter-active-text: #0f172a;
+}
+
+/* --------------------------------------------------------------------------
+   2. Global Base Theme Overrides & Full-Height Shell
+   -------------------------------------------------------------------------- */
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--ordryn-bg);
+  color: var(--ordryn-text);
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* Task creation drawer overlay & blur over left sidebar */
+#sidebar-backdrop.sidebar-backdrop,
+.sidebar-backdrop {
+  z-index: 1050 !important;
+  backdrop-filter: blur(4px) !important;
+  background: rgba(0, 0, 0, 0.4) !important;
+}
+
+#sidebar {
+  z-index: 1060 !important;
+}
+
+/* --------------------------------------------------------------------------
+   3. Modern Layout Structure (Full-Height Sidebar & Main Area)
+   -------------------------------------------------------------------------- */
+
+.ordryn-app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.ordryn-main-layout {
+  display: flex;
+  flex: 1;
+  min-height: calc(100vh - 57px);
+  align-items: stretch;
+}
+
+/* --------------------------------------------------------------------------
+   4. Full-Height Sidebar & Floating Popover Tooltips
+   -------------------------------------------------------------------------- */
+
+.ordryn-sidebar {
+  width: 260px;
+  background-color: var(--ordryn-sidebar-bg);
+  color: var(--ordryn-sidebar-text);
+  border-right: 1px solid var(--ordryn-sidebar-border);
+  padding: 1.25rem 1rem;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.25s ease, transform 0.25s ease;
+  z-index: 1040;
+  align-self: stretch;
+}
+
+.ordryn-sidebar.collapsed {
+  width: 64px;
+  padding: 1.25rem 0.5rem;
+}
+
+.ordryn-sidebar.collapsed .sidebar-text,
+.ordryn-sidebar.collapsed .sidebar-section-header span {
+  display: none;
+}
+
+/* Floating Popover Tooltip for Collapsed Sidebar Items */
+.ordryn-sidebar.collapsed .sidebar-nav-link {
+  position: relative;
+}
+
+.ordryn-sidebar.collapsed .sidebar-nav-link[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 10px;
+  background-color: var(--ordryn-sidebar-text);
+  color: var(--ordryn-sidebar-bg);
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  z-index: 1070;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+}
+
+.ordryn-sidebar-toggle-btn {
+  background: transparent;
+  border: none;
+  color: var(--ordryn-sidebar-text);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  transition: background-color 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ordryn-sidebar-toggle-btn:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.sidebar-nav-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sidebar-nav-item {
+  margin-bottom: 0.35rem;
+}
+
+.sidebar-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.75rem;
+  color: var(--ordryn-sidebar-text);
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 0.95rem;
+  transition: background-color 0.15s ease;
+}
+
+.sidebar-nav-link:hover,
+.sidebar-nav-link.active {
+  background-color: var(--ordryn-sidebar-active-bg);
+}
+
+.sidebar-section-header {
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  padding-left: 0.5rem;
+  opacity: 0.8;
+}
+
+.sidebar-section-link {
+  color: var(--ordryn-sidebar-text);
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+}
+
+.sidebar-section-link:hover {
+  opacity: 0.75;
+  text-decoration: underline;
+}
+
+/* --------------------------------------------------------------------------
+   5. Filter Toolbar Styling (No Overflow Clipping)
+   -------------------------------------------------------------------------- */
+
+.ordryn-filter-bar {
+  background-color: transparent;
+  padding: 0.5rem 0;
+  margin-bottom: 1.25rem;
+}
+
+.filter-pills-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 100;
+}
+
+.filter-pill-btn {
+  background: var(--ordryn-card-bg);
+  border: 1px solid var(--ordryn-card-border);
+  color: var(--ordryn-text);
+  padding: 0.35rem 0.85rem;
+  border-radius: 9999px;
+  font-size: 0.825rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.filter-pill-btn:hover {
+  border-color: var(--ordryn-accent);
+}
+
+.filter-pill-btn.active {
+  background-color: var(--ordryn-filter-active-bg);
+  color: var(--ordryn-filter-active-text);
+  border-color: var(--ordryn-filter-active-bg);
+}
+
+/* Ensure dropdown menus pop over cleanly */
+.filter-pills-container .dropdown-menu {
+  z-index: 1050;
+}
+
+/* --------------------------------------------------------------------------
+   6. Task Card & Inline Editing Utilities
+   -------------------------------------------------------------------------- */
+
+.ordryn-task-card {
+  background-color: var(--ordryn-card-bg);
+  border: 1px solid var(--ordryn-card-border);
+  border-radius: 12px;
+  box-shadow: var(--ordryn-card-shadow);
+  margin-bottom: 0.75rem;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  position: relative;
+  overflow: visible;
+}
+
+.ordryn-task-card:hover {
+  box-shadow: var(--ordryn-card-hover-shadow);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.ordryn-task-card.is-completed {
+  opacity: 0.8;
+}
+
+.ordryn-task-card.is-completed .task-title {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+/* Desktop Inline Edit Controls */
+.inline-edit-input {
+  background: var(--ordryn-card-bg);
+  border: 1px solid var(--ordryn-accent);
+  border-radius: 6px;
+  color: var(--ordryn-text);
+  padding: 0.2rem 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  width: 100%;
+}
+
+.inline-edit-textarea {
+  background: var(--ordryn-card-bg);
+  border: 1px solid var(--ordryn-accent);
+  border-radius: 6px;
+  color: var(--ordryn-text);
+  padding: 0.25rem 0.5rem;
+  font-size: 0.85rem;
+  width: 100%;
+  resize: vertical;
+}
+
+/* Hover-activated controls */
+.hover-reveal {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.ordryn-task-card:hover .hover-reveal,
+.sidebar-nav-item:hover .hover-reveal,
+.hover-reveal.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.drag-handle-cell,
+.select-checkbox-cell {
+  width: 22px;
+  min-width: 22px;
+}
+
+/* Translucent checkmark on hover when incomplete */
+.completion-check-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--ordryn-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  transition: color 0.15s ease, opacity 0.15s ease;
+}
+
+.completion-check-btn:hover .bi-circle {
+  opacity: 0.4;
+}
+
+/* Comfortable Mode */
+.ordryn-task-card.density-comfortable {
+  padding: 1.1rem 1.25rem;
+}
+
+/* Ultra-Compact Dense Mode */
+.ordryn-task-card.density-dense {
+  padding: 0.25rem 0.65rem;
+  margin-bottom: 0.25rem;
+  border-radius: 6px;
+}
+
+.ordryn-task-card.density-dense .task-title {
+  font-size: 0.85rem;
+}
+
+.ordryn-task-card.density-dense .ordryn-badge {
+  padding: 0.1rem 0.45rem;
+  font-size: 0.7rem;
+}
+
+.ordryn-task-card.density-dense .completion-check-btn {
+  font-size: 1.05rem;
+}
+
+.ordryn-task-card.density-dense .task-description {
+  display: none;
+}
+
+/* Nested Task Indentation Support */
+.nested-indent-wrapper {
+  transition: padding-left 0.2s ease;
+}
+
+.nested-tree-line {
+  position: absolute;
+  left: calc(var(--nest-depth) * 24px - 12px);
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: var(--ordryn-card-border);
+  display: block;
+}
+
+/* --------------------------------------------------------------------------
+   7. Badge Styling (Pills)
+   -------------------------------------------------------------------------- */
+
+.ordryn-badge {
+  padding: 0.2rem 0.65rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  line-height: 1.2;
+}
+
+.ordryn-badge-status {
+  background-color: var(--badge-status-bg);
+  color: var(--badge-status-text);
+}
+
+.ordryn-badge-tag {
+  background-color: var(--badge-tag-bg);
+  color: var(--badge-tag-text);
+}
+
+.ordryn-badge-priority-low {
+  background-color: var(--badge-priority-low-bg);
+  color: var(--badge-priority-low-text);
+}
+
+.ordryn-badge-priority-med {
+  background-color: var(--badge-priority-med-bg);
+  color: var(--badge-priority-med-text);
+}
+
+.ordryn-badge-priority-high {
+  background-color: var(--badge-priority-high-bg);
+  color: var(--badge-priority-high-text);
+}
+
+/* --------------------------------------------------------------------------
+   8. Mobile Responsiveness Breakpoints
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 768px) {
+  .ordryn-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    transform: translateX(-100%);
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+  }
+
+  .ordryn-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .ordryn-sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 1030;
+  }
+
+  .ordryn-task-card.density-comfortable {
+    padding: 0.85rem;
+  }
+
+  /* Always show hover controls on mobile devices */
+  .hover-reveal {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+
+  /* Position action buttons below task details on mobile */
+  .mobile-actions-wrapper {
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px dashed var(--ordryn-card-border);
+  }
+}

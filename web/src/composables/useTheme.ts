@@ -1,24 +1,39 @@
 import { onMounted, ref } from 'vue'
 
-const theme = ref<'light' | 'dark'>('light')
+export type ThemeName = 'warm' | 'light' | 'dark'
 
-function readTheme(): 'light' | 'dark' {
-  const existing = document.documentElement.getAttribute('data-theme')
-  if (existing === 'dark' || existing === 'light') return existing
+export interface ThemeOption {
+  id: ThemeName
+  label: string
+  icon: string
+}
+
+export const AVAILABLE_THEMES: ThemeOption[] = [
+  { id: 'warm', label: 'Warm Pastel', icon: 'bi-sun-fill' },
+  { id: 'light', label: 'Classic Light', icon: 'bi-brightness-high' },
+  { id: 'dark', label: 'Classic Dark', icon: 'bi-moon-stars-fill' },
+]
+
+const currentTheme = ref<ThemeName>('warm')
+
+function readSavedTheme(): ThemeName {
   try {
-    const saved = localStorage.getItem('theme')
-    if (saved === 'dark' || saved === 'light') return saved
+    const saved = localStorage.getItem('ordryn_theme') || localStorage.getItem('theme')
+    if (saved === 'warm' || saved === 'light' || saved === 'dark') {
+      return saved as ThemeName
+    }
   } catch {
     /* ignore */
   }
-  return 'light'
+  return 'warm'
 }
 
-function applyTheme(next: 'light' | 'dark') {
-  theme.value = next
+function applyTheme(next: ThemeName) {
+  currentTheme.value = next
   document.documentElement.setAttribute('data-theme', next)
-  document.documentElement.setAttribute('data-bs-theme', next)
+  document.documentElement.setAttribute('data-bs-theme', next === 'dark' ? 'dark' : 'light')
   try {
+    localStorage.setItem('ordryn_theme', next)
     localStorage.setItem('theme', next)
     document.cookie = `theme=${next}; path=/; max-age=31536000; SameSite=Lax`
   } catch {
@@ -28,14 +43,28 @@ function applyTheme(next: 'light' | 'dark') {
 
 export function useTheme() {
   onMounted(() => {
-    applyTheme(readTheme())
+    applyTheme(readSavedTheme())
   })
 
-  function toggleTheme() {
-    applyTheme(theme.value === 'light' ? 'dark' : 'light')
+  function setTheme(name: ThemeName) {
+    applyTheme(name)
   }
 
-  const isDark = () => theme.value === 'dark'
+  function cycleTheme() {
+    const currentIndex = AVAILABLE_THEMES.findIndex((t) => t.id === currentTheme.value)
+    const nextIndex = (currentIndex + 1) % AVAILABLE_THEMES.length
+    applyTheme(AVAILABLE_THEMES[nextIndex].id)
+  }
 
-  return { theme, toggleTheme, isDark }
+  const isDark = () => currentTheme.value === 'dark'
+
+  return {
+    theme: currentTheme,
+    currentTheme,
+    availableThemes: AVAILABLE_THEMES,
+    setTheme,
+    cycleTheme,
+    toggleTheme: cycleTheme,
+    isDark,
+  }
 }
