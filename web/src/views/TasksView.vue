@@ -7,6 +7,7 @@ import { APIError } from '@/api/types'
 import ModernSidebar from '@/components/modern/ModernSidebar.vue'
 import ModernTaskFilterBar from '@/components/modern/ModernTaskFilterBar.vue'
 import ModernTaskCard from '@/components/modern/ModernTaskCard.vue'
+import AppFooter from '@/components/AppFooter.vue'
 import { useAuth } from '@/composables/useAuth'
 import { useInfiniteScroll } from '@/composables/useInfiniteScroll'
 import { useTaskListFilters } from '@/composables/useTaskListFilters'
@@ -56,6 +57,12 @@ const showEditProjectModal = ref(false)
 const editingProject = ref<Project | null>(null)
 const editedProjectName = ref('')
 
+// Bulk Control Panel State
+const bulkProject = ref('')
+const bulkTag = ref('')
+const bulkPriority = ref('')
+const bulkDate = ref('')
+
 const toast = useToast()
 const { askConfirm } = useConfirm()
 const { user } = useAuth()
@@ -86,6 +93,22 @@ const showTaskTable = computed(
 const hasMore = computed(() => loadedPage.value < totalPages.value)
 const sortableEnabled = computed(() => filters.sort !== 'priority' && !loading.value)
 const showFavoriteList = computed(() => favoriteTasks.value.length > 0)
+
+function getTodayStr() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function getTomorrowStr() {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  return d.toISOString().slice(0, 10)
+}
+
+function getNextWeekStr() {
+  const d = new Date()
+  d.setDate(d.getDate() + 7)
+  return d.toISOString().slice(0, 10)
+}
 
 function taskMatchesCurrentFilters(task: Task): boolean {
   if (!taskMatchesStatusFilter(task)) return false
@@ -641,6 +664,109 @@ onMounted(async () => {
           <div class="d-flex align-items-center gap-2">
             <button type="button" class="btn btn-xs btn-success rounded-pill" @click="bulk('complete')">Complete</button>
             <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill" @click="bulk('incomplete')">Incomplete</button>
+
+            <!-- Compact Feature-Rich "More Actions" Popover Panel -->
+            <div class="dropdown d-inline-block">
+              <button class="btn btn-xs btn-outline-primary dropdown-toggle rounded-pill" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                More Actions
+              </button>
+              <div class="dropdown-menu shadow-lg border p-3 rounded-3 mt-1" style="width: 280px; max-width: 90vw;">
+                <!-- Move to Project -->
+                <div class="mb-3">
+                  <label class="form-label text-muted small fw-bold text-uppercase mb-1" style="font-size: 0.7rem;">Move to project...</label>
+                  <select v-model="bulkProject" class="form-select form-select-sm mb-2">
+                    <option value="">Select project...</option>
+                    <option value="0">No Project</option>
+                    <option v-for="p in projects" :key="p.id" :value="String(p.id)">{{ p.name }}</option>
+                  </select>
+                  <button
+                    type="button"
+                    class="btn btn-xs btn-outline-primary rounded-pill w-100"
+                    :disabled="bulkProject === ''"
+                    @click="bulk('move_project', { project_id: bulkProject })"
+                  >
+                    Move
+                  </button>
+                </div>
+
+                <!-- Select Tag -->
+                <div class="mb-3 border-top pt-2">
+                  <label class="form-label text-muted small fw-bold text-uppercase mb-1" style="font-size: 0.7rem;">Select tag...</label>
+                  <select v-model="bulkTag" class="form-select form-select-sm mb-2">
+                    <option value="">Select tag...</option>
+                    <option v-for="t in tags" :key="t.id" :value="String(t.id)">{{ t.name }}</option>
+                  </select>
+                  <div class="d-flex gap-2">
+                    <button
+                      type="button"
+                      class="btn btn-xs btn-outline-primary rounded-pill flex-grow-1"
+                      :disabled="!bulkTag"
+                      @click="bulk('add_tag', { tag_id: parseInt(bulkTag, 10) })"
+                    >
+                      Add Tag
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-xs btn-outline-secondary rounded-pill flex-grow-1"
+                      :disabled="!bulkTag"
+                      @click="bulk('remove_tag', { tag_id: parseInt(bulkTag, 10) })"
+                    >
+                      Remove Tag
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Priority -->
+                <div class="mb-3 border-top pt-2">
+                  <label class="form-label text-muted small fw-bold text-uppercase mb-1" style="font-size: 0.7rem;">Priority</label>
+                  <select v-model="bulkPriority" class="form-select form-select-sm mb-2">
+                    <option value="">Select priority...</option>
+                    <option value="3">High Priority</option>
+                    <option value="2">Medium Priority</option>
+                    <option value="1">Low Priority</option>
+                    <option value="0">No Priority</option>
+                  </select>
+                  <button
+                    type="button"
+                    class="btn btn-xs btn-outline-primary rounded-pill w-100"
+                    :disabled="bulkPriority === ''"
+                    @click="bulk('set_priority', { priority: parseInt(bulkPriority, 10) })"
+                  >
+                    Set Priority
+                  </button>
+                </div>
+
+                <!-- Due Date -->
+                <div class="border-top pt-2">
+                  <label class="form-label text-muted small fw-bold text-uppercase mb-1" style="font-size: 0.7rem;">Due Date</label>
+                  <div class="btn-group btn-group-sm w-100 mb-2">
+                    <button type="button" class="btn btn-xs btn-outline-secondary" @click="bulk('set_due_date', { due_date: getTodayStr() })">Today</button>
+                    <button type="button" class="btn btn-xs btn-outline-secondary" @click="bulk('set_due_date', { due_date: getTomorrowStr() })">Tomorrow</button>
+                    <button type="button" class="btn btn-xs btn-outline-secondary" @click="bulk('set_due_date', { due_date: getNextWeekStr() })">+1 Wk</button>
+                    <button type="button" class="btn btn-xs btn-outline-secondary" @click="bulk('set_due_date', { due_date: '' })">Clear</button>
+                  </div>
+                  <input v-model="bulkDate" type="date" class="form-control form-control-sm mb-2" />
+                  <div class="d-flex gap-2">
+                    <button
+                      type="button"
+                      class="btn btn-xs btn-outline-primary rounded-pill flex-grow-1"
+                      :disabled="!bulkDate"
+                      @click="bulk('set_due_date', { due_date: bulkDate })"
+                    >
+                      Set Due
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-xs btn-outline-secondary rounded-pill flex-grow-1"
+                      @click="bulk('set_due_date', { due_date: '' })"
+                    >
+                      Clear Due
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <button type="button" class="btn btn-xs btn-danger rounded-pill" @click="bulk('delete')">Delete</button>
             <button type="button" class="btn btn-xs btn-link text-muted" @click="selected = []">Deselect</button>
           </div>
@@ -841,16 +967,8 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- Clean Footer inside right content area -->
-      <footer class="text-center py-3 app-footer mt-auto border-top border-opacity-10">
-        <p class="text-muted small mb-0">
-          Made with <i class="bi bi-heart-fill text-danger" /> by xNifty |
-          <a href="https://github.com/xNifty/GoTodo" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-muted">Source</a> |
-          <RouterLink to="/docs/api/v1" class="text-decoration-none text-muted">Documentation</RouterLink> |
-          <a href="https://github.com/xNifty/GoTodo/issues" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-muted">Report a Bug</a> |
-          <a href="https://ordryn.com" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-muted">Powered by Ordryn ©</a>
-        </p>
-      </footer>
+      <!-- Clean Reusable Footer inside right content area -->
+      <AppFooter />
     </div>
   </div>
 </template>

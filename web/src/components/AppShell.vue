@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RouterView } from 'vue-router'
+import { RouterView, useRoute } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useSite } from '@/composables/useSite'
 import { api } from '@/api/client'
 import ModernHeader from '@/components/modern/ModernHeader.vue'
+import AppFooter from '@/components/AppFooter.vue'
 import ToastHost from '@/components/ToastHost.vue'
 import TaskSidebar from '@/components/TaskSidebar.vue'
 import ChangelogModal from '@/components/ChangelogModal.vue'
 import ConfirmModal from '@/components/ConfirmModal.vue'
 
+const route = useRoute()
 const { isAuthenticated } = useAuth()
 const { siteInfo, refresh: refreshSite } = useSite()
 const overdueCount = ref(0)
@@ -83,6 +85,9 @@ onMounted(() => {
     <main class="site-main flex-grow-1 d-flex flex-column" data-page="spa">
       <RouterView :mobile-sidebar-open="mobileSidebarOpen" @close-mobile-sidebar="mobileSidebarOpen = false" />
     </main>
+
+    <!-- Global Footer on all pages EXCEPT / (TasksView has its own internal footer) -->
+    <AppFooter v-if="route.path !== '/'" class="container" />
 
     <ToastHost />
     <ConfirmModal />
