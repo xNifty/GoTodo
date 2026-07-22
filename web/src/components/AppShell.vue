@@ -86,8 +86,8 @@ onMounted(() => {
       <RouterView :mobile-sidebar-open="mobileSidebarOpen" @close-mobile-sidebar="mobileSidebarOpen = false" />
     </main>
 
-    <!-- Global Footer on all pages EXCEPT / (TasksView has its own internal footer) -->
-    <AppFooter v-if="route.path !== '/'" class="container" />
+    <!-- Global Footer on all pages EXCEPT sidebar layout pages (/, /dashboard, /calendar) -->
+    <AppFooter v-if="!['/', '/dashboard', '/calendar'].includes(route.path)" class="container" />
 
     <ToastHost />
     <ConfirmModal />
