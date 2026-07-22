@@ -25,8 +25,8 @@ const emit = defineEmits<{
   'clear-filters': []
 }>()
 
-// Fold/unfold state for the filter toolbar (displayed by default)
-const showFilterPills = ref(true)
+// Fold/unfold state for the filter toolbar
+const showFilterPills = ref(false)
 
 function getDueDateLabel(preset: string) {
   if (preset === 'today') return 'TODAY'
@@ -38,16 +38,16 @@ function getDueDateLabel(preset: string) {
 </script>
 
 <template>
-  <div class="ordryn-filter-bar">
-    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-2">
+  <div class="ordryn-filter-bar mb-2">
+    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2">
       <!-- Search Input & Filter Fold Toggle Button -->
       <div class="d-flex align-items-center gap-2 flex-grow-1" style="max-width: 480px;">
         <div class="position-relative flex-grow-1">
           <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted" />
           <input
             type="text"
-            class="form-control form-control-sm ps-5 pe-3 py-2 rounded-pill border-0 shadow-xs"
-            placeholder="Search/Filter tasks..."
+            class="form-control form-control-sm ps-5 pe-3 py-1.5 rounded-pill border-0 shadow-xs"
+            placeholder="Search tasks..."
             :value="search"
             style="background: var(--ordryn-card-bg); color: var(--ordryn-text);"
             @input="emit('update:search', ($event.target as HTMLInputElement).value)"
@@ -57,7 +57,7 @@ function getDueDateLabel(preset: string) {
         <!-- Filter Fold / Toggle Button -->
         <button
           type="button"
-          class="btn btn-sm d-flex align-items-center gap-1 rounded-pill px-3 py-2 border-0 shadow-xs fw-semibold"
+          class="btn btn-sm d-flex align-items-center gap-1 rounded-pill px-3 py-1.5 border-0 shadow-xs fw-semibold"
           :class="showFilterPills ? 'btn-primary' : 'btn-outline-secondary'"
           style="white-space: nowrap;"
           title="Fold / Unfold filters"
@@ -75,7 +75,7 @@ function getDueDateLabel(preset: string) {
         <div class="btn-group btn-group-sm p-1 rounded-pill" style="background: var(--ordryn-muted-bg);">
           <button
             type="button"
-            class="btn btn-sm rounded-pill px-3 py-1 border-0 fw-medium transition-all"
+            class="btn btn-sm rounded-pill px-2.5 py-0.5 border-0 fw-medium transition-all"
             :class="density === 'comfortable' ? 'shadow-xs fw-bold' : 'text-muted'"
             :style="density === 'comfortable' ? 'background: var(--ordryn-card-bg); color: var(--ordryn-text);' : ''"
             @click="emit('update:density', 'comfortable')"
@@ -84,7 +84,7 @@ function getDueDateLabel(preset: string) {
           </button>
           <button
             type="button"
-            class="btn btn-sm rounded-pill px-3 py-1 border-0 fw-medium transition-all"
+            class="btn btn-sm rounded-pill px-2.5 py-0.5 border-0 fw-medium transition-all"
             :class="density === 'dense' ? 'shadow-xs fw-bold' : 'text-muted'"
             :style="density === 'dense' ? 'background: var(--ordryn-card-bg); color: var(--ordryn-text);' : ''"
             @click="emit('update:density', 'dense')"
@@ -96,7 +96,7 @@ function getDueDateLabel(preset: string) {
     </div>
 
     <!-- Foldable Filter Pills Row -->
-    <div v-if="showFilterPills" class="filter-pills-container mt-3">
+    <div v-if="showFilterPills" class="filter-pills-container mt-2">
       <!-- Status Dropdown Pill -->
       <div class="dropdown d-inline-block">
         <button
@@ -122,7 +122,7 @@ function getDueDateLabel(preset: string) {
           type="button"
           data-bs-toggle="dropdown"
         >
-          Tags: <span class="fw-bold">{{ tag ? tags.find(t => String(t.id) === tag)?.name || 'Selected' : 'ALL' }}</span>
+          TAGS: <span class="fw-bold">{{ tag ? tags.find(t => String(t.id) === tag)?.name || 'Selected' : 'ALL' }}</span>
         </button>
         <ul class="dropdown-menu shadow-sm border-0">
           <li><button class="dropdown-item small" @click="emit('update:tag', '')">All Tags</button></li>

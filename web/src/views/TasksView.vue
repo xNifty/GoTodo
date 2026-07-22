@@ -564,25 +564,27 @@ onMounted(async () => {
     <!-- Main Content Area -->
     <div class="flex-grow-1 p-3 p-md-4 overflow-hidden d-flex flex-column justify-content-between">
       <div>
-        <!-- Upper Header Bar: Action Buttons & Quick Stats -->
-        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-          <div class="d-flex align-items-center gap-2">
-            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-20 px-3 py-2 rounded-pill">
+        <!-- Single Compact Header Toolbar: Stats Pills, Import/Export, Add Task -->
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+          <!-- Compact Inline Task Counts -->
+          <div class="d-flex align-items-center gap-1.5 text-muted small">
+            <span class="badge rounded-pill bg-primary bg-opacity-10 text-primary border border-primary border-opacity-20 px-2.5 py-1">
               Tasks: {{ total }}
             </span>
-            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-20 px-3 py-2 rounded-pill">
+            <span class="badge rounded-pill bg-success bg-opacity-10 text-success border border-success border-opacity-20 px-2.5 py-1">
               Completed: {{ completedCount }}
             </span>
-            <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-20 px-3 py-2 rounded-pill">
+            <span class="badge rounded-pill bg-warning bg-opacity-10 text-warning border border-warning border-opacity-20 px-2.5 py-1">
               Incomplete: {{ incompleteCount }}
             </span>
           </div>
 
+          <!-- Actions Group: Import/Export & Add Task -->
           <div class="d-flex align-items-center gap-2">
             <!-- Import/Export Dropdown -->
             <div class="dropdown">
               <button
-                class="btn btn-sm btn-outline-secondary dropdown-toggle rounded-pill px-3"
+                class="btn btn-sm btn-outline-secondary dropdown-toggle rounded-pill px-3 py-1"
                 type="button"
                 data-bs-toggle="dropdown"
               >
@@ -616,7 +618,7 @@ onMounted(async () => {
             <!-- Add Task Button -->
             <button
               type="button"
-              class="btn btn-sm btn-success rounded-pill px-3 shadow-xs d-flex align-items-center gap-1"
+              class="btn btn-sm btn-success rounded-pill px-3 py-1 shadow-xs d-flex align-items-center gap-1"
               @click="() => openAdd()"
             >
               <i class="bi bi-plus-lg" />
@@ -627,7 +629,7 @@ onMounted(async () => {
             <button
               v-if="undoToken"
               type="button"
-              class="btn btn-sm btn-outline-warning rounded-pill px-3"
+              class="btn btn-sm btn-outline-warning rounded-pill px-3 py-1"
               @click="undoDelete"
             >
               <i class="bi bi-arrow-counterclockwise me-1" />Undo
@@ -635,7 +637,7 @@ onMounted(async () => {
           </div>
         </div>
 
-        <!-- Modern Filter Bar (Pills, Search, Density Toggle) -->
+        <!-- Modern Filter Bar (Search, Folded Filters, Density Toggle) -->
         <ModernTaskFilterBar
           :status="filters.status"
           :tag="filters.tag"
@@ -655,12 +657,12 @@ onMounted(async () => {
           @clear-filters="clearFilters"
         />
 
-        <!-- Bulk Actions Bar -->
+        <!-- Sleek Bulk Actions Bar -->
         <div
           v-if="selected.length"
-          class="bulk-action-bar alert alert-info py-2 px-3 rounded-3 shadow-sm d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3"
+          class="bulk-action-bar alert alert-info py-1.5 px-3 rounded-3 shadow-sm d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2"
         >
-          <span class="fw-semibold small">{{ selected.length }} tasks selected</span>
+          <span class="fw-semibold small">{{ selected.length }} task{{ selected.length === 1 ? '' : 's' }} selected</span>
           <div class="d-flex align-items-center gap-2">
             <button type="button" class="btn btn-xs btn-success rounded-pill" @click="bulk('complete')">Complete</button>
             <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill" @click="bulk('incomplete')">Incomplete</button>
@@ -779,19 +781,25 @@ onMounted(async () => {
           </div>
 
           <div v-else-if="showTaskTable">
-            <!-- Select All Controls Bar -->
+            <!-- Merged Header Row: Select All Checkbox + Starred Tasks Label -->
             <div class="d-flex align-items-center justify-content-between mb-2 px-1">
-              <div class="form-check d-flex align-items-center gap-2">
-                <input
-                  id="select-all-tasks"
-                  type="checkbox"
-                  class="form-check-input"
-                  :checked="allSelected"
-                  @change="toggleSelectAll(($event.target as HTMLInputElement).checked)"
-                />
-                <label for="select-all-tasks" class="form-check-label small text-muted cursor-pointer">
-                  Select all on page
-                </label>
+              <div class="d-flex align-items-center gap-3">
+                <div class="form-check d-flex align-items-center m-0 p-0">
+                  <input
+                    id="select-all-tasks"
+                    type="checkbox"
+                    class="form-check-input m-0 cursor-pointer"
+                    :checked="allSelected"
+                    style="width: 0.95rem; height: 0.95rem;"
+                    @change="toggleSelectAll(($event.target as HTMLInputElement).checked)"
+                  />
+                  <label for="select-all-tasks" class="form-check-label small text-muted cursor-pointer ms-1.5">
+                    Select all
+                  </label>
+                </div>
+                <span v-if="showFavoriteList" class="small fw-bold text-muted d-flex align-items-center gap-1 ms-2">
+                  <i class="bi bi-star-fill text-warning" /> Starred Tasks
+                </span>
               </div>
               <button
                 v-if="hasActiveFilters"
@@ -805,9 +813,6 @@ onMounted(async () => {
 
             <!-- Starred Tasks Section -->
             <div v-if="showFavoriteList" class="starred-tasks-section mb-3">
-              <div class="small fw-bold text-muted mb-2 px-1 d-flex align-items-center gap-1">
-                <i class="bi bi-star-fill text-warning" /> Starred Tasks
-              </div>
               <div id="favorite-task-list" ref="favoriteListEl">
                 <ModernTaskCard
                   v-for="task in favoriteTasks"
