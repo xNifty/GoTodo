@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { RouterLink, RouterView, useRouter } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useSite } from '@/composables/useSite'
 import { useTheme } from '@/composables/useTheme'
@@ -16,7 +16,9 @@ const { siteInfo, siteName, refresh: refreshSite } = useSite()
 const { theme, toggleTheme } = useTheme()
 const { push } = useToast()
 const router = useRouter()
+const route = useRoute()
 const overdueCount = ref(0)
+const pendingInviteCount = ref(0)
 
 const showAnnouncement = computed(
   () =>
@@ -37,6 +39,19 @@ async function loadOverdue() {
   }
 }
 
+async function loadPendingInvites() {
+  if (!isAuthenticated.value) {
+    pendingInviteCount.value = 0
+    return
+  }
+  try {
+    const invites = await api.listMyProjectInvites()
+    pendingInviteCount.value = invites.length
+  } catch {
+    pendingInviteCount.value = 0
+  }
+}
+
 async function dismissAnnouncement() {
   try {
     await api.dismissAnnouncement()
@@ -51,9 +66,32 @@ async function dismissAnnouncement() {
 }
 
 onMounted(() => {
-  void loadOverdue()
   void refreshSite()
 })
+
+// Auth finishes bootstrapping after mount on page refresh; load once session is ready.
+watch(
+  isAuthenticated,
+  (authed) => {
+    if (authed) {
+      void loadOverdue()
+      void loadPendingInvites()
+    } else {
+      overdueCount.value = 0
+      pendingInviteCount.value = 0
+    }
+  },
+  { immediate: true },
+)
+
+watch(
+  () => route.name,
+  (name, prev) => {
+    if (prev === 'projects' || name === 'projects') {
+      void loadPendingInvites()
+    }
+  },
+)
 
 async function onLogout() {
   try {
@@ -115,7 +153,14 @@ async function onLogout() {
           </li>
           <template v-if="isAuthenticated">
             <li class="nav-item">
-              <RouterLink class="nav-link" to="/projects">Projects</RouterLink>
+              <RouterLink class="nav-link" to="/projects">
+                Projects
+                <span
+                  v-if="pendingInviteCount > 0"
+                  class="badge bg-danger ms-1"
+                  :title="`${pendingInviteCount} pending project invite${pendingInviteCount === 1 ? '' : 's'}`"
+                >{{ pendingInviteCount }}</span>
+              </RouterLink>
             </li>
             <li v-if="hasPermission('admin')" class="nav-item">
               <RouterLink class="nav-link" to="/admin">Admin</RouterLink>
