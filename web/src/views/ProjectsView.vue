@@ -15,7 +15,9 @@
               <div>
                 <strong>{{ inv.project_name || 'Project' }}</strong>
                 <span class="text-muted"> as {{ inv.role }}</span>
-                <div class="small text-muted" v-if="inv.inviter_email">From {{ inv.inviter_email }}</div>
+                <div class="small text-muted" v-if="inv.inviter_user_name || inv.inviter_email">
+                  From {{ inv.inviter_user_name || inv.inviter_email }}
+                </div>
               </div>
               <div class="d-flex gap-2">
                 <button class="btn btn-sm btn-primary" type="button" @click="acceptInvite(inv)">Accept</button>
@@ -139,7 +141,7 @@
                 <tbody>
                   <tr v-for="p in sharedProjects" :key="p.id">
                     <td>{{ p.name }}</td>
-                    <td class="text-muted small">{{ p.owner_email }}</td>
+                    <td class="text-muted small">{{ p.owner_user_name || p.owner_email }}</td>
                     <td><span class="badge text-bg-info">{{ p.role }}</span></td>
                     <td>
                       <button

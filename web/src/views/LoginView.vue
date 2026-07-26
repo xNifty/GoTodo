@@ -1,9 +1,15 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useToast } from '@/composables/useToast'
 import { APIError } from '@/api/types'
+import {
+  isDeviceAuthPath,
+  resolvePostLoginRedirect,
+  stashDeviceAuthReturn,
+  takeDeviceAuthReturn,
+} from '@/deviceAuthReturn'
 
 const email = ref('')
 const password = ref('')
@@ -14,14 +20,25 @@ const { push } = useToast()
 const router = useRouter()
 const route = useRoute()
 
+onMounted(() => {
+  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : null
+  if (isDeviceAuthPath(redirect)) {
+    stashDeviceAuthReturn(redirect)
+  }
+})
+
 async function onSubmit() {
   busy.value = true
   error.value = ''
   try {
     await login(email.value.trim(), password.value)
     push('Welcome back', 'success')
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
-    await router.replace(redirect)
+    const queryRedirect = typeof route.query.redirect === 'string' ? route.query.redirect : null
+    const target = resolvePostLoginRedirect(queryRedirect, '/')
+    if (isDeviceAuthPath(target)) {
+      takeDeviceAuthReturn()
+    }
+    await router.replace(target)
   } catch (err) {
     error.value = err instanceof APIError ? err.message : 'Login failed'
   } finally {

@@ -99,7 +99,7 @@ async function onLogout() {
         </div>
 
         <template v-if="isAuthenticated">
-          <span class="text-muted small d-none d-lg-inline me-1">{{ user?.email }}</span>
+          <span class="text-muted small d-none d-lg-inline me-1">{{ user?.user_name || user?.email }}</span>
           <RouterLink to="/settings" class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1" title="Profile Settings">
             <i class="bi bi-person-circle" />
             <span class="d-none d-sm-inline">Profile</span>

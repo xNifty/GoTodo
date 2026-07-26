@@ -82,11 +82,12 @@ type apiReorderOKResponse struct {
 }
 
 type apiProjectJSON struct {
-	ID          int    `json:"id"`
-	Name        string `json:"name"`
-	Role        string `json:"role,omitempty"`
-	OwnerEmail  string `json:"owner_email,omitempty"`
-	OwnerUserID int    `json:"owner_user_id,omitempty"`
+	ID            int    `json:"id"`
+	Name          string `json:"name"`
+	Role          string `json:"role,omitempty"`
+	OwnerEmail    string `json:"owner_email,omitempty"`
+	OwnerUserName string `json:"owner_user_name,omitempty"`
+	OwnerUserID   int    `json:"owner_user_id,omitempty"`
 }
 
 type apiTagCreateRequest struct {
@@ -728,11 +729,12 @@ func apiV1ListProjects(w http.ResponseWriter, r *http.Request) {
 	out := make([]apiProjectJSON, 0, len(projects))
 	for _, p := range projects {
 		out = append(out, apiProjectJSON{
-			ID:          p.ID,
-			Name:        p.Name,
-			Role:        p.Role,
-			OwnerEmail:  p.OwnerEmail,
-			OwnerUserID: p.OwnerUserID,
+			ID:            p.ID,
+			Name:          p.Name,
+			Role:          p.Role,
+			OwnerEmail:    p.OwnerEmail,
+			OwnerUserName: p.OwnerUserName,
+			OwnerUserID:   p.OwnerUserID,
 		})
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -752,11 +754,12 @@ func apiV1GetProject(w http.ResponseWriter, r *http.Request, projectID int) {
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	json.NewEncoder(w).Encode(apiProjectJSON{
-		ID:          p.ID,
-		Name:        p.Name,
-		Role:        p.Role,
-		OwnerEmail:  p.OwnerEmail,
-		OwnerUserID: p.OwnerUserID,
+		ID:            p.ID,
+		Name:          p.Name,
+		Role:          p.Role,
+		OwnerEmail:    p.OwnerEmail,
+		OwnerUserName: p.OwnerUserName,
+		OwnerUserID:   p.OwnerUserID,
 	})
 }
 

@@ -8,6 +8,7 @@ export type User = {
   digest_enabled: boolean
   digest_hour: number
   allow_project_invites: boolean
+  username_change_available: boolean
 }
 
 export type Tag = {
@@ -21,6 +22,7 @@ export type Project = {
   name: string
   role?: 'owner' | 'editor' | 'viewer'
   owner_email?: string
+  owner_user_name?: string
   owner_user_id?: number
 }
 
@@ -36,11 +38,13 @@ export type ProjectInvite = {
   id: number
   project_id: number
   email: string
+  user_name?: string
   role: 'editor' | 'viewer'
   expires_at: string
   created_at: string
   project_name?: string
   inviter_email?: string
+  inviter_user_name?: string
 }
 
 export type ProjectEvent = {
@@ -48,6 +52,7 @@ export type ProjectEvent = {
   project_id: number
   actor_user_id: number
   actor_email?: string
+  actor_user_name?: string
   event_type: string
   source: 'project' | 'task'
   task_id?: number

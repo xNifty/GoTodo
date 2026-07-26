@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { appBase } from '@/base'
 import { useAuth } from '@/composables/useAuth'
+import { isDeviceAuthPath, stashDeviceAuthReturn } from '@/deviceAuthReturn'
 
 const router = createRouter({
   history: createWebHistory(appBase()),
@@ -49,6 +50,12 @@ const router = createRouter({
       name: 'register',
       component: () => import('@/views/RegisterView.vue'),
       meta: { guest: true },
+    },
+    {
+      path: '/claim-username',
+      name: 'claim-username',
+      component: () => import('@/views/ClaimUsernameView.vue'),
+      meta: { requiresAuth: true, allowUsernameClaim: true },
     },
     {
       path: '/',
@@ -106,7 +113,8 @@ const router = createRouter({
       path: '/auth/device',
       name: 'device-auth',
       component: () => import('@/views/DeviceAuthView.vue'),
-      meta: { requiresAuth: true },
+      // App browser SSO must complete without the username-claim gate taking over.
+      meta: { requiresAuth: true, allowUsernameClaim: true },
     },
     {
       path: '/admin',
@@ -136,11 +144,40 @@ router.beforeEach(async (to) => {
   if (to.meta.requiresAuth && !auth.isAuthenticated.value) {
     // Only preserve non-default destinations; `/` is the post-login default.
     if (to.fullPath && to.fullPath !== '/') {
+      if (isDeviceAuthPath(to.fullPath)) {
+        stashDeviceAuthReturn(to.fullPath)
+      }
       return { name: 'login', query: { redirect: to.fullPath } }
     }
     return { name: 'login' }
   }
   if (to.meta.guest && auth.isAuthenticated.value) {
+    // Preserve post-login redirects (e.g. /auth/device?user_code=…) so app SSO
+    // is not diverted to the username-claim screen mid-flow.
+    const redirect = typeof to.query.redirect === 'string' ? to.query.redirect : null
+    if (redirect && isDeviceAuthPath(redirect)) {
+      stashDeviceAuthReturn(redirect)
+      return redirect
+    }
+    if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
+      return redirect
+    }
+    if (auth.needsUsernameClaim.value) {
+      return { name: 'claim-username' }
+    }
+    return { name: 'tasks' }
+  }
+  // allowUsernameClaim = route may be visited while a free username claim is still pending
+  // (claim screen itself, and /auth/device so app browser SSO is not taken over).
+  if (
+    auth.isAuthenticated.value &&
+    auth.needsUsernameClaim.value &&
+    to.meta.requiresAuth &&
+    !to.meta.allowUsernameClaim
+  ) {
+    return { name: 'claim-username' }
+  }
+  if (to.name === 'claim-username' && auth.isAuthenticated.value && !auth.needsUsernameClaim.value) {
     return { name: 'tasks' }
   }
   const permission = to.meta.permission as string | undefined

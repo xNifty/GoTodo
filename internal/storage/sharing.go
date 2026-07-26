@@ -25,14 +25,15 @@ const (
 
 // ProjectWithAccess is a project plus the caller's role and owner info.
 type ProjectWithAccess struct {
-	ID          int
-	UserID      int
-	Name        string
-	Role        string
-	OwnerEmail  string
-	OwnerUserID int
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID            int
+	UserID        int
+	Name          string
+	Role          string
+	OwnerEmail    string
+	OwnerUserName string
+	OwnerUserID   int
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 // ProjectMember is a member of a shared project.
@@ -56,8 +57,10 @@ type ProjectInvite struct {
 	AcceptedAt *time.Time
 	CreatedAt  time.Time
 	// Optional join fields for listing.
-	ProjectName string
-	InviterEmail string
+	UserName        string
+	ProjectName     string
+	InviterEmail    string
+	InviterUserName string
 }
 
 // ShareLink is a read-only public view token.
@@ -74,13 +77,14 @@ type ShareLink struct {
 
 // ProjectEvent is an audit entry for project membership/share actions.
 type ProjectEvent struct {
-	ID          int
-	ProjectID   int
-	ActorUserID int
-	EventType   string
-	Metadata    map[string]interface{}
-	CreatedAt   time.Time
-	ActorEmail  string
+	ID            int
+	ProjectID     int
+	ActorUserID   int
+	EventType     string
+	Metadata      map[string]interface{}
+	CreatedAt     time.Time
+	ActorEmail    string
+	ActorUserName string
 }
 
 // CreateProjectSharingTables creates membership, invite, share-link, and event tables.
@@ -250,7 +254,7 @@ func GetAccessibleProjects(userID int) ([]ProjectWithAccess, error) {
 	rows, err := pool.Query(context.Background(), `
 		SELECT p.id, p.user_id, p.name, p.created_at, p.updated_at,
 		       COALESCE(pm.role, CASE WHEN p.user_id = $1 THEN 'owner' END),
-		       u.email, p.user_id
+		       u.email, COALESCE(u.user_name, ''), p.user_id
 		FROM projects p
 		LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $1
 		JOIN users u ON u.id = p.user_id
@@ -265,7 +269,7 @@ func GetAccessibleProjects(userID int) ([]ProjectWithAccess, error) {
 	for rows.Next() {
 		var p ProjectWithAccess
 		if err := rows.Scan(&p.ID, &p.UserID, &p.Name, &p.CreatedAt, &p.UpdatedAt,
-			&p.Role, &p.OwnerEmail, &p.OwnerUserID); err != nil {
+			&p.Role, &p.OwnerEmail, &p.OwnerUserName, &p.OwnerUserID); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
@@ -285,14 +289,14 @@ func GetAccessibleProjectByID(projectID, userID int) (*ProjectWithAccess, error)
 	err = pool.QueryRow(context.Background(), `
 		SELECT p.id, p.user_id, p.name, p.created_at, p.updated_at,
 		       COALESCE(pm.role, CASE WHEN p.user_id = $2 THEN 'owner' END),
-		       u.email, p.user_id
+		       u.email, COALESCE(u.user_name, ''), p.user_id
 		FROM projects p
 		LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $2
 		JOIN users u ON u.id = p.user_id
 		WHERE p.id = $1 AND (p.user_id = $2 OR pm.user_id = $2)`,
 		projectID, userID).Scan(
 		&p.ID, &p.UserID, &p.Name, &p.CreatedAt, &p.UpdatedAt,
-		&p.Role, &p.OwnerEmail, &p.OwnerUserID)
+		&p.Role, &p.OwnerEmail, &p.OwnerUserName, &p.OwnerUserID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("project not found")
@@ -404,10 +408,12 @@ func ListProjectInvites(projectID int) ([]ProjectInvite, error) {
 	defer CloseDatabase(pool)
 
 	rows, err := pool.Query(context.Background(), `
-		SELECT id, project_id, email, role, token, invited_by, expires_at, accepted_at, created_at
-		FROM project_invites
-		WHERE project_id = $1 AND accepted_at IS NULL
-		ORDER BY created_at DESC`, projectID)
+		SELECT i.id, i.project_id, i.email, i.role, i.token, i.invited_by, i.expires_at, i.accepted_at, i.created_at,
+		       COALESCE(u.user_name, '')
+		FROM project_invites i
+		LEFT JOIN users u ON LOWER(u.email) = LOWER(i.email)
+		WHERE i.project_id = $1 AND i.accepted_at IS NULL
+		ORDER BY i.created_at DESC`, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -417,7 +423,7 @@ func ListProjectInvites(projectID int) ([]ProjectInvite, error) {
 	for rows.Next() {
 		var inv ProjectInvite
 		if err := rows.Scan(&inv.ID, &inv.ProjectID, &inv.Email, &inv.Role, &inv.Token,
-			&inv.InvitedBy, &inv.ExpiresAt, &inv.AcceptedAt, &inv.CreatedAt); err != nil {
+			&inv.InvitedBy, &inv.ExpiresAt, &inv.AcceptedAt, &inv.CreatedAt, &inv.UserName); err != nil {
 			return nil, err
 		}
 		out = append(out, inv)
@@ -456,10 +462,11 @@ func ListPendingInvitesForEmail(email string) ([]ProjectInvite, error) {
 
 	rows, err := pool.Query(context.Background(), `
 		SELECT i.id, i.project_id, i.email, i.role, i.token, i.invited_by, i.expires_at, i.accepted_at, i.created_at,
-		       p.name, COALESCE(u.email, '')
+		       COALESCE(invitee.user_name, ''), p.name, COALESCE(u.email, ''), COALESCE(u.user_name, '')
 		FROM project_invites i
 		JOIN projects p ON p.id = i.project_id
 		LEFT JOIN users u ON u.id = i.invited_by
+		LEFT JOIN users invitee ON LOWER(invitee.email) = LOWER(i.email)
 		WHERE i.email = $1 AND i.accepted_at IS NULL AND i.expires_at > NOW()
 		ORDER BY i.created_at DESC`, email)
 	if err != nil {
@@ -472,7 +479,7 @@ func ListPendingInvitesForEmail(email string) ([]ProjectInvite, error) {
 		var inv ProjectInvite
 		if err := rows.Scan(&inv.ID, &inv.ProjectID, &inv.Email, &inv.Role, &inv.Token,
 			&inv.InvitedBy, &inv.ExpiresAt, &inv.AcceptedAt, &inv.CreatedAt,
-			&inv.ProjectName, &inv.InviterEmail); err != nil {
+			&inv.UserName, &inv.ProjectName, &inv.InviterEmail, &inv.InviterUserName); err != nil {
 			return nil, err
 		}
 		out = append(out, inv)
@@ -491,14 +498,14 @@ func GetProjectInviteByID(inviteID int) (*ProjectInvite, error) {
 	var inv ProjectInvite
 	err = pool.QueryRow(context.Background(), `
 		SELECT i.id, i.project_id, i.email, i.role, i.token, i.invited_by, i.expires_at, i.accepted_at, i.created_at,
-		       COALESCE(p.name, ''), COALESCE(u.email, '')
+		       COALESCE(p.name, ''), COALESCE(u.email, ''), COALESCE(u.user_name, '')
 		FROM project_invites i
 		LEFT JOIN projects p ON p.id = i.project_id
 		LEFT JOIN users u ON u.id = i.invited_by
 		WHERE i.id = $1`, inviteID).Scan(
 		&inv.ID, &inv.ProjectID, &inv.Email, &inv.Role, &inv.Token,
 		&inv.InvitedBy, &inv.ExpiresAt, &inv.AcceptedAt, &inv.CreatedAt,
-		&inv.ProjectName, &inv.InviterEmail)
+		&inv.ProjectName, &inv.InviterEmail, &inv.InviterUserName)
 	if err != nil {
 		return nil, err
 	}
@@ -725,7 +732,7 @@ func GetProjectEvents(projectID, limit int) ([]ProjectEvent, error) {
 
 	rows, err := pool.Query(context.Background(), `
 		SELECT pe.id, pe.project_id, pe.actor_user_id, pe.event_type, COALESCE(pe.metadata, '{}'), pe.created_at,
-		       COALESCE(u.email, '')
+		       COALESCE(u.email, ''), COALESCE(u.user_name, '')
 		FROM project_events pe
 		LEFT JOIN users u ON u.id = pe.actor_user_id
 		WHERE pe.project_id = $1
@@ -740,7 +747,7 @@ func GetProjectEvents(projectID, limit int) ([]ProjectEvent, error) {
 	for rows.Next() {
 		var ev ProjectEvent
 		var metaRaw []byte
-		if err := rows.Scan(&ev.ID, &ev.ProjectID, &ev.ActorUserID, &ev.EventType, &metaRaw, &ev.CreatedAt, &ev.ActorEmail); err != nil {
+		if err := rows.Scan(&ev.ID, &ev.ProjectID, &ev.ActorUserID, &ev.EventType, &metaRaw, &ev.CreatedAt, &ev.ActorEmail, &ev.ActorUserName); err != nil {
 			return nil, err
 		}
 		ev.Metadata = map[string]interface{}{}
@@ -791,18 +798,45 @@ func GetProjectTaskEvents(projectID, limit int) ([]TaskEvent, error) {
 	return out, nil
 }
 
-// TaskAccessSQL returns a SQL fragment (with alias prefix) for tasks visible to userID.
+// TaskVisibleCondition returns a SQL fragment for tasks readable by userID,
+// including viewer membership on shared projects.
 // Uses placeholder $N for userID; caller must append userID to args at that index.
 func TaskVisibleCondition(alias string, userParam string) string {
-	prefix := ""
+	return taskVisibleCondition(alias, userParam, false)
+}
+
+// TaskHomeVisibleCondition returns a SQL fragment for the unscoped/home task list.
+// Shared-project membership only counts when the caller is owner or editor;
+// viewers see those tasks only when listing a specific project.
+func TaskHomeVisibleCondition(alias string, userParam string) string {
+	return taskVisibleCondition(alias, userParam, true)
+}
+
+// TaskListVisibleCondition picks home vs full visibility from whether the list
+// is scoped to a specific project (projectFilter > 0).
+func TaskListVisibleCondition(alias, userParam string, projectFilter *int) string {
+	if projectFilter != nil && *projectFilter > 0 {
+		return TaskVisibleCondition(alias, userParam)
+	}
+	return TaskHomeVisibleCondition(alias, userParam)
+}
+
+func taskVisibleCondition(alias, userParam string, writeRolesOnly bool) string {
+	// Default to tasks. when unaliased so EXISTS subqueries correlate to the
+	// outer tasks row (bare project_id would resolve to pm.project_id).
+	prefix := "tasks."
 	if alias != "" {
 		prefix = alias + "."
 	}
+	memberRoleFilter := ""
+	if writeRolesOnly {
+		memberRoleFilter = " AND pm.role IN ('owner', 'editor')"
+	}
 	return fmt.Sprintf(`(%suser_id = %s OR (%sproject_id IS NOT NULL AND EXISTS (
-		SELECT 1 FROM project_members pm WHERE pm.project_id = %sproject_id AND pm.user_id = %s
+		SELECT 1 FROM project_members pm WHERE pm.project_id = %sproject_id AND pm.user_id = %s%s
 	)) OR (%sproject_id IS NOT NULL AND EXISTS (
 		SELECT 1 FROM projects p_own WHERE p_own.id = %sproject_id AND p_own.user_id = %s
-	)))`, prefix, userParam, prefix, prefix, userParam, prefix, prefix, userParam)
+	)))`, prefix, userParam, prefix, prefix, userParam, memberRoleFilter, prefix, prefix, userParam)
 }
 
 // CanUserAccessTask reports whether userID can read the task and their effective write role.
