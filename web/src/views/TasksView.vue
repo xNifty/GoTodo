@@ -651,7 +651,7 @@ onMounted(async () => {
             <button
               type="button"
               class="btn btn-sm btn-success rounded-pill px-3 py-1 shadow-xs d-flex align-items-center gap-1"
-              @click="() => openAdd()"
+              @click="openAdd(undefined, filters.project)"
             >
               <i class="bi bi-plus-lg" />
               <span>Add Task</span>
@@ -924,7 +924,7 @@ onMounted(async () => {
             <i class="bi bi-clipboard-check display-4 text-muted opacity-50" />
             <h4 class="mt-3 fw-bold">No tasks yet</h4>
             <p class="text-muted">Get started by creating your first task.</p>
-            <button type="button" class="btn btn-success rounded-pill px-4" @click="() => openAdd()">
+            <button type="button" class="btn btn-success rounded-pill px-4" @click="openAdd(undefined, filters.project)">
               <i class="bi bi-plus-lg me-1" /> Add Task
             </button>
           </div>
