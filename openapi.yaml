@@ -2610,6 +2610,27 @@ components:
           type: string
         enable_api:
           type: boolean
+        email_provider:
+          type: string
+          description: none, mailgun, or smtp
+        email_from_address:
+          type: string
+        email_from_name:
+          type: string
+        email_mailgun_domain:
+          type: string
+        email_mailgun_api_key_set:
+          type: boolean
+        email_smtp_host:
+          type: string
+        email_smtp_port:
+          type: integer
+        email_smtp_username:
+          type: string
+        email_smtp_password_set:
+          type: boolean
+        email_smtp_tls:
+          type: boolean
 
     AdminSettingsPatch:
       type: object
@@ -2631,6 +2652,28 @@ components:
         global_announcement_text:
           type: string
         enable_api:
+          type: boolean
+        email_provider:
+          type: string
+        email_from_address:
+          type: string
+        email_from_name:
+          type: string
+        email_mailgun_domain:
+          type: string
+        email_mailgun_api_key:
+          type: string
+          description: Omit to keep; non-empty to replace; empty string to clear
+        email_smtp_host:
+          type: string
+        email_smtp_port:
+          type: integer
+        email_smtp_username:
+          type: string
+        email_smtp_password:
+          type: string
+          description: Omit to keep; non-empty to replace; empty string to clear
+        email_smtp_tls:
           type: boolean
 
     AdminUser:

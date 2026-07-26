@@ -1,6 +1,7 @@
 import { withBase } from '@/base'
 import type {
   AdminSettings,
+  AdminSettingsPatch,
   AdminUser,
   APIKey,
   CalendarInfo,
@@ -466,7 +467,7 @@ export const api = {
     return request<AdminSettings>('/api/v1/admin/settings')
   },
 
-  patchAdminSettings(payload: Partial<AdminSettings>) {
+  patchAdminSettings(payload: AdminSettingsPatch) {
     return request<AdminSettings>('/api/v1/admin/settings', {
       method: 'PATCH',
       body: JSON.stringify(payload),

@@ -2,7 +2,21 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
+	"strings"
+
+	"GoTodo/internal/crypto/secret"
+
+	"github.com/jackc/pgx/v5"
+)
+
+// Email provider values stored in site_settings.email_provider.
+const (
+	EmailProviderNone    = ""
+	EmailProviderMailgun = "mailgun"
+	EmailProviderSMTP    = "smtp"
 )
 
 // SiteSettings represents site-wide settings stored in the database.
@@ -17,6 +31,17 @@ type SiteSettings struct {
 	EnableGlobalAnnouncement bool
 	GlobalAnnouncementText   string
 	EnableAPI                bool
+
+	EmailProvider         string
+	EmailFromAddress      string
+	EmailFromName         string
+	EmailMailgunDomain    string
+	EmailMailgunAPIKeyEnc string
+	EmailSMTPHost         string
+	EmailSMTPPort         int
+	EmailSMTPUsername     string
+	EmailSMTPPasswordEnc  string
+	EmailSMTPTLS         bool
 }
 
 // CreateSiteSettingsTable ensures the site_settings table exists.
@@ -57,8 +82,38 @@ func GetSiteSettings() (*SiteSettings, error) {
 	defer CloseDatabase(pool)
 
 	var s SiteSettings
-	row := pool.QueryRow(context.Background(), "SELECT site_name, default_timezone, show_changelog, COALESCE(site_version, ''), enable_registration, invite_only, COALESCE(meta_description, ''), COALESCE(enable_global_announcement, FALSE), COALESCE(global_announcement_text, ''), COALESCE(enable_api, FALSE) FROM site_settings WHERE id = 1")
-	if err := row.Scan(&s.SiteName, &s.DefaultTimezone, &s.ShowChangelog, &s.SiteVersion, &s.EnableRegistration, &s.InviteOnly, &s.MetaDescription, &s.EnableGlobalAnnouncement, &s.GlobalAnnouncementText, &s.EnableAPI); err != nil {
+	row := pool.QueryRow(context.Background(), `
+		SELECT
+			site_name,
+			default_timezone,
+			show_changelog,
+			COALESCE(site_version, ''),
+			enable_registration,
+			invite_only,
+			COALESCE(meta_description, ''),
+			COALESCE(enable_global_announcement, FALSE),
+			COALESCE(global_announcement_text, ''),
+			COALESCE(enable_api, FALSE),
+			COALESCE(email_provider, ''),
+			COALESCE(email_from_address, ''),
+			COALESCE(email_from_name, ''),
+			COALESCE(email_mailgun_domain, ''),
+			COALESCE(email_mailgun_api_key_enc, ''),
+			COALESCE(email_smtp_host, ''),
+			COALESCE(email_smtp_port, 587),
+			COALESCE(email_smtp_username, ''),
+			COALESCE(email_smtp_password_enc, ''),
+			COALESCE(email_smtp_tls, TRUE)
+		FROM site_settings WHERE id = 1`)
+	if err := row.Scan(
+		&s.SiteName, &s.DefaultTimezone, &s.ShowChangelog, &s.SiteVersion,
+		&s.EnableRegistration, &s.InviteOnly, &s.MetaDescription,
+		&s.EnableGlobalAnnouncement, &s.GlobalAnnouncementText, &s.EnableAPI,
+		&s.EmailProvider, &s.EmailFromAddress, &s.EmailFromName,
+		&s.EmailMailgunDomain, &s.EmailMailgunAPIKeyEnc,
+		&s.EmailSMTPHost, &s.EmailSMTPPort, &s.EmailSMTPUsername,
+		&s.EmailSMTPPasswordEnc, &s.EmailSMTPTLS,
+	); err != nil {
 		return nil, err
 	}
 	return &s, nil
@@ -72,9 +127,21 @@ func UpsertSiteSettings(s SiteSettings) error {
 	}
 	defer CloseDatabase(pool)
 
+	if s.EmailSMTPPort <= 0 {
+		s.EmailSMTPPort = 587
+	}
+
 	_, err = pool.Exec(context.Background(), `
-        INSERT INTO site_settings (id, site_name, default_timezone, show_changelog, site_version, enable_registration, invite_only, meta_description, enable_global_announcement, global_announcement_text, enable_api)
-        VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        INSERT INTO site_settings (
+			id, site_name, default_timezone, show_changelog, site_version,
+			enable_registration, invite_only, meta_description,
+			enable_global_announcement, global_announcement_text, enable_api,
+			email_provider, email_from_address, email_from_name,
+			email_mailgun_domain, email_mailgun_api_key_enc,
+			email_smtp_host, email_smtp_port, email_smtp_username,
+			email_smtp_password_enc, email_smtp_tls
+		)
+        VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
         ON CONFLICT (id) DO UPDATE SET
             site_name = EXCLUDED.site_name,
             default_timezone = EXCLUDED.default_timezone,
@@ -85,8 +152,24 @@ func UpsertSiteSettings(s SiteSettings) error {
             meta_description = EXCLUDED.meta_description,
             enable_global_announcement = EXCLUDED.enable_global_announcement,
             global_announcement_text = EXCLUDED.global_announcement_text,
-            enable_api = EXCLUDED.enable_api
-    `, s.SiteName, s.DefaultTimezone, s.ShowChangelog, s.SiteVersion, s.EnableRegistration, s.InviteOnly, s.MetaDescription, s.EnableGlobalAnnouncement, s.GlobalAnnouncementText, s.EnableAPI)
+            enable_api = EXCLUDED.enable_api,
+			email_provider = EXCLUDED.email_provider,
+			email_from_address = EXCLUDED.email_from_address,
+			email_from_name = EXCLUDED.email_from_name,
+			email_mailgun_domain = EXCLUDED.email_mailgun_domain,
+			email_mailgun_api_key_enc = EXCLUDED.email_mailgun_api_key_enc,
+			email_smtp_host = EXCLUDED.email_smtp_host,
+			email_smtp_port = EXCLUDED.email_smtp_port,
+			email_smtp_username = EXCLUDED.email_smtp_username,
+			email_smtp_password_enc = EXCLUDED.email_smtp_password_enc,
+			email_smtp_tls = EXCLUDED.email_smtp_tls
+    `, s.SiteName, s.DefaultTimezone, s.ShowChangelog, s.SiteVersion,
+		s.EnableRegistration, s.InviteOnly, s.MetaDescription,
+		s.EnableGlobalAnnouncement, s.GlobalAnnouncementText, s.EnableAPI,
+		s.EmailProvider, s.EmailFromAddress, s.EmailFromName,
+		s.EmailMailgunDomain, s.EmailMailgunAPIKeyEnc,
+		s.EmailSMTPHost, s.EmailSMTPPort, s.EmailSMTPUsername,
+		s.EmailSMTPPasswordEnc, s.EmailSMTPTLS)
 	if err != nil {
 		return fmt.Errorf("failed to upsert site_settings: %v", err)
 	}
@@ -152,5 +235,92 @@ func MigrateSiteSettingsAddEnableAPI() error {
 	if _, err := pool.Exec(context.Background(), "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS enable_api BOOLEAN DEFAULT FALSE"); err != nil {
 		return fmt.Errorf("failed to add enable_api column to site_settings: %v", err)
 	}
+	return nil
+}
+
+// MigrateSiteSettingsAddEmailSettings adds outbound email configuration columns.
+func MigrateSiteSettingsAddEmailSettings() error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return err
+	}
+	defer CloseDatabase(pool)
+
+	alters := []string{
+		"ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS email_provider TEXT DEFAULT ''",
+		"ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS email_from_address TEXT DEFAULT ''",
+		"ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS email_from_name TEXT DEFAULT ''",
+		"ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS email_mailgun_domain TEXT DEFAULT ''",
+		"ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS email_mailgun_api_key_enc TEXT DEFAULT ''",
+		"ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS email_smtp_host TEXT DEFAULT ''",
+		"ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS email_smtp_port INTEGER DEFAULT 587",
+		"ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS email_smtp_username TEXT DEFAULT ''",
+		"ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS email_smtp_password_enc TEXT DEFAULT ''",
+		"ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS email_smtp_tls BOOLEAN DEFAULT TRUE",
+	}
+	for _, q := range alters {
+		if _, err := pool.Exec(context.Background(), q); err != nil {
+			return fmt.Errorf("failed to migrate site_settings email columns: %v", err)
+		}
+	}
+	return nil
+}
+
+// MaybeImportEmailSettingsFromEnv seeds Mailgun settings from legacy env vars when
+// the DB has no email provider configured yet. Safe to call repeatedly.
+func MaybeImportEmailSettingsFromEnv() error {
+	apiKey := strings.TrimSpace(os.Getenv("MAILGUN_API_KEY"))
+	domain := strings.TrimSpace(os.Getenv("MAILGUN_DOMAIN"))
+	if apiKey == "" || domain == "" {
+		return nil
+	}
+
+	current, err := GetSiteSettings()
+	if err != nil {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		current = &SiteSettings{
+			SiteName:           "GoTodo",
+			DefaultTimezone:    "America/New_York",
+			ShowChangelog:      true,
+			EnableRegistration: true,
+			InviteOnly:         true,
+			EmailSMTPPort:      587,
+			EmailSMTPTLS:      true,
+		}
+	}
+	if current == nil {
+		return nil
+	}
+	if strings.TrimSpace(current.EmailProvider) != "" && strings.TrimSpace(current.EmailProvider) != "none" {
+		return nil
+	}
+	if current.EmailMailgunAPIKeyEnc != "" {
+		return nil
+	}
+
+	enc, err := secret.Encrypt(apiKey)
+	if err != nil {
+		return fmt.Errorf("encrypt mailgun api key from env: %w", err)
+	}
+
+	from := strings.TrimSpace(os.Getenv("FROM_EMAIL"))
+	if from == "" {
+		from = current.EmailFromAddress
+	}
+
+	next := *current
+	next.EmailProvider = EmailProviderMailgun
+	next.EmailMailgunDomain = domain
+	next.EmailMailgunAPIKeyEnc = enc
+	next.EmailFromAddress = from
+	if next.EmailSMTPPort <= 0 {
+		next.EmailSMTPPort = 587
+	}
+	if err := UpsertSiteSettings(next); err != nil {
+		return err
+	}
+	fmt.Println("migration: imported Mailgun email settings from MAILGUN_* / FROM_EMAIL env into site_settings; configure email in Admin going forward (env vars are deprecated)")
 	return nil
 }
