@@ -125,6 +125,8 @@ func EnsureEnableAPI() error {
 			EnableRegistration: true,
 			InviteOnly:         true,
 			EnableAPI:          true,
+			EmailSMTPPort:      587,
+			EmailSMTPTLS:      true,
 		}
 	} else {
 		s.EnableAPI = true
