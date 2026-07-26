@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { api } from '@/api/client'
 import type { Project, SavedView, Tag, Task } from '@/api/types'
 import { APIError } from '@/api/types'
@@ -16,6 +16,7 @@ import { useTaskSortable } from '@/composables/useTaskSortable'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { useViewDensity } from '@/composables/useViewDensity'
+import { useSidebarState } from '@/composables/useSidebarState'
 
 defineProps<{
   mobileSidebarOpen?: boolean
@@ -25,10 +26,11 @@ const emit = defineEmits<{
   'close-mobile-sidebar': []
 }>()
 
+const route = useRoute()
 const { openAdd, openEdit, lastSavedTask } = useTaskSidebar()
 const { density } = useViewDensity()
+const { sidebarCollapsed, toggleSidebar } = useSidebarState()
 
-const sidebarCollapsed = ref(false)
 const tasks = ref<Task[]>([])
 const projects = ref<Project[]>([])
 const tags = ref<Tag[]>([])
@@ -238,6 +240,27 @@ async function loadMeta() {
   }
 }
 
+function syncFiltersFromRoute() {
+  const qView = typeof route.query.view === 'string' ? route.query.view : null
+  const qProject = typeof route.query.project === 'string' ? route.query.project : null
+
+  if (qView) {
+    const view = savedViews.value.find((v) => String(v.id) === qView)
+    if (view) {
+      activeViewId.value = String(view.id)
+      applySavedViewFilters(view.filter || {})
+      search.value = filters.search
+      return
+    }
+  }
+
+  if (qProject !== null) {
+    activeViewId.value = null
+    setFilter('project', qProject)
+    return
+  }
+}
+
 async function reloadInitial() {
   loading.value = true
   loadedPage.value = 0
@@ -297,6 +320,14 @@ watch(lastSavedTask, async (task) => {
   await nextTick()
   refreshSortable()
 })
+
+watch(
+  () => route.query,
+  () => {
+    syncFiltersFromRoute()
+    void reloadInitial()
+  },
+)
 
 async function toggleComplete(task: Task) {
   try {
@@ -537,6 +568,7 @@ useInfiniteScroll(loadMoreSentinel, loadMore, hasMore)
 
 onMounted(async () => {
   await loadMeta()
+  syncFiltersFromRoute()
   await reloadInitial()
 })
 </script>
@@ -551,7 +583,7 @@ onMounted(async () => {
       :saved-views="savedViews"
       :active-project="filters.project"
       :active-view="activeViewId || undefined"
-      @toggle-collapse="sidebarCollapsed = !sidebarCollapsed"
+      @toggle-collapse="toggleSidebar"
       @close-mobile="emit('close-mobile-sidebar')"
       @select-home="selectHome"
       @select-project="selectProjectFilter"
@@ -672,7 +704,10 @@ onMounted(async () => {
               <button class="btn btn-xs btn-outline-primary dropdown-toggle rounded-pill" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
                 More Actions
               </button>
-              <div class="dropdown-menu shadow-lg border p-3 rounded-3 mt-1" style="width: 280px; max-width: 90vw;">
+              <div
+                class="dropdown-menu shadow-lg border p-3 rounded-3 mt-1"
+                style="width: 280px; max-width: 90vw; background: var(--ordryn-card-bg); color: var(--ordryn-text); border-color: var(--ordryn-card-border) !important;"
+              >
                 <!-- Move to Project -->
                 <div class="mb-3">
                   <label class="form-label text-muted small fw-bold text-uppercase mb-1" style="font-size: 0.7rem;">Move to project...</label>
@@ -849,7 +884,11 @@ onMounted(async () => {
               />
 
               <!-- Empty Search Results -->
-              <div v-if="!tasks.length && hasActiveFilters" class="text-center py-5 bg-white rounded-3 border">
+              <div
+                v-if="!tasks.length && hasActiveFilters"
+                class="text-center py-5 rounded-3 border"
+                style="background: var(--ordryn-card-bg); color: var(--ordryn-text); border-color: var(--ordryn-card-border) !important;"
+              >
                 <p class="text-muted mb-2">No tasks match your active filters.</p>
                 <button type="button" class="btn btn-sm btn-outline-primary rounded-pill" @click="clearFilters">
                   <i class="bi bi-x-circle me-1" />Clear filters
@@ -865,7 +904,11 @@ onMounted(async () => {
           </div>
 
           <!-- Zero State (No tasks match search) -->
-          <div v-else-if="isSearching" class="text-center py-5 bg-white rounded-3 border">
+          <div
+            v-else-if="isSearching"
+            class="text-center py-5 rounded-3 border"
+            style="background: var(--ordryn-card-bg); color: var(--ordryn-text); border-color: var(--ordryn-card-border) !important;"
+          >
             <p class="text-muted mb-2">No tasks match your search query.</p>
             <button type="button" class="btn btn-sm btn-outline-primary rounded-pill" @click="clearFilters">
               Clear Search
@@ -873,7 +916,11 @@ onMounted(async () => {
           </div>
 
           <!-- Empty State (No tasks at all) -->
-          <div v-else class="text-center py-5 bg-white rounded-3 border shadow-xs">
+          <div
+            v-else
+            class="text-center py-5 rounded-3 border shadow-xs"
+            style="background: var(--ordryn-card-bg); color: var(--ordryn-text); border-color: var(--ordryn-card-border) !important;"
+          >
             <i class="bi bi-clipboard-check display-4 text-muted opacity-50" />
             <h4 class="mt-3 fw-bold">No tasks yet</h4>
             <p class="text-muted">Get started by creating your first task.</p>
@@ -887,7 +934,10 @@ onMounted(async () => {
       <!-- Save Current View Modal -->
       <div v-if="showSaveViewModal" class="modal fade show d-block" style="background: rgba(0,0,0,0.5);" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
-          <div class="modal-content border-0 shadow">
+          <div
+            class="modal-content border-0 shadow"
+            style="background: var(--ordryn-card-bg); color: var(--ordryn-text);"
+          >
             <div class="modal-header border-0 pb-0">
               <h5 class="modal-title fw-bold">Save Current View</h5>
               <button type="button" class="btn-close" @click="showSaveViewModal = false" />
@@ -917,7 +967,10 @@ onMounted(async () => {
       <!-- Add Project Modal -->
       <div v-if="showAddProjectModal" class="modal fade show d-block" style="background: rgba(0,0,0,0.5);" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
-          <div class="modal-content border-0 shadow">
+          <div
+            class="modal-content border-0 shadow"
+            style="background: var(--ordryn-card-bg); color: var(--ordryn-text);"
+          >
             <div class="modal-header border-0 pb-0">
               <h5 class="modal-title fw-bold">Create New Project</h5>
               <button type="button" class="btn-close" @click="showAddProjectModal = false" />
@@ -946,7 +999,10 @@ onMounted(async () => {
       <!-- Edit Project Modal -->
       <div v-if="showEditProjectModal" class="modal fade show d-block" style="background: rgba(0,0,0,0.5);" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
-          <div class="modal-content border-0 shadow">
+          <div
+            class="modal-content border-0 shadow"
+            style="background: var(--ordryn-card-bg); color: var(--ordryn-text);"
+          >
             <div class="modal-header border-0 pb-0">
               <h5 class="modal-title fw-bold">Rename Project</h5>
               <button type="button" class="btn-close" @click="showEditProjectModal = false" />

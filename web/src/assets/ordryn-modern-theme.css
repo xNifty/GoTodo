@@ -43,6 +43,7 @@
   --ordryn-input-border: #e2e8f0;
   --ordryn-filter-active-bg: #1e293b;
   --ordryn-filter-active-text: #ffffff;
+  --ordryn-card-hover-border: rgba(245, 158, 11, 0.4);
 }
 
 /* Theme: LIGHT (Classic Light) */
@@ -79,6 +80,7 @@
   --ordryn-input-border: #cbd5e1;
   --ordryn-filter-active-bg: #2563eb;
   --ordryn-filter-active-text: #ffffff;
+  --ordryn-card-hover-border: rgba(37, 99, 235, 0.35);
 }
 
 /* Theme: DARK (Classic Dark) */
@@ -115,6 +117,7 @@
   --ordryn-input-border: #475569;
   --ordryn-filter-active-bg: #38bdf8;
   --ordryn-filter-active-text: #0f172a;
+  --ordryn-card-hover-border: rgba(56, 189, 248, 0.4);
 }
 
 /* --------------------------------------------------------------------------
@@ -350,7 +353,7 @@ body {
 
 .ordryn-task-card:hover {
   box-shadow: var(--ordryn-card-hover-shadow);
-  border-color: rgba(245, 158, 11, 0.3);
+  border-color: var(--ordryn-card-hover-border);
 }
 
 .ordryn-task-card.is-completed {

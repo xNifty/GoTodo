@@ -7,6 +7,7 @@ import { APIError } from '@/api/types'
 import ModernSidebar from '@/components/modern/ModernSidebar.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import { useToast } from '@/composables/useToast'
+import { useSidebarState } from '@/composables/useSidebarState'
 
 defineProps<{
   mobileSidebarOpen?: boolean
@@ -20,7 +21,7 @@ const router = useRouter()
 const stats = ref<DashboardStats | null>(null)
 const projects = ref<Project[]>([])
 const savedViews = ref<SavedView[]>([])
-const sidebarCollapsed = ref(false)
+const { sidebarCollapsed, toggleSidebar } = useSidebarState()
 const loading = ref(true)
 const toast = useToast()
 
@@ -62,7 +63,7 @@ onMounted(async () => {
       :mobile-open="mobileSidebarOpen || false"
       :projects="projects"
       :saved-views="savedViews"
-      @toggle-collapse="sidebarCollapsed = !sidebarCollapsed"
+      @toggle-collapse="toggleSidebar"
       @close-mobile="emit('close-mobile-sidebar')"
       @select-home="selectHome"
       @select-project="selectProject"

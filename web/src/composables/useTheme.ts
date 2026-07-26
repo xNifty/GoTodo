@@ -14,8 +14,6 @@ export const AVAILABLE_THEMES: ThemeOption[] = [
   { id: 'dark', label: 'Classic Dark', icon: 'bi-moon-stars-fill' },
 ]
 
-const currentTheme = ref<ThemeName>('warm')
-
 function readSavedTheme(): ThemeName {
   try {
     const saved = localStorage.getItem('ordryn_theme') || localStorage.getItem('theme')
@@ -27,6 +25,8 @@ function readSavedTheme(): ThemeName {
   }
   return 'warm'
 }
+
+const currentTheme = ref<ThemeName>(readSavedTheme())
 
 function applyTheme(next: ThemeName) {
   currentTheme.value = next
@@ -40,6 +40,9 @@ function applyTheme(next: ThemeName) {
     /* ignore */
   }
 }
+
+// Synchronously apply initial theme on script execution
+applyTheme(readSavedTheme())
 
 export function useTheme() {
   onMounted(() => {

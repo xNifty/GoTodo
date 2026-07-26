@@ -132,7 +132,7 @@ function formatDueDate(dateStr?: string): string {
             type="checkbox"
             class="cursor-pointer m-0 p-0"
             :checked="selected"
-            style="width: 1.05rem; height: 1.05rem; cursor: pointer; accent-color: #f59e0b;"
+            style="width: 1.05rem; height: 1.05rem; cursor: pointer; accent-color: var(--ordryn-accent);"
             :aria-label="`Select task ${task.title}`"
             @change="emit('toggle-select', ($event.target as HTMLInputElement).checked)"
           />
