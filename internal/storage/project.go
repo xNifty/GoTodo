@@ -28,6 +28,9 @@ func CreateProject(userID int, name string) (*Project, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create project: %v", err)
 	}
+	if err := EnsureProjectOwnerMember(p.ID, userID); err != nil {
+		return nil, fmt.Errorf("failed to create project owner membership: %v", err)
+	}
 	return &p, nil
 }
 

@@ -42,15 +42,15 @@ func RemoveColumns() (bool, error) {
 
 func CreateDatabase() {
 	pool, err := OpenDatabase()
+	if err != nil {
+		log.Fatalf("Unable to connect to database: %v\n", err)
+	}
 	defer CloseDatabase(pool)
 
-	err = CreateTasksTable()
-
-	if err != nil {
+	if err := CreateTasksTable(); err != nil {
 		log.Fatalf("Unable to create table: %v\n", err)
-	} else {
-		fmt.Println("Database connection appears to be " + GREEN + "successful" + RESET + ".")
 	}
+	fmt.Println("Database connection appears to be " + GREEN + "successful" + RESET + ".")
 }
 
 func GetNextID() int {
@@ -412,6 +412,22 @@ func MigrateUsersAddDigestSettings() error {
 	_, err = pool.Exec(context.Background(), "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_digest_sent DATE")
 	if err != nil {
 		return fmt.Errorf("failed to add last_digest_sent: %v", err)
+	}
+	return nil
+}
+
+// MigrateUsersAddAllowProjectInvites adds preference for receiving project invites (default on).
+func MigrateUsersAddAllowProjectInvites() error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return fmt.Errorf("failed to open database: %v", err)
+	}
+	defer CloseDatabase(pool)
+
+	_, err = pool.Exec(context.Background(),
+		"ALTER TABLE users ADD COLUMN IF NOT EXISTS allow_project_invites BOOLEAN DEFAULT TRUE")
+	if err != nil {
+		return fmt.Errorf("failed to add allow_project_invites: %v", err)
 	}
 	return nil
 }

@@ -14,7 +14,11 @@ import (
 func TestMain(m *testing.M) {
 	os.Setenv("SESSION_KEY", "test-session-key-for-unit-tests-32chars!!")
 	port := uint32(5438)
-	db := embeddedpostgres.NewDatabase(embeddedpostgres.DefaultConfig().Port(port).Database("gotodo_test"))
+	// Pin a Maven-published binary version (DefaultConfig alone can drift and 404).
+	db := embeddedpostgres.NewDatabase(embeddedpostgres.DefaultConfig().
+		Version(embeddedpostgres.V16).
+		Port(port).
+		Database("gotodo_test"))
 	if err := db.Start(); err != nil {
 		fmt.Fprintf(os.Stderr, "start postgres: %v\n", err)
 		os.Exit(1)
@@ -45,6 +49,13 @@ func TestMain(m *testing.M) {
 			UNIQUE (user_id, name)
 		);
 		CREATE TABLE projects (id SERIAL PRIMARY KEY, user_id INT, name TEXT);
+		CREATE TABLE project_members (
+			project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+			user_id INTEGER NOT NULL,
+			role VARCHAR(16) NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			PRIMARY KEY (project_id, user_id)
+		);
 		CREATE TABLE tags (
 			id SERIAL PRIMARY KEY,
 			user_id INTEGER NOT NULL,
@@ -82,13 +93,24 @@ func TestMain(m *testing.M) {
 		);
 		INSERT INTO users (id, email) VALUES
 			(1, 'user@example.com'),
-			(2, 'other@example.com');
+			(2, 'other@example.com'),
+			(3, 'viewer@example.com'),
+			(4, 'editor@example.com');
+		INSERT INTO projects (id, user_id, name) VALUES
+			(1, 1, 'Owned project'),
+			(2, 2, 'Shared project');
+		INSERT INTO project_members (project_id, user_id, role) VALUES
+			(1, 1, 'owner'),
+			(2, 2, 'owner'),
+			(2, 3, 'viewer'),
+			(2, 4, 'editor');
 		INSERT INTO tags (id, user_id, name, color) VALUES (1, 1, 'work', '#0d6efd'), (2, 1, 'personal', '#198754');
 		INSERT INTO tasks (title, description, user_id, completed, is_favorite, position, priority, project_id, due_date) VALUES
 		 ('Favorite task', 'fav desc', 1, false, true, 1, 2, NULL, CURRENT_DATE),
 		 ('Open task', 'open desc', 1, false, false, 2, 1, 1, CURRENT_DATE + 1),
 		 ('Done task', 'done desc', 1, true, false, 3, 0, 1, CURRENT_DATE - 1),
-		 ('Tagged task', 'has work tag', 1, false, false, 4, 0, NULL, NULL);
+		 ('Tagged task', 'has work tag', 1, false, false, 4, 0, NULL, NULL),
+		 ('Shared owner task', 'owned by project owner', 2, false, false, 5, 0, 2, NULL);
 		INSERT INTO task_tags (task_id, tag_id) VALUES (4, 1);
 	`)
 	pool.Close()
@@ -178,6 +200,83 @@ func TestSearchTasksForUserWithFilters(t *testing.T) {
 	if tagSearchTotal != 1 {
 		t.Fatalf("expected 1 task matching tag name search, got %d", tagSearchTotal)
 	}
+}
+
+func TestSharedProjectVisibilityByRole(t *testing.T) {
+	timezone := "America/New_York"
+	sharedProject := 2
+	viewerID := 3
+	editorID := 4
+
+	viewerHome, viewerHomeTotal, err := tasks.ReturnPaginationForUserWithFilters(1, 10, &viewerID, timezone, tasks.ListFilters{})
+	if err != nil {
+		t.Fatalf("viewer home list: %v", err)
+	}
+	if viewerHomeTotal != 0 || len(viewerHome) != 0 {
+		t.Fatalf("viewer should not see shared tasks on home list, got total %d tasks %v", viewerHomeTotal, titles(viewerHome))
+	}
+
+	viewerScoped, viewerScopedTotal, err := tasks.ReturnPaginationForUserWithFilters(1, 10, &viewerID, timezone, tasks.ListFilters{ProjectFilter: &sharedProject})
+	if err != nil {
+		t.Fatalf("viewer project list: %v", err)
+	}
+	if viewerScopedTotal != 1 || len(viewerScoped) != 1 || viewerScoped[0].Title != "Shared owner task" {
+		t.Fatalf("viewer should see shared task in project view, got total %d tasks %v", viewerScopedTotal, titles(viewerScoped))
+	}
+
+	matchHome, err := tasks.TaskMatchesFilters(5, viewerID, timezone, tasks.ListFilters{}, "")
+	if err != nil {
+		t.Fatalf("viewer home TaskMatchesFilters: %v", err)
+	}
+	if matchHome {
+		t.Fatal("viewer TaskMatchesFilters should be false on home list")
+	}
+	matchScoped, err := tasks.TaskMatchesFilters(5, viewerID, timezone, tasks.ListFilters{ProjectFilter: &sharedProject}, "")
+	if err != nil {
+		t.Fatalf("viewer scoped TaskMatchesFilters: %v", err)
+	}
+	if !matchScoped {
+		t.Fatal("viewer TaskMatchesFilters should be true for project filter")
+	}
+
+	editorHome, editorHomeTotal, err := tasks.ReturnPaginationForUserWithFilters(1, 10, &editorID, timezone, tasks.ListFilters{})
+	if err != nil {
+		t.Fatalf("editor home list: %v", err)
+	}
+	if editorHomeTotal != 1 || len(editorHome) != 1 || editorHome[0].Title != "Shared owner task" {
+		t.Fatalf("editor should see shared tasks on home list, got total %d tasks %v", editorHomeTotal, titles(editorHome))
+	}
+
+	editorScoped, editorScopedTotal, err := tasks.ReturnPaginationForUserWithFilters(1, 10, &editorID, timezone, tasks.ListFilters{ProjectFilter: &sharedProject})
+	if err != nil {
+		t.Fatalf("editor project list: %v", err)
+	}
+	if editorScopedTotal != 1 || len(editorScoped) != 1 || editorScoped[0].Title != "Shared owner task" {
+		t.Fatalf("editor should see shared task in project view, got total %d tasks %v", editorScopedTotal, titles(editorScoped))
+	}
+
+	_, searchHomeTotal, err := tasks.SearchTasksForUserWithFilters(1, 10, "Shared", &viewerID, timezone, tasks.ListFilters{})
+	if err != nil {
+		t.Fatalf("viewer home search: %v", err)
+	}
+	if searchHomeTotal != 0 {
+		t.Fatalf("viewer home search should hide shared tasks, got %d", searchHomeTotal)
+	}
+	_, searchScopedTotal, err := tasks.SearchTasksForUserWithFilters(1, 10, "Shared", &viewerID, timezone, tasks.ListFilters{ProjectFilter: &sharedProject})
+	if err != nil {
+		t.Fatalf("viewer project search: %v", err)
+	}
+	if searchScopedTotal != 1 {
+		t.Fatalf("viewer project search should find shared task, got %d", searchScopedTotal)
+	}
+}
+
+func titles(list []tasks.Task) []string {
+	out := make([]string, len(list))
+	for i, task := range list {
+		out[i] = task.Title
+	}
+	return out
 }
 
 func intPtr(n int) *int {

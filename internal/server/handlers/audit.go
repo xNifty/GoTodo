@@ -71,8 +71,54 @@ func projectDisplayName(userID, projectID int) string {
 	if projectID == 0 {
 		return "No project"
 	}
-	if p, err := storage.GetProjectByID(projectID, userID); err == nil {
+	if p, err := storage.GetAccessibleProjectByID(projectID, userID); err == nil {
 		return p.Name
 	}
 	return "Project"
+}
+
+func formatEventLabel(eventType string, meta map[string]interface{}) string {
+	switch eventType {
+	case "created":
+		return "Created"
+	case "edited":
+		if fields, ok := meta["fields"].([]interface{}); ok && len(fields) > 0 {
+			parts := make([]string, 0, len(fields))
+			for _, f := range fields {
+				parts = append(parts, fmt.Sprintf("%v", f))
+			}
+			return "Edited · " + strings.Join(parts, ", ")
+		}
+		return "Edited"
+	case "completed":
+		return "Completed"
+	case "reopened":
+		return "Reopened"
+	case "deleted":
+		return "Deleted"
+	case "moved_project":
+		if name, ok := meta["project"].(string); ok && name != "" {
+			return "Moved to · " + name
+		}
+		return "Moved project"
+	case "tag_added":
+		if name, ok := meta["tag"].(string); ok {
+			return "Tag added · " + name
+		}
+		return "Tag added"
+	case "tag_removed":
+		if name, ok := meta["tag"].(string); ok {
+			return "Tag removed · " + name
+		}
+		return "Tag removed"
+	case "reordered":
+		return "Reordered"
+	case "priority_changed":
+		if to, ok := meta["to"].(string); ok {
+			return "Priority · " + to
+		}
+		return "Priority changed"
+	default:
+		return eventType
+	}
 }

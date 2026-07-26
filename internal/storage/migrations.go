@@ -57,6 +57,14 @@ func RunMigrations() error {
 		fmt.Printf("migration: MigrateUsersAddDigestSettings failed: %v\n", err)
 		errCount++
 	}
+	if err := MigrateUsersAddAllowProjectInvites(); err != nil {
+		fmt.Printf("migration: MigrateUsersAddAllowProjectInvites failed: %v\n", err)
+		errCount++
+	}
+	if err := MigrateUsersUsernames(); err != nil {
+		fmt.Printf("migration: MigrateUsersUsernames failed: %v\n", err)
+		errCount++
+	}
 	if err := MigrateTasksAddIsFavorite(); err != nil {
 		fmt.Printf("migration: MigrateTasksAddIsFavorite failed: %v\n", err)
 		errCount++
@@ -127,6 +135,15 @@ func RunMigrations() error {
 
 	if err := CreateAPIKeysTable(); err != nil {
 		fmt.Printf("migration: CreateAPIKeysTable failed: %v\n", err)
+		errCount++
+	}
+
+	if err := CreateProjectSharingTables(); err != nil {
+		fmt.Printf("migration: CreateProjectSharingTables failed: %v\n", err)
+		errCount++
+	}
+	if err := MigrateProjectOwnersToMembers(); err != nil {
+		fmt.Printf("migration: MigrateProjectOwnersToMembers failed: %v\n", err)
 		errCount++
 	}
 

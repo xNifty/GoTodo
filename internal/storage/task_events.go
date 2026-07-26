@@ -80,7 +80,7 @@ func GetEventsForTask(taskID, userID int, limit int) ([]TaskEvent, error) {
 		SELECT te.id, te.task_id, te.user_id, te.event_type, COALESCE(te.metadata, '{}'), te.created_at
 		FROM task_events te
 		JOIN tasks t ON t.id = te.task_id
-		WHERE te.task_id = $1 AND t.user_id = $2
+		WHERE te.task_id = $1 AND `+TaskVisibleCondition("t", "$2")+`
 		ORDER BY te.created_at DESC
 		LIMIT $3`, taskID, userID, limit)
 	if err != nil {
