@@ -12,8 +12,9 @@ import { useTaskSidebar } from '@/composables/useTaskSidebar'
 import { useTaskSortable } from '@/composables/useTaskSortable'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import { projectOptionLabel } from '@/utils/projectLabel'
 
-const { openAdd, openEdit, lastSavedTask } = useTaskSidebar()
+const { openAdd, openEdit, openView, lastSavedTask } = useTaskSidebar()
 
 const tasks = ref<Task[]>([])
 const projects = ref<Project[]>([])
@@ -49,17 +50,46 @@ const favoriteListEl = ref<HTMLElement | null>(null)
 const taskListEl = ref<HTMLElement | null>(null)
 const loadMoreSentinel = ref<HTMLElement | null>(null)
 
-const favoriteTasks = computed(() => tasks.value.filter((t) => t.favorite))
-const regularTasks = computed(() => tasks.value.filter((t) => !t.favorite))
-const allSelected = computed(
-  () => tasks.value.length > 0 && selected.value.length === tasks.value.length,
+const isViewerProjectView = computed(() => {
+  if (!filters.project || filters.project === '0') return false
+  const pid = parseInt(filters.project, 10)
+  if (Number.isNaN(pid)) return false
+  return projects.value.find((p) => p.id === pid)?.role === 'viewer'
+})
+
+const favoriteTasks = computed(() =>
+  isViewerProjectView.value ? [] : tasks.value.filter((t) => t.favorite),
 )
+const regularTasks = computed(() =>
+  isViewerProjectView.value ? tasks.value : tasks.value.filter((t) => !t.favorite),
+)
+const writableTasks = computed(() => tasks.value.filter((t) => canWriteTask(t)))
+const allSelected = computed(
+  () =>
+    writableTasks.value.length > 0 &&
+    writableTasks.value.every((t) => selected.value.includes(t.id)),
+)
+const tableColSpan = computed(() => (isViewerProjectView.value ? 5 : 7))
+
+function canWriteTask(task: Task): boolean {
+  if (task.project_id == null) return true
+  const project = projects.value.find((p) => p.id === task.project_id)
+  if (!project) return true
+  return project.role !== 'viewer'
+}
+
+function openTask(task: Task) {
+  if (canWriteTask(task)) openEdit(task.id)
+  else openView(task.id)
+}
 const isSearching = computed(() => filters.search !== '')
 const showTaskTable = computed(
   () => total.value > 0 || favoriteTasks.value.length > 0 || hasActiveFilters.value,
 )
 const hasMore = computed(() => loadedPage.value < totalPages.value)
-const sortableEnabled = computed(() => filters.sort !== 'priority' && !loading.value)
+const sortableEnabled = computed(
+  () => !isViewerProjectView.value && filters.sort !== 'priority' && !loading.value,
+)
 const showFavoriteList = computed(() => favoriteTasks.value.length > 0)
 
 function taskMatchesCurrentFilters(task: Task): boolean {
@@ -251,6 +281,7 @@ watch(lastSavedTask, async (task) => {
 })
 
 async function toggleComplete(task: Task) {
+  if (!canWriteTask(task)) return
   try {
     const updated = await api.patchTask(task.id, { completed: !task.completed })
     applyTaskUpdate(updated)
@@ -260,6 +291,7 @@ async function toggleComplete(task: Task) {
 }
 
 async function toggleFavorite(task: Task) {
+  if (!canWriteTask(task)) return
   try {
     const updated = await api.patchTask(task.id, { favorite: !task.favorite })
     applyTaskUpdate(updated)
@@ -271,6 +303,7 @@ async function toggleFavorite(task: Task) {
 }
 
 async function removeTask(task: Task) {
+  if (!canWriteTask(task)) return
   const ok = await askConfirm({
     title: 'Delete task?',
     message: `Delete “${task.title}”?`,
@@ -303,6 +336,8 @@ async function undoDelete() {
 }
 
 function toggleSelect(id: number, checked: boolean) {
+  const task = tasks.value.find((t) => t.id === id)
+  if (task && !canWriteTask(task)) return
   if (checked) {
     if (!selected.value.includes(id)) selected.value = [...selected.value, id]
   } else {
@@ -311,7 +346,7 @@ function toggleSelect(id: number, checked: boolean) {
 }
 
 function toggleSelectAll(checked: boolean) {
-  selected.value = checked ? tasks.value.map((t) => t.id) : []
+  selected.value = checked ? writableTasks.value.map((t) => t.id) : []
 }
 
 async function bulk(action: string, extra: Record<string, unknown> = {}) {
@@ -548,7 +583,7 @@ onMounted(async () => {
         >
           <option value="">All projects</option>
           <option value="0">No project</option>
-          <option v-for="p in projects" :key="p.id" :value="String(p.id)">{{ p.name }}</option>
+          <option v-for="p in projects" :key="p.id" :value="String(p.id)">{{ projectOptionLabel(p) }}</option>
         </select>
       </div>
       <div class="dropdown" id="saved-views-dropdown">
@@ -695,7 +730,7 @@ onMounted(async () => {
             <select v-model="bulkProjectId" id="bulk-project" class="form-select form-select-sm" aria-label="Move to project">
               <option value="">Move to project…</option>
               <option value="0">No project</option>
-              <option v-for="p in projects" :key="p.id" :value="String(p.id)">{{ p.name }}</option>
+              <option v-for="p in projects" :key="p.id" :value="String(p.id)">{{ projectOptionLabel(p) }}</option>
             </select>
             <button type="button" class="btn btn-sm btn-outline-primary" @click="bulkMoveProject">Move</button>
           </div>
@@ -743,12 +778,12 @@ onMounted(async () => {
           <span id="total-tasks-badge" class="badge bg-primary me-2">Tasks: {{ total }}</span>
           <span id="completed-tasks-badge" class="badge bg-success me-2">Completed: {{ completedCount }}</span>
           <span id="incomplete-tasks-badge" class="badge bg-warning text-dark">Incomplete: {{ incompleteCount }}</span>
-          <small class="task-count-hint ms-2">Task count excludes starred items</small>
+          <small v-if="!isViewerProjectView" class="task-count-hint ms-2">Task count excludes starred items</small>
 
           <table class="table table-striped table-bordered w-100 mb-3 mt-3">
             <thead>
               <tr>
-                <th style="width: 32px">
+                <th v-if="!isViewerProjectView" style="width: 32px">
                   <input
                     id="select-all-tasks"
                     type="checkbox"
@@ -759,7 +794,7 @@ onMounted(async () => {
                     @change="toggleSelectAll(($event.target as HTMLInputElement).checked)"
                   />
                 </th>
-                <th style="width: 32px" />
+                <th v-if="!isViewerProjectView" style="width: 32px" />
                 <th class="description-column">Title</th>
                 <th class="tags-column">Tags</th>
                 <th class="description-column">Description</th>
@@ -795,7 +830,7 @@ onMounted(async () => {
             </thead>
             <tbody v-if="favoriteTasks.length">
               <tr class="starred-section-label">
-                <td colspan="7" class="py-1 px-2 border-0">
+                <td :colspan="tableColSpan" class="py-1 px-2 border-0">
                   <small><i class="bi bi-star-fill" /> Starred tasks (always visible)</small>
                 </td>
               </tr>
@@ -806,10 +841,12 @@ onMounted(async () => {
                 :key="task.id"
                 :task="task"
                 :selected="selected.includes(task.id)"
+                :can-write="canWriteTask(task)"
+                :show-write-columns="!isViewerProjectView"
                 @toggle-select="toggleSelect(task.id, $event)"
                 @toggle-complete="toggleComplete(task)"
                 @toggle-favorite="toggleFavorite(task)"
-                @edit="openEdit(task.id)"
+                @edit="openTask(task)"
                 @remove="removeTask(task)"
               />
             </tbody>
@@ -819,14 +856,16 @@ onMounted(async () => {
                 :key="task.id"
                 :task="task"
                 :selected="selected.includes(task.id)"
+                :can-write="canWriteTask(task)"
+                :show-write-columns="!isViewerProjectView"
                 @toggle-select="toggleSelect(task.id, $event)"
                 @toggle-complete="toggleComplete(task)"
                 @toggle-favorite="toggleFavorite(task)"
-                @edit="openEdit(task.id)"
+                @edit="openTask(task)"
                 @remove="removeTask(task)"
               />
               <tr v-if="!tasks.length && hasActiveFilters">
-                <td colspan="7" class="text-center py-4">
+                <td :colspan="tableColSpan" class="text-center py-4">
                   <div class="empty-state-inline">
                     <p class="text-muted mb-2">No tasks match this filter.</p>
                     <button type="button" class="btn btn-sm btn-outline-primary" @click="clearFilters">
@@ -836,7 +875,7 @@ onMounted(async () => {
                 </td>
               </tr>
               <tr v-if="hasMore" ref="loadMoreSentinel">
-                <td colspan="7" class="text-center py-3 text-muted">
+                <td :colspan="tableColSpan" class="text-center py-3 text-muted">
                   <span v-if="loadingMore" class="spinner-border spinner-border-sm me-2" role="status" />
                   {{ loadingMore ? 'Loading more tasks…' : 'Scroll for more tasks' }}
                 </td>
