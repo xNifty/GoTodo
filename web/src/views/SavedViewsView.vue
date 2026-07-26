@@ -7,6 +7,7 @@ import { APIError } from '@/api/types'
 import { useTaskListFilters } from '@/composables/useTaskListFilters'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import { projectOptionLabel } from '@/utils/projectLabel'
 
 const views = ref<SavedView[]>([])
 const projects = ref<Project[]>([])
@@ -222,7 +223,7 @@ onMounted(load)
               <select id="view-project" v-model="project" class="form-select">
                 <option value="">All projects</option>
                 <option value="0">No project</option>
-                <option v-for="p in projects" :key="p.id" :value="String(p.id)">{{ p.name }}</option>
+                <option v-for="p in projects" :key="p.id" :value="String(p.id)">{{ projectOptionLabel(p) }}</option>
               </select>
             </div>
             <div v-if="tags.length" class="col-sm-6 col-md-4">

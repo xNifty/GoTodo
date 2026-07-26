@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"GoTodo/internal/config"
+	"GoTodo/internal/crypto/secret"
 	"GoTodo/internal/domain"
 	"GoTodo/internal/server/utils"
 	"GoTodo/internal/storage"
@@ -25,6 +26,17 @@ type adminSettingsJSON struct {
 	EnableGlobalAnnouncement bool   `json:"enable_global_announcement"`
 	GlobalAnnouncementText   string `json:"global_announcement_text"`
 	EnableAPI                bool   `json:"enable_api"`
+
+	EmailProvider           string `json:"email_provider"`
+	EmailFromAddress        string `json:"email_from_address"`
+	EmailFromName           string `json:"email_from_name"`
+	EmailMailgunDomain      string `json:"email_mailgun_domain"`
+	EmailMailgunAPIKeySet   bool   `json:"email_mailgun_api_key_set"`
+	EmailSMTPHost           string `json:"email_smtp_host"`
+	EmailSMTPPort           int    `json:"email_smtp_port"`
+	EmailSMTPUsername       string `json:"email_smtp_username"`
+	EmailSMTPPasswordSet    bool   `json:"email_smtp_password_set"`
+	EmailSMTPTLS           bool   `json:"email_smtp_tls"`
 }
 
 type adminSettingsPatch struct {
@@ -37,6 +49,17 @@ type adminSettingsPatch struct {
 	EnableGlobalAnnouncement *bool   `json:"enable_global_announcement"`
 	GlobalAnnouncementText   *string `json:"global_announcement_text"`
 	EnableAPI                *bool   `json:"enable_api"`
+
+	EmailProvider        *string `json:"email_provider"`
+	EmailFromAddress     *string `json:"email_from_address"`
+	EmailFromName        *string `json:"email_from_name"`
+	EmailMailgunDomain   *string `json:"email_mailgun_domain"`
+	EmailMailgunAPIKey   *string `json:"email_mailgun_api_key"`
+	EmailSMTPHost        *string `json:"email_smtp_host"`
+	EmailSMTPPort        *int    `json:"email_smtp_port"`
+	EmailSMTPUsername    *string `json:"email_smtp_username"`
+	EmailSMTPPassword    *string `json:"email_smtp_password"`
+	EmailSMTPTLS        *bool   `json:"email_smtp_tls"`
 }
 
 // APIV1AdminSettings handles GET/PATCH /api/v1/admin/settings.
@@ -99,6 +122,56 @@ func apiV1PatchAdminSettings(w http.ResponseWriter, r *http.Request) {
 	if req.EnableAPI != nil {
 		next.EnableAPI = *req.EnableAPI
 	}
+	if req.EmailProvider != nil {
+		next.EmailProvider = normalizeEmailProvider(*req.EmailProvider)
+	}
+	if req.EmailFromAddress != nil {
+		next.EmailFromAddress = strings.TrimSpace(*req.EmailFromAddress)
+	}
+	if req.EmailFromName != nil {
+		next.EmailFromName = strings.TrimSpace(*req.EmailFromName)
+	}
+	if req.EmailMailgunDomain != nil {
+		next.EmailMailgunDomain = strings.TrimSpace(*req.EmailMailgunDomain)
+	}
+	if req.EmailMailgunAPIKey != nil {
+		key := *req.EmailMailgunAPIKey
+		if key == "" {
+			next.EmailMailgunAPIKeyEnc = ""
+		} else {
+			enc, err := secret.Encrypt(key)
+			if err != nil {
+				utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to encrypt mailgun API key.")
+				return
+			}
+			next.EmailMailgunAPIKeyEnc = enc
+		}
+	}
+	if req.EmailSMTPHost != nil {
+		next.EmailSMTPHost = strings.TrimSpace(*req.EmailSMTPHost)
+	}
+	if req.EmailSMTPPort != nil {
+		next.EmailSMTPPort = *req.EmailSMTPPort
+	}
+	if req.EmailSMTPUsername != nil {
+		next.EmailSMTPUsername = strings.TrimSpace(*req.EmailSMTPUsername)
+	}
+	if req.EmailSMTPPassword != nil {
+		pass := *req.EmailSMTPPassword
+		if pass == "" {
+			next.EmailSMTPPasswordEnc = ""
+		} else {
+			enc, err := secret.Encrypt(pass)
+			if err != nil {
+				utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to encrypt SMTP password.")
+				return
+			}
+			next.EmailSMTPPasswordEnc = enc
+		}
+	}
+	if req.EmailSMTPTLS != nil {
+		next.EmailSMTPTLS = *req.EmailSMTPTLS
+	}
 	if next.SiteName == "" || next.DefaultTimezone == "" {
 		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "site_name and default_timezone are required.")
 		return
@@ -109,6 +182,10 @@ func apiV1PatchAdminSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if next.EnableAPI && !utils.RedisAvailable() {
 		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Cannot enable REST API without Redis.")
+		return
+	}
+	if errMsg := validateEmailSettings(&next); errMsg != "" {
+		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", errMsg)
 		return
 	}
 	next.SiteVersion = "" // never persist binary version from API
@@ -126,6 +203,56 @@ func apiV1PatchAdminSettings(w http.ResponseWriter, r *http.Request) {
 	writeAdminSettings(w, saved)
 }
 
+func normalizeEmailProvider(p string) string {
+	p = strings.ToLower(strings.TrimSpace(p))
+	switch p {
+	case storage.EmailProviderMailgun, storage.EmailProviderSMTP:
+		return p
+	case "none", "":
+		return storage.EmailProviderNone
+	default:
+		return p
+	}
+}
+
+func validateEmailSettings(s *storage.SiteSettings) string {
+	provider := normalizeEmailProvider(s.EmailProvider)
+	s.EmailProvider = provider
+	switch provider {
+	case storage.EmailProviderNone:
+		return ""
+	case storage.EmailProviderMailgun:
+		if s.EmailFromAddress == "" {
+			return "email_from_address is required for Mailgun."
+		}
+		if s.EmailMailgunDomain == "" {
+			return "email_mailgun_domain is required for Mailgun."
+		}
+		if s.EmailMailgunAPIKeyEnc == "" {
+			return "email_mailgun_api_key is required for Mailgun."
+		}
+	case storage.EmailProviderSMTP:
+		if s.EmailFromAddress == "" {
+			return "email_from_address is required for SMTP."
+		}
+		if s.EmailSMTPHost == "" {
+			return "email_smtp_host is required for SMTP."
+		}
+		if s.EmailSMTPPort <= 0 {
+			return "email_smtp_port must be a positive integer."
+		}
+		if s.EmailSMTPUsername == "" {
+			return "email_smtp_username is required for SMTP."
+		}
+		if s.EmailSMTPPasswordEnc == "" {
+			return "email_smtp_password is required for SMTP."
+		}
+	default:
+		return "email_provider must be none, mailgun, or smtp."
+	}
+	return ""
+}
+
 func writeAdminSettings(w http.ResponseWriter, s *storage.SiteSettings) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	_ = json.NewEncoder(w).Encode(adminSettingsJSON{
@@ -139,6 +266,16 @@ func writeAdminSettings(w http.ResponseWriter, s *storage.SiteSettings) {
 		EnableGlobalAnnouncement: s.EnableGlobalAnnouncement,
 		GlobalAnnouncementText:   s.GlobalAnnouncementText,
 		EnableAPI:                s.EnableAPI,
+		EmailProvider:            s.EmailProvider,
+		EmailFromAddress:         s.EmailFromAddress,
+		EmailFromName:            s.EmailFromName,
+		EmailMailgunDomain:       s.EmailMailgunDomain,
+		EmailMailgunAPIKeySet:    s.EmailMailgunAPIKeyEnc != "",
+		EmailSMTPHost:            s.EmailSMTPHost,
+		EmailSMTPPort:            s.EmailSMTPPort,
+		EmailSMTPUsername:        s.EmailSMTPUsername,
+		EmailSMTPPasswordSet:     s.EmailSMTPPasswordEnc != "",
+		EmailSMTPTLS:            s.EmailSMTPTLS,
 	})
 }
 

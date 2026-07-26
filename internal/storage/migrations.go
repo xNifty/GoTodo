@@ -132,6 +132,14 @@ func RunMigrations() error {
 		fmt.Printf("migration: MigrateSiteSettingsAddEnableAPI failed: %v\n", err)
 		errCount++
 	}
+	if err := MigrateSiteSettingsAddEmailSettings(); err != nil {
+		fmt.Printf("migration: MigrateSiteSettingsAddEmailSettings failed: %v\n", err)
+		errCount++
+	}
+	if err := MaybeImportEmailSettingsFromEnv(); err != nil {
+		fmt.Printf("migration: MaybeImportEmailSettingsFromEnv failed: %v\n", err)
+		errCount++
+	}
 
 	if err := CreateAPIKeysTable(); err != nil {
 		fmt.Printf("migration: CreateAPIKeysTable failed: %v\n", err)

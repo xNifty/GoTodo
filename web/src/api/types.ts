@@ -218,6 +218,22 @@ export type AdminSettings = {
   enable_global_announcement: boolean
   global_announcement_text: string
   enable_api: boolean
+  email_provider: string
+  email_from_address: string
+  email_from_name: string
+  email_mailgun_domain: string
+  email_mailgun_api_key_set: boolean
+  email_smtp_host: string
+  email_smtp_port: number
+  email_smtp_username: string
+  email_smtp_password_set: boolean
+  email_smtp_tls: boolean
+}
+
+/** Write-only secret fields accepted by PATCH /admin/settings. */
+export type AdminSettingsPatch = Partial<AdminSettings> & {
+  email_mailgun_api_key?: string
+  email_smtp_password?: string
 }
 
 export type AdminUser = {
