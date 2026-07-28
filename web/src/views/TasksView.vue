@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { api } from '@/api/client'
 import type { Project, SavedView, Tag, Task } from '@/api/types'
 import { APIError } from '@/api/types'
-import TaskTableRow from '@/components/TaskTableRow.vue'
+import ModernSidebar from '@/components/modern/ModernSidebar.vue'
+import ModernTaskFilterBar from '@/components/modern/ModernTaskFilterBar.vue'
+import ModernTaskCard from '@/components/modern/ModernTaskCard.vue'
+import AppFooter from '@/components/AppFooter.vue'
 import { useAuth } from '@/composables/useAuth'
 import { useInfiniteScroll } from '@/composables/useInfiniteScroll'
 import { useTaskListFilters } from '@/composables/useTaskListFilters'
@@ -12,14 +15,29 @@ import { useTaskSidebar } from '@/composables/useTaskSidebar'
 import { useTaskSortable } from '@/composables/useTaskSortable'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import { useViewDensity } from '@/composables/useViewDensity'
+import { useSidebarState } from '@/composables/useSidebarState'
 import { projectOptionLabel } from '@/utils/projectLabel'
 
-const { openAdd, openEdit, openView, lastSavedTask } = useTaskSidebar()
+defineProps<{
+  mobileSidebarOpen?: boolean
+}>()
+
+const emit = defineEmits<{
+  'close-mobile-sidebar': []
+}>()
+
+const route = useRoute()
+const { openAdd, openEdit, lastSavedTask } = useTaskSidebar()
+const { density } = useViewDensity()
+const { sidebarCollapsed, toggleSidebar } = useSidebarState()
 
 const tasks = ref<Task[]>([])
 const projects = ref<Project[]>([])
 const tags = ref<Tag[]>([])
 const savedViews = ref<SavedView[]>([])
+const activeViewId = ref<string | null>(null)
+
 const total = ref(0)
 const loadedPage = ref(0)
 const totalPages = ref(1)
@@ -28,6 +46,26 @@ const incompleteCount = ref(0)
 const search = ref('')
 const loading = ref(true)
 const loadingMore = ref(false)
+
+// Save View Modal state
+const showSaveViewModal = ref(false)
+const newViewName = ref('')
+
+// Add Project Modal state
+const showAddProjectModal = ref(false)
+const newProjectName = ref('')
+
+// Edit Project Modal state
+const showEditProjectModal = ref(false)
+const editingProject = ref<Project | null>(null)
+const editedProjectName = ref('')
+
+// Bulk Control Panel State
+const bulkProject = ref('')
+const bulkTag = ref('')
+const bulkPriority = ref('')
+const bulkDate = ref('')
+
 const toast = useToast()
 const { askConfirm } = useConfirm()
 const { user } = useAuth()
@@ -42,55 +80,59 @@ const {
 } = useTaskListFilters()
 const undoToken = ref<string | null>(null)
 const selected = ref<number[]>([])
-const bulkProjectId = ref('')
-const bulkTagId = ref('')
-const bulkPriority = ref('0')
-const bulkDueDate = ref('')
 const favoriteListEl = ref<HTMLElement | null>(null)
 const taskListEl = ref<HTMLElement | null>(null)
 const loadMoreSentinel = ref<HTMLElement | null>(null)
 
-const isViewerProjectView = computed(() => {
-  if (!filters.project || filters.project === '0') return false
-  const pid = parseInt(filters.project, 10)
-  if (Number.isNaN(pid)) return false
-  return projects.value.find((p) => p.id === pid)?.role === 'viewer'
-})
-
-const favoriteTasks = computed(() =>
-  isViewerProjectView.value ? [] : tasks.value.filter((t) => t.favorite),
-)
-const regularTasks = computed(() =>
-  isViewerProjectView.value ? tasks.value : tasks.value.filter((t) => !t.favorite),
-)
-const writableTasks = computed(() => tasks.value.filter((t) => canWriteTask(t)))
+const favoriteTasks = computed(() => tasks.value.filter((t) => t.favorite))
+const regularTasks = computed(() => tasks.value.filter((t) => !t.favorite))
 const allSelected = computed(
-  () =>
-    writableTasks.value.length > 0 &&
-    writableTasks.value.every((t) => selected.value.includes(t.id)),
+  () => tasks.value.length > 0 && selected.value.length === tasks.value.length,
 )
-const tableColSpan = computed(() => (isViewerProjectView.value ? 5 : 7))
-
-function canWriteTask(task: Task): boolean {
-  if (task.project_id == null) return true
-  const project = projects.value.find((p) => p.id === task.project_id)
-  if (!project) return true
-  return project.role !== 'viewer'
-}
-
-function openTask(task: Task) {
-  if (canWriteTask(task)) openEdit(task.id)
-  else openView(task.id)
-}
 const isSearching = computed(() => filters.search !== '')
 const showTaskTable = computed(
   () => total.value > 0 || favoriteTasks.value.length > 0 || hasActiveFilters.value,
 )
-const hasMore = computed(() => loadedPage.value < totalPages.value)
-const sortableEnabled = computed(
-  () => !isViewerProjectView.value && filters.sort !== 'priority' && !loading.value,
+
+const activeProjectObj = computed(() => {
+  if (!filters.project || filters.project === '0') return null
+  const pid = parseInt(filters.project, 10)
+  if (Number.isNaN(pid)) return null
+  return projects.value.find((p) => p.id === pid) ?? null
+})
+
+const isViewerProjectView = computed(
+  () => activeProjectObj.value?.role === 'viewer',
 )
+
+function canWriteTask(task: Task): boolean {
+  if (isViewerProjectView.value) return false
+  if (task.project_id) {
+    const p = projects.value.find((pr) => pr.id === task.project_id)
+    if (p && p.role === 'viewer') return false
+  }
+  return true
+}
+
+const hasMore = computed(() => loadedPage.value < totalPages.value)
+const sortableEnabled = computed(() => filters.sort !== 'priority' && !loading.value)
 const showFavoriteList = computed(() => favoriteTasks.value.length > 0)
+
+function getTodayStr() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function getTomorrowStr() {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  return d.toISOString().slice(0, 10)
+}
+
+function getNextWeekStr() {
+  const d = new Date()
+  d.setDate(d.getDate() + 7)
+  return d.toISOString().slice(0, 10)
+}
 
 function taskMatchesCurrentFilters(task: Task): boolean {
   if (!taskMatchesStatusFilter(task)) return false
@@ -220,6 +262,27 @@ async function loadMeta() {
   }
 }
 
+function syncFiltersFromRoute() {
+  const qView = typeof route.query.view === 'string' ? route.query.view : null
+  const qProject = typeof route.query.project === 'string' ? route.query.project : null
+
+  if (qView) {
+    const view = savedViews.value.find((v) => String(v.id) === qView)
+    if (view) {
+      activeViewId.value = String(view.id)
+      applySavedViewFilters(view.filter || {})
+      search.value = filters.search
+      return
+    }
+  }
+
+  if (qProject !== null) {
+    activeViewId.value = null
+    setFilter('project', qProject)
+    return
+  }
+}
+
 async function reloadInitial() {
   loading.value = true
   loadedPage.value = 0
@@ -280,6 +343,14 @@ watch(lastSavedTask, async (task) => {
   refreshSortable()
 })
 
+watch(
+  () => route.query,
+  () => {
+    syncFiltersFromRoute()
+    void reloadInitial()
+  },
+)
+
 async function toggleComplete(task: Task) {
   if (!canWriteTask(task)) return
   try {
@@ -291,12 +362,24 @@ async function toggleComplete(task: Task) {
 }
 
 async function toggleFavorite(task: Task) {
-  if (!canWriteTask(task)) return
   try {
     const updated = await api.patchTask(task.id, { favorite: !task.favorite })
     applyTaskUpdate(updated)
     await nextTick()
     refreshSortable()
+  } catch (err) {
+    toast.push(err instanceof APIError ? err.message : 'Update failed', 'error')
+  }
+}
+
+async function handleInlineTaskPatch(payload: { id: number; title?: string; description?: string }) {
+  try {
+    const updated = await api.patchTask(payload.id, {
+      title: payload.title,
+      description: payload.description,
+    })
+    applyTaskUpdate(updated)
+    toast.push('Task updated', 'success')
   } catch (err) {
     toast.push(err instanceof APIError ? err.message : 'Update failed', 'error')
   }
@@ -336,8 +419,6 @@ async function undoDelete() {
 }
 
 function toggleSelect(id: number, checked: boolean) {
-  const task = tasks.value.find((t) => t.id === id)
-  if (task && !canWriteTask(task)) return
   if (checked) {
     if (!selected.value.includes(id)) selected.value = [...selected.value, id]
   } else {
@@ -346,11 +427,11 @@ function toggleSelect(id: number, checked: boolean) {
 }
 
 function toggleSelectAll(checked: boolean) {
-  selected.value = checked ? writableTasks.value.map((t) => t.id) : []
+  selected.value = checked ? tasks.value.map((t) => t.id) : []
 }
 
 async function bulk(action: string, extra: Record<string, unknown> = {}) {
-  if (!selected.value.length) return
+  if (!selected.value.length || isViewerProjectView.value) return
   if (action === 'delete') {
     const ok = await askConfirm({
       title: 'Delete tasks?',
@@ -387,74 +468,102 @@ async function bulk(action: string, extra: Record<string, unknown> = {}) {
   }
 }
 
-function bulkMoveProject() {
-  if (!bulkProjectId.value) return
-  void bulk('move_project', { project_id: bulkProjectId.value === '0' ? 0 : Number(bulkProjectId.value) })
-}
-
-function bulkTagAction(action: 'add_tag' | 'remove_tag') {
-  if (!bulkTagId.value) return
-  void bulk(action, { tag_id: Number(bulkTagId.value) })
-}
-
-function bulkSetPriority() {
-  void bulk('set_priority', { priority: Number(bulkPriority.value) })
-}
-
-function bulkSetDueDate() {
-  if (!bulkDueDate.value) return
-  void bulk('set_due_date', { due_date: bulkDueDate.value })
-}
-
-function bulkDuePreset(preset: string) {
-  const today = new Date()
-  let due = ''
-  if (preset === 'today') {
-    due = today.toISOString().slice(0, 10)
-  } else if (preset === 'tomorrow') {
-    today.setDate(today.getDate() + 1)
-    due = today.toISOString().slice(0, 10)
-  } else if (preset === 'week') {
-    today.setDate(today.getDate() + 7)
-    due = today.toISOString().slice(0, 10)
-  } else if (preset === 'clear') {
-    void bulk('clear_due_date')
-    return
-  }
-  if (due) void bulk('set_due_date', { due_date: due })
-}
-
 function setFilterAndReload(key: Parameters<typeof setFilter>[0], value: string) {
+  activeViewId.value = null
   setFilter(key, value)
   void reloadInitial()
 }
 
-function applySearch() {
-  setFilter('search', search.value.trim())
-  void reloadInitial()
-}
-
 function clearFilters() {
+  activeViewId.value = null
   search.value = ''
   resetFilters()
   void reloadInitial()
 }
 
-function toggleSort() {
-  setFilter('sort', filters.sort === 'priority' ? '' : 'priority')
-  void reloadInitial()
+function selectProjectFilter(id: string) {
+  activeViewId.value = null
+  if (filters.project === id) {
+    setFilterAndReload('project', '')
+  } else {
+    setFilterAndReload('project', id)
+  }
 }
 
-function cycleStatusColumnFilter() {
-  if (!filters.status) setFilterAndReload('status', 'incomplete')
-  else if (filters.status === 'incomplete') setFilterAndReload('status', 'complete')
-  else setFilterAndReload('status', '')
+function selectSavedViewFilter(id: string) {
+  const view = savedViews.value.find((v) => String(v.id) === id)
+  if (view) {
+    activeViewId.value = String(view.id)
+    applySavedViewFilters(view.filter || {})
+    search.value = filters.search
+    void reloadInitial()
+  }
 }
 
-function applySavedView(view: SavedView) {
-  applySavedViewFilters(view.filter || {})
-  search.value = filters.search
-  void reloadInitial()
+async function saveCurrentView() {
+  if (!newViewName.value.trim()) return
+  try {
+    const created = await api.createSavedView({
+      name: newViewName.value.trim(),
+      filter: {
+        status: filters.status || undefined,
+        due: filters.due || undefined,
+        project: filters.project || undefined,
+        priority: filters.priority || undefined,
+        tag: filters.tag || undefined,
+        sort: filters.sort || undefined,
+        search: filters.search || undefined,
+      },
+    })
+    toast.push('View saved successfully!', 'success')
+    activeViewId.value = String(created.id)
+    newViewName.value = ''
+    showSaveViewModal.value = false
+    await loadMeta()
+  } catch (err) {
+    toast.push(err instanceof APIError ? err.message : 'Failed to save view', 'error')
+  }
+}
+
+async function createProject() {
+  if (!newProjectName.value.trim()) return
+  try {
+    await api.createProject(newProjectName.value.trim())
+    toast.push('Project created!', 'success')
+    newProjectName.value = ''
+    showAddProjectModal.value = false
+    await loadMeta()
+  } catch (err) {
+    toast.push(err instanceof APIError ? err.message : 'Failed to create project', 'error')
+  }
+}
+
+function openEditProject(proj: Project) {
+  editingProject.value = proj
+  editedProjectName.value = proj.name
+  showEditProjectModal.value = true
+}
+
+async function renameProject() {
+  if (!editingProject.value || !editedProjectName.value.trim()) return
+  try {
+    await api.renameProject(editingProject.value.id, editedProjectName.value.trim())
+    toast.push('Project renamed!', 'success')
+    editingProject.value = null
+    editedProjectName.value = ''
+    showEditProjectModal.value = false
+    await loadMeta()
+    await reloadInitial()
+  } catch (err) {
+    toast.push(err instanceof APIError ? err.message : 'Failed to rename project', 'error')
+  }
+}
+
+function selectHome() {
+  activeViewId.value = null
+  if (filters.project) {
+    setFilterAndReload('project', '')
+  }
 }
 
 async function exportTasks(format: 'json' | 'csv', filtered: boolean) {
@@ -482,433 +591,481 @@ useInfiniteScroll(loadMoreSentinel, loadMore, hasMore)
 
 onMounted(async () => {
   await loadMeta()
+  syncFiltersFromRoute()
   await reloadInitial()
 })
 </script>
 
 <template>
-  <div class="container mt-3 rounded p-3">
-    <div class="d-flex justify-content-between align-items-start mb-4">
-      <div class="d-flex flex-column me-3">
-        <form id="search-form" class="d-flex gap-2" @submit.prevent="applySearch">
-          <input
-            id="search"
-            v-model="search"
-            type="search"
-            class="form-control search-input"
-            placeholder="Search tasks..."
-            aria-label="Search tasks"
-          />
-          <button type="submit" class="btn btn-primary">
-            <i class="bi bi-search" />
-          </button>
-        </form>
-      </div>
-      <div class="d-flex gap-2 align-items-start flex-shrink-0">
-        <div class="btn-group">
-          <button
-            type="button"
-            class="btn btn-outline-secondary btn-sm dropdown-toggle"
-            data-bs-toggle="dropdown"
-            aria-expanded="false"
-            aria-label="Import or export tasks"
-          >
-            <i class="bi bi-arrow-down-up" /> Import / Export
-          </button>
-          <ul class="dropdown-menu dropdown-menu-end">
-            <li>
-              <RouterLink class="dropdown-item" to="/import">
-                <i class="bi bi-upload me-2" />Import CSV (with preview)
-              </RouterLink>
-            </li>
-            <li>
-              <RouterLink class="dropdown-item" to="/settings#calendar-feed">
-                <i class="bi bi-calendar3 me-2" />Calendar sync (ICS)
-              </RouterLink>
-            </li>
-            <template v-if="hasActiveFilters">
-              <li><hr class="dropdown-divider" /></li>
-              <li><h6 class="dropdown-header">Current filters</h6></li>
-              <li>
-                <button type="button" class="dropdown-item" @click="exportTasks('csv', true)">
-                  <i class="bi bi-download me-2" />Export CSV
-                </button>
-              </li>
-              <li>
-                <button type="button" class="dropdown-item" @click="exportTasks('json', true)">
-                  <i class="bi bi-download me-2" />Export JSON
-                </button>
-              </li>
-              <li><hr class="dropdown-divider" /></li>
-            </template>
-            <li><h6 class="dropdown-header">All your tasks</h6></li>
-            <li>
-              <button type="button" class="dropdown-item" @click="exportTasks('csv', false)">
-                <i class="bi bi-download me-2" />Export all CSV
-              </button>
-            </li>
-            <li>
-              <button type="button" class="dropdown-item" @click="exportTasks('json', false)">
-                <i class="bi bi-download me-2" />Export all JSON
-              </button>
-            </li>
-          </ul>
-        </div>
-        <button type="button" class="btn btn-success" id="openSidebar" @click="() => openAdd()">
-          <i class="bi bi-plus-lg" /> Add Task
-        </button>
-        <button
-          v-if="undoToken"
-          type="button"
-          class="btn btn-outline-secondary btn-sm"
-          @click="undoDelete"
-        >
-          Undo delete
-        </button>
-      </div>
-    </div>
-  </div>
+  <div class="ordryn-main-layout">
+    <!-- Collapsible & Responsive Warm Sidebar -->
+    <ModernSidebar
+      :collapsed="sidebarCollapsed"
+      :mobile-open="mobileSidebarOpen || false"
+      :projects="projects"
+      :saved-views="savedViews"
+      :active-project="filters.project"
+      :active-view="activeViewId || undefined"
+      @toggle-collapse="toggleSidebar"
+      @close-mobile="emit('close-mobile-sidebar')"
+      @select-home="selectHome"
+      @select-project="selectProjectFilter"
+      @select-view="selectSavedViewFilter"
+      @add-project="showAddProjectModal = true"
+      @edit-project="openEditProject"
+      @add-view="showSaveViewModal = true"
+    />
 
-  <div class="container mb-3 filter-toolbar-wrapper">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+    <!-- Main Content Area -->
+    <div class="flex-grow-1 p-3 p-md-4 overflow-hidden d-flex flex-column justify-content-between">
       <div>
-        <select
-          v-if="projects.length"
-          id="project-filter"
-          class="form-select w-auto"
-          style="width: 220px"
-          :value="filters.project"
-          aria-label="Filter by project"
-          @change="setFilterAndReload('project', ($event.target as HTMLSelectElement).value)"
-        >
-          <option value="">All projects</option>
-          <option value="0">No project</option>
-          <option v-for="p in projects" :key="p.id" :value="String(p.id)">{{ projectOptionLabel(p) }}</option>
-        </select>
-      </div>
-      <div class="dropdown" id="saved-views-dropdown">
-        <button
-          type="button"
-          class="btn btn-outline-secondary btn-sm dropdown-toggle"
-          id="saved-views-btn"
-          data-bs-toggle="dropdown"
-          aria-expanded="false"
-          aria-label="Saved views"
-        >
-          <i class="bi bi-bookmark" /> Views
-        </button>
-        <ul class="dropdown-menu dropdown-menu-end" id="saved-views-menu" aria-labelledby="saved-views-btn">
-          <li v-if="!savedViews.length">
-            <span class="dropdown-item-text text-muted small">No saved views</span>
-          </li>
-          <li v-for="view in savedViews" :key="view.id">
-            <button type="button" class="dropdown-item" @click="applySavedView(view)">
-              {{ view.name }}
-            </button>
-          </li>
-          <li><hr class="dropdown-divider" /></li>
-          <li>
-            <RouterLink class="dropdown-item" to="/views">
-              <i class="bi bi-gear me-2" />Manage views
-            </RouterLink>
-          </li>
-        </ul>
-      </div>
-    </div>
-    <div class="d-flex justify-content-end mb-2">
-      <button
-        v-if="hasActiveFilters"
-        type="button"
-        class="btn btn-outline-secondary btn-sm"
-        id="filter-clear-all"
-        @click="clearFilters"
-      >
-        <i class="bi bi-x-circle" /> Clear all filters
-      </button>
-    </div>
-    <div id="filter-toolbar-panel" class="filter-toolbar-panel">
-      <div class="d-flex flex-wrap align-items-center gap-2 filter-toolbar-inner">
-        <select
-          id="status-filter-select"
-          class="form-select form-select-sm w-auto"
-          aria-label="Filter by status"
-          :value="filters.status"
-          @change="setFilterAndReload('status', ($event.target as HTMLSelectElement).value)"
-        >
-          <option value="">All statuses</option>
-          <option value="incomplete">Incomplete</option>
-          <option value="complete">Complete</option>
-        </select>
-        <select
-          v-if="tags.length"
-          id="tag-filter-toolbar"
-          class="form-select form-select-sm w-auto"
-          aria-label="Filter by tag"
-          :value="filters.tag"
-          @change="setFilterAndReload('tag', ($event.target as HTMLSelectElement).value)"
-        >
-          <option value="">All tags</option>
-          <option v-for="tag in tags" :key="tag.id" :value="String(tag.id)">{{ tag.name }}</option>
-        </select>
-        <div class="btn-group btn-group-sm" role="group" aria-label="Due date filters">
-          <button
-            v-for="opt in [
-              { key: '', label: 'All' },
-              { key: 'today', label: 'Today' },
-              { key: 'overdue', label: 'Overdue' },
-              { key: 'week', label: 'This Week' },
-              { key: 'none', label: 'No Date' },
-            ]"
-            :key="opt.key || 'all'"
-            type="button"
-            class="btn btn-outline-secondary due-filter-btn"
-            :class="{ 'due-filter-active': filters.due === opt.key }"
-            :aria-pressed="filters.due === opt.key"
-            @click="setFilterAndReload('due', opt.key)"
-          >
-            {{ opt.label }}
-          </button>
-        </div>
-        <select
-          id="priority-filter-toolbar"
-          class="form-select form-select-sm w-auto"
-          aria-label="Filter by priority"
-          :value="filters.priority"
-          @change="setFilterAndReload('priority', ($event.target as HTMLSelectElement).value)"
-        >
-          <option value="">All priorities</option>
-          <option value="1">Low</option>
-          <option value="2">Medium</option>
-          <option value="3">High</option>
-        </select>
-        <button
-          type="button"
-          class="btn btn-sm"
-          :class="filters.sort === 'priority' ? 'btn-primary' : 'btn-outline-primary'"
-          id="sort-priority-btn"
-          :aria-pressed="filters.sort === 'priority'"
-          :title="
-            filters.sort === 'priority'
-              ? 'Sorted by priority (high first). Click to restore manual drag order.'
-              : 'Sorted by manual order. Click to sort by priority (high first).'
-          "
-          @click="toggleSort"
-        >
-          {{ filters.sort === 'priority' ? 'Sort: Priority' : 'Sort: Manual' }}
-        </button>
-      </div>
-    </div>
-  </div>
+        <!-- Single Compact Header Toolbar: Stats Pills, Import/Export, Add Task -->
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+          <!-- Compact Inline Task Counts -->
+          <div class="d-flex align-items-center gap-1.5 text-muted small">
+            <span class="badge rounded-pill bg-primary bg-opacity-10 text-primary border border-primary border-opacity-20 px-2.5 py-1">
+              Tasks: {{ total }}
+            </span>
+            <span class="badge rounded-pill bg-success bg-opacity-10 text-success border border-success border-opacity-20 px-2.5 py-1">
+              Completed: {{ completedCount }}
+            </span>
+            <span class="badge rounded-pill bg-warning bg-opacity-10 text-warning border border-warning border-opacity-20 px-2.5 py-1">
+              Incomplete: {{ incompleteCount }}
+            </span>
+            <span v-if="isViewerProjectView" class="badge rounded-pill bg-info bg-opacity-10 text-info border border-info border-opacity-20 px-2.5 py-1">
+              Viewer (Read Only)
+            </span>
+          </div>
 
-  <div
-    id="bulk-bar"
-    class="bulk-action-bar container mb-2"
-    :class="{ 'd-none': !selected.length }"
-    :aria-hidden="!selected.length"
-    role="region"
-    aria-label="Bulk actions"
-  >
-    <div class="d-flex flex-wrap align-items-center gap-2 py-2 px-3">
-      <span id="bulk-count" class="fw-semibold me-2" aria-live="polite">{{ selected.length }} selected</span>
-      <button type="button" class="btn btn-sm btn-success" @click="bulk('complete')">Complete</button>
-      <button type="button" class="btn btn-sm btn-outline-secondary" @click="bulk('incomplete')">
-        Mark incomplete
-      </button>
-      <button type="button" class="btn btn-sm btn-danger" @click="bulk('delete')">Delete</button>
-      <button type="button" class="btn btn-sm btn-outline-secondary" @click="selected = []">Clear</button>
-      <div class="dropdown">
-        <button
-          type="button"
-          class="btn btn-sm btn-outline-primary dropdown-toggle"
-          data-bs-toggle="dropdown"
-          aria-expanded="false"
-        >
-          More actions
-        </button>
-        <div class="dropdown-menu dropdown-menu-end p-3 bulk-more-menu">
-          <div v-if="projects.length" class="mb-2 d-flex flex-wrap gap-2 align-items-center">
-            <select v-model="bulkProjectId" id="bulk-project" class="form-select form-select-sm" aria-label="Move to project">
-              <option value="">Move to project…</option>
-              <option value="0">No project</option>
-              <option v-for="p in projects" :key="p.id" :value="String(p.id)">{{ projectOptionLabel(p) }}</option>
-            </select>
-            <button type="button" class="btn btn-sm btn-outline-primary" @click="bulkMoveProject">Move</button>
-          </div>
-          <div v-if="tags.length" class="mb-2 d-flex flex-wrap gap-2 align-items-center">
-            <select v-model="bulkTagId" id="bulk-tag" class="form-select form-select-sm" aria-label="Tag for bulk action">
-              <option value="">Select tag…</option>
-              <option v-for="tag in tags" :key="tag.id" :value="String(tag.id)">{{ tag.name }}</option>
-            </select>
-            <button type="button" class="btn btn-sm btn-outline-primary" @click="bulkTagAction('add_tag')">Add tag</button>
-            <button type="button" class="btn btn-sm btn-outline-secondary" @click="bulkTagAction('remove_tag')">
-              Remove tag
-            </button>
-          </div>
-          <div class="mb-2 d-flex flex-wrap gap-2 align-items-center">
-            <select v-model="bulkPriority" id="bulk-priority" class="form-select form-select-sm" aria-label="Set priority">
-              <option value="0">Priority: None</option>
-              <option value="1">Low</option>
-              <option value="2">Medium</option>
-              <option value="3">High</option>
-            </select>
-            <button type="button" class="btn btn-sm btn-outline-primary" @click="bulkSetPriority">Set priority</button>
-          </div>
-          <div class="d-flex flex-wrap gap-2 align-items-center">
-            <div class="btn-group btn-group-sm" role="group" aria-label="Due date presets">
-              <button type="button" class="btn btn-outline-secondary" @click="bulkDuePreset('today')">Today</button>
-              <button type="button" class="btn btn-outline-secondary" @click="bulkDuePreset('tomorrow')">Tomorrow</button>
-              <button type="button" class="btn btn-outline-secondary" @click="bulkDuePreset('week')">+1 week</button>
-              <button type="button" class="btn btn-outline-secondary" @click="bulkDuePreset('clear')">Clear</button>
+          <!-- Actions Group: Import/Export & Add Task -->
+          <div class="d-flex align-items-center gap-2">
+            <!-- Import/Export Dropdown -->
+            <div class="dropdown">
+              <button
+                class="btn btn-sm btn-outline-secondary dropdown-toggle rounded-pill px-3 py-1"
+                type="button"
+                data-bs-toggle="dropdown"
+              >
+                <i class="bi bi-arrow-down-up me-1" /> Import / Export
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
+                <li>
+                  <RouterLink class="dropdown-item small" to="/import">
+                    <i class="bi bi-upload me-2" />Import CSV
+                  </RouterLink>
+                </li>
+                <li>
+                  <RouterLink class="dropdown-item small" to="/settings#calendar-feed">
+                    <i class="bi bi-calendar3 me-2" />Calendar Sync (ICS)
+                  </RouterLink>
+                </li>
+                <li><hr class="dropdown-divider" /></li>
+                <li>
+                  <button type="button" class="dropdown-item small" @click="exportTasks('csv', true)">
+                    <i class="bi bi-download me-2" />Export Filtered CSV
+                  </button>
+                </li>
+                <li>
+                  <button type="button" class="dropdown-item small" @click="exportTasks('json', true)">
+                    <i class="bi bi-download me-2" />Export Filtered JSON
+                  </button>
+                </li>
+              </ul>
             </div>
-            <input v-model="bulkDueDate" type="date" id="bulk-due-date" class="form-control form-control-sm" aria-label="Set due date" />
-            <button type="button" class="btn btn-sm btn-outline-primary" @click="bulkSetDueDate">Set due</button>
-            <button type="button" class="btn btn-sm btn-outline-secondary" @click="bulk('clear_due_date')">Clear due</button>
+
+            <!-- Add Task Button (Hidden for read-only viewer role) -->
+            <button
+              v-if="!isViewerProjectView"
+              type="button"
+              class="btn btn-sm btn-success rounded-pill px-3 py-1 shadow-xs d-flex align-items-center gap-1"
+              @click="openAdd(undefined, filters.project)"
+            >
+              <i class="bi bi-plus-lg" />
+              <span>Add Task</span>
+            </button>
+
+            <!-- Undo Delete Button -->
+            <button
+              v-if="undoToken"
+              type="button"
+              class="btn btn-sm btn-outline-warning rounded-pill px-3 py-1"
+              @click="undoDelete"
+            >
+              <i class="bi bi-arrow-counterclockwise me-1" />Undo
+            </button>
           </div>
         </div>
-      </div>
-    </div>
-  </div>
 
-  <div id="task-container" class="container" aria-live="polite" aria-atomic="false">
-    <p v-if="loading && !tasks.length" class="text-muted">Loading…</p>
+        <!-- Modern Filter Bar (Search, Folded Filters, Density Toggle) -->
+        <ModernTaskFilterBar
+          :status="filters.status"
+          :tag="filters.tag"
+          :priority="filters.priority"
+          :due-date-preset="filters.due"
+          :sort="filters.sort"
+          :search="search"
+          :density="density"
+          :tags="tags"
+          @update:status="setFilterAndReload('status', $event)"
+          @update:tag="setFilterAndReload('tag', $event)"
+          @update:priority="setFilterAndReload('priority', $event)"
+          @update:due-date-preset="setFilterAndReload('due', $event)"
+          @update:sort="setFilterAndReload('sort', $event)"
+          @update:search="search = $event; setFilter('search', $event); reloadInitial()"
+          @update:density="density = $event"
+          @clear-filters="clearFilters"
+        />
 
-    <div v-else-if="showTaskTable" class="row justify-content-center mb-5">
-      <div>
-        <div class="mb-3">
-          <span id="total-tasks-badge" class="badge bg-primary me-2">Tasks: {{ total }}</span>
-          <span id="completed-tasks-badge" class="badge bg-success me-2">Completed: {{ completedCount }}</span>
-          <span id="incomplete-tasks-badge" class="badge bg-warning text-dark">Incomplete: {{ incompleteCount }}</span>
-          <small v-if="!isViewerProjectView" class="task-count-hint ms-2">Task count excludes starred items</small>
+        <!-- Sleek Bulk Actions Bar -->
+        <div
+          v-if="selected.length && !isViewerProjectView"
+          class="bulk-action-bar alert alert-info py-1.5 px-3 rounded-3 shadow-sm d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2"
+        >
+          <span class="fw-semibold small">{{ selected.length }} task{{ selected.length === 1 ? '' : 's' }} selected</span>
+          <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-xs btn-success rounded-pill" @click="bulk('complete')">Complete</button>
+            <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill" @click="bulk('incomplete')">Incomplete</button>
 
-          <table class="table table-striped table-bordered w-100 mb-3 mt-3">
-            <thead>
-              <tr>
-                <th v-if="!isViewerProjectView" style="width: 32px">
+            <!-- Compact Feature-Rich "More Actions" Popover Panel -->
+            <div class="dropdown d-inline-block">
+              <button class="btn btn-xs btn-outline-primary dropdown-toggle rounded-pill" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                More Actions
+              </button>
+              <div
+                class="dropdown-menu shadow-lg border p-3 rounded-3 mt-1"
+                style="width: 280px; max-width: 90vw; background: var(--ordryn-card-bg); color: var(--ordryn-text); border-color: var(--ordryn-card-border) !important;"
+              >
+                <!-- Move to Project -->
+                <div class="mb-3">
+                  <label class="form-label text-muted small fw-bold text-uppercase mb-1" style="font-size: 0.7rem;">Move to project...</label>
+                  <select v-model="bulkProject" class="form-select form-select-sm mb-2">
+                    <option value="">Select project...</option>
+                    <option value="0">No Project</option>
+                    <option v-for="p in projects" :key="p.id" :value="String(p.id)">{{ projectOptionLabel(p) }}</option>
+                  </select>
+                  <button
+                    type="button"
+                    class="btn btn-xs btn-outline-primary rounded-pill w-100"
+                    :disabled="bulkProject === ''"
+                    @click="bulk('move_project', { project_id: bulkProject })"
+                  >
+                    Move
+                  </button>
+                </div>
+
+                <!-- Select Tag -->
+                <div class="mb-3 border-top pt-2">
+                  <label class="form-label text-muted small fw-bold text-uppercase mb-1" style="font-size: 0.7rem;">Select tag...</label>
+                  <select v-model="bulkTag" class="form-select form-select-sm mb-2">
+                    <option value="">Select tag...</option>
+                    <option v-for="t in tags" :key="t.id" :value="String(t.id)">{{ t.name }}</option>
+                  </select>
+                  <div class="d-flex gap-2">
+                    <button
+                      type="button"
+                      class="btn btn-xs btn-outline-primary rounded-pill flex-grow-1"
+                      :disabled="!bulkTag"
+                      @click="bulk('add_tag', { tag_id: parseInt(bulkTag, 10) })"
+                    >
+                      Add Tag
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-xs btn-outline-secondary rounded-pill flex-grow-1"
+                      :disabled="!bulkTag"
+                      @click="bulk('remove_tag', { tag_id: parseInt(bulkTag, 10) })"
+                    >
+                      Remove Tag
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Priority -->
+                <div class="mb-3 border-top pt-2">
+                  <label class="form-label text-muted small fw-bold text-uppercase mb-1" style="font-size: 0.7rem;">Priority</label>
+                  <select v-model="bulkPriority" class="form-select form-select-sm mb-2">
+                    <option value="">Select priority...</option>
+                    <option value="3">High Priority</option>
+                    <option value="2">Medium Priority</option>
+                    <option value="1">Low Priority</option>
+                    <option value="0">No Priority</option>
+                  </select>
+                  <button
+                    type="button"
+                    class="btn btn-xs btn-outline-primary rounded-pill w-100"
+                    :disabled="bulkPriority === ''"
+                    @click="bulk('set_priority', { priority: parseInt(bulkPriority, 10) })"
+                  >
+                    Set Priority
+                  </button>
+                </div>
+
+                <!-- Due Date -->
+                <div class="border-top pt-2">
+                  <label class="form-label text-muted small fw-bold text-uppercase mb-1" style="font-size: 0.7rem;">Due Date</label>
+                  <div class="btn-group btn-group-sm w-100 mb-2">
+                    <button type="button" class="btn btn-xs btn-outline-secondary" @click="bulk('set_due_date', { due_date: getTodayStr() })">Today</button>
+                    <button type="button" class="btn btn-xs btn-outline-secondary" @click="bulk('set_due_date', { due_date: getTomorrowStr() })">Tomorrow</button>
+                    <button type="button" class="btn btn-xs btn-outline-secondary" @click="bulk('set_due_date', { due_date: getNextWeekStr() })">+1 Wk</button>
+                    <button type="button" class="btn btn-xs btn-outline-secondary" @click="bulk('set_due_date', { due_date: '' })">Clear</button>
+                  </div>
+                  <input v-model="bulkDate" type="date" class="form-control form-control-sm mb-2" />
+                  <div class="d-flex gap-2">
+                    <button
+                      type="button"
+                      class="btn btn-xs btn-outline-primary rounded-pill flex-grow-1"
+                      :disabled="!bulkDate"
+                      @click="bulk('set_due_date', { due_date: bulkDate })"
+                    >
+                      Set Due
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-xs btn-outline-secondary rounded-pill flex-grow-1"
+                      @click="bulk('set_due_date', { due_date: '' })"
+                    >
+                      Clear Due
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <button type="button" class="btn btn-xs btn-danger rounded-pill" @click="bulk('delete')">Delete</button>
+            <button type="button" class="btn btn-xs btn-link text-muted" @click="selected = []">Deselect</button>
+          </div>
+        </div>
+
+        <!-- Task Lists Container -->
+        <div id="task-container" aria-live="polite">
+          <div v-if="loading && !tasks.length" class="text-center py-5 text-muted">
+            <div class="spinner-border spinner-border-sm me-2" role="status" />Loading tasks…
+          </div>
+
+          <div v-else-if="showTaskTable">
+            <!-- Merged Header Row: Select All Checkbox + Starred Tasks Label -->
+            <div class="d-flex align-items-center justify-content-between mb-2 px-1">
+              <div class="d-flex align-items-center gap-3">
+                <div v-if="!isViewerProjectView" class="form-check d-flex align-items-center m-0 p-0">
                   <input
                     id="select-all-tasks"
                     type="checkbox"
-                    class="form-check-input"
+                    class="form-check-input m-0 cursor-pointer"
                     :checked="allSelected"
-                    aria-label="Select all tasks on this page"
-                    title="Select all on page"
+                    style="width: 0.95rem; height: 0.95rem;"
                     @change="toggleSelectAll(($event.target as HTMLInputElement).checked)"
                   />
-                </th>
-                <th v-if="!isViewerProjectView" style="width: 32px" />
-                <th class="description-column">Title</th>
-                <th class="tags-column">Tags</th>
-                <th class="description-column">Description</th>
-                <th class="date-added">Due Date (if set)</th>
-                <th class="actions-column">
-                  <button
-                    type="button"
-                    class="status-filter-toggle btn btn-link p-0 text-decoration-none d-inline-flex align-items-center gap-1"
-                    @click="cycleStatusColumnFilter"
-                  >
-                    Status
-                    <span class="status-filter-state">
-                      ({{
-                        filters.status === 'incomplete'
-                          ? 'Incomplete'
-                          : filters.status === 'complete'
-                            ? 'Complete'
-                            : 'All'
-                      }})
-                    </span>
-                    <i
-                      :class="
-                        filters.status === 'incomplete'
-                          ? 'bi bi-arrow-right-short'
-                          : filters.status === 'complete'
-                            ? 'bi bi-x-circle'
-                            : 'bi bi-funnel'
-                      "
-                    />
-                  </button>
-                </th>
-              </tr>
-            </thead>
-            <tbody v-if="favoriteTasks.length">
-              <tr class="starred-section-label">
-                <td :colspan="tableColSpan" class="py-1 px-2 border-0">
-                  <small><i class="bi bi-star-fill" /> Starred tasks (always visible)</small>
-                </td>
-              </tr>
-            </tbody>
-            <tbody v-if="showFavoriteList" id="favorite-task-list" ref="favoriteListEl">
-              <TaskTableRow
-                v-for="task in favoriteTasks"
-                :key="task.id"
-                :task="task"
-                :selected="selected.includes(task.id)"
-                :can-write="canWriteTask(task)"
-                :show-write-columns="!isViewerProjectView"
-                @toggle-select="toggleSelect(task.id, $event)"
-                @toggle-complete="toggleComplete(task)"
-                @toggle-favorite="toggleFavorite(task)"
-                @edit="openTask(task)"
-                @remove="removeTask(task)"
-              />
-            </tbody>
-            <tbody id="task-list" ref="taskListEl">
-              <TaskTableRow
+                  <label for="select-all-tasks" class="form-check-label small text-muted cursor-pointer ms-1.5">
+                    Select all
+                  </label>
+                </div>
+                <span v-if="showFavoriteList" class="small fw-bold text-muted d-flex align-items-center gap-1 ms-2">
+                  <i class="bi bi-star-fill text-warning" /> Starred Tasks
+                </span>
+              </div>
+              <button
+                v-if="hasActiveFilters"
+                type="button"
+                class="btn btn-link btn-sm text-decoration-none p-0 text-muted small"
+                @click="clearFilters"
+              >
+                <i class="bi bi-x-circle me-1" />Clear active filters
+              </button>
+            </div>
+
+            <!-- Starred Tasks Section -->
+            <div v-if="showFavoriteList" class="starred-tasks-section mb-3">
+              <div id="favorite-task-list" ref="favoriteListEl">
+                <ModernTaskCard
+                  v-for="task in favoriteTasks"
+                  :key="task.id"
+                  :task="task"
+                  :selected="selected.includes(task.id)"
+                  :density="density"
+                  :show-project-pill="!filters.project"
+                  :can-write="canWriteTask(task)"
+                  @toggle-select="toggleSelect(task.id, $event)"
+                  @toggle-complete="toggleComplete(task)"
+                  @toggle-favorite="toggleFavorite(task)"
+                  @patch-task="handleInlineTaskPatch"
+                  @edit="openEdit(task.id)"
+                  @remove="removeTask(task)"
+                />
+              </div>
+            </div>
+
+            <!-- Regular Task List -->
+            <div id="task-list" ref="taskListEl">
+              <ModernTaskCard
                 v-for="task in regularTasks"
                 :key="task.id"
                 :task="task"
                 :selected="selected.includes(task.id)"
+                :density="density"
+                :show-project-pill="!filters.project"
                 :can-write="canWriteTask(task)"
-                :show-write-columns="!isViewerProjectView"
                 @toggle-select="toggleSelect(task.id, $event)"
                 @toggle-complete="toggleComplete(task)"
                 @toggle-favorite="toggleFavorite(task)"
-                @edit="openTask(task)"
+                @patch-task="handleInlineTaskPatch"
+                @edit="openEdit(task.id)"
                 @remove="removeTask(task)"
               />
-              <tr v-if="!tasks.length && hasActiveFilters">
-                <td :colspan="tableColSpan" class="text-center py-4">
-                  <div class="empty-state-inline">
-                    <p class="text-muted mb-2">No tasks match this filter.</p>
-                    <button type="button" class="btn btn-sm btn-outline-primary" @click="clearFilters">
-                      <i class="bi bi-x-circle" /> Clear filters
-                    </button>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="hasMore" ref="loadMoreSentinel">
-                <td :colspan="tableColSpan" class="text-center py-3 text-muted">
-                  <span v-if="loadingMore" class="spinner-border spinner-border-sm me-2" role="status" />
-                  {{ loadingMore ? 'Loading more tasks…' : 'Scroll for more tasks' }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+
+              <!-- Empty Search Results -->
+              <div
+                v-if="!tasks.length && hasActiveFilters"
+                class="text-center py-5 rounded-3 border"
+                style="background: var(--ordryn-card-bg); color: var(--ordryn-text); border-color: var(--ordryn-card-border) !important;"
+              >
+                <p class="text-muted mb-2">No tasks match your active filters.</p>
+                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill" @click="clearFilters">
+                  <i class="bi bi-x-circle me-1" />Clear filters
+                </button>
+              </div>
+
+              <!-- Infinite Scroll Sentinel -->
+              <div v-if="hasMore" ref="loadMoreSentinel" class="text-center py-3 text-muted small">
+                <span v-if="loadingMore" class="spinner-border spinner-border-sm me-2" />
+                {{ loadingMore ? 'Loading more tasks…' : 'Scroll for more tasks' }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Zero State (No tasks match search) -->
+          <div
+            v-else-if="isSearching"
+            class="text-center py-5 rounded-3 border"
+            style="background: var(--ordryn-card-bg); color: var(--ordryn-text); border-color: var(--ordryn-card-border) !important;"
+          >
+            <p class="text-muted mb-2">No tasks match your search query.</p>
+            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill" @click="clearFilters">
+              Clear Search
+            </button>
+          </div>
+
+          <!-- Empty State (No tasks at all) -->
+          <div
+            v-else
+            class="text-center py-5 rounded-3 border shadow-xs"
+            style="background: var(--ordryn-card-bg); color: var(--ordryn-text); border-color: var(--ordryn-card-border) !important;"
+          >
+            <i class="bi bi-clipboard-check display-4 text-muted opacity-50" />
+            <h4 class="mt-3 fw-bold">No tasks yet</h4>
+            <p class="text-muted">Get started by creating your first task.</p>
+            <button v-if="!isViewerProjectView" type="button" class="btn btn-success rounded-pill px-4" @click="openAdd(undefined, filters.project)">
+              <i class="bi bi-plus-lg me-1" /> Add Task
+            </button>
+          </div>
         </div>
       </div>
-    </div>
 
-    <div v-else-if="isSearching" class="card text-center">
-      <div class="card-body">
-        <p class="text-muted mb-2">No tasks match your search.</p>
-        <div class="d-flex flex-wrap gap-2 justify-content-center">
-          <button type="button" class="btn btn-sm btn-outline-primary" @click="clearFilters">
-            <i class="bi bi-x-circle" /> Clear search
-          </button>
-          <button v-if="hasActiveFilters" type="button" class="btn btn-sm btn-outline-secondary" @click="clearFilters">
-            Reset filters
-          </button>
+      <!-- Save Current View Modal -->
+      <div v-if="showSaveViewModal" class="modal fade show d-block" style="background: rgba(0,0,0,0.5);" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+          <div
+            class="modal-content border-0 shadow"
+            style="background: var(--ordryn-card-bg); color: var(--ordryn-text);"
+          >
+            <div class="modal-header border-0 pb-0">
+              <h5 class="modal-title fw-bold">Save Current View</h5>
+              <button type="button" class="btn-close" @click="showSaveViewModal = false" />
+            </div>
+            <div class="modal-body py-3">
+              <p class="text-muted small mb-3">Save your current active filters into a custom named View in the sidebar.</p>
+              <div class="mb-3">
+                <label for="new-view-name" class="form-label small fw-bold">View Name</label>
+                <input
+                  id="new-view-name"
+                  v-model="newViewName"
+                  type="text"
+                  class="form-control"
+                  placeholder="e.g., High Priority Work"
+                  @keyup.enter="saveCurrentView"
+                />
+              </div>
+            </div>
+            <div class="modal-footer border-0 pt-0 justify-content-end gap-2">
+              <button type="button" class="btn btn-sm btn-outline-secondary" @click="showSaveViewModal = false">Cancel</button>
+              <button type="button" class="btn btn-sm btn-primary px-3" :disabled="!newViewName.trim()" @click="saveCurrentView">Save View</button>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
 
-    <div v-else class="card text-center empty-state-card">
-      <div class="card-body">
-        <i class="bi bi-clipboard-check empty-state-icon" aria-hidden="true" />
-        <h3 class="mt-3">Add your first Todo!</h3>
-        <p class="text-muted">Get started by creating a task.</p>
-        <button type="button" class="btn btn-success" @click="() => openAdd()">
-          <i class="bi bi-plus-lg" /> Add Task
-        </button>
+      <!-- Add Project Modal -->
+      <div v-if="showAddProjectModal" class="modal fade show d-block" style="background: rgba(0,0,0,0.5);" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+          <div
+            class="modal-content border-0 shadow"
+            style="background: var(--ordryn-card-bg); color: var(--ordryn-text);"
+          >
+            <div class="modal-header border-0 pb-0">
+              <h5 class="modal-title fw-bold">Create New Project</h5>
+              <button type="button" class="btn-close" @click="showAddProjectModal = false" />
+            </div>
+            <div class="modal-body py-3">
+              <div class="mb-3">
+                <label for="new-project-name" class="form-label small fw-bold">Project Name</label>
+                <input
+                  id="new-project-name"
+                  v-model="newProjectName"
+                  type="text"
+                  class="form-control"
+                  placeholder="e.g., Marketing Campaign"
+                  @keyup.enter="createProject"
+                />
+              </div>
+            </div>
+            <div class="modal-footer border-0 pt-0 justify-content-end gap-2">
+              <button type="button" class="btn btn-sm btn-outline-secondary" @click="showAddProjectModal = false">Cancel</button>
+              <button type="button" class="btn btn-sm btn-success px-3" :disabled="!newProjectName.trim()" @click="createProject">Create Project</button>
+            </div>
+          </div>
+        </div>
       </div>
+
+      <!-- Edit Project Modal -->
+      <div v-if="showEditProjectModal" class="modal fade show d-block" style="background: rgba(0,0,0,0.5);" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+          <div
+            class="modal-content border-0 shadow"
+            style="background: var(--ordryn-card-bg); color: var(--ordryn-text);"
+          >
+            <div class="modal-header border-0 pb-0">
+              <h5 class="modal-title fw-bold">Rename Project</h5>
+              <button type="button" class="btn-close" @click="showEditProjectModal = false" />
+            </div>
+            <div class="modal-body py-3">
+              <div class="mb-3">
+                <label for="edit-project-name" class="form-label small fw-bold">Project Name</label>
+                <input
+                  id="edit-project-name"
+                  v-model="editedProjectName"
+                  type="text"
+                  class="form-control"
+                  placeholder="Project Name"
+                  @keyup.enter="renameProject"
+                />
+              </div>
+            </div>
+            <div class="modal-footer border-0 pt-0 justify-content-end gap-2">
+              <button type="button" class="btn btn-sm btn-outline-secondary" @click="showEditProjectModal = false">Cancel</button>
+              <button type="button" class="btn btn-sm btn-primary px-3" :disabled="!editedProjectName.trim()" @click="renameProject">Save Name</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Clean Reusable Footer inside right content area -->
+      <AppFooter />
     </div>
   </div>
 </template>
+
+<style scoped>
+.btn-xs {
+  padding: 0.15rem 0.5rem;
+  font-size: 0.75rem;
+}
+</style>

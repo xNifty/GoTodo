@@ -1,6 +1,7 @@
 @import 'bootstrap/dist/css/bootstrap.min.css';
 @import 'bootstrap-icons/font/bootstrap-icons.css';
 @import './assets/site.css';
+@import './assets/ordryn-modern-theme.css';
 
 /* Vue SPA mount point */
 #app {
