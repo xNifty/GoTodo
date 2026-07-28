@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch, provide } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useSite } from '@/composables/useSite'
@@ -15,7 +15,11 @@ const route = useRoute()
 const { isAuthenticated } = useAuth()
 const { siteInfo, refresh: refreshSite } = useSite()
 const overdueCount = ref(0)
+const pendingInviteCount = ref(0)
 const mobileSidebarOpen = ref(false)
+
+provide('overdueCount', overdueCount)
+provide('pendingInviteCount', pendingInviteCount)
 
 const showAnnouncement = computed(
   () =>
@@ -36,6 +40,19 @@ async function loadOverdue() {
   }
 }
 
+async function loadPendingInvites() {
+  if (!isAuthenticated.value) {
+    pendingInviteCount.value = 0
+    return
+  }
+  try {
+    const invites = await api.listMyProjectInvites()
+    pendingInviteCount.value = invites.length
+  } catch {
+    pendingInviteCount.value = 0
+  }
+}
+
 async function dismissAnnouncement() {
   try {
     await api.dismissAnnouncement()
@@ -53,8 +70,30 @@ function toggleMobileSidebar() {
   mobileSidebarOpen.value = !mobileSidebarOpen.value
 }
 
+watch(
+  isAuthenticated,
+  (authed) => {
+    if (authed) {
+      void loadOverdue()
+      void loadPendingInvites()
+    } else {
+      overdueCount.value = 0
+      pendingInviteCount.value = 0
+    }
+  },
+  { immediate: true },
+)
+
+watch(
+  () => route.name,
+  (name, prev) => {
+    if (prev === 'projects' || name === 'projects') {
+      void loadPendingInvites()
+    }
+  },
+)
+
 onMounted(() => {
-  void loadOverdue()
   void refreshSite()
 })
 </script>

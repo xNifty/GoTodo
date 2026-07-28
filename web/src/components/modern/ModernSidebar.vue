@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, inject, type Ref } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import type { Project, SavedView } from '@/api/types'
+import { projectOptionLabel } from '@/utils/projectLabel'
 
 defineProps<{
   collapsed: boolean
@@ -24,6 +25,9 @@ const emit = defineEmits<{
 }>()
 
 const route = useRoute()
+
+const overdueCount = inject<Ref<number>>('overdueCount', ref(0))
+const pendingInviteCount = inject<Ref<number>>('pendingInviteCount', ref(0))
 
 const projectsCollapsed = ref(false)
 const viewsCollapsed = ref(false)
@@ -82,6 +86,12 @@ const viewsCollapsed = ref(false)
         >
           <i class="bi bi-grid-1x2" />
           <span class="sidebar-text">Dashboard</span>
+          <span
+            v-if="overdueCount > 0"
+            class="badge bg-danger ms-auto sidebar-text px-2 py-1"
+            style="font-size: 0.7rem; font-weight: 600;"
+            :title="`${overdueCount} overdue tasks`"
+          >{{ overdueCount }}</span>
         </RouterLink>
       </li>
       <li class="sidebar-nav-item">
@@ -103,12 +113,18 @@ const viewsCollapsed = ref(false)
     <div class="sidebar-section-header d-flex align-items-center justify-content-between">
       <RouterLink
         to="/projects"
-        class="sidebar-section-link sidebar-text fw-bold text-uppercase"
+        class="sidebar-section-link sidebar-text fw-bold text-uppercase d-flex align-items-center"
         data-tooltip="Projects"
         title="Manage Projects"
         @click="emit('close-mobile')"
       >
         <span>Projects</span>
+        <span
+          v-if="pendingInviteCount > 0"
+          class="badge bg-danger ms-2 sidebar-text px-2 py-1"
+          style="font-size: 0.7rem; font-weight: 600;"
+          :title="`${pendingInviteCount} pending project invite${pendingInviteCount === 1 ? '' : 's'}`"
+        >{{ pendingInviteCount }}</span>
         <i class="bi bi-box-arrow-up-right ms-1 opacity-75" style="font-size: 0.75rem;" />
       </RouterLink>
 
@@ -146,16 +162,17 @@ const viewsCollapsed = ref(false)
             href="#"
             class="sidebar-nav-link flex-grow-1 min-w-0"
             :class="{ active: activeProject === String(proj.id) }"
-            :data-tooltip="proj.name"
-            :title="proj.name"
+            :data-tooltip="projectOptionLabel(proj)"
+            :title="projectOptionLabel(proj)"
             @click.prevent="emit('select-project', String(proj.id)); emit('close-mobile')"
           >
             <i class="bi bi-folder2-open" />
-            <span class="sidebar-text text-truncate">{{ proj.name }}</span>
+            <span class="sidebar-text text-truncate">{{ projectOptionLabel(proj) }}</span>
           </a>
 
-          <!-- Pencil Edit Icon (Desktop Hover Reveal) -->
+          <!-- Pencil Edit Icon (Desktop Hover Reveal, hidden for non-owner/viewer roles) -->
           <button
+            v-if="!proj.role || proj.role === 'owner'"
             type="button"
             class="btn btn-sm text-muted p-0 border-0 hover-reveal d-none d-md-inline-block me-2"
             title="Rename project"

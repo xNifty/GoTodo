@@ -5,6 +5,7 @@ import type { Project, Tag, TaskEvent } from '@/api/types'
 import { APIError } from '@/api/types'
 import { useTaskSidebar } from '@/composables/useTaskSidebar'
 import { useToast } from '@/composables/useToast'
+import { projectOptionLabel } from '@/utils/projectLabel'
 
 const { open, mode, taskId, defaultDueDate, defaultProjectId, close, notifySaved } = useTaskSidebar()
 const toast = useToast()
@@ -28,7 +29,12 @@ const selectedTagIds = ref<number[]>([])
 const newTags = ref('')
 const completed = ref(false)
 
-const sidebarTitle = computed(() => (mode.value === 'edit' ? 'Edit Task' : 'Add Task'))
+const readOnly = computed(() => mode.value === 'view')
+const sidebarTitle = computed(() => {
+  if (mode.value === 'view') return 'View Task'
+  if (mode.value === 'edit') return 'Edit Task'
+  return 'Add Task'
+})
 const submitText = computed(() => (mode.value === 'edit' ? 'Save Task' : 'Add Task'))
 const charCount = computed(() => description.value.length)
 
@@ -108,6 +114,7 @@ function validateDescription() {
 }
 
 async function save(keepOpen = false) {
+  if (readOnly.value) return
   if (!title.value.trim()) return
   if (!validateDescription()) return
   saving.value = true
@@ -202,7 +209,7 @@ watch(
   async ({ isOpen, m, id, due, proj }) => {
     if (!isOpen) return
     await loadMeta()
-    if (m === 'edit' && id) {
+    if ((m === 'edit' || m === 'view') && id) {
       await loadTask(id)
     } else {
       resetForm()
@@ -245,7 +252,9 @@ watch(
             v-model="title"
             type="text"
             class="form-control"
-            required
+            :required="!readOnly"
+            :readonly="readOnly"
+            :disabled="readOnly"
             placeholder="Your Task Title"
           />
         </div>
@@ -254,8 +263,16 @@ watch(
             <i class="bi bi-check-circle" /> This task is completed
           </div>
           <label for="description">Description:</label>
-          <textarea id="description" v-model="description" class="form-control" maxlength="1000" rows="4" />
-          <div class="d-flex justify-content-between align-items-center mt-1">
+          <textarea
+            id="description"
+            v-model="description"
+            class="form-control"
+            maxlength="1000"
+            rows="4"
+            :readonly="readOnly"
+            :disabled="readOnly"
+          />
+          <div v-if="!readOnly" class="d-flex justify-content-between align-items-center mt-1">
             <small class="form-hint">Max 1000 Characters</small>
             <small class="text-muted"><span id="char-count">{{ charCount }}</span>/1000</small>
           </div>
@@ -265,14 +282,14 @@ watch(
         </div>
         <div class="form-group mt-2">
           <label for="project_id">Project (optional):</label>
-          <select id="project_id" v-model="projectId" class="form-select">
+          <select id="project_id" v-model="projectId" class="form-select" :disabled="readOnly">
             <option value="">No project</option>
-            <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
+            <option v-for="p in projects" :key="p.id" :value="p.id">{{ projectOptionLabel(p) }}</option>
           </select>
         </div>
         <div class="form-group mt-2">
           <label for="priority">Priority:</label>
-          <select id="priority" v-model.number="priority" class="form-select">
+          <select id="priority" v-model.number="priority" class="form-select" :disabled="readOnly">
             <option :value="0">None</option>
             <option :value="1">Low</option>
             <option :value="2">Medium</option>
@@ -281,8 +298,8 @@ watch(
         </div>
         <div class="form-group mt-2">
           <label for="due_date">Due Date (optional):</label>
-          <input id="due_date" v-model="dueDate" type="date" class="form-control" />
-          <div class="btn-group btn-group-sm mt-1" role="group" aria-label="Due date presets">
+          <input id="due_date" v-model="dueDate" type="date" class="form-control" :disabled="readOnly" :readonly="readOnly" />
+          <div v-if="!readOnly" class="btn-group btn-group-sm mt-1" role="group" aria-label="Due date presets">
             <button type="button" class="btn btn-outline-secondary" @click="applyDuePreset('today')">Today</button>
             <button type="button" class="btn btn-outline-secondary" @click="applyDuePreset('tomorrow')">Tomorrow</button>
             <button type="button" class="btn btn-outline-secondary" @click="applyDuePreset('week')">+1 week</button>
@@ -297,6 +314,7 @@ watch(
               type="checkbox"
               class="form-check-input"
               :checked="selectedTagIds.includes(tag.id)"
+              :disabled="readOnly"
               @change="toggleTag(tag.id, ($event.target as HTMLInputElement).checked)"
             />
             <label class="form-check-label" :for="`tag-${tag.id}`">
@@ -304,7 +322,7 @@ watch(
             </label>
           </div>
         </div>
-        <div class="form-group mt-2">
+        <div v-if="!readOnly" class="form-group mt-2">
           <label for="new_tags">Add tags (comma-separated)</label>
           <input
             id="new_tags"
@@ -318,7 +336,7 @@ watch(
         </div>
 
         <!-- Form Submit Action Buttons -->
-        <div class="d-flex gap-2 mt-3">
+        <div v-if="!readOnly" class="d-flex gap-2 mt-3">
           <button type="submit" class="btn btn-primary flex-grow-1" :disabled="saving">
             {{ saving ? 'Saving…' : submitText }}
           </button>
@@ -334,7 +352,7 @@ watch(
         </div>
 
         <details
-          v-if="mode === 'edit'"
+          v-if="mode === 'edit' || mode === 'view'"
           class="task-timeline mt-3"
           @toggle="(e) => { if ((e.target as HTMLDetailsElement).open) void loadEvents() }"
         >

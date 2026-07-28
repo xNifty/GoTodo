@@ -2,7 +2,7 @@ import { ref } from 'vue'
 import type { Task } from '@/api/types'
 
 const open = ref(false)
-const mode = ref<'add' | 'edit'>('add')
+const mode = ref<'add' | 'edit' | 'view'>('add')
 const taskId = ref<number | null>(null)
 const defaultDueDate = ref('')
 const defaultProjectId = ref<number | string | null>(null)
@@ -26,6 +26,13 @@ export function useTaskSidebar() {
     open.value = true
   }
 
+  function openView(id: number) {
+    mode.value = 'view'
+    taskId.value = id
+    defaultDueDate.value = ''
+    open.value = true
+  }
+
   function close() {
     open.value = false
   }
@@ -46,6 +53,7 @@ export function useTaskSidebar() {
     lastSavedTask,
     openAdd,
     openEdit,
+    openView,
     close,
     notifySaved,
   }

@@ -17,6 +17,7 @@ import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { useViewDensity } from '@/composables/useViewDensity'
 import { useSidebarState } from '@/composables/useSidebarState'
+import { projectOptionLabel } from '@/utils/projectLabel'
 
 defineProps<{
   mobileSidebarOpen?: boolean
@@ -92,6 +93,27 @@ const isSearching = computed(() => filters.search !== '')
 const showTaskTable = computed(
   () => total.value > 0 || favoriteTasks.value.length > 0 || hasActiveFilters.value,
 )
+
+const activeProjectObj = computed(() => {
+  if (!filters.project || filters.project === '0') return null
+  const pid = parseInt(filters.project, 10)
+  if (Number.isNaN(pid)) return null
+  return projects.value.find((p) => p.id === pid) ?? null
+})
+
+const isViewerProjectView = computed(
+  () => activeProjectObj.value?.role === 'viewer',
+)
+
+function canWriteTask(task: Task): boolean {
+  if (isViewerProjectView.value) return false
+  if (task.project_id) {
+    const p = projects.value.find((pr) => pr.id === task.project_id)
+    if (p && p.role === 'viewer') return false
+  }
+  return true
+}
+
 const hasMore = computed(() => loadedPage.value < totalPages.value)
 const sortableEnabled = computed(() => filters.sort !== 'priority' && !loading.value)
 const showFavoriteList = computed(() => favoriteTasks.value.length > 0)
@@ -330,6 +352,7 @@ watch(
 )
 
 async function toggleComplete(task: Task) {
+  if (!canWriteTask(task)) return
   try {
     const updated = await api.patchTask(task.id, { completed: !task.completed })
     applyTaskUpdate(updated)
@@ -363,6 +386,7 @@ async function handleInlineTaskPatch(payload: { id: number; title?: string; desc
 }
 
 async function removeTask(task: Task) {
+  if (!canWriteTask(task)) return
   const ok = await askConfirm({
     title: 'Delete task?',
     message: `Delete “${task.title}”?`,
@@ -407,7 +431,7 @@ function toggleSelectAll(checked: boolean) {
 }
 
 async function bulk(action: string, extra: Record<string, unknown> = {}) {
-  if (!selected.value.length) return
+  if (!selected.value.length || isViewerProjectView.value) return
   if (action === 'delete') {
     const ok = await askConfirm({
       title: 'Delete tasks?',
@@ -457,7 +481,6 @@ function clearFilters() {
   void reloadInitial()
 }
 
-// Toggle / Deselect project filter when clicking an already selected project
 function selectProjectFilter(id: string) {
   activeViewId.value = null
   if (filters.project === id) {
@@ -609,6 +632,9 @@ onMounted(async () => {
             <span class="badge rounded-pill bg-warning bg-opacity-10 text-warning border border-warning border-opacity-20 px-2.5 py-1">
               Incomplete: {{ incompleteCount }}
             </span>
+            <span v-if="isViewerProjectView" class="badge rounded-pill bg-info bg-opacity-10 text-info border border-info border-opacity-20 px-2.5 py-1">
+              Viewer (Read Only)
+            </span>
           </div>
 
           <!-- Actions Group: Import/Export & Add Task -->
@@ -647,8 +673,9 @@ onMounted(async () => {
               </ul>
             </div>
 
-            <!-- Add Task Button -->
+            <!-- Add Task Button (Hidden for read-only viewer role) -->
             <button
+              v-if="!isViewerProjectView"
               type="button"
               class="btn btn-sm btn-success rounded-pill px-3 py-1 shadow-xs d-flex align-items-center gap-1"
               @click="openAdd(undefined, filters.project)"
@@ -691,7 +718,7 @@ onMounted(async () => {
 
         <!-- Sleek Bulk Actions Bar -->
         <div
-          v-if="selected.length"
+          v-if="selected.length && !isViewerProjectView"
           class="bulk-action-bar alert alert-info py-1.5 px-3 rounded-3 shadow-sm d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2"
         >
           <span class="fw-semibold small">{{ selected.length }} task{{ selected.length === 1 ? '' : 's' }} selected</span>
@@ -714,7 +741,7 @@ onMounted(async () => {
                   <select v-model="bulkProject" class="form-select form-select-sm mb-2">
                     <option value="">Select project...</option>
                     <option value="0">No Project</option>
-                    <option v-for="p in projects" :key="p.id" :value="String(p.id)">{{ p.name }}</option>
+                    <option v-for="p in projects" :key="p.id" :value="String(p.id)">{{ projectOptionLabel(p) }}</option>
                   </select>
                   <button
                     type="button"
@@ -819,7 +846,7 @@ onMounted(async () => {
             <!-- Merged Header Row: Select All Checkbox + Starred Tasks Label -->
             <div class="d-flex align-items-center justify-content-between mb-2 px-1">
               <div class="d-flex align-items-center gap-3">
-                <div class="form-check d-flex align-items-center m-0 p-0">
+                <div v-if="!isViewerProjectView" class="form-check d-flex align-items-center m-0 p-0">
                   <input
                     id="select-all-tasks"
                     type="checkbox"
@@ -856,6 +883,7 @@ onMounted(async () => {
                   :selected="selected.includes(task.id)"
                   :density="density"
                   :show-project-pill="!filters.project"
+                  :can-write="canWriteTask(task)"
                   @toggle-select="toggleSelect(task.id, $event)"
                   @toggle-complete="toggleComplete(task)"
                   @toggle-favorite="toggleFavorite(task)"
@@ -875,6 +903,7 @@ onMounted(async () => {
                 :selected="selected.includes(task.id)"
                 :density="density"
                 :show-project-pill="!filters.project"
+                :can-write="canWriteTask(task)"
                 @toggle-select="toggleSelect(task.id, $event)"
                 @toggle-complete="toggleComplete(task)"
                 @toggle-favorite="toggleFavorite(task)"
@@ -924,7 +953,7 @@ onMounted(async () => {
             <i class="bi bi-clipboard-check display-4 text-muted opacity-50" />
             <h4 class="mt-3 fw-bold">No tasks yet</h4>
             <p class="text-muted">Get started by creating your first task.</p>
-            <button type="button" class="btn btn-success rounded-pill px-4" @click="openAdd(undefined, filters.project)">
+            <button v-if="!isViewerProjectView" type="button" class="btn btn-success rounded-pill px-4" @click="openAdd(undefined, filters.project)">
               <i class="bi bi-plus-lg me-1" /> Add Task
             </button>
           </div>

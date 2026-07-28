@@ -10,11 +10,13 @@ const props = withDefaults(
     density?: ViewDensity
     depth?: number
     showProjectPill?: boolean
+    canWrite?: boolean
   }>(),
   {
     density: 'comfortable',
     depth: 0,
     showProjectPill: true,
+    canWrite: true,
   },
 )
 
@@ -34,6 +36,7 @@ const isEditingDesc = ref(false)
 const descVal = ref('')
 
 function startEditTitle() {
+  if (!props.canWrite) return
   titleVal.value = props.task.title
   isEditingTitle.value = true
 }
@@ -52,6 +55,7 @@ function cancelEditTitle() {
 }
 
 function startEditDesc() {
+  if (!props.canWrite) return
   descVal.value = props.task.description || ''
   isEditingDesc.value = true
 }
@@ -124,6 +128,7 @@ function formatDueDate(dateStr?: string): string {
 
         <!-- Multi-Select Checkbox -->
         <div
+          v-if="canWrite"
           class="hover-reveal flex-shrink-0 d-inline-flex align-items-center justify-content-center m-0 p-0"
           :class="{ 'is-visible': selected }"
           title="Select task for bulk actions"
@@ -157,6 +162,7 @@ function formatDueDate(dateStr?: string): string {
           type="button"
           class="completion-check-btn flex-shrink-0 d-inline-flex align-items-center justify-content-center m-0 p-0 border-0 bg-transparent"
           :title="task.completed ? 'Mark incomplete' : 'Mark complete'"
+          :disabled="!canWrite"
           @click="emit('toggle-complete')"
         >
           <i v-if="task.completed" class="bi bi-check-circle-fill text-success" style="font-size: 1.15rem; line-height: 1;" />
@@ -171,7 +177,7 @@ function formatDueDate(dateStr?: string): string {
           <div class="d-flex align-items-center gap-2 flex-wrap">
             <!-- Inline Title Editor (Desktop) -->
             <input
-              v-if="isEditingTitle"
+              v-if="isEditingTitle && canWrite"
               v-model="titleVal"
               type="text"
               class="inline-edit-input"
@@ -183,8 +189,9 @@ function formatDueDate(dateStr?: string): string {
             <span
               v-else
               class="task-title fw-semibold text-truncate"
-              style="color: var(--ordryn-text); cursor: pointer;"
-              title="Click to rename task"
+              style="color: var(--ordryn-text);"
+              :style="{ cursor: canWrite ? 'pointer' : 'default' }"
+              :title="canWrite ? 'Click to rename task' : undefined"
               @click="startEditTitle"
             >
               {{ task.title }}
@@ -213,7 +220,7 @@ function formatDueDate(dateStr?: string): string {
           <!-- Inline Description Editor or Preview (Comfortable mode only) -->
           <div v-if="density === 'comfortable'">
             <textarea
-              v-if="isEditingDesc"
+              v-if="isEditingDesc && canWrite"
               v-model="descVal"
               class="inline-edit-textarea mt-1"
               rows="2"
@@ -222,8 +229,9 @@ function formatDueDate(dateStr?: string): string {
             />
             <div
               v-else-if="task.description"
-              class="task-description text-muted small text-truncate max-w-xl cursor-pointer"
-              title="Click to edit description"
+              class="task-description text-muted small text-truncate max-w-xl"
+              :class="{ 'cursor-pointer': canWrite }"
+              :title="canWrite ? 'Click to edit description' : undefined"
               @click="startEditDesc"
             >
               {{ task.description }}
@@ -253,8 +261,8 @@ function formatDueDate(dateStr?: string): string {
           Priority {{ priorityLabel(task.priority) }}
         </span>
 
-        <!-- Edit / Delete Actions (Hover-revealed on Desktop) -->
-        <div class="d-flex align-items-center gap-1 action-buttons-group hover-reveal">
+        <!-- Edit / Delete Actions (Hover-revealed on Desktop, hidden if viewer/read-only) -->
+        <div v-if="canWrite" class="d-flex align-items-center gap-1 action-buttons-group hover-reveal">
           <button
             type="button"
             class="btn btn-sm btn-icon text-muted hover-accent border-0 p-1"
@@ -295,7 +303,7 @@ function formatDueDate(dateStr?: string): string {
             {{ priorityLabel(task.priority) }}
           </span>
         </div>
-        <div class="d-flex align-items-center gap-2">
+        <div v-if="canWrite" class="d-flex align-items-center gap-2">
           <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" @click="emit('edit')">
             <i class="bi bi-pencil me-1" />Edit
           </button>

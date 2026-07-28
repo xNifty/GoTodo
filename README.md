@@ -59,7 +59,9 @@ SESSION_KEY=your-32-char-or-longer-secret-key!!
 REDIS_URL=redis://localhost:6379/0
 ```
 
-Optional (defaults apply if unset): `PORT` (8080), `GOTODO_MODE` (full), `BASE_PATH` (`/`), `USE_HTTPS`, `MAILGUN_*` / `FROM_EMAIL`, and `GOTODO_BOOTSTRAP_*`. See [`.env.example`](.env.example).
+Optional (defaults apply if unset): `PORT` (8080), `GOTODO_MODE` (full), `BASE_PATH` (`/`), `USE_HTTPS`, and `GOTODO_BOOTSTRAP_*`. See [`.env.example`](.env.example).
+
+Outbound email (password resets, digests) is configured in **Admin → Email** (Mailgun or SMTP). The From address is independent of the Mailgun/SMTP sending domain. Provider secrets are encrypted with `SESSION_KEY`; rotating that key requires re-entering the API key or SMTP password.
 
 `config/config.json` is an optional site overlay (see [`config/config.json.example`](config/config.json.example)). **Environment variables always win** over JSON for overlapping keys (including `BASE_PATH` / `USE_HTTPS`).
 
