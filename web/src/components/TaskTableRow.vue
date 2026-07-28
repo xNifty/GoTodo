@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import type { Task } from '@/api/types'
 
-defineProps<{
-  task: Task
-  selected: boolean
-}>()
+withDefaults(
+  defineProps<{
+    task: Task
+    selected: boolean
+    canWrite?: boolean
+    /** When false, omit select/drag columns entirely (viewer-only project lists). */
+    showWriteColumns?: boolean
+  }>(),
+  { canWrite: true, showWriteColumns: true },
+)
 
 const emit = defineEmits<{
   'toggle-select': [checked: boolean]
@@ -31,8 +37,9 @@ function priorityLabel(priority: number) {
 
 <template>
   <tr :id="`task-${task.id}`" class="task-row">
-    <td class="text-center align-middle select-column">
+    <td v-if="showWriteColumns" class="text-center align-middle select-column">
       <input
+        v-if="canWrite"
         type="checkbox"
         class="form-check-input task-select"
         :checked="selected"
@@ -40,12 +47,13 @@ function priorityLabel(priority: number) {
         @change="emit('toggle-select', ($event.target as HTMLInputElement).checked)"
       />
     </td>
-    <td class="text-center align-middle drag-column">
-      <span class="drag-handle" style="cursor: move"><i class="bi bi-grip-vertical" /></span>
+    <td v-if="showWriteColumns" class="text-center align-middle drag-column">
+      <span v-if="canWrite" class="drag-handle" style="cursor: move"><i class="bi bi-grip-vertical" /></span>
     </td>
     <td class="title-column">
       <div class="d-flex align-items-center flex-wrap">
         <button
+          v-if="canWrite && showWriteColumns"
           type="button"
           class="btn btn-link p-0 me-2 favorite-btn"
           style="text-decoration: none"
@@ -93,6 +101,7 @@ function priorityLabel(priority: number) {
     <td class="actions-column">
       <div class="d-flex align-items-center gap-2 justify-content-start">
         <button
+          v-if="canWrite"
           type="button"
           class="badge status-column"
           :class="task.completed ? 'bg-success' : 'bg-danger text-white'"
@@ -102,16 +111,26 @@ function priorityLabel(priority: number) {
           <i :class="task.completed ? 'bi bi-toggle-on' : 'bi bi-toggle-off'" />
           {{ task.completed ? 'Complete' : 'Incomplete' }}
         </button>
+        <span
+          v-else
+          class="badge status-column"
+          :class="task.completed ? 'bg-success' : 'bg-danger text-white'"
+        >
+          {{ task.completed ? 'Complete' : 'Incomplete' }}
+        </span>
         <button
           type="button"
           class="btn btn-link p-0 mx-2 edit-btn"
           style="text-decoration: none"
-          aria-label="Edit task"
+          :aria-label="canWrite ? 'Edit task' : 'View Details'"
+          :title="canWrite ? 'Edit task' : 'View Details'"
           @click="emit('edit')"
         >
-          <i class="bi bi-pencil" />
+          <i v-if="canWrite" class="bi bi-pencil" />
+          <span v-else>View Details</span>
         </button>
         <button
+          v-if="canWrite"
           type="button"
           class="btn btn-link p-0 delete-column"
           style="text-decoration: none"

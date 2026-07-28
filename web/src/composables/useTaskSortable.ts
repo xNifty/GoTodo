@@ -24,15 +24,18 @@ export function useTaskSortable(
     const coarse = window.matchMedia('(pointer: coarse)').matches
     return {
       handle: '.drag-handle',
-      draggable: '.task-row',
+      draggable: '.ordryn-task-card, .task-row',
       animation: 150,
       delay: coarse ? 200 : 0,
       delayOnTouchOnly: true,
       touchStartThreshold: coarse ? 5 : 1,
       onEnd(evt) {
-        const tbody = evt.to as HTMLElement
-        const ids = Array.from(tbody.querySelectorAll('tr.task-row'))
-          .map((row) => parseInt(row.id.replace('task-', ''), 10))
+        const container = evt.to as HTMLElement
+        const ids = Array.from(container.querySelectorAll('.ordryn-task-card, tr.task-row'))
+          .map((el) => {
+            const rawId = el.id.replace('task-card-', '').replace('task-', '')
+            return parseInt(rawId, 10)
+          })
           .filter((id) => !Number.isNaN(id))
         void onReorder(ids, favorite)
       },
