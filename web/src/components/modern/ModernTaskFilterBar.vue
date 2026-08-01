@@ -26,7 +26,7 @@ const emit = defineEmits<{
 }>()
 
 // Fold/unfold state for the filter toolbar
-const showFilterPills = ref(false)
+const showFilterPills = ref(true)
 
 function getDueDateLabel(preset: string) {
   if (preset === 'today') return 'TODAY'
