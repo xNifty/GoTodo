@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { api } from '@/api/client'
 import type { Project, Tag, TaskEvent } from '@/api/types'
 import { APIError } from '@/api/types'
@@ -7,7 +7,7 @@ import { useTaskSidebar } from '@/composables/useTaskSidebar'
 import { useToast } from '@/composables/useToast'
 import { projectOptionLabel } from '@/utils/projectLabel'
 
-const { open, mode, taskId, defaultDueDate, close, notifySaved } = useTaskSidebar()
+const { open, mode, taskId, defaultDueDate, defaultProjectId, close, notifySaved } = useTaskSidebar()
 const toast = useToast()
 
 const loading = ref(false)
@@ -19,6 +19,7 @@ const eventsLoaded = ref(false)
 const eventsLoading = ref(false)
 const descriptionError = ref('')
 
+const titleInput = ref<HTMLInputElement | null>(null)
 const title = ref('')
 const description = ref('')
 const projectId = ref<number | ''>('')
@@ -112,7 +113,7 @@ function validateDescription() {
   return true
 }
 
-async function save() {
+async function save(keepOpen = false) {
   if (readOnly.value) return
   if (!title.value.trim()) return
   if (!validateDescription()) return
@@ -128,9 +129,20 @@ async function save() {
         due_date: dueDate.value || undefined,
         tag_ids: tagIds,
       })
-      notifySaved(created)
+      notifySaved(created, !keepOpen)
       toast.push('Task created', 'success')
-      resetForm()
+
+      if (keepOpen) {
+        // Clear title & description for next task while keeping project/due date pre-selected
+        title.value = ''
+        description.value = ''
+        newTags.value = ''
+        descriptionError.value = ''
+        await nextTick()
+        titleInput.value?.focus()
+      } else {
+        resetForm()
+      }
       return
     }
     if (!taskId.value) return
@@ -144,7 +156,7 @@ async function save() {
     if (dueDate.value) payload.due_date = dueDate.value
     else payload.clear_due_date = true
     const updated = await api.patchTask(taskId.value, payload)
-    notifySaved(updated)
+    notifySaved(updated, true)
     toast.push('Task saved', 'success')
   } catch (err) {
     const msg = err instanceof APIError ? err.message : err instanceof Error ? err.message : 'Save failed'
@@ -193,8 +205,8 @@ async function loadEvents() {
 watch(description, validateDescription)
 
 watch(
-  () => ({ isOpen: open.value, m: mode.value, id: taskId.value, due: defaultDueDate.value }),
-  async ({ isOpen, m, id, due }) => {
+  () => ({ isOpen: open.value, m: mode.value, id: taskId.value, due: defaultDueDate.value, proj: defaultProjectId.value }),
+  async ({ isOpen, m, id, due, proj }) => {
     if (!isOpen) return
     await loadMeta()
     if ((m === 'edit' || m === 'view') && id) {
@@ -202,6 +214,9 @@ watch(
     } else {
       resetForm()
       if (due) dueDate.value = due
+      if (proj) projectId.value = Number(proj)
+      await nextTick()
+      titleInput.value?.focus()
     }
   },
   { immediate: true },
@@ -228,11 +243,12 @@ watch(
         </div>
         <p class="mb-0">Loading task…</p>
       </div>
-      <form v-else id="newTaskForm" @submit.prevent="save">
+      <form v-else id="newTaskForm" @submit.prevent="save(false)">
         <div class="form-group">
           <label for="title">Title:</label>
           <input
             id="title"
+            ref="titleInput"
             v-model="title"
             type="text"
             class="form-control"
@@ -318,9 +334,23 @@ watch(
           />
           <small class="form-hint">New tag names are created on save (max 5 tags per task).</small>
         </div>
-        <button v-if="!readOnly" type="submit" class="btn btn-primary w-100 mt-3" :disabled="saving">
-          {{ saving ? 'Saving…' : submitText }}
-        </button>
+
+        <!-- Form Submit Action Buttons -->
+        <div v-if="!readOnly" class="d-flex gap-2 mt-3">
+          <button type="submit" class="btn btn-primary flex-grow-1" :disabled="saving">
+            {{ saving ? 'Saving…' : submitText }}
+          </button>
+          <button
+            v-if="mode === 'add'"
+            type="button"
+            class="btn btn-outline-primary flex-grow-1"
+            :disabled="saving || !title.trim()"
+            @click="save(true)"
+          >
+            Save &amp; Add Another
+          </button>
+        </div>
+
         <details
           v-if="mode === 'edit' || mode === 'view'"
           class="task-timeline mt-3"
