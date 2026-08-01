@@ -282,10 +282,20 @@ func MigrateTasksAddProjectID() error {
 		return fmt.Errorf("failed to add project_id column to tasks table: %v", err)
 	}
 
-	// Add foreign key constraint to projects (ON DELETE SET NULL so tasks remain)
+	// Add foreign key constraint to projects when missing (ON DELETE SET NULL so tasks remain)
+	var exists bool
+	err = pool.QueryRow(context.Background(),
+		"SELECT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_tasks_projects')",
+	).Scan(&exists)
+	if err != nil {
+		return fmt.Errorf("failed to check tasks project fk: %v", err)
+	}
+	if exists {
+		return nil
+	}
+
 	_, err = pool.Exec(context.Background(), "ALTER TABLE tasks ADD CONSTRAINT fk_tasks_projects FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE SET NULL")
 	if err != nil {
-		// If the constraint already exists or projects table not yet present this may fail; return error to be logged by caller
 		return fmt.Errorf("failed to add foreign key constraint to tasks.project_id: %v", err)
 	}
 	return nil
