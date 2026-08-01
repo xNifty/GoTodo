@@ -229,7 +229,7 @@ function formatDueDate(dateStr?: string): string {
             />
             <div
               v-else-if="task.description"
-              class="task-description text-muted small text-truncate max-w-xl"
+              class="task-description text-muted small text-break"
               :class="{ 'cursor-pointer': canWrite }"
               :title="canWrite ? 'Click to edit description' : undefined"
               @click="startEditDesc"
