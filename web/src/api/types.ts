@@ -96,6 +96,10 @@ export type Task = {
   priority: number
   favorite: boolean
   position: number
+  parent_id?: number | null
+  child_count?: number
+  children_completed?: number
+  children?: Task[]
   tags: Tag[]
   created_at: string
   modified_at: string

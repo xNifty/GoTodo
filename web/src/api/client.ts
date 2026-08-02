@@ -229,6 +229,7 @@ export const api = {
     description?: string
     due_date?: string
     project_id?: number | null
+    parent_id?: number | null
     priority?: number
     favorite?: boolean
     tag_ids?: number[]
@@ -247,6 +248,7 @@ export const api = {
       due_date: string
       clear_due_date: boolean
       project_id: number | null
+      parent_id: number | null
       priority: number
       completed: boolean
       favorite: boolean
@@ -259,10 +261,22 @@ export const api = {
     })
   },
 
-  deleteTask(id: number) {
-    return request<{ ok: boolean; undo_token?: string; expires_in?: number }>(`/api/v1/tasks/${id}`, {
-      method: 'DELETE',
-    })
+  deleteTask(
+    id: number,
+    opts?: { mode?: 'cascade' | 'reparent'; new_parent_id?: number | null },
+  ) {
+    const params = new URLSearchParams()
+    if (opts?.mode) params.set('mode', opts.mode)
+    if (opts?.mode === 'reparent' && opts.new_parent_id != null) {
+      params.set('new_parent_id', String(opts.new_parent_id))
+    } else if (opts?.mode === 'reparent') {
+      params.set('new_parent_id', '0')
+    }
+    const qs = params.toString()
+    return request<{ ok: boolean; undo_token?: string; expires_in?: number }>(
+      `/api/v1/tasks/${id}${qs ? `?${qs}` : ''}`,
+      { method: 'DELETE' },
+    )
   },
 
   undo(undo_token: string) {
@@ -286,7 +300,12 @@ export const api = {
     })
   },
 
-  reorderTasks(payload: { task_ids: number[]; favorite: boolean; project?: string }) {
+  reorderTasks(payload: {
+    task_ids: number[]
+    favorite: boolean
+    project?: string
+    parent_id?: number | null
+  }) {
     return request<{ ok: boolean }>('/api/v1/tasks/reorder', {
       method: 'POST',
       body: JSON.stringify(payload),

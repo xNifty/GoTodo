@@ -11,12 +11,14 @@ const props = withDefaults(
     depth?: number
     showProjectPill?: boolean
     canWrite?: boolean
+    expanded?: boolean
   }>(),
   {
     density: 'comfortable',
     depth: 0,
     showProjectPill: true,
     canWrite: true,
+    expanded: false,
   },
 )
 
@@ -24,10 +26,22 @@ const emit = defineEmits<{
   'toggle-select': [checked: boolean]
   'toggle-complete': []
   'toggle-favorite': []
+  'toggle-expand': []
   'patch-task': [payload: { id: number; title?: string; description?: string }]
+  'add-subtask': []
   edit: []
   remove: []
 }>()
+
+const isSubtask = () => props.depth > 0 || !!(props.task.parent_id && props.task.parent_id > 0)
+const childTotal = () => props.task.child_count ?? props.task.children?.length ?? 0
+const hasChildren = () => childTotal() > 0
+const childProgress = () => {
+  const total = childTotal()
+  if (total <= 0) return ''
+  const done = props.task.children_completed ?? 0
+  return `${done}/${total}`
+}
 
 // Inline Editing State (Desktop)
 const isEditingTitle = ref(false)
@@ -100,23 +114,36 @@ function formatDueDate(dateStr?: string): string {
     class="ordryn-task-card"
     :class="{
       'is-completed': task.completed,
+      'is-nested': depth > 0,
+      'has-children': hasChildren(),
+      'is-expanded': expanded,
       'density-comfortable': density === 'comfortable',
       'density-dense': density === 'dense',
     }"
-    :style="{
-      paddingLeft: depth > 0 ? `calc(${depth} * 28px + ${density === 'dense' ? 0.65 : 1.25}rem)` : undefined
-    }"
   >
-    <!-- Visual Tree Connector Line for Nested Tasks -->
     <div
       v-if="depth > 0"
-      class="nested-tree-line"
-      :style="{ '--nest-depth': depth }"
+      class="nested-branch"
+      aria-hidden="true"
     />
 
     <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap flex-md-nowrap">
       <!-- Left Controls Container: Tight 5px gap moving everything slightly left -->
       <div class="d-flex align-items-center flex-grow-1 min-w-0" style="gap: 5px;">
+        <!-- Expand / collapse subtasks (roots with children) -->
+        <button
+          v-if="depth === 0 && hasChildren()"
+          type="button"
+          class="btn btn-link p-0 m-0 border-0 text-decoration-none nest-toggle flex-shrink-0 d-inline-flex align-items-center justify-content-center"
+          :aria-expanded="expanded"
+          :aria-label="expanded ? 'Collapse subtasks' : 'Expand subtasks'"
+          :title="expanded ? 'Collapse subtasks' : 'Expand subtasks'"
+          @click="emit('toggle-expand')"
+        >
+          <i :class="expanded ? 'bi bi-chevron-down' : 'bi bi-chevron-right'" />
+        </button>
+        <span v-else-if="depth === 0" class="nest-toggle-spacer flex-shrink-0" aria-hidden="true" />
+
         <!-- Drag Handle -->
         <span
           class="drag-handle text-muted flex-shrink-0 d-inline-flex align-items-center justify-content-center m-0 p-0"
@@ -143,12 +170,14 @@ function formatDueDate(dateStr?: string): string {
           />
         </div>
 
-        <!-- Favorite Star Button -->
+        <!-- Favorite Star Button (roots only) -->
         <button
+          v-if="!isSubtask()"
           type="button"
           class="btn btn-link p-0 m-0 border-0 text-decoration-none hover-reveal flex-shrink-0 d-inline-flex align-items-center justify-content-center"
           :class="{ 'is-visible': task.favorite }"
           :aria-label="task.favorite ? 'Unstar task' : 'Star task'"
+          :disabled="!canWrite"
           @click="emit('toggle-favorite')"
         >
           <i
@@ -197,9 +226,22 @@ function formatDueDate(dateStr?: string): string {
               {{ task.title }}
             </span>
 
+            <!-- Subtask progress (also toggles expand) -->
+            <button
+              v-if="childProgress()"
+              type="button"
+              class="badge rounded-pill border px-2 py-1 small nest-progress-btn"
+              :class="expanded ? 'nest-progress-btn-open' : 'nest-progress-btn-closed'"
+              :title="expanded ? 'Collapse subtasks' : `Show ${childTotal()} subtask${childTotal() === 1 ? '' : 's'}`"
+              @click="emit('toggle-expand')"
+            >
+              <i class="bi bi-diagram-3 me-1" />{{ childProgress() }}
+              <span class="ms-1 opacity-75">{{ expanded ? 'Hide' : 'Show' }}</span>
+            </button>
+
             <!-- Project Badge Pill -->
             <span
-              v-if="showProjectPill && task.project"
+              v-if="showProjectPill && task.project && !isSubtask()"
               class="badge rounded-pill bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-20 px-2 py-1 small"
             >
               <i class="bi bi-folder2 me-1" />{{ task.project }}
@@ -264,6 +306,15 @@ function formatDueDate(dateStr?: string): string {
         <!-- Edit / Delete Actions (Hover-revealed on Desktop, hidden if viewer/read-only) -->
         <div v-if="canWrite" class="d-flex align-items-center gap-1 action-buttons-group hover-reveal">
           <button
+            v-if="!isSubtask()"
+            type="button"
+            class="btn btn-sm btn-icon text-muted hover-accent border-0 p-1"
+            title="Add subtask"
+            @click="emit('add-subtask')"
+          >
+            <i class="bi bi-node-plus" />
+          </button>
+          <button
             type="button"
             class="btn btn-sm btn-icon text-muted hover-accent border-0 p-1"
             title="Open task details editor"
@@ -304,6 +355,14 @@ function formatDueDate(dateStr?: string): string {
           </span>
         </div>
         <div v-if="canWrite" class="d-flex align-items-center gap-2">
+          <button
+            v-if="!isSubtask()"
+            type="button"
+            class="btn btn-sm btn-outline-secondary py-0 px-2"
+            @click="emit('add-subtask')"
+          >
+            <i class="bi bi-node-plus me-1" />Subtask
+          </button>
           <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" @click="emit('edit')">
             <i class="bi bi-pencil me-1" />Edit
           </button>
@@ -334,5 +393,28 @@ function formatDueDate(dateStr?: string): string {
 }
 .hover-danger:hover {
   background-color: rgba(239, 68, 68, 0.1) !important;
+}
+.nest-toggle {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--ordryn-muted);
+  line-height: 1;
+}
+.nest-toggle:hover {
+  color: var(--ordryn-accent);
+}
+.nest-toggle-spacer {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+.nest-progress-btn {
+  cursor: pointer;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--ordryn-accent) 14%, transparent);
+  color: var(--ordryn-accent);
+  border-color: color-mix(in srgb, var(--ordryn-accent) 35%, transparent) !important;
+}
+.nest-progress-btn:hover {
+  background: color-mix(in srgb, var(--ordryn-accent) 22%, transparent);
 }
 </style>

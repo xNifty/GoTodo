@@ -50,6 +50,28 @@ func ReturnTaskListForUser(userID *int) []Task {
 }
 
 const nonFavoriteCond = " AND (is_favorite IS NULL OR is_favorite = false)"
+const rootCond = " AND parent_id IS NULL"
+const rootCondT = " AND t.parent_id IS NULL"
+
+func taskSelectSQL() string {
+	return `SELECT t.id, t.title, t.description, t.completed,
+		TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM') AS date_added,
+		COALESCE(CAST(t.due_date AS TEXT), '') AS due_date,
+		TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM') AS date_created,
+		COALESCE(TO_CHAR((t.date_modified AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM'), '') AS date_modified,
+		COALESCE(t.is_favorite,false), COALESCE(t.position,0), COALESCE(t.priority,0), t.project_id, COALESCE(p.name,''), t.parent_id
+		FROM tasks t LEFT JOIN projects p ON t.project_id = p.id `
+}
+
+func nonFavSelectSQL() string {
+	return `SELECT t.id, t.title, t.description, t.completed,
+		TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM') AS date_added,
+		COALESCE(CAST(t.due_date AS TEXT), '') AS due_date,
+		TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM') AS date_created,
+		COALESCE(TO_CHAR((t.date_modified AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM'), '') AS date_modified,
+		COALESCE(t.position,0), COALESCE(t.priority,0), t.project_id, COALESCE(p.name,''), t.parent_id
+		FROM tasks t LEFT JOIN projects p ON t.project_id = p.id `
+}
 
 func ReturnPaginationForUserWithFilters(page, pageSize int, userID *int, timezone string, filters ListFilters) ([]Task, int, error) {
 	pool, err := storage.OpenDatabase()
@@ -62,25 +84,12 @@ func ReturnPaginationForUserWithFilters(page, pageSize int, userID *int, timezon
 		return []Task{}, 0, nil
 	}
 
-	taskSelect := `SELECT t.id, t.title, t.description, t.completed,
-		TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM') AS date_added,
-		COALESCE(CAST(t.due_date AS TEXT), '') AS due_date,
-		TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM') AS date_created,
-		COALESCE(TO_CHAR((t.date_modified AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM'), '') AS date_modified,
-		COALESCE(t.is_favorite,false), COALESCE(t.position,0), COALESCE(t.priority,0), t.project_id, COALESCE(p.name,'')
-		FROM tasks t LEFT JOIN projects p ON t.project_id = p.id `
-
-	nonFavSelect := `SELECT t.id, t.title, t.description, t.completed,
-		TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM') AS date_added,
-		COALESCE(CAST(t.due_date AS TEXT), '') AS due_date,
-		TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM') AS date_created,
-		COALESCE(TO_CHAR((t.date_modified AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM'), '') AS date_modified,
-		COALESCE(t.position,0), COALESCE(t.priority,0), t.project_id, COALESCE(p.name,'')
-		FROM tasks t LEFT JOIN projects p ON t.project_id = p.id `
+	taskSelect := taskSelectSQL()
+	nonFavSelect := nonFavSelectSQL()
 
 	visT := storage.TaskListVisibleCondition("t", "$1", filters.ProjectFilter)
 	favArgs := []interface{}{*userID, timezone}
-	favWhere := "WHERE " + visT + " AND t.is_favorite = true"
+	favWhere := "WHERE " + visT + " AND t.is_favorite = true" + rootCondT
 	favWhere, favArgs = appendFilterSQL(favWhere, favArgs, filters, timezone, "t")
 	favRows, err := pool.Query(context.Background(), taskSelect+favWhere+filters.orderByClause("t"), favArgs...)
 	if err != nil {
@@ -98,7 +107,7 @@ func ReturnPaginationForUserWithFilters(page, pageSize int, userID *int, timezon
 	}
 
 	countArgs := []interface{}{*userID}
-	countWhere := "WHERE " + storage.TaskListVisibleCondition("", "$1", filters.ProjectFilter) + nonFavoriteCond
+	countWhere := "WHERE " + storage.TaskListVisibleCondition("", "$1", filters.ProjectFilter) + nonFavoriteCond + rootCond
 	countWhere, countArgs = appendFilterSQL(countWhere, countArgs, filters, timezone, "")
 	var totalTasks int
 	if err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks "+countWhere, countArgs...).Scan(&totalTasks); err != nil {
@@ -111,7 +120,7 @@ func ReturnPaginationForUserWithFilters(page, pageSize int, userID *int, timezon
 	}
 
 	nonFavArgs := []interface{}{pageSize, timezone, *userID, offset}
-	nonFavWhere := "WHERE " + storage.TaskListVisibleCondition("t", "$3", filters.ProjectFilter) + " AND (t.is_favorite IS NULL OR t.is_favorite = false)"
+	nonFavWhere := "WHERE " + storage.TaskListVisibleCondition("t", "$3", filters.ProjectFilter) + " AND (t.is_favorite IS NULL OR t.is_favorite = false)" + rootCondT
 	nonFavWhere, nonFavArgs = appendFilterSQL(nonFavWhere, nonFavArgs, filters, timezone, "t")
 	rows, err := pool.Query(
 		context.Background(),
@@ -132,14 +141,17 @@ func ReturnPaginationForUserWithFilters(page, pageSize int, userID *int, timezon
 		nonFavs = append(nonFavs, task)
 	}
 
-	tasks := nonFavs
+	taskList := nonFavs
 	if page == 1 && len(favs) > 0 {
-		tasks = append(favs, nonFavs...)
+		taskList = append(favs, nonFavs...)
 	}
-	if err := attachTagsToTasks(tasks); err != nil {
+	if err := attachTagsToTasks(taskList); err != nil {
 		return nil, 0, err
 	}
-	return tasks, totalTasks, nil
+	if err := attachChildrenToRoots(taskList, timezone); err != nil {
+		return nil, 0, err
+	}
+	return taskList, totalTasks, nil
 }
 
 func SearchTasksForUserWithFilters(page, pageSize int, searchQuery string, userID *int, timezone string, filters ListFilters) ([]Task, int, error) {
@@ -156,8 +168,12 @@ func SearchTasksForUserWithFilters(page, pageSize int, searchQuery string, userI
 	offset := (page - 1) * pageSize
 	searchPattern := "%" + searchQuery + "%"
 
+	childSearch := `(c.title ILIKE $1 OR c.description ILIKE $1 OR EXISTS (
+		SELECT 1 FROM task_tags tt JOIN tags tg ON tt.tag_id = tg.id
+		WHERE tt.task_id = c.id AND tg.name ILIKE $1))`
 	countArgs := []interface{}{searchPattern, *userID}
-	countWhere := "WHERE " + storage.TaskListVisibleCondition("", "$2", filters.ProjectFilter) + " AND " + searchMatchClause("")
+	countWhere := "WHERE " + storage.TaskListVisibleCondition("", "$2", filters.ProjectFilter) + rootCond +
+		" AND (" + searchMatchClause("") + " OR EXISTS (SELECT 1 FROM tasks c WHERE c.parent_id = id AND " + childSearch + "))"
 	countWhere, countArgs = appendFilterSQL(countWhere, countArgs, filters, timezone, "")
 	var totalTasks int
 	if err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks "+countWhere, countArgs...).Scan(&totalTasks); err != nil {
@@ -165,16 +181,14 @@ func SearchTasksForUserWithFilters(page, pageSize int, searchQuery string, userI
 	}
 
 	selectArgs := []interface{}{searchPattern, timezone, pageSize, *userID, offset}
-	selectWhere := "WHERE (t.title ILIKE $1 OR t.description ILIKE $1 OR EXISTS (SELECT 1 FROM task_tags tt JOIN tags tg ON tt.tag_id = tg.id WHERE tt.task_id = t.id AND tg.name ILIKE $1)) AND " + storage.TaskListVisibleCondition("t", "$4", filters.ProjectFilter)
+	selectWhere := "WHERE " + storage.TaskListVisibleCondition("t", "$4", filters.ProjectFilter) + rootCondT +
+		` AND ((t.title ILIKE $1 OR t.description ILIKE $1 OR EXISTS (
+			SELECT 1 FROM task_tags tt JOIN tags tg ON tt.tag_id = tg.id
+			WHERE tt.task_id = t.id AND tg.name ILIKE $1))
+		 OR EXISTS (SELECT 1 FROM tasks c WHERE c.parent_id = t.id AND ` + childSearch + `))`
 	selectWhere, selectArgs = appendFilterSQL(selectWhere, selectArgs, filters, timezone, "t")
 
-	query := `SELECT t.id, t.title, t.description, t.completed,
-		TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MM AM') as date_added,
-		COALESCE(CAST(t.due_date AS TEXT), '') AS due_date,
-		TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MM AM') AS date_created,
-		COALESCE(TO_CHAR((t.date_modified AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MM AM'), '') AS date_modified,
-		COALESCE(t.is_favorite,false), COALESCE(t.position,0), COALESCE(t.priority,0), t.project_id, COALESCE(p.name,'')
-		FROM tasks t LEFT JOIN projects p ON t.project_id = p.id ` + selectWhere + filters.orderByClause("t") + " LIMIT $3 OFFSET $5"
+	query := taskSelectSQL() + selectWhere + filters.orderByClause("t") + " LIMIT $3 OFFSET $5"
 
 	rows, err := pool.Query(context.Background(), query, selectArgs...)
 	if err != nil {
@@ -182,18 +196,21 @@ func SearchTasksForUserWithFilters(page, pageSize int, searchQuery string, userI
 	}
 	defer rows.Close()
 
-	tasks := make([]Task, 0)
+	taskList := make([]Task, 0)
 	for rows.Next() {
 		task, err := scanFavoriteTaskRow(rows)
 		if err != nil {
 			return nil, 0, err
 		}
-		tasks = append(tasks, task)
+		taskList = append(taskList, task)
 	}
-	if err := attachTagsToTasks(tasks); err != nil {
+	if err := attachTagsToTasks(taskList); err != nil {
 		return nil, 0, err
 	}
-	return tasks, totalTasks, nil
+	if err := attachChildrenToRoots(taskList, timezone); err != nil {
+		return nil, 0, err
+	}
+	return taskList, totalTasks, nil
 }
 
 func appendFilterSQL(where string, args []interface{}, filters ListFilters, timezone, tablePrefix string) (string, []interface{}) {
@@ -259,10 +276,11 @@ func scanFavoriteTaskRow(rows interface {
 	var task Task
 	var pid sql.NullInt64
 	var pname sql.NullString
+	var parentID sql.NullInt64
 	if err := rows.Scan(
 		&task.ID, &task.Title, &task.Description, &task.Completed,
 		&task.DateAdded, &task.DueDate, &task.DateCreated, &task.DateModified,
-		&task.IsFavorite, &task.Position, &task.Priority, &pid, &pname,
+		&task.IsFavorite, &task.Position, &task.Priority, &pid, &pname, &parentID,
 	); err != nil {
 		return task, err
 	}
@@ -270,6 +288,9 @@ func scanFavoriteTaskRow(rows interface {
 		task.ProjectID = int(pid.Int64)
 	}
 	task.ProjectName = pname.String
+	if parentID.Valid {
+		task.ParentID = int(parentID.Int64)
+	}
 	return task, nil
 }
 
@@ -279,10 +300,11 @@ func scanTaskRow(rows interface {
 	var task Task
 	var pid sql.NullInt64
 	var pname sql.NullString
+	var parentID sql.NullInt64
 	if err := rows.Scan(
 		&task.ID, &task.Title, &task.Description, &task.Completed,
 		&task.DateAdded, &task.DueDate, &task.DateCreated, &task.DateModified,
-		&task.Position, &task.Priority, &pid, &pname,
+		&task.Position, &task.Priority, &pid, &pname, &parentID,
 	); err != nil {
 		return task, err
 	}
@@ -290,7 +312,73 @@ func scanTaskRow(rows interface {
 		task.ProjectID = int(pid.Int64)
 	}
 	task.ProjectName = pname.String
+	if parentID.Valid {
+		task.ParentID = int(parentID.Int64)
+	}
 	return task, nil
+}
+
+// attachChildrenToRoots loads direct children for the given root tasks.
+func attachChildrenToRoots(roots []Task, timezone string) error {
+	if len(roots) == 0 {
+		return nil
+	}
+	pool, err := storage.OpenDatabase()
+	if err != nil {
+		return err
+	}
+	defer storage.CloseDatabase(pool)
+
+	ids := make([]int, len(roots))
+	indexByID := make(map[int]int, len(roots))
+	for i, t := range roots {
+		ids[i] = t.ID
+		indexByID[t.ID] = i
+		roots[i].Children = []Task{}
+	}
+
+	rows, err := pool.Query(context.Background(),
+		`SELECT t.id, t.title, t.description, t.completed,
+			TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM') AS date_added,
+			COALESCE(CAST(t.due_date AS TEXT), '') AS due_date,
+			TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM') AS date_created,
+			COALESCE(TO_CHAR((t.date_modified AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM'), '') AS date_modified,
+			COALESCE(t.is_favorite,false), COALESCE(t.position,0), COALESCE(t.priority,0), t.project_id, COALESCE(p.name,''), t.parent_id
+		 FROM tasks t LEFT JOIN projects p ON t.project_id = p.id
+		 WHERE t.parent_id = ANY($1)
+		 ORDER BY t.position ASC, t.id ASC`,
+		ids, timezone)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	children := make([]Task, 0)
+	for rows.Next() {
+		child, err := scanFavoriteTaskRow(rows)
+		if err != nil {
+			return err
+		}
+		children = append(children, child)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if err := attachTagsToTasks(children); err != nil {
+		return err
+	}
+	for _, child := range children {
+		idx, ok := indexByID[child.ParentID]
+		if !ok {
+			continue
+		}
+		roots[idx].Children = append(roots[idx].Children, child)
+		roots[idx].ChildCount++
+		if child.Completed {
+			roots[idx].ChildrenCompleted++
+		}
+	}
+	return nil
 }
 
 func ReturnPaginationForUserWithProject(page, pageSize int, userID *int, timezone string, projectFilter *int) ([]Task, int, error) {
@@ -332,18 +420,19 @@ func FetchTaskByIDForUser(taskID, userID int, timezone string, page int) (Task, 
 	var task Task
 	var projectID sql.NullInt64
 	var projectName sql.NullString
+	var parentID sql.NullInt64
 	err = pool.QueryRow(context.Background(),
 		`SELECT t.id, t.title, t.description, t.completed,
 			TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $3, 'YYYY/MM/DD HH:MI AM') AS date_added,
 			COALESCE(CAST(t.due_date AS TEXT), '') AS due_date,
 			TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $3, 'YYYY/MM/DD HH:MI AM') AS date_created,
 			COALESCE(TO_CHAR((t.date_modified AT TIME ZONE 'UTC') AT TIME ZONE $3, 'YYYY/MM/DD HH:MI AM'), '') AS date_modified,
-			COALESCE(t.is_favorite,false), COALESCE(t.position,0), COALESCE(t.priority,0), t.project_id, COALESCE(p.name,'')
+			COALESCE(t.is_favorite,false), COALESCE(t.position,0), COALESCE(t.priority,0), t.project_id, COALESCE(p.name,''), t.parent_id
 		FROM tasks t LEFT JOIN projects p ON t.project_id = p.id
 		WHERE t.id = $1 AND `+storage.TaskVisibleCondition("t", "$2"), taskID, userID, timezone).Scan(
 		&task.ID, &task.Title, &task.Description, &task.Completed,
 		&task.DateAdded, &task.DueDate, &task.DateCreated, &task.DateModified,
-		&task.IsFavorite, &task.Position, &task.Priority, &projectID, &projectName)
+		&task.IsFavorite, &task.Position, &task.Priority, &projectID, &projectName, &parentID)
 	if err != nil {
 		return Task{}, err
 	}
@@ -351,12 +440,20 @@ func FetchTaskByIDForUser(taskID, userID int, timezone string, page int) (Task, 
 		task.ProjectID = int(projectID.Int64)
 	}
 	task.ProjectName = projectName.String
+	if parentID.Valid {
+		task.ParentID = int(parentID.Int64)
+	}
 	task.Page = page
-	tasks := []Task{task}
-	if err := attachTagsToTasks(tasks); err != nil {
+	taskList := []Task{task}
+	if err := attachTagsToTasks(taskList); err != nil {
 		return Task{}, err
 	}
-	return tasks[0], nil
+	if task.ParentID == 0 {
+		if err := attachChildrenToRoots(taskList, timezone); err != nil {
+			return Task{}, err
+		}
+	}
+	return taskList[0], nil
 }
 
 // TaskMatchesFilters reports whether a task satisfies the active list filters.
