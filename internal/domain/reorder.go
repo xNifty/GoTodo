@@ -43,8 +43,9 @@ func ApplyRelativeReorder(allIDs []int, orderedIDs []int) ([]int, error) {
 	return out, nil
 }
 
-// ReorderTasks validates IDs and renumbers position within a favorite/project group.
-func ReorderTasks(ctx context.Context, userID int, ids []int, isFav bool, projectFilter *int) error {
+// ReorderTasks validates IDs and renumbers position within a favorite/project/parent group.
+// parentID nil or 0 reorders root tasks; otherwise reorders siblings under that parent.
+func ReorderTasks(ctx context.Context, userID int, ids []int, isFav bool, projectFilter *int, parentID *int) error {
 	if len(ids) == 0 {
 		return fmt.Errorf("%w: empty task_ids", ErrValidation)
 	}
@@ -55,6 +56,7 @@ func ReorderTasks(ctx context.Context, userID int, ids []int, isFav bool, projec
 	}
 	defer storage.CloseDatabase(pool)
 
+	nesting := parentID != nil && *parentID > 0
 	for _, id := range ids {
 		canRead, writeRole, _, accessErr := storage.CanUserAccessTask(id, userID)
 		if accessErr != nil {
@@ -64,38 +66,54 @@ func ReorderTasks(ctx context.Context, userID int, ids []int, isFav bool, projec
 			return fmt.Errorf("%w: task %d does not belong to user or mismatched favorite group/project", ErrValidation, id)
 		}
 		var isFavorite bool
-		var proj sql.NullInt64
+		var proj, pid sql.NullInt64
 		err := pool.QueryRow(ctx,
-			`SELECT COALESCE(is_favorite,false), project_id FROM tasks WHERE id = $1`, id).Scan(&isFavorite, &proj)
+			`SELECT COALESCE(is_favorite,false), project_id, parent_id FROM tasks WHERE id = $1`, id).Scan(&isFavorite, &proj, &pid)
 		if err != nil {
 			return err
 		}
-		if isFavorite != isFav {
-			return fmt.Errorf("%w: task %d does not belong to user or mismatched favorite group/project", ErrValidation, id)
-		}
-		if projectFilter != nil {
-			if *projectFilter == 0 {
-				if proj.Valid {
+		if nesting {
+			if !pid.Valid || int(pid.Int64) != *parentID {
+				return fmt.Errorf("%w: task %d does not belong to user or mismatched favorite group/project", ErrValidation, id)
+			}
+		} else {
+			if pid.Valid {
+				return fmt.Errorf("%w: task %d does not belong to user or mismatched favorite group/project", ErrValidation, id)
+			}
+			if isFavorite != isFav {
+				return fmt.Errorf("%w: task %d does not belong to user or mismatched favorite group/project", ErrValidation, id)
+			}
+			if projectFilter != nil {
+				if *projectFilter == 0 {
+					if proj.Valid {
+						return fmt.Errorf("%w: task %d does not belong to user or mismatched favorite group/project", ErrValidation, id)
+					}
+				} else if !proj.Valid || int(proj.Int64) != *projectFilter {
 					return fmt.Errorf("%w: task %d does not belong to user or mismatched favorite group/project", ErrValidation, id)
 				}
-			} else if !proj.Valid || int(proj.Int64) != *projectFilter {
-				return fmt.Errorf("%w: task %d does not belong to user or mismatched favorite group/project", ErrValidation, id)
 			}
 		}
 	}
 
-	vis := storage.TaskListVisibleCondition("t", "$1", projectFilter)
-	argsAll := []interface{}{userID, isFav}
-	q := "SELECT t.id FROM tasks t WHERE " + vis + " AND COALESCE(t.is_favorite,false) = $2"
-	if projectFilter != nil {
-		if *projectFilter == 0 {
-			q += " AND t.project_id IS NULL"
-		} else {
-			q += " AND t.project_id = $3"
-			argsAll = append(argsAll, *projectFilter)
+	var argsAll []interface{}
+	var q string
+	if nesting {
+		argsAll = []interface{}{*parentID}
+		q = "SELECT id FROM tasks WHERE parent_id = $1 ORDER BY position ASC, id ASC"
+	} else {
+		vis := storage.TaskListVisibleCondition("t", "$1", projectFilter)
+		argsAll = []interface{}{userID, isFav}
+		q = "SELECT t.id FROM tasks t WHERE " + vis + " AND COALESCE(t.is_favorite,false) = $2 AND t.parent_id IS NULL"
+		if projectFilter != nil {
+			if *projectFilter == 0 {
+				q += " AND t.project_id IS NULL"
+			} else {
+				q += " AND t.project_id = $3"
+				argsAll = append(argsAll, *projectFilter)
+			}
 		}
+		q += " ORDER BY t.position ASC, t.id ASC"
 	}
-	q += " ORDER BY t.position ASC, t.id ASC"
 
 	rowsAll, err := pool.Query(ctx, q, argsAll...)
 	if err != nil {

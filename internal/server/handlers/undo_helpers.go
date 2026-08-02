@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -27,6 +28,7 @@ func toRedisUndoSnapshots(tasks []DeletedTaskSnapshot) []utils.UndoTaskSnapshot 
 			Priority:    t.Priority,
 			Position:    t.Position,
 			ProjectID:   t.ProjectID,
+			ParentID:    t.ParentID,
 			TagIDs:      t.TagIDs,
 		})
 	}
@@ -46,6 +48,7 @@ func fromRedisUndoSnapshots(tasks []utils.UndoTaskSnapshot) []DeletedTaskSnapsho
 			Priority:    t.Priority,
 			Position:    t.Position,
 			ProjectID:   t.ProjectID,
+			ParentID:    t.ParentID,
 			TagIDs:      t.TagIDs,
 		})
 	}
@@ -65,6 +68,7 @@ type DeletedTaskSnapshot struct {
 	Priority    int
 	Position    int
 	ProjectID   *int
+	ParentID    *int
 	TagIDs      []int
 }
 
@@ -77,16 +81,16 @@ func snapshotTasksForUndo(ctx context.Context, db *pgxpool.Pool, ids []int, user
 	out := make([]DeletedTaskSnapshot, 0, len(ids))
 	for _, id := range ids {
 		var snap DeletedTaskSnapshot
-		var projectID sql.NullInt64
+		var projectID, parentID sql.NullInt64
 		var dueDate sql.NullString
 		err := db.QueryRow(ctx, `
 			SELECT id, title, COALESCE(description, ''), COALESCE(completed, false),
 			       COALESCE(is_favorite, false), COALESCE(priority, 0), COALESCE(position, 0),
-			       project_id, COALESCE(CAST(due_date AS TEXT), '')
+			       project_id, parent_id, COALESCE(CAST(due_date AS TEXT), '')
 			FROM tasks WHERE id = $1`,
 			id).Scan(
 			&snap.ID, &snap.Title, &snap.Description, &snap.Completed, &snap.IsFavorite,
-			&snap.Priority, &snap.Position, &projectID, &dueDate,
+			&snap.Priority, &snap.Position, &projectID, &parentID, &dueDate,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("task not found")
@@ -95,6 +99,10 @@ func snapshotTasksForUndo(ctx context.Context, db *pgxpool.Pool, ids []int, user
 		if projectID.Valid {
 			pid := int(projectID.Int64)
 			snap.ProjectID = &pid
+		}
+		if parentID.Valid {
+			pid := int(parentID.Int64)
+			snap.ParentID = &pid
 		}
 		if dueDate.Valid {
 			snap.DueDate = dueDate.String
@@ -172,16 +180,26 @@ func clearPendingUndo(r *http.Request, w http.ResponseWriter) error {
 func restoreDeletedTasks(ctx context.Context, db *pgxpool.Pool, userID int, tasks []DeletedTaskSnapshot) error {
 	var nextPos int
 	if err := db.QueryRow(ctx,
-		"SELECT COALESCE(MAX(position),0) + 1 FROM tasks WHERE user_id = $1 AND (is_favorite IS NULL OR is_favorite = false)",
+		"SELECT COALESCE(MAX(position),0) + 1 FROM tasks WHERE user_id = $1 AND (is_favorite IS NULL OR is_favorite = false) AND parent_id IS NULL",
 		userID).Scan(&nextPos); err != nil {
 		return err
 	}
 
+	// Restore roots before children so parent_id FK succeeds.
+	sort.SliceStable(tasks, func(i, j int) bool {
+		iChild := tasks[i].ParentID != nil && *tasks[i].ParentID > 0
+		jChild := tasks[j].ParentID != nil && *tasks[j].ParentID > 0
+		if iChild != jChild {
+			return !iChild
+		}
+		return false
+	})
+
 	for _, snap := range tasks {
-		position := nextPos
-		nextPos++
-		if snap.IsFavorite {
-			position = snap.Position
+		position := snap.Position
+		if snap.ParentID == nil && !snap.IsFavorite {
+			position = nextPos
+			nextPos++
 		}
 
 		newID, err := insertRestoredTask(ctx, db, userID, snap, position)
@@ -218,50 +236,26 @@ func insertRestoredTask(ctx context.Context, db *pgxpool.Pool, userID int, snap 
 }
 
 func insertTaskWithID(ctx context.Context, db *pgxpool.Pool, explicitID, userID int, snap DeletedTaskSnapshot, position int, outID *int) error {
-	if explicitID > 0 {
-		if snap.ProjectID != nil && snap.DueDate != "" {
-			return db.QueryRow(ctx,
-				`INSERT INTO tasks (id, title, description, completed, user_id, time_stamp, position, priority, project_id, due_date, is_favorite)
-				 VALUES ($1,$2,$3,$4,$5,NOW() AT TIME ZONE 'UTC',$6,$7,$8,$9,$10) RETURNING id`,
-				explicitID, snap.Title, snap.Description, snap.Completed, userID, position, snap.Priority, *snap.ProjectID, snap.DueDate, snap.IsFavorite).Scan(outID)
-		}
-		if snap.ProjectID != nil {
-			return db.QueryRow(ctx,
-				`INSERT INTO tasks (id, title, description, completed, user_id, time_stamp, position, priority, project_id, is_favorite)
-				 VALUES ($1,$2,$3,$4,$5,NOW() AT TIME ZONE 'UTC',$6,$7,$8,$9) RETURNING id`,
-				explicitID, snap.Title, snap.Description, snap.Completed, userID, position, snap.Priority, *snap.ProjectID, snap.IsFavorite).Scan(outID)
-		}
-		if snap.DueDate != "" {
-			return db.QueryRow(ctx,
-				`INSERT INTO tasks (id, title, description, completed, user_id, time_stamp, position, priority, due_date, is_favorite)
-				 VALUES ($1,$2,$3,$4,$5,NOW() AT TIME ZONE 'UTC',$6,$7,$8,$9) RETURNING id`,
-				explicitID, snap.Title, snap.Description, snap.Completed, userID, position, snap.Priority, snap.DueDate, snap.IsFavorite).Scan(outID)
-		}
-		return db.QueryRow(ctx,
-			`INSERT INTO tasks (id, title, description, completed, user_id, time_stamp, position, priority, is_favorite)
-			 VALUES ($1,$2,$3,$4,$5,NOW() AT TIME ZONE 'UTC',$6,$7,$8) RETURNING id`,
-			explicitID, snap.Title, snap.Description, snap.Completed, userID, position, snap.Priority, snap.IsFavorite).Scan(outID)
-	}
-	if snap.ProjectID != nil && snap.DueDate != "" {
-		return db.QueryRow(ctx,
-			`INSERT INTO tasks (title, description, completed, user_id, time_stamp, position, priority, project_id, due_date, is_favorite)
-			 VALUES ($1,$2,$3,$4,NOW() AT TIME ZONE 'UTC',$5,$6,$7,$8,$9) RETURNING id`,
-			snap.Title, snap.Description, snap.Completed, userID, position, snap.Priority, *snap.ProjectID, snap.DueDate, snap.IsFavorite).Scan(outID)
-	}
+	var projectArg interface{}
 	if snap.ProjectID != nil {
-		return db.QueryRow(ctx,
-			`INSERT INTO tasks (title, description, completed, user_id, time_stamp, position, priority, project_id, is_favorite)
-			 VALUES ($1,$2,$3,$4,NOW() AT TIME ZONE 'UTC',$5,$6,$7,$8) RETURNING id`,
-			snap.Title, snap.Description, snap.Completed, userID, position, snap.Priority, *snap.ProjectID, snap.IsFavorite).Scan(outID)
+		projectArg = *snap.ProjectID
 	}
+	var parentArg interface{}
+	if snap.ParentID != nil && *snap.ParentID > 0 {
+		parentArg = *snap.ParentID
+	}
+	var dueArg interface{}
 	if snap.DueDate != "" {
+		dueArg = snap.DueDate
+	}
+	if explicitID > 0 {
 		return db.QueryRow(ctx,
-			`INSERT INTO tasks (title, description, completed, user_id, time_stamp, position, priority, due_date, is_favorite)
-			 VALUES ($1,$2,$3,$4,NOW() AT TIME ZONE 'UTC',$5,$6,$7,$8) RETURNING id`,
-			snap.Title, snap.Description, snap.Completed, userID, position, snap.Priority, snap.DueDate, snap.IsFavorite).Scan(outID)
+			`INSERT INTO tasks (id, title, description, completed, user_id, time_stamp, position, priority, project_id, due_date, is_favorite, parent_id)
+			 VALUES ($1,$2,$3,$4,$5,NOW() AT TIME ZONE 'UTC',$6,$7,$8,$9,$10,$11) RETURNING id`,
+			explicitID, snap.Title, snap.Description, snap.Completed, userID, position, snap.Priority, projectArg, dueArg, snap.IsFavorite, parentArg).Scan(outID)
 	}
 	return db.QueryRow(ctx,
-		`INSERT INTO tasks (title, description, completed, user_id, time_stamp, position, priority, is_favorite)
-		 VALUES ($1,$2,$3,$4,NOW() AT TIME ZONE 'UTC',$5,$6,$7) RETURNING id`,
-		snap.Title, snap.Description, snap.Completed, userID, position, snap.Priority, snap.IsFavorite).Scan(outID)
+		`INSERT INTO tasks (title, description, completed, user_id, time_stamp, position, priority, project_id, due_date, is_favorite, parent_id)
+		 VALUES ($1,$2,$3,$4,NOW() AT TIME ZONE 'UTC',$5,$6,$7,$8,$9,$10) RETURNING id`,
+		snap.Title, snap.Description, snap.Completed, userID, position, snap.Priority, projectArg, dueArg, snap.IsFavorite, parentArg).Scan(outID)
 }

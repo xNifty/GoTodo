@@ -21,7 +21,10 @@ type CreateTaskInput struct {
 	Description string
 	DueDate     string
 	// ProjectID: nil = omit column (no project); &0 = no project; &n = assign project n.
+	// Ignored when ParentID is set (project is copied from parent).
 	ProjectID *int
+	// ParentID: nil = root; &n = nest under root task n.
+	ParentID  *int
 	Priority  int
 	Completed bool
 	Favorite  bool
@@ -36,6 +39,8 @@ type UpdateTaskInput struct {
 	ClearDue    bool
 	// ProjectID: nil = leave; non-nil with *nil or 0 = clear; non-nil with id = set.
 	ProjectID **int
+	// ParentID: nil = leave; non-nil with *nil or 0 = promote to root; non-nil with id = nest.
+	ParentID  **int
 	Priority  *int
 	Completed *bool
 	Favorite  *bool
@@ -74,58 +79,80 @@ func CreateTask(ctx context.Context, userID int, in CreateTaskInput) (int, error
 	}
 	defer storage.CloseDatabase(pool)
 
-	var nextPos int
-	if err := pool.QueryRow(ctx,
-		`SELECT COALESCE(MAX(position),0) + 1 FROM tasks
-		 WHERE user_id = $1 AND (is_favorite IS NULL OR is_favorite = false)`,
-		userID).Scan(&nextPos); err != nil {
-		return 0, err
+	favorite := in.Favorite
+	var parentArg interface{}
+	var projectArg interface{}
+
+	var dueArg interface{}
+	if dueDate != "" {
+		dueArg = dueDate
 	}
 
-	var projectArg interface{}
-	useProjectCol := false
-	if in.ProjectID != nil {
-		if *in.ProjectID == 0 {
-			projectArg = nil
-			useProjectCol = false
-		} else {
-			if err := RequireProjectWriteAccess(*in.ProjectID, userID); err != nil {
-				if err == ErrForbidden {
-					return 0, ErrForbidden
-				}
-				return 0, fmt.Errorf("%w: invalid project_id", ErrValidation)
+	if in.ParentID != nil && *in.ParentID > 0 {
+		parentProj, err := requireWritableRootParent(ctx, pool, userID, *in.ParentID)
+		if err != nil {
+			return 0, err
+		}
+		parentArg = *in.ParentID
+		favorite = false
+		if parentProj.Valid {
+			projectArg = int(parentProj.Int64)
+		}
+		var nextPos int
+		if err := pool.QueryRow(ctx,
+			`SELECT COALESCE(MAX(position),0) + 1 FROM tasks WHERE parent_id = $1`,
+			*in.ParentID).Scan(&nextPos); err != nil {
+			return 0, err
+		}
+		var newID int
+		err = pool.QueryRow(ctx,
+			`INSERT INTO tasks (title, description, completed, user_id, time_stamp, position, priority, project_id, due_date, is_favorite, parent_id)
+			 VALUES ($1, $2, $3, $4, NOW() AT TIME ZONE 'UTC', $5, $6, $7, $8, $9, $10) RETURNING id`,
+			title, description, in.Completed, userID, nextPos, in.Priority, projectArg, dueArg, favorite, parentArg).Scan(&newID)
+		if err != nil {
+			return 0, err
+		}
+		if len(in.TagIDs) > 0 {
+			if err := storage.SetTaskTags(newID, userID, in.TagIDs); err != nil {
+				return 0, fmt.Errorf("%w: %s", ErrValidation, err.Error())
 			}
-			projectArg = *in.ProjectID
-			useProjectCol = true
+		}
+		_ = storage.LogTaskEvent(newID, userID, "created", map[string]interface{}{"parent_id": *in.ParentID})
+		return newID, nil
+	}
+
+	if in.ProjectID != nil && *in.ProjectID > 0 {
+		if err := RequireProjectWriteAccess(*in.ProjectID, userID); err != nil {
+			if err == ErrForbidden {
+				return 0, ErrForbidden
+			}
+			return 0, fmt.Errorf("%w: invalid project_id", ErrValidation)
+		}
+		projectArg = *in.ProjectID
+	}
+
+	var nextPos int
+	if favorite {
+		if err := pool.QueryRow(ctx,
+			`SELECT COALESCE(MAX(position),0) + 1 FROM tasks
+			 WHERE user_id = $1 AND is_favorite = true AND parent_id IS NULL`,
+			userID).Scan(&nextPos); err != nil {
+			return 0, err
+		}
+	} else {
+		if err := pool.QueryRow(ctx,
+			`SELECT COALESCE(MAX(position),0) + 1 FROM tasks
+			 WHERE user_id = $1 AND (is_favorite IS NULL OR is_favorite = false) AND parent_id IS NULL`,
+			userID).Scan(&nextPos); err != nil {
+			return 0, err
 		}
 	}
 
 	var newID int
-	if useProjectCol {
-		if dueDate != "" {
-			err = pool.QueryRow(ctx,
-				`INSERT INTO tasks (title, description, completed, user_id, time_stamp, position, priority, project_id, due_date, is_favorite)
-				 VALUES ($1, $2, $3, $4, NOW() AT TIME ZONE 'UTC', $5, $6, $7, $8, $9) RETURNING id`,
-				title, description, in.Completed, userID, nextPos, in.Priority, projectArg, dueDate, in.Favorite).Scan(&newID)
-		} else {
-			err = pool.QueryRow(ctx,
-				`INSERT INTO tasks (title, description, completed, user_id, time_stamp, position, priority, project_id, is_favorite)
-				 VALUES ($1, $2, $3, $4, NOW() AT TIME ZONE 'UTC', $5, $6, $7, $8) RETURNING id`,
-				title, description, in.Completed, userID, nextPos, in.Priority, projectArg, in.Favorite).Scan(&newID)
-		}
-	} else {
-		if dueDate != "" {
-			err = pool.QueryRow(ctx,
-				`INSERT INTO tasks (title, description, completed, user_id, time_stamp, position, priority, due_date, is_favorite)
-				 VALUES ($1, $2, $3, $4, NOW() AT TIME ZONE 'UTC', $5, $6, $7, $8) RETURNING id`,
-				title, description, in.Completed, userID, nextPos, in.Priority, dueDate, in.Favorite).Scan(&newID)
-		} else {
-			err = pool.QueryRow(ctx,
-				`INSERT INTO tasks (title, description, completed, user_id, time_stamp, position, priority, is_favorite)
-				 VALUES ($1, $2, $3, $4, NOW() AT TIME ZONE 'UTC', $5, $6, $7) RETURNING id`,
-				title, description, in.Completed, userID, nextPos, in.Priority, in.Favorite).Scan(&newID)
-		}
-	}
+	err = pool.QueryRow(ctx,
+		`INSERT INTO tasks (title, description, completed, user_id, time_stamp, position, priority, project_id, due_date, is_favorite, parent_id)
+		 VALUES ($1, $2, $3, $4, NOW() AT TIME ZONE 'UTC', $5, $6, $7, $8, $9, NULL) RETURNING id`,
+		title, description, in.Completed, userID, nextPos, in.Priority, projectArg, dueArg, favorite).Scan(&newID)
 	if err != nil {
 		return 0, err
 	}
@@ -137,6 +164,33 @@ func CreateTask(ctx context.Context, userID int, in CreateTaskInput) (int, error
 	}
 	_ = storage.LogTaskEvent(newID, userID, "created", nil)
 	return newID, nil
+}
+
+// requireWritableRootParent ensures parentID is a writable root task and returns its project_id.
+func requireWritableRootParent(ctx context.Context, pool interface {
+	QueryRow(context.Context, string, ...interface{}) pgx.Row
+}, userID, parentID int) (sql.NullInt64, error) {
+	canRead, writeRole, _, accessErr := storage.CanUserAccessTask(parentID, userID)
+	if accessErr != nil {
+		return sql.NullInt64{}, accessErr
+	}
+	if !canRead || !storage.RoleCanWrite(writeRole) {
+		return sql.NullInt64{}, fmt.Errorf("%w: parent task not found", ErrValidation)
+	}
+	var parentParent sql.NullInt64
+	var projectID sql.NullInt64
+	err := pool.QueryRow(ctx,
+		`SELECT parent_id, project_id FROM tasks WHERE id = $1`, parentID).Scan(&parentParent, &projectID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, sql.ErrNoRows) {
+			return sql.NullInt64{}, fmt.Errorf("%w: parent task not found", ErrValidation)
+		}
+		return sql.NullInt64{}, err
+	}
+	if parentParent.Valid {
+		return sql.NullInt64{}, fmt.Errorf("%w: cannot nest under a subtask", ErrValidation)
+	}
+	return projectID, nil
 }
 
 // UpdateTask applies a partial update for an owned task.
@@ -167,11 +221,11 @@ func UpdateTask(ctx context.Context, userID, taskID int, in UpdateTaskInput) (*U
 	var title, description, dueDate string
 	var completed, favorite bool
 	var priority int
-	var projectID sql.NullInt64
+	var projectID, parentID sql.NullInt64
 	err = pool.QueryRow(ctx,
 		`SELECT title, description, COALESCE(CAST(due_date AS TEXT), ''), completed,
-		 COALESCE(priority,0), COALESCE(is_favorite,false), project_id FROM tasks WHERE id = $1`,
-		taskID).Scan(&title, &description, &dueDate, &completed, &priority, &favorite, &projectID)
+		 COALESCE(priority,0), COALESCE(is_favorite,false), project_id, parent_id FROM tasks WHERE id = $1`,
+		taskID).Scan(&title, &description, &dueDate, &completed, &priority, &favorite, &projectID, &parentID)
 	if err != nil {
 		return nil, err
 	}
@@ -213,8 +267,36 @@ func UpdateTask(ctx context.Context, userID, taskID int, in UpdateTaskInput) (*U
 		dueDate = strings.TrimSpace(*in.DueDate)
 	}
 
+	newParentID := parentID
+	if in.ParentID != nil {
+		if *in.ParentID == nil || **in.ParentID == 0 {
+			newParentID = sql.NullInt64{Valid: false}
+		} else {
+			if **in.ParentID == taskID {
+				return nil, fmt.Errorf("%w: cannot nest a task under itself", ErrValidation)
+			}
+			var childCount int
+			if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM tasks WHERE parent_id = $1`, taskID).Scan(&childCount); err != nil {
+				return nil, err
+			}
+			if childCount > 0 {
+				return nil, fmt.Errorf("%w: cannot nest a task that has subtasks", ErrValidation)
+			}
+			parentProj, err := requireWritableRootParent(ctx, pool, userID, **in.ParentID)
+			if err != nil {
+				return nil, err
+			}
+			newParentID = sql.NullInt64{Int64: int64(**in.ParentID), Valid: true}
+			projectID = parentProj
+			favorite = false
+		}
+	}
+
 	newProjectID := projectID
 	if in.ProjectID != nil {
+		if newParentID.Valid {
+			return nil, fmt.Errorf("%w: subtasks inherit project from parent", ErrValidation)
+		}
 		if *in.ProjectID == nil || **in.ProjectID == 0 {
 			newProjectID = sql.NullInt64{Valid: false}
 		} else {
@@ -228,19 +310,33 @@ func UpdateTask(ctx context.Context, userID, taskID int, in UpdateTaskInput) (*U
 		}
 	}
 
+	if newParentID.Valid {
+		favorite = false
+	}
+	if favorite && newParentID.Valid {
+		return nil, fmt.Errorf("%w: subtasks cannot be favorites", ErrValidation)
+	}
+
 	if dueDate == "" {
 		_, err = pool.Exec(ctx,
 			`UPDATE tasks SET title=$1, description=$2, completed=$3, priority=$4, is_favorite=$5,
-			 project_id=$6, due_date=NULL, date_modified=NOW() AT TIME ZONE 'UTC' WHERE id=$7`,
-			title, description, completed, priority, favorite, newProjectID, taskID)
+			 project_id=$6, parent_id=$7, due_date=NULL, date_modified=NOW() AT TIME ZONE 'UTC' WHERE id=$8`,
+			title, description, completed, priority, favorite, newProjectID, newParentID, taskID)
 	} else {
 		_, err = pool.Exec(ctx,
 			`UPDATE tasks SET title=$1, description=$2, completed=$3, priority=$4, is_favorite=$5,
-			 project_id=$6, due_date=$7, date_modified=NOW() AT TIME ZONE 'UTC' WHERE id=$8`,
-			title, description, completed, priority, favorite, newProjectID, dueDate, taskID)
+			 project_id=$6, parent_id=$7, due_date=$8, date_modified=NOW() AT TIME ZONE 'UTC' WHERE id=$9`,
+			title, description, completed, priority, favorite, newProjectID, newParentID, dueDate, taskID)
 	}
 	if err != nil {
 		return nil, err
+	}
+
+	// Keep children project in sync when a root's project changes.
+	if !newParentID.Valid && result.OldProjectID != nullInt(newProjectID) {
+		_, _ = pool.Exec(ctx,
+			`UPDATE tasks SET project_id = $1, date_modified = NOW() AT TIME ZONE 'UTC' WHERE parent_id = $2`,
+			newProjectID, taskID)
 	}
 
 	if in.TagIDs != nil {
@@ -371,6 +467,16 @@ func SetTaskFavorite(ctx context.Context, userID, taskID int, favorite bool) err
 		return ErrNotFound
 	}
 
+	if favorite {
+		var parentID sql.NullInt64
+		if err := pool.QueryRow(ctx, `SELECT parent_id FROM tasks WHERE id = $1`, taskID).Scan(&parentID); err != nil {
+			return err
+		}
+		if parentID.Valid {
+			return fmt.Errorf("%w: subtasks cannot be favorites", ErrValidation)
+		}
+	}
+
 	tag, err := pool.Exec(ctx,
 		`UPDATE tasks SET is_favorite = $1, date_modified = NOW() AT TIME ZONE 'UTC'
 		 WHERE id = $2`, favorite, taskID)
@@ -421,4 +527,67 @@ func nullInt(v sql.NullInt64) int {
 		return int(v.Int64)
 	}
 	return 0
+}
+
+// ChildIDsOf returns direct child task ids for the given parents.
+func ChildIDsOf(ctx context.Context, parentIDs []int) ([]int, error) {
+	if len(parentIDs) == 0 {
+		return nil, nil
+	}
+	pool, err := storage.OpenDatabase()
+	if err != nil {
+		return nil, err
+	}
+	defer storage.CloseDatabase(pool)
+	rows, err := pool.Query(ctx, `SELECT id FROM tasks WHERE parent_id = ANY($1)`, parentIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]int, 0)
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}
+
+// ReparentChildren moves children of fromParent to toParent (nil/0 = promote to root).
+func ReparentChildren(ctx context.Context, userID, fromParent int, toParent *int) error {
+	pool, err := storage.OpenDatabase()
+	if err != nil {
+		return err
+	}
+	defer storage.CloseDatabase(pool)
+
+	canRead, writeRole, _, accessErr := storage.CanUserAccessTask(fromParent, userID)
+	if accessErr != nil {
+		return accessErr
+	}
+	if !canRead || !storage.RoleCanWrite(writeRole) {
+		return ErrNotFound
+	}
+
+	if toParent != nil && *toParent > 0 {
+		if *toParent == fromParent {
+			return fmt.Errorf("%w: cannot reparent onto the task being deleted", ErrValidation)
+		}
+		parentProj, err := requireWritableRootParent(ctx, pool, userID, *toParent)
+		if err != nil {
+			return err
+		}
+		_, err = pool.Exec(ctx,
+			`UPDATE tasks SET parent_id = $1, project_id = $2, is_favorite = false,
+			 date_modified = NOW() AT TIME ZONE 'UTC' WHERE parent_id = $3`,
+			*toParent, parentProj, fromParent)
+		return err
+	}
+
+	_, err = pool.Exec(ctx,
+		`UPDATE tasks SET parent_id = NULL, date_modified = NOW() AT TIME ZONE 'UTC' WHERE parent_id = $1`,
+		fromParent)
+	return err
 }

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -83,12 +84,38 @@ func deleteTaskRows(ctx context.Context, db *pgxpool.Pool, ids []int, userID int
 }
 
 // deleteTasksForAPI deletes tasks and returns a Redis undo token (session undo saved when possible).
+// Children of deleted parents are snapshotted for undo; FK CASCADE removes them with the parent.
 func deleteTasksForAPI(ctx context.Context, db *pgxpool.Pool, r *http.Request, w http.ResponseWriter, ids []int, userID int) (string, error) {
-	snapshots, err := snapshotTasksForUndo(ctx, db, ids, userID)
+	childIDs, err := domain.ChildIDsOf(ctx, ids)
 	if err != nil {
 		return "", err
 	}
-	if err := deleteTaskRows(ctx, db, ids, userID); err != nil {
+	snapshotIDs := uniqueInts(append(append([]int{}, ids...), childIDs...))
+	snapshots, err := snapshotTasksForUndo(ctx, db, snapshotIDs, userID)
+	if err != nil {
+		return "", err
+	}
+	// Delete parents first when both parent and child are selected; CASCADE removes children.
+	// Also delete orphan selected leaves (not children of another selected id).
+	childSet := make(map[int]struct{}, len(childIDs))
+	for _, id := range childIDs {
+		childSet[id] = struct{}{}
+	}
+	idSet := make(map[int]struct{}, len(ids))
+	for _, id := range ids {
+		idSet[id] = struct{}{}
+	}
+	deleteIDs := make([]int, 0, len(ids))
+	for _, id := range ids {
+		if _, isChildOfSelected := childSet[id]; isChildOfSelected {
+			// Will be removed via parent CASCADE if parent is also selected.
+			if parentAlsoSelected(ctx, db, id, idSet) {
+				continue
+			}
+		}
+		deleteIDs = append(deleteIDs, id)
+	}
+	if err := deleteTaskRows(ctx, db, deleteIDs, userID); err != nil {
 		return "", err
 	}
 	_ = savePendingUndo(r, w, snapshots)
@@ -97,6 +124,31 @@ func deleteTasksForAPI(ctx context.Context, db *pgxpool.Pool, r *http.Request, w
 		return "", err
 	}
 	return token, nil
+}
+
+func uniqueInts(ids []int) []int {
+	seen := make(map[int]struct{}, len(ids))
+	out := make([]int, 0, len(ids))
+	for _, id := range ids {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	return out
+}
+
+func parentAlsoSelected(ctx context.Context, db *pgxpool.Pool, childID int, selected map[int]struct{}) bool {
+	var parentID sql.NullInt64
+	if err := db.QueryRow(ctx, `SELECT parent_id FROM tasks WHERE id = $1`, childID).Scan(&parentID); err != nil {
+		return false
+	}
+	if !parentID.Valid {
+		return false
+	}
+	_, ok := selected[int(parentID.Int64)]
+	return ok
 }
 
 func bulkSetCompleted(ctx context.Context, db *pgxpool.Pool, ids []int, userID int, completed bool) error {

@@ -356,6 +356,42 @@ func MigrateTasksAddPriority() error {
 	return nil
 }
 
+// MigrateTasksAddParentID adds nullable parent_id for one-level subtasks.
+func MigrateTasksAddParentID() error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return fmt.Errorf("failed to open database: %v", err)
+	}
+	defer CloseDatabase(pool)
+
+	_, err = pool.Exec(context.Background(), "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS parent_id INTEGER")
+	if err != nil {
+		return fmt.Errorf("failed to add parent_id column to tasks table: %v", err)
+	}
+
+	var exists bool
+	err = pool.QueryRow(context.Background(),
+		"SELECT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_tasks_parent')",
+	).Scan(&exists)
+	if err != nil {
+		return fmt.Errorf("failed to check tasks parent fk: %v", err)
+	}
+	if !exists {
+		_, err = pool.Exec(context.Background(),
+			`ALTER TABLE tasks ADD CONSTRAINT fk_tasks_parent
+			 FOREIGN KEY (parent_id) REFERENCES tasks (id) ON DELETE CASCADE`)
+		if err != nil {
+			return fmt.Errorf("failed to add foreign key constraint to tasks.parent_id: %v", err)
+		}
+	}
+
+	_, err = pool.Exec(context.Background(), "CREATE INDEX IF NOT EXISTS idx_tasks_parent_id ON tasks(parent_id)")
+	if err != nil {
+		return fmt.Errorf("failed to create parent_id index: %v", err)
+	}
+	return nil
+}
+
 // MigrateUsersAddTimezone adds timezone column to users table
 func MigrateUsersAddTimezone() error {
 	pool, err := OpenDatabase()
