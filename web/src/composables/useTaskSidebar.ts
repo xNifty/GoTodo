@@ -6,15 +6,26 @@ const mode = ref<'add' | 'edit' | 'view'>('add')
 const taskId = ref<number | null>(null)
 const defaultDueDate = ref('')
 const defaultProjectId = ref<number | string | null>(null)
+const defaultParentId = ref<number | null>(null)
+const defaultParentTitle = ref('')
 const lastSavedTask = ref<Task | null>(null)
 
 export function useTaskSidebar() {
-  function openAdd(dueDate?: string, projectId?: number | string | null) {
+  function openAdd(
+    dueDate?: string,
+    projectId?: number | string | null,
+    parent?: { id: number; title?: string } | null,
+  ) {
     mode.value = 'add'
     taskId.value = null
     // Ignore PointerEvent when bound as @click="openAdd"
     defaultDueDate.value = typeof dueDate === 'string' ? dueDate.trim() : ''
-    defaultProjectId.value = (typeof projectId === 'number' || typeof projectId === 'string') && projectId !== '0' ? projectId : null
+    defaultProjectId.value =
+      (typeof projectId === 'number' || typeof projectId === 'string') && projectId !== '0'
+        ? projectId
+        : null
+    defaultParentId.value = parent?.id ?? null
+    defaultParentTitle.value = parent?.title?.trim() || ''
     open.value = true
   }
 
@@ -23,6 +34,8 @@ export function useTaskSidebar() {
     taskId.value = id
     defaultDueDate.value = ''
     defaultProjectId.value = null
+    defaultParentId.value = null
+    defaultParentTitle.value = ''
     open.value = true
   }
 
@@ -30,6 +43,8 @@ export function useTaskSidebar() {
     mode.value = 'view'
     taskId.value = id
     defaultDueDate.value = ''
+    defaultParentId.value = null
+    defaultParentTitle.value = ''
     open.value = true
   }
 
@@ -50,6 +65,8 @@ export function useTaskSidebar() {
     taskId,
     defaultDueDate,
     defaultProjectId,
+    defaultParentId,
+    defaultParentTitle,
     lastSavedTask,
     openAdd,
     openEdit,

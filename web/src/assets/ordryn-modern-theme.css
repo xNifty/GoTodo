@@ -455,7 +455,54 @@ body {
   display: none;
 }
 
-/* Nested Task Indentation Support */
+/* Nested task tree */
+.task-tree-root {
+  margin-bottom: 0.55rem;
+}
+
+.task-tree-root > .ordryn-task-card.has-children {
+  margin-bottom: 0;
+}
+
+.task-children {
+  position: relative;
+  margin: 0.35rem 0 0.15rem 1.15rem;
+  padding: 0.4rem 0.55rem 0.4rem 0.85rem;
+  border-left: 2px solid color-mix(in srgb, var(--ordryn-accent) 45%, var(--ordryn-card-border));
+  border-radius: 0 10px 10px 0;
+  background: color-mix(in srgb, var(--ordryn-muted-bg) 65%, transparent);
+}
+
+.task-children .ordryn-task-card {
+  margin-bottom: 0.35rem;
+  background: color-mix(in srgb, var(--ordryn-card-bg) 92%, var(--ordryn-accent));
+  border-color: color-mix(in srgb, var(--ordryn-card-border) 80%, var(--ordryn-accent));
+  box-shadow: none;
+}
+
+.task-children .ordryn-task-card:last-child {
+  margin-bottom: 0;
+}
+
+.ordryn-task-card.is-nested {
+  position: relative;
+  padding-left: 1.35rem !important;
+}
+
+.ordryn-task-card.is-nested .nested-branch {
+  position: absolute;
+  left: 0.35rem;
+  top: 1.15rem;
+  width: 0.7rem;
+  height: 2px;
+  background: color-mix(in srgb, var(--ordryn-accent) 40%, var(--ordryn-card-border));
+  border-radius: 1px;
+}
+
+.ordryn-task-card.density-dense.is-nested .nested-branch {
+  top: 0.85rem;
+}
+
 .nested-indent-wrapper {
   transition: padding-left 0.2s ease;
 }

@@ -7,6 +7,7 @@ import { APIError } from '@/api/types'
 import ModernSidebar from '@/components/modern/ModernSidebar.vue'
 import ModernTaskFilterBar from '@/components/modern/ModernTaskFilterBar.vue'
 import ModernTaskCard from '@/components/modern/ModernTaskCard.vue'
+import DeleteTaskDialog from '@/components/DeleteTaskDialog.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import { useAuth } from '@/composables/useAuth'
 import { useInfiniteScroll } from '@/composables/useInfiniteScroll'
@@ -37,6 +38,10 @@ const projects = ref<Project[]>([])
 const tags = ref<Tag[]>([])
 const savedViews = ref<SavedView[]>([])
 const activeViewId = ref<string | null>(null)
+const deleteDialogOpen = ref(false)
+const deleteDialogTask = ref<Task | null>(null)
+/** Parent ids with expanded subtasks. Collapsed by default. */
+const expandedParentIds = ref<Set<number>>(new Set())
 
 const total = ref(0)
 const loadedPage = ref(0)
@@ -84,10 +89,18 @@ const favoriteListEl = ref<HTMLElement | null>(null)
 const taskListEl = ref<HTMLElement | null>(null)
 const loadMoreSentinel = ref<HTMLElement | null>(null)
 
-const favoriteTasks = computed(() => tasks.value.filter((t) => t.favorite))
-const regularTasks = computed(() => tasks.value.filter((t) => !t.favorite))
+const favoriteTasks = computed(() => tasks.value.filter((t) => t.favorite && !t.parent_id))
+const regularTasks = computed(() => tasks.value.filter((t) => !t.favorite && !t.parent_id))
+const flatSelectableIds = computed(() => {
+  const ids: number[] = []
+  for (const t of tasks.value) {
+    ids.push(t.id)
+    for (const c of t.children || []) ids.push(c.id)
+  }
+  return ids
+})
 const allSelected = computed(
-  () => tasks.value.length > 0 && selected.value.length === tasks.value.length,
+  () => flatSelectableIds.value.length > 0 && selected.value.length === flatSelectableIds.value.length,
 )
 const isSearching = computed(() => filters.search !== '')
 const showTaskTable = computed(
@@ -154,25 +167,72 @@ function taskMatchesCurrentFilters(task: Task): boolean {
   return true
 }
 
+function findTaskInTree(id: number): { parent: Task | null; task: Task } | null {
+  for (const t of tasks.value) {
+    if (t.id === id) return { parent: null, task: t }
+    const child = t.children?.find((c) => c.id === id)
+    if (child) return { parent: t, task: child }
+  }
+  return null
+}
+
+function refreshParentCounts(parent: Task) {
+  const kids = parent.children || []
+  parent.child_count = kids.length
+  parent.children_completed = kids.filter((c) => c.completed).length
+}
+
 function registerTaskAdded(task: Task) {
+  if (task.parent_id) {
+    const parent = tasks.value.find((t) => t.id === task.parent_id)
+    if (parent) {
+      if (!parent.children) parent.children = []
+      if (!parent.children.some((c) => c.id === task.id)) {
+        parent.children = [...parent.children, task]
+        refreshParentCounts(parent)
+      }
+      if (task.completed) completedCount.value += 1
+      else incompleteCount.value += 1
+      return
+    }
+    // Parent not on the current page — don't insert a root row for a subtask.
+    if (task.completed) completedCount.value += 1
+    else incompleteCount.value += 1
+    return
+  }
   total.value += 1
   if (task.completed) completedCount.value += 1
   else incompleteCount.value += 1
   if (!taskMatchesCurrentFilters(task) || tasks.value.some((t) => t.id === task.id)) return
+  const withChildren = { ...task, children: task.children || [] }
   if (task.favorite) {
-    tasks.value = [task, ...tasks.value]
+    tasks.value = [withChildren, ...tasks.value]
   } else {
-    tasks.value = [...tasks.value, task]
+    tasks.value = [...tasks.value, withChildren]
   }
 }
 
 function removeTaskLocally(task: Task) {
-  if (!tasks.value.some((t) => t.id === task.id)) return
+  const found = findTaskInTree(task.id)
+  if (!found) return
+  if (found.parent) {
+    found.parent.children = (found.parent.children || []).filter((c) => c.id !== task.id)
+    refreshParentCounts(found.parent)
+    if (task.completed) completedCount.value = Math.max(0, completedCount.value - 1)
+    else incompleteCount.value = Math.max(0, incompleteCount.value - 1)
+    selected.value = selected.value.filter((id) => id !== task.id)
+    return
+  }
+  const childIds = (task.children || []).map((c) => c.id)
   tasks.value = tasks.value.filter((t) => t.id !== task.id)
   total.value = Math.max(0, total.value - 1)
   if (task.completed) completedCount.value = Math.max(0, completedCount.value - 1)
   else incompleteCount.value = Math.max(0, incompleteCount.value - 1)
-  selected.value = selected.value.filter((id) => id !== task.id)
+  for (const c of task.children || []) {
+    if (c.completed) completedCount.value = Math.max(0, completedCount.value - 1)
+    else incompleteCount.value = Math.max(0, incompleteCount.value - 1)
+  }
+  selected.value = selected.value.filter((id) => id !== task.id && !childIds.includes(id))
 }
 
 function taskMatchesStatusFilter(task: Task) {
@@ -193,28 +253,75 @@ function adjustCompletionCounts(wasCompleted: boolean, isCompleted: boolean) {
 }
 
 function applyTaskUpdate(updated: Task) {
-  const idx = tasks.value.findIndex((t) => t.id === updated.id)
-  const previous = idx >= 0 ? tasks.value[idx] : null
+  const found = findTaskInTree(updated.id)
+  const previous = found?.task ?? null
 
-  if (!taskMatchesStatusFilter(updated)) {
-    if (idx >= 0) {
+  if (updated.parent_id) {
+    if (found?.parent) {
+      adjustCompletionCounts(previous!.completed, updated.completed)
+      found.parent.children = (found.parent.children || []).map((c) =>
+        c.id === updated.id ? { ...c, ...updated, children: undefined } : c,
+      )
+      refreshParentCounts(found.parent)
+      return
+    }
+    // Newly nested or moved under a parent already in the list
+    if (found && !found.parent) {
       tasks.value = tasks.value.filter((t) => t.id !== updated.id)
       total.value = Math.max(0, total.value - 1)
+    }
+    const parent = tasks.value.find((t) => t.id === updated.parent_id)
+    if (parent) {
+      if (!parent.children) parent.children = []
+      parent.children = [...parent.children.filter((c) => c.id !== updated.id), { ...updated, children: undefined }]
+      refreshParentCounts(parent)
+      if (previous) adjustCompletionCounts(previous.completed, updated.completed)
+      return
+    }
+  }
+
+  if (!taskMatchesStatusFilter(updated)) {
+    if (found) {
+      removeTaskLocally(found.task)
     }
     if (previous) adjustCompletionCounts(previous.completed, updated.completed)
     return
   }
 
-  if (idx >= 0) {
-    adjustCompletionCounts(tasks.value[idx].completed, updated.completed)
-    tasks.value[idx] = updated
+  if (found && !found.parent) {
+    adjustCompletionCounts(found.task.completed, updated.completed)
+    const idx = tasks.value.findIndex((t) => t.id === updated.id)
+    const existingChildren = found.task.children || updated.children || []
+    tasks.value[idx] = {
+      ...updated,
+      children: existingChildren,
+      child_count: existingChildren.length,
+      children_completed: existingChildren.filter((c) => c.completed).length,
+    }
     return
   }
 
-  tasks.value = [...tasks.value, updated]
+  if (found?.parent && !updated.parent_id) {
+    // Promoted to root
+    found.parent.children = (found.parent.children || []).filter((c) => c.id !== updated.id)
+    refreshParentCounts(found.parent)
+    tasks.value = [...tasks.value, { ...updated, children: [] }]
+    total.value += 1
+    return
+  }
+
+  tasks.value = [...tasks.value, { ...updated, children: updated.children || [] }]
 }
 
-function reorderLocalTasks(orderedIds: number[], favorite: boolean) {
+function reorderLocalTasks(orderedIds: number[], favorite: boolean, parentId?: number | null) {
+  if (parentId) {
+    const parent = tasks.value.find((t) => t.id === parentId)
+    if (!parent?.children) return
+    parent.children = orderedIds
+      .map((id) => parent.children!.find((c) => c.id === id))
+      .filter((t): t is Task => !!t)
+    return
+  }
   const reordered = orderedIds
     .map((id) => tasks.value.find((t) => t.id === id))
     .filter((t): t is Task => !!t)
@@ -225,13 +332,14 @@ function reorderLocalTasks(orderedIds: number[], favorite: boolean) {
   }
 }
 
-async function saveReorder(orderedIds: number[], favorite: boolean) {
-  reorderLocalTasks(orderedIds, favorite)
+async function saveReorder(orderedIds: number[], favorite: boolean, parentId?: number | null) {
+  reorderLocalTasks(orderedIds, favorite, parentId)
   try {
     await api.reorderTasks({
       task_ids: orderedIds,
-      favorite,
-      project: filters.project || undefined,
+      favorite: parentId ? false : favorite,
+      project: parentId ? undefined : filters.project || undefined,
+      parent_id: parentId ?? null,
     })
   } catch (err) {
     toast.push(err instanceof APIError ? err.message : 'Could not save task order', 'error')
@@ -332,7 +440,8 @@ async function loadMore() {
 
 watch(lastSavedTask, async (task) => {
   if (!task) return
-  const exists = tasks.value.some((t) => t.id === task.id)
+  if (task.parent_id) expandParent(task.parent_id)
+  const exists = !!findTaskInTree(task.id)
   if (exists) {
     applyTaskUpdate(task)
   } else {
@@ -387,6 +496,12 @@ async function handleInlineTaskPatch(payload: { id: number; title?: string; desc
 
 async function removeTask(task: Task) {
   if (!canWriteTask(task)) return
+  const childCount = task.child_count ?? task.children?.length ?? 0
+  if (childCount > 0) {
+    deleteDialogTask.value = task
+    deleteDialogOpen.value = true
+    return
+  }
   const ok = await askConfirm({
     title: 'Delete task?',
     message: `Delete “${task.title}”?`,
@@ -394,16 +509,68 @@ async function removeTask(task: Task) {
     danger: true,
   })
   if (!ok) return
+  await performDelete(task, { mode: 'cascade' })
+}
+
+async function performDelete(
+  task: Task,
+  opts: { mode: 'cascade' | 'reparent'; new_parent_id?: number | null },
+) {
   try {
-    const res = await api.deleteTask(task.id)
+    const res = await api.deleteTask(task.id, opts)
     undoToken.value = res.undo_token || null
-    removeTaskLocally(task)
+    if (opts.mode === 'reparent') {
+      // Children moved; drop parent only and refresh to show new homes.
+      const withoutChildren = { ...task, children: [], child_count: 0 }
+      removeTaskLocally(withoutChildren)
+      await reloadInitial()
+    } else {
+      removeTaskLocally(task)
+    }
     toast.push(undoToken.value ? 'Task deleted — undo available' : 'Task deleted', 'info')
     await nextTick()
     refreshSortable()
   } catch (err) {
     toast.push(err instanceof APIError ? err.message : 'Delete failed', 'error')
+  } finally {
+    deleteDialogOpen.value = false
+    deleteDialogTask.value = null
   }
+}
+
+function isParentExpanded(taskId: number) {
+  return expandedParentIds.value.has(taskId)
+}
+
+async function toggleParentExpanded(taskId: number) {
+  const next = new Set(expandedParentIds.value)
+  if (next.has(taskId)) next.delete(taskId)
+  else next.add(taskId)
+  expandedParentIds.value = next
+  await nextTick()
+  refreshSortable()
+}
+
+function expandParent(taskId: number) {
+  if (expandedParentIds.value.has(taskId)) return
+  const next = new Set(expandedParentIds.value)
+  next.add(taskId)
+  expandedParentIds.value = next
+}
+
+function openAddSubtask(task: Task) {
+  expandParent(task.id)
+  openAdd(undefined, task.project_id ?? null, { id: task.id, title: task.title })
+}
+
+async function onDeleteCascade() {
+  if (!deleteDialogTask.value) return
+  await performDelete(deleteDialogTask.value, { mode: 'cascade' })
+}
+
+async function onDeleteReparent(newParentId: number | null) {
+  if (!deleteDialogTask.value) return
+  await performDelete(deleteDialogTask.value, { mode: 'reparent', new_parent_id: newParentId })
 }
 
 async function undoDelete() {
@@ -427,15 +594,32 @@ function toggleSelect(id: number, checked: boolean) {
 }
 
 function toggleSelectAll(checked: boolean) {
-  selected.value = checked ? tasks.value.map((t) => t.id) : []
+  selected.value = checked ? [...flatSelectableIds.value] : []
+}
+
+async function toggleCompleteChild(child: Task) {
+  if (!canWriteTask(child)) return
+  try {
+    const updated = await api.patchTask(child.id, { completed: !child.completed })
+    applyTaskUpdate(updated)
+  } catch (err) {
+    toast.push(err instanceof APIError ? err.message : 'Update failed', 'error')
+  }
 }
 
 async function bulk(action: string, extra: Record<string, unknown> = {}) {
   if (!selected.value.length || isViewerProjectView.value) return
   if (action === 'delete') {
+    const nestedCount = selected.value.reduce((n, id) => {
+      const t = findTaskInTree(id)?.task
+      return n + (t?.child_count ?? t?.children?.length ?? 0)
+    }, 0)
     const ok = await askConfirm({
       title: 'Delete tasks?',
-      message: `Delete ${selected.value.length} selected task${selected.value.length === 1 ? '' : 's'}?`,
+      message:
+        nestedCount > 0
+          ? `Delete ${selected.value.length} selected task${selected.value.length === 1 ? '' : 's'}? This also deletes ${nestedCount} nested subtask${nestedCount === 1 ? '' : 's'}.`
+          : `Delete ${selected.value.length} selected task${selected.value.length === 1 ? '' : 's'}?`,
       confirmLabel: 'Delete',
       danger: true,
     })
@@ -876,41 +1060,99 @@ onMounted(async () => {
             <!-- Starred Tasks Section -->
             <div v-if="showFavoriteList" class="starred-tasks-section mb-3">
               <div id="favorite-task-list" ref="favoriteListEl">
-                <ModernTaskCard
+                <div
                   v-for="task in favoriteTasks"
                   :key="task.id"
-                  :task="task"
-                  :selected="selected.includes(task.id)"
-                  :density="density"
-                  :show-project-pill="!filters.project"
-                  :can-write="canWriteTask(task)"
-                  @toggle-select="toggleSelect(task.id, $event)"
-                  @toggle-complete="toggleComplete(task)"
-                  @toggle-favorite="toggleFavorite(task)"
-                  @patch-task="handleInlineTaskPatch"
-                  @edit="openEdit(task.id)"
-                  @remove="removeTask(task)"
-                />
+                  class="task-tree-root"
+                  :data-task-id="task.id"
+                >
+                  <ModernTaskCard
+                    :task="task"
+                    :selected="selected.includes(task.id)"
+                    :density="density"
+                    :show-project-pill="!filters.project"
+                    :can-write="canWriteTask(task)"
+                    :expanded="isParentExpanded(task.id)"
+                    @toggle-select="toggleSelect(task.id, $event)"
+                    @toggle-complete="toggleComplete(task)"
+                    @toggle-favorite="toggleFavorite(task)"
+                    @toggle-expand="toggleParentExpanded(task.id)"
+                    @patch-task="handleInlineTaskPatch"
+                    @add-subtask="openAddSubtask(task)"
+                    @edit="openEdit(task.id)"
+                    @remove="removeTask(task)"
+                  />
+                  <div
+                    v-if="task.children?.length && isParentExpanded(task.id)"
+                    class="task-children"
+                    :data-parent-id="task.id"
+                  >
+                    <ModernTaskCard
+                      v-for="child in task.children"
+                      :key="child.id"
+                      :task="child"
+                      :depth="1"
+                      :selected="selected.includes(child.id)"
+                      :density="density"
+                      :show-project-pill="false"
+                      :can-write="canWriteTask(child)"
+                      @toggle-select="toggleSelect(child.id, $event)"
+                      @toggle-complete="toggleCompleteChild(child)"
+                      @patch-task="handleInlineTaskPatch"
+                      @edit="openEdit(child.id)"
+                      @remove="removeTask(child)"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
             <!-- Regular Task List -->
             <div id="task-list" ref="taskListEl">
-              <ModernTaskCard
+              <div
                 v-for="task in regularTasks"
                 :key="task.id"
-                :task="task"
-                :selected="selected.includes(task.id)"
-                :density="density"
-                :show-project-pill="!filters.project"
-                :can-write="canWriteTask(task)"
-                @toggle-select="toggleSelect(task.id, $event)"
-                @toggle-complete="toggleComplete(task)"
-                @toggle-favorite="toggleFavorite(task)"
-                @patch-task="handleInlineTaskPatch"
-                @edit="openEdit(task.id)"
-                @remove="removeTask(task)"
-              />
+                class="task-tree-root"
+                :data-task-id="task.id"
+              >
+                <ModernTaskCard
+                  :task="task"
+                  :selected="selected.includes(task.id)"
+                  :density="density"
+                  :show-project-pill="!filters.project"
+                  :can-write="canWriteTask(task)"
+                  :expanded="isParentExpanded(task.id)"
+                  @toggle-select="toggleSelect(task.id, $event)"
+                  @toggle-complete="toggleComplete(task)"
+                  @toggle-favorite="toggleFavorite(task)"
+                  @toggle-expand="toggleParentExpanded(task.id)"
+                  @patch-task="handleInlineTaskPatch"
+                  @add-subtask="openAddSubtask(task)"
+                  @edit="openEdit(task.id)"
+                  @remove="removeTask(task)"
+                />
+                <div
+                  v-if="task.children?.length && isParentExpanded(task.id)"
+                  class="task-children"
+                  :data-parent-id="task.id"
+                >
+                  <ModernTaskCard
+                    v-for="child in task.children"
+                    :key="child.id"
+                    :task="child"
+                    :depth="1"
+                    :selected="selected.includes(child.id)"
+                    :density="density"
+                    :show-project-pill="false"
+                    :can-write="canWriteTask(child)"
+                    @toggle-select="toggleSelect(child.id, $event)"
+                    @toggle-complete="toggleCompleteChild(child)"
+                    @patch-task="handleInlineTaskPatch"
+                    @edit="openEdit(child.id)"
+                    @remove="removeTask(child)"
+                  />
+                </div>
+              </div>
 
               <!-- Empty Search Results -->
               <div
@@ -1056,6 +1298,15 @@ onMounted(async () => {
           </div>
         </div>
       </div>
+
+      <DeleteTaskDialog
+        :open="deleteDialogOpen"
+        :task="deleteDialogTask"
+        :root-tasks="tasks"
+        @cancel="deleteDialogOpen = false; deleteDialogTask = null"
+        @cascade="onDeleteCascade"
+        @reparent="onDeleteReparent"
+      />
 
       <!-- Clean Reusable Footer inside right content area -->
       <AppFooter />

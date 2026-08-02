@@ -27,6 +27,10 @@ type Task struct {
 	ProjectName  string
 	Priority     int
 	Tags         []Tag
+	ParentID           int // 0 = root
+	ChildCount         int
+	ChildrenCompleted  int
+	Children           []Task
 }
 
 func (t *Task) Validate() error {

@@ -21,6 +21,7 @@ import (
 	"golang.org/x/mod/semver"
 
 	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
 )
 
 // ChangelogEntry is the public structure returned to the client
@@ -343,16 +344,43 @@ func parseNotesFromBody(body string) []string {
 	return notes
 }
 
-// renderMarkdown converts markdown text to HTML using goldmark.
+// changelogMarkdown renders GitHub-style release notes (GFM + autolinks).
+var changelogMarkdown = goldmark.New(
+	goldmark.WithExtensions(extension.GFM),
+)
+
+// renderMarkdown converts markdown text to HTML using goldmark with GFM
+// so bare URLs in auto-generated release notes become clickable links.
 func renderMarkdown(md string) string {
 	if strings.TrimSpace(md) == "" {
 		return ""
 	}
 	var buf bytes.Buffer
-	if err := goldmark.Convert([]byte(md), &buf); err != nil {
+	if err := changelogMarkdown.Convert([]byte(md), &buf); err != nil {
 		return ""
 	}
-	return buf.String()
+	// Open external links in a new tab from the changelog modal.
+	return linkifyAnchors(buf.String())
+}
+
+// linkifyAnchors adds target=_blank to anchors that don't already set a target.
+func linkifyAnchors(htmlStr string) string {
+	const needle = "<a href="
+	const attrs = `<a target="_blank" rel="noopener noreferrer" href=`
+	var b strings.Builder
+	rest := htmlStr
+	for {
+		i := strings.Index(rest, needle)
+		if i == -1 {
+			b.WriteString(rest)
+			break
+		}
+		b.WriteString(rest[:i])
+		// Skip if this <a already has a target= attribute before href (unlikely with goldmark).
+		b.WriteString(attrs)
+		rest = rest[i+len(needle):]
+	}
+	return b.String()
 }
 
 // stripTags removes any HTML tags from s (naive) and returns plain text.

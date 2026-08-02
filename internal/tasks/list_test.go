@@ -75,6 +75,7 @@ func TestMain(m *testing.M) {
 			priority SMALLINT DEFAULT 0,
 			user_id INTEGER,
 			project_id INTEGER,
+			parent_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE,
 			date_modified TIMESTAMP,
 			due_date DATE
 		);

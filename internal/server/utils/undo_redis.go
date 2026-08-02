@@ -26,6 +26,7 @@ type UndoTaskSnapshot struct {
 	Priority    int    `json:"priority"`
 	Position    int    `json:"position"`
 	ProjectID   *int   `json:"project_id,omitempty"`
+	ParentID    *int   `json:"parent_id,omitempty"`
 	TagIDs      []int  `json:"tag_ids,omitempty"`
 }
 
