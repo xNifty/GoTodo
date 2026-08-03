@@ -10,7 +10,7 @@ import { RouterLink } from 'vue-router'
       <RouterLink to="/docs/guide" class="text-decoration-none text-muted">Documentation</RouterLink> |
       <RouterLink to="/docs/api/v1" class="text-decoration-none text-muted">API</RouterLink> |
       <a href="https://github.com/xNifty/GoTodo/issues" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-muted">Report a Bug</a> |
-      <a href="https://ordryn.com" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-muted">Powered by Ordryn ©</a>
+      <a href="https://ordryn.com" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-muted">Powered by Ordryn © 2026</a>
     </p>
   </footer>
 </template>
