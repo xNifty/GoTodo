@@ -283,9 +283,9 @@ function formatDueDate(dateStr?: string): string {
       </div>
 
       <!-- Right Group (Desktop): Due Date, Priority Badge, Edit/Delete Action Buttons -->
-      <div class="d-none d-md-flex align-items-center gap-3 ms-auto">
+      <div class="d-none d-md-flex align-items-center gap-3 ms-auto flex-shrink-0">
         <!-- Smart Formatted Due Date (Icon hidden in Dense mode) -->
-        <div v-if="task.due_date" class="d-flex align-items-center gap-1 text-muted small whitespace-nowrap">
+        <div v-if="task.due_date" class="d-flex align-items-center gap-1 text-muted small text-nowrap">
           <i v-if="density !== 'dense'" class="bi bi-calendar-event opacity-75" />
           <span>{{ formatDueDate(task.due_date) }}</span>
         </div>
@@ -293,7 +293,7 @@ function formatDueDate(dateStr?: string): string {
         <!-- Priority Pill -->
         <span
           v-if="priorityLabel(task.priority)"
-          class="ordryn-badge"
+          class="ordryn-badge text-nowrap"
           :class="{
             'ordryn-badge-priority-low': task.priority === 1,
             'ordryn-badge-priority-med': task.priority === 2,

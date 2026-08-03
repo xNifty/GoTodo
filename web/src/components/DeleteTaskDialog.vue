@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { Task } from '@/api/types'
+import ParentTaskCombobox from '@/components/ParentTaskCombobox.vue'
 
 const props = defineProps<{
   open: boolean
@@ -76,10 +77,12 @@ function confirm() {
           </div>
           <div v-if="mode === 'reparent'" class="ms-4 mt-2">
             <label for="reparent-target" class="form-label small">Move subtasks to</label>
-            <select id="reparent-target" v-model="newParentId" class="form-select form-select-sm">
-              <option value="">No parent — top level</option>
-              <option v-for="t in otherRoots" :key="t.id" :value="t.id">{{ t.title }}</option>
-            </select>
+            <ParentTaskCombobox
+              v-model="newParentId"
+              input-id="reparent-target"
+              :options="otherRoots"
+              placeholder="Type to search parent tasks or projects…"
+            />
           </div>
         </div>
         <div class="modal-footer border-secondary-subtle">

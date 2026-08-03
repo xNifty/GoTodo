@@ -3,6 +3,7 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { api } from '@/api/client'
 import type { Project, Tag, Task, TaskEvent } from '@/api/types'
 import { APIError } from '@/api/types'
+import ParentTaskCombobox from '@/components/ParentTaskCombobox.vue'
 import { useTaskSidebar } from '@/composables/useTaskSidebar'
 import { useToast } from '@/composables/useToast'
 import { projectOptionLabel } from '@/utils/projectLabel'
@@ -42,8 +43,13 @@ const selectedTagIds = ref<number[]>([])
 const newTags = ref('')
 const completed = ref(false)
 const isSubtask = computed(() => parentId.value !== '' && Number(parentId.value) > 0)
-
 const readOnly = computed(() => mode.value === 'view')
+const parentOptions = computed(() => rootTasks.value.filter((r) => r.id !== taskId.value))
+const parentPickerDisabled = computed(
+  () =>
+    readOnly.value ||
+    (mode.value === 'edit' && (rootTasks.value.find((t) => t.id === taskId.value)?.child_count || 0) > 0),
+)
 const sidebarTitle = computed(() => {
   if (mode.value === 'view') return 'View Task'
   if (mode.value === 'edit') return 'Edit Task'
@@ -343,22 +349,14 @@ function onParentChange() {
         </div>
         <div class="form-group mt-2">
           <label for="parent_id">Parent task (optional):</label>
-          <select
-            id="parent_id"
+          <ParentTaskCombobox
             v-model="parentId"
-            class="form-select"
-            :disabled="readOnly || (mode === 'edit' && (rootTasks.find((t) => t.id === taskId)?.child_count || 0) > 0)"
+            input-id="parent_id"
+            :options="parentOptions"
+            :disabled="parentPickerDisabled"
+            placeholder="Type to search parent tasks or projects…"
             @change="onParentChange"
-          >
-            <option value="">No parent — top level</option>
-            <option
-              v-for="t in rootTasks.filter((r) => r.id !== taskId)"
-              :key="t.id"
-              :value="t.id"
-            >
-              {{ t.title }}
-            </option>
-          </select>
+          />
           <small v-if="isSubtask" class="form-hint d-block mt-1">
             Subtask of {{ parentTitle || 'selected parent' }}. Project is inherited.
           </small>

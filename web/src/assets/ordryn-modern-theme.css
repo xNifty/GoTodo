@@ -385,6 +385,7 @@ body {
   padding: 0.25rem 0.5rem;
   font-size: 0.85rem;
   width: 100%;
+  max-width: min(36rem, 100%);
   resize: vertical;
 }
 
@@ -449,6 +450,10 @@ body {
 
 .ordryn-task-card.density-dense .completion-check-btn {
   font-size: 1.05rem;
+}
+
+.ordryn-task-card .task-description {
+  max-width: min(36rem, 100%);
 }
 
 .ordryn-task-card.density-dense .task-description {
