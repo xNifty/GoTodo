@@ -2350,9 +2350,10 @@ select.form-select:focus {
     width: 36px;
 }
 
-.task-row-focused {
+.task-row-focused,
+.ordryn-task-card.is-focused {
     outline: 2px solid var(--bs-primary);
-    outline-offset: -2px;
+    outline-offset: 2px;
 }
 
 .task-timeline summary {

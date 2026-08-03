@@ -130,6 +130,24 @@ html, body {
   padding: 0;
 }
 
+/* High-contrast keycaps (Bootstrap kbd uses body tokens that wash out in dark modals) */
+kbd {
+  background-color: var(--ordryn-muted-bg);
+  color: var(--ordryn-text);
+  border: 1px solid var(--ordryn-card-border);
+  border-radius: 0.35rem;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.85em;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+[data-theme="dark"] kbd {
+  background-color: #0f172a;
+  color: #f8fafc;
+  border-color: #64748b;
+}
+
 body {
   background-color: var(--ordryn-bg);
   color: var(--ordryn-text);
@@ -354,6 +372,16 @@ body {
 .ordryn-task-card:hover {
   box-shadow: var(--ordryn-card-hover-shadow);
   border-color: var(--ordryn-card-hover-border);
+}
+
+.ordryn-task-card:focus {
+  outline: none;
+}
+
+.ordryn-task-card.is-focused {
+  outline: 2px solid var(--ordryn-accent);
+  outline-offset: 2px;
+  border-color: var(--ordryn-accent);
 }
 
 .ordryn-task-card.is-completed {

@@ -12,6 +12,7 @@ const props = withDefaults(
     showProjectPill?: boolean
     canWrite?: boolean
     expanded?: boolean
+    focused?: boolean
   }>(),
   {
     density: 'comfortable',
@@ -19,6 +20,7 @@ const props = withDefaults(
     showProjectPill: true,
     canWrite: true,
     expanded: false,
+    focused: false,
   },
 )
 
@@ -112,11 +114,13 @@ function formatDueDate(dateStr?: string): string {
   <div
     :id="`task-card-${task.id}`"
     class="ordryn-task-card"
+    tabindex="-1"
     :class="{
       'is-completed': task.completed,
       'is-nested': depth > 0,
       'has-children': hasChildren(),
       'is-expanded': expanded,
+      'is-focused': focused,
       'density-comfortable': density === 'comfortable',
       'density-dense': density === 'dense',
     }"

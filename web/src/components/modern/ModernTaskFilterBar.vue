@@ -45,6 +45,7 @@ function getDueDateLabel(preset: string) {
         <div class="position-relative flex-grow-1">
           <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted" />
           <input
+            id="task-search"
             type="text"
             class="form-control form-control-sm ps-5 pe-3 py-1.5 rounded-pill border-0 shadow-xs"
             placeholder="Search tasks..."

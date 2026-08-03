@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { api } from '@/api/client'
 import type { Project, SavedView, Tag, Task } from '@/api/types'
@@ -18,6 +18,7 @@ import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { useViewDensity } from '@/composables/useViewDensity'
 import { useSidebarState } from '@/composables/useSidebarState'
+import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { projectOptionLabel } from '@/utils/projectLabel'
 
 defineProps<{
@@ -32,6 +33,11 @@ const route = useRoute()
 const { openAdd, openEdit, lastSavedTask } = useTaskSidebar()
 const { density } = useViewDensity()
 const { sidebarCollapsed, toggleSidebar } = useSidebarState()
+const {
+  focusedTaskId,
+  registerTaskShortcuts,
+  unregisterTaskShortcuts,
+} = useKeyboardShortcuts()
 
 const tasks = ref<Task[]>([])
 const projects = ref<Project[]>([])
@@ -773,10 +779,77 @@ async function exportTasks(format: 'json' | 'csv', filtered: boolean) {
 
 useInfiniteScroll(loadMoreSentinel, loadMore, hasMore)
 
+function getFocusableTaskIds(): number[] {
+  const ids: number[] = []
+  const pushVisible = (list: Task[]) => {
+    for (const task of list) {
+      ids.push(task.id)
+      if (task.children?.length && isParentExpanded(task.id)) {
+        for (const child of task.children) ids.push(child.id)
+      }
+    }
+  }
+  pushVisible(favoriteTasks.value)
+  pushVisible(regularTasks.value)
+  return ids
+}
+
+function focusSearchInput() {
+  const el = document.getElementById('task-search') as HTMLInputElement | null
+  if (!el) return
+  el.focus()
+  el.select()
+}
+
+function shortcutEditTask(id: number) {
+  openEdit(id)
+}
+
+function shortcutDeleteTask(id: number) {
+  const found = findTaskInTree(id)
+  if (!found) return
+  void removeTask(found.task)
+}
+
+function shortcutToggleComplete(id: number) {
+  const found = findTaskInTree(id)
+  if (!found) return
+  if (found.parent) void toggleCompleteChild(found.task)
+  else void toggleComplete(found.task)
+}
+
+function showShortcutsHintOnce() {
+  try {
+    if (localStorage.getItem('shortcuts-hint-dismissed') === '1') return
+    localStorage.setItem('shortcuts-hint-dismissed', '1')
+  } catch {
+    return
+  }
+  window.setTimeout(() => {
+    toast.push('Tip: Press ? for keyboard shortcuts.', 'info', 6000)
+  }, 1500)
+}
+
 onMounted(async () => {
+  registerTaskShortcuts({
+    newTask: () => {
+      if (isViewerProjectView.value) return
+      openAdd(undefined, filters.project)
+    },
+    focusSearch: focusSearchInput,
+    getFocusableTaskIds,
+    editTask: shortcutEditTask,
+    deleteTask: shortcutDeleteTask,
+    toggleComplete: shortcutToggleComplete,
+  })
+  showShortcutsHintOnce()
   await loadMeta()
   syncFiltersFromRoute()
   await reloadInitial()
+})
+
+onUnmounted(() => {
+  unregisterTaskShortcuts()
 })
 </script>
 
@@ -1069,6 +1142,7 @@ onMounted(async () => {
                   <ModernTaskCard
                     :task="task"
                     :selected="selected.includes(task.id)"
+                    :focused="focusedTaskId === task.id"
                     :density="density"
                     :show-project-pill="!filters.project"
                     :can-write="canWriteTask(task)"
@@ -1093,6 +1167,7 @@ onMounted(async () => {
                       :task="child"
                       :depth="1"
                       :selected="selected.includes(child.id)"
+                      :focused="focusedTaskId === child.id"
                       :density="density"
                       :show-project-pill="false"
                       :can-write="canWriteTask(child)"
@@ -1118,6 +1193,7 @@ onMounted(async () => {
                 <ModernTaskCard
                   :task="task"
                   :selected="selected.includes(task.id)"
+                  :focused="focusedTaskId === task.id"
                   :density="density"
                   :show-project-pill="!filters.project"
                   :can-write="canWriteTask(task)"
@@ -1142,6 +1218,7 @@ onMounted(async () => {
                     :task="child"
                     :depth="1"
                     :selected="selected.includes(child.id)"
+                    :focused="focusedTaskId === child.id"
                     :density="density"
                     :show-project-pill="false"
                     :can-write="canWriteTask(child)"

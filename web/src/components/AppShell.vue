@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch, provide } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch, provide } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useSite } from '@/composables/useSite'
+import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { api } from '@/api/client'
 import ModernHeader from '@/components/modern/ModernHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
@@ -10,11 +11,13 @@ import ToastHost from '@/components/ToastHost.vue'
 import GoToTopButton from '@/components/GoToTopButton.vue'
 import TaskSidebar from '@/components/TaskSidebar.vue'
 import ChangelogModal from '@/components/ChangelogModal.vue'
+import ShortcutsModal from '@/components/ShortcutsModal.vue'
 import ConfirmModal from '@/components/ConfirmModal.vue'
 
 const route = useRoute()
 const { isAuthenticated } = useAuth()
 const { siteInfo, refresh: refreshSite } = useSite()
+const { initKeyboardShortcuts, destroyKeyboardShortcuts } = useKeyboardShortcuts()
 const overdueCount = ref(0)
 const pendingInviteCount = ref(0)
 const mobileSidebarOpen = ref(false)
@@ -95,7 +98,12 @@ watch(
 )
 
 onMounted(() => {
+  initKeyboardShortcuts()
   void refreshSite()
+})
+
+onUnmounted(() => {
+  destroyKeyboardShortcuts()
 })
 </script>
 
@@ -134,5 +142,6 @@ onMounted(() => {
     <ConfirmModal />
     <TaskSidebar v-if="isAuthenticated" />
     <ChangelogModal v-if="showChangelog" />
+    <ShortcutsModal />
   </div>
 </template>

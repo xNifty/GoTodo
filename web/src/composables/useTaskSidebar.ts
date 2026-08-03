@@ -50,6 +50,11 @@ export function useTaskSidebar() {
 
   function close() {
     open.value = false
+    // Sidebar stays mounted when closed; blur so shortcuts are not trapped in hidden inputs.
+    const active = document.activeElement
+    if (active instanceof HTMLElement && active.closest('#sidebar')) {
+      active.blur()
+    }
   }
 
   function notifySaved(task: Task, closeDrawer = true) {

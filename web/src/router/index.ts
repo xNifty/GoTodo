@@ -18,6 +18,11 @@ const router = createRouter({
   },
   routes: [
     {
+      path: '/docs/guide',
+      name: 'user-guide',
+      component: () => import('@/views/UserGuideView.vue'),
+    },
+    {
       path: '/docs/api/v1',
       name: 'api-docs',
       component: () => import('@/views/ApiDocsView.vue'),

@@ -1,0 +1,143 @@
+<script setup lang="ts">
+import { onMounted, onUnmounted } from 'vue'
+import { RouterLink } from 'vue-router'
+import { useSite } from '@/composables/useSite'
+
+const { siteName, refresh: refreshSite } = useSite()
+
+onMounted(() => {
+  document.body.classList.add('user-guide-page')
+  void refreshSite()
+})
+
+onUnmounted(() => {
+  document.body.classList.remove('user-guide-page')
+})
+</script>
+
+<template>
+  <div class="container mt-3 mb-4">
+    <div class="card">
+      <div class="card-body">
+        <h1 class="card-title">How to use {{ siteName }}</h1>
+        <p class="lead">
+          A short guide to managing tasks, projects, and views — plus keyboard shortcuts for power
+          users.
+        </p>
+
+        <nav class="api-docs-toc mb-4" aria-label="Guide sections">
+          <ul class="list-inline mb-0">
+            <li class="list-inline-item"><a href="#getting-started">Getting started</a></li>
+            <li class="list-inline-item"><a href="#tasks">Tasks</a></li>
+            <li class="list-inline-item"><a href="#projects-views">Projects &amp; views</a></li>
+            <li class="list-inline-item"><a href="#calendar-dashboard">Calendar &amp; dashboard</a></li>
+            <li class="list-inline-item"><a href="#shortcuts">Shortcuts</a></li>
+            <li class="list-inline-item"><a href="#settings-api">Settings &amp; API</a></li>
+          </ul>
+        </nav>
+
+        <h2 id="getting-started" class="h4 mt-4">Getting started</h2>
+        <p>
+          After you sign in, the home page shows your task list. Use the sidebar to switch between
+          Home, Dashboard, Calendar, Projects, and saved Views. The header has profile settings,
+          theme controls, and links to this guide.
+        </p>
+
+        <h2 id="tasks" class="h4 mt-4">Creating and editing tasks</h2>
+        <p>
+          Click <strong>Add Task</strong> (or press <kbd>n</kbd> on the home page) to open the task
+          sidebar. Fill in a title, optional description, due date, project, tags, and priority, then
+          save.
+        </p>
+        <ul>
+          <li>Click a task’s edit control (or press <kbd>e</kbd> / <kbd>Enter</kbd> on a focused task) to edit it in the sidebar.</li>
+          <li>Use the checkmark to mark a task complete, or press <kbd>x</kbd> on the focused task.</li>
+          <li>Star important tasks so they stay pinned at the top of the list.</li>
+          <li>Nest work under a parent with <strong>Add subtask</strong>; expand or collapse children as needed.</li>
+          <li>Deleting a task may offer undo for a short time when the server returns an undo token.</li>
+        </ul>
+
+        <h2 id="projects-views" class="h4 mt-4">Projects, tags, filters, and saved views</h2>
+        <p>
+          Organize work with projects and tags. On the home page, the filter bar lets you search,
+          filter by status / tag / priority / due date, and change sort order or list density.
+        </p>
+        <ul>
+          <li>
+            Manage projects from
+            <RouterLink to="/projects">Projects</RouterLink>
+            — create, rename, share, and invite collaborators.
+          </li>
+          <li>
+            Save the current filter set as a view so you can reopen it later from the sidebar or
+            <RouterLink to="/views">Views</RouterLink>.
+          </li>
+        </ul>
+
+        <h2 id="calendar-dashboard" class="h4 mt-4">Calendar and dashboard</h2>
+        <p>
+          <RouterLink to="/calendar">Calendar</RouterLink>
+          shows tasks by due date so you can plan the month at a glance.
+          <RouterLink to="/dashboard">Dashboard</RouterLink>
+          summarizes progress, overdue items, and other quick stats.
+        </p>
+
+        <h2 id="shortcuts" class="h4 mt-4">Keyboard shortcuts</h2>
+        <p>
+          Shortcuts work on the home page task list. Press <kbd>?</kbd> anytime to open the shortcuts
+          help modal, or use the <strong>Shortcuts</strong> link in the header.
+        </p>
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th>Key</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><kbd>n</kbd></td>
+              <td>New task</td>
+            </tr>
+            <tr>
+              <td><kbd>/</kbd></td>
+              <td>Focus search</td>
+            </tr>
+            <tr>
+              <td><kbd>Esc</kbd></td>
+              <td>Close sidebar or modal</td>
+            </tr>
+            <tr>
+              <td><kbd>j</kbd> / <kbd>k</kbd></td>
+              <td>Move focus between tasks</td>
+            </tr>
+            <tr>
+              <td><kbd>Enter</kbd> / <kbd>e</kbd></td>
+              <td>Edit focused task</td>
+            </tr>
+            <tr>
+              <td><kbd>d</kbd></td>
+              <td>Delete focused task</td>
+            </tr>
+            <tr>
+              <td><kbd>x</kbd></td>
+              <td>Toggle complete</td>
+            </tr>
+            <tr>
+              <td><kbd>?</kbd></td>
+              <td>Show shortcuts help</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2 id="settings-api" class="h4 mt-4">Settings and API</h2>
+        <p>
+          Update your profile, timezone, and API keys under
+          <RouterLink to="/settings">Settings</RouterLink>.
+          For machine clients and integrations, see the
+          <RouterLink to="/docs/api/v1">REST API documentation</RouterLink>.
+        </p>
+      </div>
+    </div>
+  </div>
+</template>
