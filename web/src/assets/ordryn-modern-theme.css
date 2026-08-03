@@ -563,7 +563,60 @@ body {
 }
 
 /* --------------------------------------------------------------------------
-   8. Mobile Responsiveness Breakpoints
+   8. Go to Top Button
+   -------------------------------------------------------------------------- */
+
+.go-to-top-btn {
+  position: fixed;
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  right: 1rem;
+  z-index: 1030;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.9rem;
+  color: var(--ordryn-text);
+  background: var(--ordryn-card-bg);
+  border: 1px solid var(--ordryn-card-border);
+  box-shadow: var(--ordryn-card-shadow);
+  opacity: 0;
+  transform: translateY(0.5rem);
+  pointer-events: none;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease,
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.go-to-top-btn.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.go-to-top-btn:hover,
+.go-to-top-btn:focus-visible {
+  color: var(--ordryn-text);
+  background: var(--ordryn-accent-light);
+  border-color: var(--ordryn-accent);
+  box-shadow: var(--ordryn-card-hover-shadow);
+}
+
+.go-to-top-btn__label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .go-to-top-btn {
+    transition: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   9. Mobile Responsiveness Breakpoints
    -------------------------------------------------------------------------- */
 
 @media (max-width: 768px) {

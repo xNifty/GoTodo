@@ -7,6 +7,7 @@ import { api } from '@/api/client'
 import ModernHeader from '@/components/modern/ModernHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import ToastHost from '@/components/ToastHost.vue'
+import GoToTopButton from '@/components/GoToTopButton.vue'
 import TaskSidebar from '@/components/TaskSidebar.vue'
 import ChangelogModal from '@/components/ChangelogModal.vue'
 import ConfirmModal from '@/components/ConfirmModal.vue'
@@ -129,6 +130,7 @@ onMounted(() => {
     <AppFooter v-if="!['/', '/dashboard', '/calendar'].includes(route.path)" class="container" />
 
     <ToastHost />
+    <GoToTopButton />
     <ConfirmModal />
     <TaskSidebar v-if="isAuthenticated" />
     <ChangelogModal v-if="showChangelog" />
