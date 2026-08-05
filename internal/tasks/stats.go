@@ -67,7 +67,11 @@ func GetDashboardStats(userID int, timezone string) (*DashboardStats, error) {
 	defer storage.CloseDatabase(pool)
 
 	ctx := context.Background()
-	stats := &DashboardStats{}
+	stats := &DashboardStats{
+		ByProject:            []NameCount{},
+		ByPriority:           []PriorityCount{},
+		CompletionsLast7Days: []DayCount{},
+	}
 
 	where := "user_id = $1"
 	args := []interface{}{userID}

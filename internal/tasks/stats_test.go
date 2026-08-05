@@ -4,6 +4,8 @@ import (
 	"GoTodo/internal/storage"
 	"GoTodo/internal/tasks"
 	"context"
+	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -15,11 +17,52 @@ func TestGetDashboardStats(t *testing.T) {
 	if stats == nil {
 		t.Fatal("expected stats")
 	}
+	if stats.ByProject == nil {
+		t.Error("ByProject must be non-nil")
+	}
+	if stats.ByPriority == nil {
+		t.Error("ByPriority must be non-nil")
+	}
+	if stats.CompletionsLast7Days == nil {
+		t.Error("CompletionsLast7Days must be non-nil")
+	}
 	if len(stats.ByProject) == 0 {
 		t.Error("expected open tasks grouped by project")
 	}
 	if len(stats.CompletionsLast7Days) != 7 {
 		t.Fatalf("expected 7 chart days, got %d", len(stats.CompletionsLast7Days))
+	}
+}
+
+func TestGetDashboardStatsEmptyBreakdownsEncodeAsArrays(t *testing.T) {
+	// Seeded user 3 has no tasks, so project/priority GROUP BYs return zero rows.
+	stats, err := tasks.GetDashboardStats(3, "America/New_York")
+	if err != nil {
+		t.Fatalf("GetDashboardStats: %v", err)
+	}
+	if stats.ByProject == nil {
+		t.Fatal("ByProject must be non-nil empty slice, not nil")
+	}
+	if stats.ByPriority == nil {
+		t.Fatal("ByPriority must be non-nil empty slice, not nil")
+	}
+	if len(stats.ByProject) != 0 || len(stats.ByPriority) != 0 {
+		t.Fatalf("expected empty breakdowns, got by_project=%v by_priority=%v", stats.ByProject, stats.ByPriority)
+	}
+
+	raw, err := json.Marshal(stats)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	body := string(raw)
+	if !strings.Contains(body, `"by_project":[]`) {
+		t.Errorf("expected by_project:[], got %s", body)
+	}
+	if !strings.Contains(body, `"by_priority":[]`) {
+		t.Errorf("expected by_priority:[], got %s", body)
+	}
+	if strings.Contains(body, `"by_project":null`) || strings.Contains(body, `"by_priority":null`) {
+		t.Errorf("breakdown fields must not encode as null: %s", body)
 	}
 }
 

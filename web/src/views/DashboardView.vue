@@ -211,11 +211,11 @@ watch(lastSavedTask, () => {
               <div class="card border-0 shadow-xs">
                 <div class="card-header bg-transparent border-0 pt-3 pb-0"><h2 class="h5 fw-bold mb-0">By project</h2></div>
                 <ul class="list-group list-group-flush">
-                  <li v-for="row in stats.by_project" :key="row.name" class="list-group-item d-flex justify-content-between align-items-center">
+                  <li v-for="row in (stats.by_project ?? [])" :key="row.name" class="list-group-item d-flex justify-content-between align-items-center">
                     <span class="fw-medium">{{ row.name || 'No project' }}</span>
                     <span class="badge rounded-pill bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-20 px-2.5 py-1">{{ row.count }}</span>
                   </li>
-                  <li v-if="!stats.by_project.length" class="list-group-item text-muted">No project breakdown.</li>
+                  <li v-if="!(stats.by_project?.length)" class="list-group-item text-muted">No project breakdown.</li>
                 </ul>
               </div>
             </div>
