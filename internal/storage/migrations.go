@@ -92,6 +92,10 @@ func RunMigrations() error {
 		fmt.Printf("migration: MigrateTasksAddPriority failed: %v\n", err)
 		errCount++
 	}
+	if err := MigrateTasksAddParentID(); err != nil {
+		fmt.Printf("migration: MigrateTasksAddParentID failed: %v\n", err)
+		errCount++
+	}
 	if err := CreateTagsTables(); err != nil {
 		fmt.Printf("migration: CreateTagsTables failed: %v\n", err)
 		errCount++

@@ -62,6 +62,14 @@ async function onLogout() {
               style="color: var(--ordryn-muted);"
             >Changelog</a>
           </template>
+          <a
+            href="#shortcutsModal"
+            data-bs-toggle="modal"
+            data-bs-target="#shortcutsModal"
+            class="nav-link-item text-decoration-none small fw-medium"
+            style="color: var(--ordryn-muted);"
+          >Shortcuts</a>
+          <RouterLink to="/docs/guide" class="nav-link-item text-decoration-none small fw-medium" style="color: var(--ordryn-muted);">How to use</RouterLink>
           <RouterLink to="/docs/api/v1" class="nav-link-item text-decoration-none small fw-medium" style="color: var(--ordryn-muted);">API</RouterLink>
           <template v-if="isAuthenticated">
             <RouterLink v-if="hasPermission('admin')" to="/admin" class="nav-link-item text-decoration-none small fw-medium" style="color: var(--ordryn-muted);">Admin</RouterLink>

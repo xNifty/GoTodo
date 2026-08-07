@@ -236,7 +236,7 @@ func validateSavedViewFilter(filter *storage.SavedViewFilter) (storage.SavedView
 	rawDue := strings.TrimSpace(filter.Due)
 	normalized.Due = normalizeDueFilter(rawDue)
 	if rawDue != "" && normalized.Due == "" {
-		return storage.SavedViewFilter{}, errors.New("filter.due must be \"overdue\", \"today\", \"week\", or \"none\".")
+		return storage.SavedViewFilter{}, errors.New("filter.due must be \"overdue\", \"today\", \"week\", \"through_week\", or \"none\".")
 	}
 
 	rawCompleted := strings.TrimSpace(filter.Completed)

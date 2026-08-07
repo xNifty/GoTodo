@@ -1,6 +1,9 @@
 package tasks
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestNormalizeDueFilter(t *testing.T) {
 	tests := []struct {
@@ -9,6 +12,8 @@ func TestNormalizeDueFilter(t *testing.T) {
 		{"overdue", "overdue"},
 		{"TODAY", "today"},
 		{" week ", "week"},
+		{"through_week", "through_week"},
+		{"THROUGH_WEEK", "through_week"},
 		{"none", "none"},
 		{"invalid", ""},
 		{"", ""},
@@ -30,6 +35,20 @@ func TestAppendDueDateCondition(t *testing.T) {
 	}
 	if args[1] != "America/New_York" {
 		t.Fatalf("timezone arg = %v", args[1])
+	}
+
+	throughWeek, throughArgs := appendDueDateCondition("user_id = $1", []interface{}{1}, "through_week", "UTC", "")
+	if !strings.Contains(throughWeek, "date_trunc('week'") {
+		t.Fatalf("expected calendar week bound, got %q", throughWeek)
+	}
+	if !strings.Contains(throughWeek, ">= (NOW() AT TIME ZONE") {
+		t.Fatalf("expected lower bound of today (excludes overdue), got %q", throughWeek)
+	}
+	if !strings.Contains(throughWeek, "completed") {
+		t.Fatalf("expected incomplete constraint, got %q", throughWeek)
+	}
+	if len(throughArgs) != 2 || throughArgs[1] != "UTC" {
+		t.Fatalf("through_week args = %v", throughArgs)
 	}
 
 	where2, args2 := appendDueDateCondition("x = 1", nil, "", "UTC", "")

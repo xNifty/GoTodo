@@ -1,19 +1,31 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { api } from '@/api/client'
-import type { Project, Tag, TaskEvent } from '@/api/types'
+import type { Project, Tag, Task, TaskEvent } from '@/api/types'
 import { APIError } from '@/api/types'
+import ParentTaskCombobox from '@/components/ParentTaskCombobox.vue'
 import { useTaskSidebar } from '@/composables/useTaskSidebar'
 import { useToast } from '@/composables/useToast'
 import { projectOptionLabel } from '@/utils/projectLabel'
 
-const { open, mode, taskId, defaultDueDate, defaultProjectId, close, notifySaved } = useTaskSidebar()
+const {
+  open,
+  mode,
+  taskId,
+  defaultDueDate,
+  defaultProjectId,
+  defaultParentId,
+  defaultParentTitle,
+  close,
+  notifySaved,
+} = useTaskSidebar()
 const toast = useToast()
 
 const loading = ref(false)
 const saving = ref(false)
 const projects = ref<Project[]>([])
 const allTags = ref<Tag[]>([])
+const rootTasks = ref<Task[]>([])
 const events = ref<TaskEvent[]>([])
 const eventsLoaded = ref(false)
 const eventsLoading = ref(false)
@@ -23,13 +35,21 @@ const titleInput = ref<HTMLInputElement | null>(null)
 const title = ref('')
 const description = ref('')
 const projectId = ref<number | ''>('')
+const parentId = ref<number | ''>('')
+const parentTitle = ref('')
 const priority = ref(0)
 const dueDate = ref('')
 const selectedTagIds = ref<number[]>([])
 const newTags = ref('')
 const completed = ref(false)
-
+const isSubtask = computed(() => parentId.value !== '' && Number(parentId.value) > 0)
 const readOnly = computed(() => mode.value === 'view')
+const parentOptions = computed(() => rootTasks.value.filter((r) => r.id !== taskId.value))
+const parentPickerDisabled = computed(
+  () =>
+    readOnly.value ||
+    (mode.value === 'edit' && (rootTasks.value.find((t) => t.id === taskId.value)?.child_count || 0) > 0),
+)
 const sidebarTitle = computed(() => {
   if (mode.value === 'view') return 'View Task'
   if (mode.value === 'edit') return 'Edit Task'
@@ -42,6 +62,8 @@ function resetForm() {
   title.value = ''
   description.value = ''
   projectId.value = ''
+  parentId.value = ''
+  parentTitle.value = ''
   priority.value = 0
   dueDate.value = ''
   selectedTagIds.value = []
@@ -53,9 +75,14 @@ function resetForm() {
 }
 
 async function loadMeta() {
-  const [projs, tags] = await Promise.all([api.listProjects(), api.listTags()])
+  const [projs, tags, list] = await Promise.all([
+    api.listProjects(),
+    api.listTags(),
+    api.listTasks({ page: 1, per_page: 100 }),
+  ])
   projects.value = projs
   allTags.value = tags
+  rootTasks.value = list.tasks.filter((t) => !t.parent_id)
 }
 
 async function loadTask(id: number) {
@@ -65,6 +92,12 @@ async function loadTask(id: number) {
     title.value = task.title
     description.value = task.description || ''
     projectId.value = task.project_id ?? ''
+    parentId.value = task.parent_id ?? ''
+    parentTitle.value = ''
+    if (task.parent_id) {
+      const parent = rootTasks.value.find((t) => t.id === task.parent_id)
+      parentTitle.value = parent?.title || `Task #${task.parent_id}`
+    }
     priority.value = task.priority
     dueDate.value = task.due_date || ''
     selectedTagIds.value = task.tags?.map((t) => t.id) ?? []
@@ -124,16 +157,21 @@ async function save(keepOpen = false) {
       const created = await api.createTask({
         title: title.value.trim(),
         description: description.value,
-        project_id: projectId.value === '' ? null : Number(projectId.value),
+        project_id: isSubtask.value
+          ? undefined
+          : projectId.value === ''
+            ? null
+            : Number(projectId.value),
+        parent_id: isSubtask.value ? Number(parentId.value) : null,
         priority: priority.value,
         due_date: dueDate.value || undefined,
         tag_ids: tagIds,
       })
       notifySaved(created, !keepOpen)
-      toast.push('Task created', 'success')
+      toast.push(isSubtask.value ? 'Subtask created' : 'Task created', 'success')
 
       if (keepOpen) {
-        // Clear title & description for next task while keeping project/due date pre-selected
+        // Clear title & description for next task while keeping project/due/parent pre-selected
         title.value = ''
         description.value = ''
         newTags.value = ''
@@ -151,7 +189,11 @@ async function save(keepOpen = false) {
       description: description.value,
       priority: priority.value,
       tag_ids: tagIds,
-      project_id: projectId.value === '' ? null : Number(projectId.value),
+      // 0 clears parent (promotes to root); JSON null is indistinguishable from omitted for **int.
+      parent_id: isSubtask.value ? Number(parentId.value) : 0,
+    }
+    if (!isSubtask.value) {
+      payload.project_id = projectId.value === '' ? null : Number(projectId.value)
     }
     if (dueDate.value) payload.due_date = dueDate.value
     else payload.clear_due_date = true
@@ -205,8 +247,16 @@ async function loadEvents() {
 watch(description, validateDescription)
 
 watch(
-  () => ({ isOpen: open.value, m: mode.value, id: taskId.value, due: defaultDueDate.value, proj: defaultProjectId.value }),
-  async ({ isOpen, m, id, due, proj }) => {
+  () => ({
+    isOpen: open.value,
+    m: mode.value,
+    id: taskId.value,
+    due: defaultDueDate.value,
+    proj: defaultProjectId.value,
+    parent: defaultParentId.value,
+    parentLabel: defaultParentTitle.value,
+  }),
+  async ({ isOpen, m, id, due, proj, parent, parentLabel }) => {
     if (!isOpen) return
     await loadMeta()
     if ((m === 'edit' || m === 'view') && id) {
@@ -215,12 +265,29 @@ watch(
       resetForm()
       if (due) dueDate.value = due
       if (proj) projectId.value = Number(proj)
+      if (parent) {
+        parentId.value = parent
+        parentTitle.value = parentLabel || rootTasks.value.find((t) => t.id === parent)?.title || ''
+        const p = rootTasks.value.find((t) => t.id === parent)
+        if (p?.project_id) projectId.value = p.project_id
+      }
       await nextTick()
       titleInput.value?.focus()
     }
   },
   { immediate: true },
 )
+
+function onParentChange() {
+  if (!isSubtask.value) {
+    parentTitle.value = ''
+    return
+  }
+  const p = rootTasks.value.find((t) => t.id === Number(parentId.value))
+  parentTitle.value = p?.title || ''
+  if (p?.project_id) projectId.value = p.project_id
+  else projectId.value = ''
+}
 </script>
 
 <template>
@@ -281,8 +348,22 @@ watch(
           </div>
         </div>
         <div class="form-group mt-2">
+          <label for="parent_id">Parent task (optional):</label>
+          <ParentTaskCombobox
+            v-model="parentId"
+            input-id="parent_id"
+            :options="parentOptions"
+            :disabled="parentPickerDisabled"
+            placeholder="Type to search parent tasks or projects…"
+            @change="onParentChange"
+          />
+          <small v-if="isSubtask" class="form-hint d-block mt-1">
+            Subtask of {{ parentTitle || 'selected parent' }}. Project is inherited.
+          </small>
+        </div>
+        <div class="form-group mt-2">
           <label for="project_id">Project (optional):</label>
-          <select id="project_id" v-model="projectId" class="form-select" :disabled="readOnly">
+          <select id="project_id" v-model="projectId" class="form-select" :disabled="readOnly || isSubtask">
             <option value="">No project</option>
             <option v-for="p in projects" :key="p.id" :value="p.id">{{ projectOptionLabel(p) }}</option>
           </select>

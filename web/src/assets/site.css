@@ -2350,9 +2350,10 @@ select.form-select:focus {
     width: 36px;
 }
 
-.task-row-focused {
+.task-row-focused,
+.ordryn-task-card.is-focused {
     outline: 2px solid var(--bs-primary);
-    outline-offset: -2px;
+    outline-offset: 2px;
 }
 
 .task-timeline summary {
@@ -2603,9 +2604,20 @@ button.theme-toggle:focus-visible {
     transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
+button.dashboard-stat-link {
+    background: var(--bs-card-bg, var(--ordryn-card-bg, #fff));
+    color: inherit;
+    cursor: pointer;
+}
+
 .dashboard-stat-link:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+button.dashboard-stat-link:focus-visible {
+    outline: 2px solid var(--bs-primary);
+    outline-offset: 2px;
 }
 
 /* In-app calendar */

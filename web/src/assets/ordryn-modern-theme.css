@@ -130,6 +130,24 @@ html, body {
   padding: 0;
 }
 
+/* High-contrast keycaps (Bootstrap kbd uses body tokens that wash out in dark modals) */
+kbd {
+  background-color: var(--ordryn-muted-bg);
+  color: var(--ordryn-text);
+  border: 1px solid var(--ordryn-card-border);
+  border-radius: 0.35rem;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.85em;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+[data-theme="dark"] kbd {
+  background-color: #0f172a;
+  color: #f8fafc;
+  border-color: #64748b;
+}
+
 body {
   background-color: var(--ordryn-bg);
   color: var(--ordryn-text);
@@ -356,6 +374,16 @@ body {
   border-color: var(--ordryn-card-hover-border);
 }
 
+.ordryn-task-card:focus {
+  outline: none;
+}
+
+.ordryn-task-card.is-focused {
+  outline: 2px solid var(--ordryn-accent);
+  outline-offset: 2px;
+  border-color: var(--ordryn-accent);
+}
+
 .ordryn-task-card.is-completed {
   opacity: 0.8;
 }
@@ -385,6 +413,7 @@ body {
   padding: 0.25rem 0.5rem;
   font-size: 0.85rem;
   width: 100%;
+  max-width: min(36rem, 100%);
   resize: vertical;
 }
 
@@ -451,11 +480,62 @@ body {
   font-size: 1.05rem;
 }
 
+.ordryn-task-card .task-description {
+  max-width: min(36rem, 100%);
+}
+
 .ordryn-task-card.density-dense .task-description {
   display: none;
 }
 
-/* Nested Task Indentation Support */
+/* Nested task tree */
+.task-tree-root {
+  margin-bottom: 0.55rem;
+}
+
+.task-tree-root > .ordryn-task-card.has-children {
+  margin-bottom: 0;
+}
+
+.task-children {
+  position: relative;
+  margin: 0.35rem 0 0.15rem 1.15rem;
+  padding: 0.4rem 0.55rem 0.4rem 0.85rem;
+  border-left: 2px solid color-mix(in srgb, var(--ordryn-accent) 45%, var(--ordryn-card-border));
+  border-radius: 0 10px 10px 0;
+  background: color-mix(in srgb, var(--ordryn-muted-bg) 65%, transparent);
+}
+
+.task-children .ordryn-task-card {
+  margin-bottom: 0.35rem;
+  background: color-mix(in srgb, var(--ordryn-card-bg) 92%, var(--ordryn-accent));
+  border-color: color-mix(in srgb, var(--ordryn-card-border) 80%, var(--ordryn-accent));
+  box-shadow: none;
+}
+
+.task-children .ordryn-task-card:last-child {
+  margin-bottom: 0;
+}
+
+.ordryn-task-card.is-nested {
+  position: relative;
+  padding-left: 1.35rem !important;
+}
+
+.ordryn-task-card.is-nested .nested-branch {
+  position: absolute;
+  left: 0.35rem;
+  top: 1.15rem;
+  width: 0.7rem;
+  height: 2px;
+  background: color-mix(in srgb, var(--ordryn-accent) 40%, var(--ordryn-card-border));
+  border-radius: 1px;
+}
+
+.ordryn-task-card.density-dense.is-nested .nested-branch {
+  top: 0.85rem;
+}
+
 .nested-indent-wrapper {
   transition: padding-left 0.2s ease;
 }
@@ -511,7 +591,60 @@ body {
 }
 
 /* --------------------------------------------------------------------------
-   8. Mobile Responsiveness Breakpoints
+   8. Go to Top Button
+   -------------------------------------------------------------------------- */
+
+.go-to-top-btn {
+  position: fixed;
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  right: 1rem;
+  z-index: 1030;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.9rem;
+  color: var(--ordryn-text);
+  background: var(--ordryn-card-bg);
+  border: 1px solid var(--ordryn-card-border);
+  box-shadow: var(--ordryn-card-shadow);
+  opacity: 0;
+  transform: translateY(0.5rem);
+  pointer-events: none;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease,
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.go-to-top-btn.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.go-to-top-btn:hover,
+.go-to-top-btn:focus-visible {
+  color: var(--ordryn-text);
+  background: var(--ordryn-accent-light);
+  border-color: var(--ordryn-accent);
+  box-shadow: var(--ordryn-card-hover-shadow);
+}
+
+.go-to-top-btn__label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .go-to-top-btn {
+    transition: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   9. Mobile Responsiveness Breakpoints
    -------------------------------------------------------------------------- */
 
 @media (max-width: 768px) {

@@ -743,9 +743,25 @@ paths:
     delete:
       tags: [Tasks]
       summary: Delete a task (returns undo_token)
+      description: |
+        When the task has subtasks, pass mode=cascade (default) to delete them too,
+        or mode=reparent with new_parent_id (0 or omit to promote to root) to move
+        children before deleting the parent.
       security:
         - SessionCookie: []
         - BearerAuth: []
+      parameters:
+        - name: mode
+          in: query
+          schema:
+            type: string
+            enum: [cascade, reparent]
+            default: cascade
+        - name: new_parent_id
+          in: query
+          schema:
+            type: integer
+          description: Target root task id when mode=reparent; 0 or omit promotes children to root
       responses:
         "200":
           description: Deleted with undo token
@@ -753,6 +769,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DeleteResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
 
@@ -2164,6 +2182,19 @@ components:
           type: boolean
         position:
           type: integer
+        parent_id:
+          type: integer
+          nullable: true
+          description: Parent task id; null for root tasks. One level of nesting only.
+        child_count:
+          type: integer
+        children_completed:
+          type: integer
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/Task"
+          description: Direct subtasks when listing or fetching a root task
         tags:
           type: array
           items:
@@ -2206,6 +2237,10 @@ components:
         project_id:
           type: integer
           nullable: true
+        parent_id:
+          type: integer
+          nullable: true
+          description: Root task id to nest under; must itself have no parent
         priority:
           type: integer
         completed:
@@ -2231,6 +2266,10 @@ components:
         project_id:
           type: integer
           nullable: true
+        parent_id:
+          type: integer
+          nullable: true
+          description: Set to a root task id to nest, or null to promote to root
         priority:
           type: integer
         completed:
@@ -2252,6 +2291,10 @@ components:
             type: integer
         favorite:
           type: boolean
+        parent_id:
+          type: integer
+          nullable: true
+          description: When set, reorder siblings under this parent; when null/omitted, reorder roots
         page:
           type: integer
         per_page:
@@ -2477,6 +2520,9 @@ components:
           type: integer
         due_today_count:
           type: integer
+        due_this_week_count:
+          type: integer
+          description: Incomplete tasks due from today through end of the current calendar week (excludes overdue)
         completed_this_week:
           type: integer
         completed_this_month:

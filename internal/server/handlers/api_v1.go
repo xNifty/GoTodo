@@ -21,19 +21,23 @@ type apiTagJSON struct {
 }
 
 type apiTaskJSON struct {
-	ID          int          `json:"id"`
-	Title       string       `json:"title"`
-	Description string       `json:"description"`
-	Completed   bool         `json:"completed"`
-	DueDate     string       `json:"due_date"`
-	ProjectID   *int         `json:"project_id,omitempty"`
-	Project     string       `json:"project,omitempty"`
-	Priority    int          `json:"priority"`
-	Favorite    bool         `json:"favorite"`
-	Position    int          `json:"position"`
-	Tags        []apiTagJSON `json:"tags"`
-	CreatedAt   string       `json:"created_at"`
-	ModifiedAt  string       `json:"modified_at"`
+	ID                 int          `json:"id"`
+	Title              string       `json:"title"`
+	Description        string       `json:"description"`
+	Completed          bool         `json:"completed"`
+	DueDate            string       `json:"due_date"`
+	ProjectID          *int         `json:"project_id,omitempty"`
+	Project            string       `json:"project,omitempty"`
+	Priority           int          `json:"priority"`
+	Favorite           bool         `json:"favorite"`
+	Position           int          `json:"position"`
+	ParentID           *int         `json:"parent_id"`
+	ChildCount         int          `json:"child_count"`
+	ChildrenCompleted  int          `json:"children_completed"`
+	Children           []apiTaskJSON `json:"children,omitempty"`
+	Tags               []apiTagJSON `json:"tags"`
+	CreatedAt          string       `json:"created_at"`
+	ModifiedAt         string       `json:"modified_at"`
 }
 
 type apiTaskListResponse struct {
@@ -51,6 +55,7 @@ type apiTaskCreateRequest struct {
 	Description string `json:"description"`
 	DueDate     string `json:"due_date"`
 	ProjectID   *int   `json:"project_id"`
+	ParentID    *int   `json:"parent_id"`
 	Priority    *int   `json:"priority"`
 	Completed   *bool  `json:"completed"`
 	Favorite    *bool  `json:"favorite"`
@@ -62,6 +67,7 @@ type apiTaskPatchRequest struct {
 	Description *string `json:"description"`
 	DueDate     *string `json:"due_date"`
 	ProjectID   **int   `json:"project_id"`
+	ParentID    **int   `json:"parent_id"`
 	Priority    *int    `json:"priority"`
 	Completed   *bool   `json:"completed"`
 	Favorite    *bool   `json:"favorite"`
@@ -72,6 +78,7 @@ type apiTaskPatchRequest struct {
 type apiTaskReorderRequest struct {
 	TaskIDs  []int   `json:"task_ids"`
 	Favorite *bool   `json:"favorite"`
+	ParentID *int    `json:"parent_id"`
 	Page     *int    `json:"page"`
 	PerPage  *int    `json:"per_page"`
 	Project  *string `json:"project"`
@@ -142,17 +149,23 @@ func taskToAPIJSON(t tasks.Task) apiTaskJSON {
 		tags = append(tags, apiTagJSON{ID: tg.ID, Name: tg.Name, Color: tg.Color})
 	}
 	out := apiTaskJSON{
-		ID:          t.ID,
-		Title:       t.Title,
-		Description: t.Description,
-		Completed:   t.Completed,
-		DueDate:     t.DueDate,
-		Priority:    t.Priority,
-		Favorite:    t.IsFavorite,
-		Position:    t.Position,
-		Tags:        tags,
-		CreatedAt:   t.DateCreated,
-		ModifiedAt:  t.DateModified,
+		ID:                t.ID,
+		Title:             t.Title,
+		Description:       t.Description,
+		Completed:         t.Completed,
+		DueDate:           t.DueDate,
+		Priority:          t.Priority,
+		Favorite:          t.IsFavorite,
+		Position:          t.Position,
+		ChildCount:        t.ChildCount,
+		ChildrenCompleted: t.ChildrenCompleted,
+		Tags:              tags,
+		CreatedAt:         t.DateCreated,
+		ModifiedAt:        t.DateModified,
+	}
+	if t.ParentID > 0 {
+		pid := t.ParentID
+		out.ParentID = &pid
 	}
 	if t.ProjectID > 0 {
 		pid := t.ProjectID
@@ -160,6 +173,12 @@ func taskToAPIJSON(t tasks.Task) apiTaskJSON {
 		out.Project = t.ProjectName
 	} else if t.ProjectName != "" {
 		out.Project = t.ProjectName
+	}
+	if len(t.Children) > 0 {
+		out.Children = make([]apiTaskJSON, 0, len(t.Children))
+		for _, c := range t.Children {
+			out.Children = append(out.Children, taskToAPIJSON(c))
+		}
 	}
 	return out
 }
@@ -335,6 +354,7 @@ func apiV1CreateTask(w http.ResponseWriter, r *http.Request) {
 		Description: req.Description,
 		DueDate:     req.DueDate,
 		ProjectID:   req.ProjectID,
+		ParentID:    req.ParentID,
 		Priority:    priority,
 		Completed:   completed,
 		Favorite:    favorite,
@@ -386,6 +406,7 @@ func apiV1PatchTask(w http.ResponseWriter, r *http.Request, taskID int) {
 		Favorite:    req.Favorite,
 		TagIDs:      req.TagIDs,
 		ProjectID:   req.ProjectID,
+		ParentID:    req.ParentID,
 	}
 	if req.ClearDue != nil && *req.ClearDue {
 		in.ClearDue = true
@@ -431,6 +452,41 @@ func apiV1DeleteTask(w http.ResponseWriter, r *http.Request, taskID int) {
 	}
 	defer storage.CloseDatabase(db)
 
+	mode := strings.TrimSpace(r.URL.Query().Get("mode"))
+	if mode == "" {
+		mode = "cascade"
+	}
+	if mode != "cascade" && mode != "reparent" {
+		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "mode must be cascade or reparent.")
+		return
+	}
+
+	if mode == "reparent" {
+		var newParent *int
+		if raw := strings.TrimSpace(r.URL.Query().Get("new_parent_id")); raw != "" {
+			v, err := strconv.Atoi(raw)
+			if err != nil || v < 0 {
+				utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "invalid new_parent_id.")
+				return
+			}
+			if v > 0 {
+				newParent = &v
+			}
+		}
+		if err := domain.ReparentChildren(r.Context(), userID, taskID, newParent); err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				utils.APIJSONError(w, http.StatusNotFound, "not_found", "Task not found.")
+				return
+			}
+			if errors.Is(err, domain.ErrValidation) {
+				utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", err.Error())
+				return
+			}
+			utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to reparent subtasks.")
+			return
+		}
+	}
+
 	token, err := deleteTasksForAPI(r.Context(), db, r, w, []int{taskID}, userID)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
@@ -442,9 +498,9 @@ func apiV1DeleteTask(w http.ResponseWriter, r *http.Request, taskID int) {
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"ok":          true,
-		"undo_token":  token,
-		"expires_in":  utils.UndoTTLSeconds,
+		"ok":         true,
+		"undo_token": token,
+		"expires_in": utils.UndoTTLSeconds,
 	})
 }
 
@@ -663,7 +719,7 @@ func apiV1ReorderTasks(w http.ResponseWriter, r *http.Request) {
 		projectFilter = parseProjectFilter(*req.Project)
 	}
 
-	if err := domain.ReorderTasks(r.Context(), userID, req.TaskIDs, *req.Favorite, projectFilter); err != nil {
+	if err := domain.ReorderTasks(r.Context(), userID, req.TaskIDs, *req.Favorite, projectFilter, req.ParentID); err != nil {
 		if errors.Is(err, domain.ErrValidation) {
 			utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Task does not belong to user or mismatched favorite group/project.")
 			return
