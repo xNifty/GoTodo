@@ -41,6 +41,9 @@ func TestAppendDueDateCondition(t *testing.T) {
 	if !strings.Contains(throughWeek, "date_trunc('week'") {
 		t.Fatalf("expected calendar week bound, got %q", throughWeek)
 	}
+	if !strings.Contains(throughWeek, ">= (NOW() AT TIME ZONE") {
+		t.Fatalf("expected lower bound of today (excludes overdue), got %q", throughWeek)
+	}
 	if !strings.Contains(throughWeek, "completed") {
 		t.Fatalf("expected incomplete constraint, got %q", throughWeek)
 	}

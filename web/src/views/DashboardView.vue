@@ -22,6 +22,7 @@ const router = useRouter()
 const stats = ref<DashboardStats | null>(null)
 const projects = ref<Project[]>([])
 const savedViews = ref<SavedView[]>([])
+const overdueTasks = ref<Task[]>([])
 const dueTodayTasks = ref<Task[]>([])
 const dueThisWeekTasks = ref<Task[]>([])
 const doneThisWeekTasks = ref<Task[]>([])
@@ -50,19 +51,6 @@ function formatDueDate(dateStr?: string): string {
   return dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function todayISO(): string {
-  const now = new Date()
-  const y = now.getFullYear()
-  const m = String(now.getMonth() + 1).padStart(2, '0')
-  const d = String(now.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
-}
-
-function isOverdue(task: Task): boolean {
-  if (!task.due_date || task.completed) return false
-  return task.due_date < todayISO()
-}
-
 function scrollToSection(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
@@ -72,11 +60,13 @@ function sortByDueDate(tasks: Task[]): Task[] {
 }
 
 async function loadSectionLists() {
-  const [todayList, weekList, doneList] = await Promise.all([
+  const [overdueList, todayList, weekList, doneList] = await Promise.all([
+    api.listTasks({ due: 'overdue', page: 1, per_page: 50 }),
     api.listTasks({ due: 'today', status: 'incomplete', page: 1, per_page: 50 }),
     api.listTasks({ due: 'through_week', page: 1, per_page: 50 }),
     api.listTasks({ completed: 'week', page: 1, per_page: 50 }),
   ])
+  overdueTasks.value = sortByDueDate(overdueList.tasks)
   dueTodayTasks.value = sortByDueDate(todayList.tasks)
   dueThisWeekTasks.value = sortByDueDate(weekList.tasks)
   doneThisWeekTasks.value = [...doneList.tasks]
@@ -91,24 +81,25 @@ async function refreshDashboard() {
 async function toggleComplete(task: Task) {
   if (completing.value[task.id] || task.completed) return
   completing.value = { ...completing.value, [task.id]: true }
+  const inOverdue = overdueTasks.value.some((t) => t.id === task.id)
   const inToday = dueTodayTasks.value.some((t) => t.id === task.id)
   const inWeek = dueThisWeekTasks.value.some((t) => t.id === task.id)
-  const wasOverdue = isOverdue(task)
   try {
     const updated = await api.patchTask(task.id, { completed: true })
+    overdueTasks.value = overdueTasks.value.filter((t) => t.id !== task.id)
     dueTodayTasks.value = dueTodayTasks.value.filter((t) => t.id !== task.id)
     dueThisWeekTasks.value = dueThisWeekTasks.value.filter((t) => t.id !== task.id)
     doneThisWeekTasks.value = [updated, ...doneThisWeekTasks.value.filter((t) => t.id !== task.id)]
     if (stats.value) {
       stats.value = {
         ...stats.value,
-        overdue_count: wasOverdue ? Math.max(0, stats.value.overdue_count - 1) : stats.value.overdue_count,
+        overdue_count: inOverdue ? Math.max(0, stats.value.overdue_count - 1) : stats.value.overdue_count,
         due_today_count: inToday ? Math.max(0, stats.value.due_today_count - 1) : stats.value.due_today_count,
         due_this_week_count:
           inWeek || inToday ? Math.max(0, stats.value.due_this_week_count - 1) : stats.value.due_this_week_count,
         completed_this_week: stats.value.completed_this_week + 1,
       }
-      if (overdueCount && wasOverdue) {
+      if (overdueCount && inOverdue) {
         overdueCount.value = Math.max(0, overdueCount.value - 1)
       }
     }
@@ -171,7 +162,19 @@ watch(lastSavedTask, () => {
         <p v-if="loading" class="text-muted">Loading…</p>
         <template v-else-if="stats">
           <div class="row g-3 mb-4">
-            <div class="col-sm-6 col-lg-4">
+            <div class="col-sm-6 col-lg-3">
+              <button
+                type="button"
+                class="card text-center border-0 shadow-xs w-100 dashboard-stat-link"
+                @click="scrollToSection('overdue')"
+              >
+                <div class="card-body py-3">
+                  <div class="text-muted small fw-medium">Overdue</div>
+                  <div class="display-6 fw-bold text-danger">{{ stats.overdue_count }}</div>
+                </div>
+              </button>
+            </div>
+            <div class="col-sm-6 col-lg-3">
               <button
                 type="button"
                 class="card text-center border-0 shadow-xs w-100 dashboard-stat-link"
@@ -183,7 +186,7 @@ watch(lastSavedTask, () => {
                 </div>
               </button>
             </div>
-            <div class="col-sm-6 col-lg-4">
+            <div class="col-sm-6 col-lg-3">
               <button
                 type="button"
                 class="card text-center border-0 shadow-xs w-100 dashboard-stat-link"
@@ -191,11 +194,11 @@ watch(lastSavedTask, () => {
               >
                 <div class="card-body py-3">
                   <div class="text-muted small fw-medium">Due this week</div>
-                  <div class="display-6 fw-bold text-danger">{{ stats.due_this_week_count }}</div>
+                  <div class="display-6 fw-bold text-info">{{ stats.due_this_week_count }}</div>
                 </div>
               </button>
             </div>
-            <div class="col-sm-6 col-lg-4">
+            <div class="col-sm-6 col-lg-3">
               <button
                 type="button"
                 class="card text-center border-0 shadow-xs w-100 dashboard-stat-link"
@@ -207,6 +210,45 @@ watch(lastSavedTask, () => {
                 </div>
               </button>
             </div>
+          </div>
+
+          <div id="overdue" class="card border-0 shadow-xs mb-4">
+            <div class="card-header bg-transparent border-0 pt-3 pb-0 d-flex justify-content-between align-items-center">
+              <h2 class="h5 fw-bold mb-0">Overdue</h2>
+              <span class="badge rounded-pill bg-danger bg-opacity-10 text-danger border border-danger border-opacity-20 px-2.5 py-1">
+                {{ stats.overdue_count }}
+              </span>
+            </div>
+            <ul class="list-group list-group-flush">
+              <li
+                v-for="task in overdueTasks"
+                :key="task.id"
+                class="list-group-item d-flex align-items-center gap-3"
+              >
+                <button
+                  type="button"
+                  class="btn btn-link p-0 text-danger flex-shrink-0"
+                  :title="`Mark ${task.title} complete`"
+                  :aria-label="`Mark ${task.title} complete`"
+                  :disabled="!!completing[task.id]"
+                  @click="toggleComplete(task)"
+                >
+                  <i class="bi bi-circle fs-5" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-link text-start text-decoration-none flex-grow-1 p-0 min-w-0"
+                  @click="openEdit(task.id)"
+                >
+                  <span class="fw-medium text-body d-block text-truncate">{{ task.title }}</span>
+                  <span v-if="task.project" class="text-muted small">{{ task.project }}</span>
+                </button>
+                <span class="text-danger small fw-medium flex-shrink-0 whitespace-nowrap">
+                  {{ formatDueDate(task.due_date) }}
+                </span>
+              </li>
+              <li v-if="!overdueTasks.length" class="list-group-item text-muted">No overdue tasks.</li>
+            </ul>
           </div>
 
           <div id="due-today" class="card border-0 shadow-xs mb-4">
@@ -251,7 +293,7 @@ watch(lastSavedTask, () => {
           <div id="due-this-week" class="card border-0 shadow-xs mb-4">
             <div class="card-header bg-transparent border-0 pt-3 pb-0 d-flex justify-content-between align-items-center">
               <h2 class="h5 fw-bold mb-0">Due this week</h2>
-              <span class="badge rounded-pill bg-danger bg-opacity-10 text-danger border border-danger border-opacity-20 px-2.5 py-1">
+              <span class="badge rounded-pill bg-info bg-opacity-10 text-info border border-info border-opacity-20 px-2.5 py-1">
                 {{ stats.due_this_week_count }}
               </span>
             </div>
@@ -263,8 +305,7 @@ watch(lastSavedTask, () => {
               >
                 <button
                   type="button"
-                  class="btn btn-link p-0 flex-shrink-0"
-                  :class="isOverdue(task) ? 'text-danger' : 'text-body-secondary'"
+                  class="btn btn-link p-0 text-body-secondary flex-shrink-0"
                   :title="`Mark ${task.title} complete`"
                   :aria-label="`Mark ${task.title} complete`"
                   :disabled="!!completing[task.id]"
@@ -278,16 +319,9 @@ watch(lastSavedTask, () => {
                   @click="openEdit(task.id)"
                 >
                   <span class="fw-medium text-body d-block text-truncate">{{ task.title }}</span>
-                  <span class="text-muted small">
-                    <template v-if="task.project">{{ task.project }}</template>
-                    <template v-if="task.project && isOverdue(task)"> · </template>
-                    <span v-if="isOverdue(task)" class="text-danger">Overdue</span>
-                  </span>
+                  <span v-if="task.project" class="text-muted small">{{ task.project }}</span>
                 </button>
-                <span
-                  class="small fw-medium flex-shrink-0 whitespace-nowrap"
-                  :class="isOverdue(task) ? 'text-danger' : 'text-muted'"
-                >
+                <span class="text-muted small fw-medium flex-shrink-0 whitespace-nowrap">
                   {{ formatDueDate(task.due_date) }}
                 </span>
               </li>

@@ -2522,7 +2522,7 @@ components:
           type: integer
         due_this_week_count:
           type: integer
-          description: Incomplete tasks due on or before end of the current calendar week (includes overdue)
+          description: Incomplete tasks due from today through end of the current calendar week (excludes overdue)
         completed_this_week:
           type: integer
         completed_this_month:

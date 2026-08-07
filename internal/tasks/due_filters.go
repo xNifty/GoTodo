@@ -49,12 +49,12 @@ func appendDueDateCondition(where string, args []interface{}, dueFilter, timezon
 			prefix, prefix, idx, prefix, idx,
 		)
 	case "through_week":
-		// Incomplete tasks due on or before end of the current calendar week (Mon–Sun), including overdue.
+		// Incomplete tasks due from today through end of the current calendar week (Mon–Sun). Excludes overdue.
 		args = append(args, timezone)
 		idx := len(args)
 		where += fmt.Sprintf(
-			" AND %sdue_date IS NOT NULL AND %sdue_date <= (date_trunc('week', (NOW() AT TIME ZONE $%d)) + INTERVAL '6 days')::date AND (%scompleted IS NULL OR %scompleted = false)",
-			prefix, prefix, idx, prefix, prefix,
+			" AND %sdue_date IS NOT NULL AND %sdue_date >= (NOW() AT TIME ZONE $%d)::date AND %sdue_date <= (date_trunc('week', (NOW() AT TIME ZONE $%d)) + INTERVAL '6 days')::date AND (%scompleted IS NULL OR %scompleted = false)",
+			prefix, prefix, idx, prefix, idx, prefix, prefix,
 		)
 	case "none":
 		where += fmt.Sprintf(" AND %sdue_date IS NULL", prefix)
