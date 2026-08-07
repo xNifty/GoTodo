@@ -14,6 +14,7 @@ import (
 type DashboardStats struct {
 	OverdueCount         int             `json:"overdue_count"`
 	DueTodayCount        int             `json:"due_today_count"`
+	DueThisWeekCount     int             `json:"due_this_week_count"`
 	CompletedThisWeek    int             `json:"completed_this_week"`
 	CompletedThisMonth   int             `json:"completed_this_month"`
 	StreakDays           int             `json:"streak_days"`
@@ -85,6 +86,11 @@ func GetDashboardStats(userID int, timezone string) (*DashboardStats, error) {
 	todayWhere += " AND (completed IS NULL OR completed = false)"
 	if err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM tasks WHERE "+todayWhere, todayArgs...).Scan(&stats.DueTodayCount); err != nil {
 		return nil, fmt.Errorf("due today count: %w", err)
+	}
+
+	throughWeekWhere, throughWeekArgs := appendDueDateCondition(where, args, "through_week", timezone, "")
+	if err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM tasks WHERE "+throughWeekWhere, throughWeekArgs...).Scan(&stats.DueThisWeekCount); err != nil {
+		return nil, fmt.Errorf("due this week count: %w", err)
 	}
 
 	weekQ := `

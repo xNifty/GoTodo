@@ -32,6 +32,12 @@ func TestGetDashboardStats(t *testing.T) {
 	if len(stats.CompletionsLast7Days) != 7 {
 		t.Fatalf("expected 7 chart days, got %d", len(stats.CompletionsLast7Days))
 	}
+	if stats.DueThisWeekCount < stats.OverdueCount {
+		t.Fatalf("due_this_week_count (%d) should include overdue (%d)", stats.DueThisWeekCount, stats.OverdueCount)
+	}
+	if stats.DueThisWeekCount < stats.DueTodayCount {
+		t.Fatalf("due_this_week_count (%d) should include due today (%d)", stats.DueThisWeekCount, stats.DueTodayCount)
+	}
 }
 
 func TestGetDashboardStatsEmptyBreakdownsEncodeAsArrays(t *testing.T) {

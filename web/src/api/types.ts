@@ -164,6 +164,7 @@ export type SavedView = {
 export type DashboardStats = {
   overdue_count: number
   due_today_count: number
+  due_this_week_count: number
   completed_this_week: number
   completed_this_month: number
   streak_days: number

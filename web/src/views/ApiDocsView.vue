@@ -278,7 +278,7 @@ Content-Type: application/json
                         <tbody>
                             <tr><td><code>project</code></td><td>project ID, <code>none</code>, or <code>0</code></td><td>Filter by project</td></tr>
                             <tr><td><code>status</code></td><td><code>incomplete</code>, <code>complete</code></td><td>Completion status</td></tr>
-                            <tr><td><code>due</code></td><td><code>overdue</code>, <code>today</code>, <code>week</code>, <code>none</code></td><td>Due date quick filter</td></tr>
+                            <tr><td><code>due</code></td><td><code>overdue</code>, <code>today</code>, <code>week</code>, <code>through_week</code>, <code>none</code></td><td>Due date quick filter</td></tr>
                             <tr><td><code>completed</code></td><td><code>week</code></td><td>Tasks completed in the last 7 days</td></tr>
                             <tr><td><code>priority</code></td><td><code>0</code>–<code>3</code></td><td>Priority level</td></tr>
                             <tr><td><code>tag</code></td><td>tag ID</td><td>Filter by tag</td></tr>
@@ -418,7 +418,7 @@ Content-Type: application/json
                         <tbody>
                             <tr><td><code>project</code></td><td>Empty for all projects; a positive project ID; <code>0</code> or <code>none</code> for no project</td></tr>
                             <tr><td><code>status</code></td><td>Empty, <code>complete</code>, <code>completed</code>, or <code>incomplete</code></td></tr>
-                            <tr><td><code>due</code></td><td>Empty, <code>overdue</code>, <code>today</code>, <code>week</code>, or <code>none</code></td></tr>
+                            <tr><td><code>due</code></td><td>Empty, <code>overdue</code>, <code>today</code>, <code>week</code>, <code>through_week</code>, or <code>none</code></td></tr>
                             <tr><td><code>completed</code></td><td>Empty, or <code>week</code> for tasks completed in the last 7 days</td></tr>
                             <tr><td><code>priority</code></td><td>Empty, or <code>0</code>–<code>3</code></td></tr>
                             <tr><td><code>tag</code></td><td>Empty, or a positive tag ID</td></tr>
