@@ -7,6 +7,7 @@ import { useConfirm } from '@/composables/useConfirm'
 import { api } from '@/api/client'
 import type { APIKey, CalendarInfo, Tag } from '@/api/types'
 import { APIError } from '@/api/types'
+import TimezoneSelect from '@/components/TimezoneSelect.vue'
 
 const { user, updateProfile } = useAuth()
 const { push } = useToast()
@@ -239,7 +240,7 @@ onUnmounted(() => {
           </div>
           <div class="mb-3">
             <label for="profile-timezone" class="form-label">Timezone</label>
-            <input id="profile-timezone" v-model="timezone" type="text" class="form-control" required />
+            <TimezoneSelect id="profile-timezone" v-model="timezone" required />
           </div>
           <div class="mb-3">
             <label for="profile-per-page" class="form-label">Tasks per page</label>

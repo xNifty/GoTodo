@@ -5,6 +5,7 @@ import { useAuth } from '@/composables/useAuth'
 import { useToast } from '@/composables/useToast'
 import { api } from '@/api/client'
 import { APIError } from '@/api/types'
+import TimezoneSelect from '@/components/TimezoneSelect.vue'
 
 const email = ref('')
 const userName = ref('')
@@ -114,7 +115,7 @@ async function onSubmit() {
               </div>
               <div class="mb-3">
                 <label for="signup-timezone" class="form-label">Timezone</label>
-                <input id="signup-timezone" v-model="timezone" type="text" class="form-control" required />
+                <TimezoneSelect id="signup-timezone" v-model="timezone" required />
               </div>
               <div class="mb-3">
                 <label for="signup-invite" class="form-label">Invite token <span class="text-muted">(optional)</span></label>
