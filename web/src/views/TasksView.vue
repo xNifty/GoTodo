@@ -7,6 +7,7 @@ import { APIError } from '@/api/types'
 import ModernSidebar from '@/components/modern/ModernSidebar.vue'
 import ModernTaskFilterBar from '@/components/modern/ModernTaskFilterBar.vue'
 import ModernTaskCard from '@/components/modern/ModernTaskCard.vue'
+import KanbanBoard from '@/components/KanbanBoard.vue'
 import DeleteTaskDialog from '@/components/DeleteTaskDialog.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import { useAuth } from '@/composables/useAuth'
@@ -123,6 +124,43 @@ const activeProjectObj = computed(() => {
 const isViewerProjectView = computed(
   () => activeProjectObj.value?.role === 'viewer',
 )
+
+const VIEW_MODE_KEY = 'gotodo.viewMode'
+type TaskViewMode = 'list' | 'board'
+
+function readStoredViewMode(): TaskViewMode {
+  try {
+    const v = localStorage.getItem(VIEW_MODE_KEY)
+    return v === 'board' ? 'board' : 'list'
+  } catch {
+    return 'list'
+  }
+}
+
+const viewMode = ref<TaskViewMode>(readStoredViewMode())
+
+const isKanbanProjectView = computed(() => {
+  const p = activeProjectObj.value
+  if (!p) return false
+  if (p.workflow_mode === 'kanban') return true
+  // Fallback: any loaded task for this project reports kanban workflow
+  return tasks.value.some(
+    (t) => t.project_id === p.id && t.project_workflow === 'kanban',
+  )
+})
+
+const showBoardView = computed(
+  () => isKanbanProjectView.value && viewMode.value === 'board',
+)
+
+function setViewMode(mode: TaskViewMode) {
+  viewMode.value = mode
+  try {
+    localStorage.setItem(VIEW_MODE_KEY, mode)
+  } catch {
+    /* ignore */
+  }
+}
 
 function canWriteTask(task: Task): boolean {
   if (isViewerProjectView.value) return false
@@ -973,9 +1011,49 @@ onUnmounted(() => {
           @clear-filters="clearFilters"
         />
 
+        <!-- List | Board toggle for kanban projects -->
+        <div
+          v-if="isKanbanProjectView"
+          class="d-flex align-items-center justify-content-end mb-2"
+        >
+          <div class="btn-group btn-group-sm" role="group" aria-label="View mode">
+            <button
+              type="button"
+              class="btn"
+              :class="viewMode === 'list' ? 'btn-primary' : 'btn-outline-secondary'"
+              @click="setViewMode('list')"
+            >
+              <i class="bi bi-list-ul me-1" />List
+            </button>
+            <button
+              type="button"
+              class="btn"
+              :class="viewMode === 'board' ? 'btn-primary' : 'btn-outline-secondary'"
+              @click="setViewMode('board')"
+            >
+              <i class="bi bi-kanban me-1" />Board
+            </button>
+          </div>
+        </div>
+
+        <!-- Kanban board -->
+        <div v-if="showBoardView" class="mb-3">
+          <div v-if="loading && !tasks.length" class="text-center py-5 text-muted">
+            <div class="spinner-border spinner-border-sm me-2" role="status" />Loading tasks…
+          </div>
+          <KanbanBoard
+            v-else-if="activeProjectObj"
+            :project-id="activeProjectObj.id"
+            :tasks="tasks"
+            :role="activeProjectObj.role"
+            @open-task="openEdit"
+            @changed="reloadInitial"
+          />
+        </div>
+
         <!-- Sleek Bulk Actions Bar -->
         <div
-          v-if="selected.length && !isViewerProjectView"
+          v-if="!showBoardView && selected.length && !isViewerProjectView"
           class="bulk-action-bar alert alert-info py-1.5 px-3 rounded-3 shadow-sm d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2"
         >
           <span class="fw-semibold small">{{ selected.length }} task{{ selected.length === 1 ? '' : 's' }} selected</span>
@@ -1094,7 +1172,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Task Lists Container -->
-        <div id="task-container" aria-live="polite">
+        <div v-if="!showBoardView" id="task-container" aria-live="polite">
           <div v-if="loading && !tasks.length" class="text-center py-5 text-muted">
             <div class="spinner-border spinner-border-sm me-2" role="status" />Loading tasks…
           </div>

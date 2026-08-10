@@ -15,6 +15,7 @@ import type {
   ProjectEvent,
   ProjectInvite,
   ProjectMember,
+  ProjectStatus,
   SavedView,
   SavedViewFilter,
   ShareLink,
@@ -24,7 +25,9 @@ import type {
   Task,
   TaskEvent,
   TaskList,
+  TaskTimeEntry,
   User,
+  WorkflowMode,
 } from './types'
 import { APIError, type APIErrorBody } from './types'
 
@@ -233,6 +236,8 @@ export const api = {
     priority?: number
     favorite?: boolean
     tag_ids?: number[]
+    status_id?: number | null
+    estimate_points?: number | null
   }) {
     return request<Task>('/api/v1/tasks', {
       method: 'POST',
@@ -253,6 +258,8 @@ export const api = {
       completed: boolean
       favorite: boolean
       tag_ids: number[]
+      status_id: number | null
+      estimate_points: number | null
     }>,
   ) {
     return request<Task>(`/api/v1/tasks/${id}`, {
@@ -305,6 +312,7 @@ export const api = {
     favorite: boolean
     project?: string
     parent_id?: number | null
+    status_id?: number | null
   }) {
     return request<{ ok: boolean }>('/api/v1/tasks/reorder', {
       method: 'POST',
@@ -323,10 +331,79 @@ export const api = {
     })
   },
 
+  updateProject(
+    id: number,
+    payload: Partial<{ name: string; workflow_mode: WorkflowMode }>,
+  ) {
+    return request<Project>(`/api/v1/projects/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    })
+  },
+
   renameProject(id: number, name: string) {
     return request<Project>(`/api/v1/projects/${id}`, {
       method: 'PATCH',
       body: JSON.stringify({ name }),
+    })
+  },
+
+  listProjectStatuses(projectId: number) {
+    return request<ProjectStatus[]>(`/api/v1/projects/${projectId}/statuses`)
+  },
+
+  createProjectStatus(
+    projectId: number,
+    payload: { name: string; is_done?: boolean; is_default?: boolean },
+  ) {
+    return request<ProjectStatus>(`/api/v1/projects/${projectId}/statuses`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  updateProjectStatus(
+    projectId: number,
+    statusId: number,
+    payload: Partial<{ name: string; is_done: boolean; is_default: boolean }>,
+  ) {
+    return request<ProjectStatus>(`/api/v1/projects/${projectId}/statuses/${statusId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  deleteProjectStatus(projectId: number, statusId: number, moveToStatusId?: number) {
+    const qs =
+      moveToStatusId != null
+        ? `?move_to_status_id=${encodeURIComponent(String(moveToStatusId))}`
+        : ''
+    return request<void>(`/api/v1/projects/${projectId}/statuses/${statusId}${qs}`, {
+      method: 'DELETE',
+    })
+  },
+
+  reorderProjectStatuses(projectId: number, statusIds: number[]) {
+    return request<{ ok: boolean }>(`/api/v1/projects/${projectId}/statuses/reorder`, {
+      method: 'POST',
+      body: JSON.stringify({ status_ids: statusIds }),
+    })
+  },
+
+  listTimeEntries(taskId: number) {
+    return request<TaskTimeEntry[]>(`/api/v1/tasks/${taskId}/time-entries`)
+  },
+
+  addTimeEntry(taskId: number, minutes: number, note = '') {
+    return request<TaskTimeEntry>(`/api/v1/tasks/${taskId}/time-entries`, {
+      method: 'POST',
+      body: JSON.stringify({ minutes, note }),
+    })
+  },
+
+  deleteTimeEntry(taskId: number, entryId: number) {
+    return request<void>(`/api/v1/tasks/${taskId}/time-entries/${entryId}`, {
+      method: 'DELETE',
     })
   },
 

@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { api } from '@/api/client'
-import type { Project, Tag, Task, TaskEvent } from '@/api/types'
+import type { Project, ProjectStatus, Tag, Task, TaskEvent, TaskTimeEntry } from '@/api/types'
 import { APIError } from '@/api/types'
 import ParentTaskCombobox from '@/components/ParentTaskCombobox.vue'
 import { useTaskSidebar } from '@/composables/useTaskSidebar'
 import { useToast } from '@/composables/useToast'
+import { useConfirm } from '@/composables/useConfirm'
 import { projectOptionLabel } from '@/utils/projectLabel'
 
 const {
@@ -20,6 +21,7 @@ const {
   notifySaved,
 } = useTaskSidebar()
 const toast = useToast()
+const { askConfirm } = useConfirm()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -30,6 +32,13 @@ const events = ref<TaskEvent[]>([])
 const eventsLoaded = ref(false)
 const eventsLoading = ref(false)
 const descriptionError = ref('')
+const statuses = ref<ProjectStatus[]>([])
+const timeEntries = ref<TaskTimeEntry[]>([])
+const timeSpentMinutes = ref(0)
+const newEntryMinutes = ref<number | ''>('')
+const newEntryNote = ref('')
+const addingTime = ref(false)
+const taskWorkflow = ref('')
 
 const titleInput = ref<HTMLInputElement | null>(null)
 const title = ref('')
@@ -42,6 +51,8 @@ const dueDate = ref('')
 const selectedTagIds = ref<number[]>([])
 const newTags = ref('')
 const completed = ref(false)
+const statusId = ref<number | ''>('')
+const estimatePoints = ref<number | ''>('')
 const isSubtask = computed(() => parentId.value !== '' && Number(parentId.value) > 0)
 const readOnly = computed(() => mode.value === 'view')
 const parentOptions = computed(() => rootTasks.value.filter((r) => r.id !== taskId.value))
@@ -50,6 +61,14 @@ const parentPickerDisabled = computed(
     readOnly.value ||
     (mode.value === 'edit' && (rootTasks.value.find((t) => t.id === taskId.value)?.child_count || 0) > 0),
 )
+const selectedProject = computed(() => {
+  if (projectId.value === '') return null
+  return projects.value.find((p) => p.id === Number(projectId.value)) ?? null
+})
+const isKanbanTask = computed(() => {
+  if (taskWorkflow.value === 'kanban') return true
+  return (selectedProject.value?.workflow_mode || 'classic') === 'kanban'
+})
 const sidebarTitle = computed(() => {
   if (mode.value === 'view') return 'View Task'
   if (mode.value === 'edit') return 'Edit Task'
@@ -57,6 +76,16 @@ const sidebarTitle = computed(() => {
 })
 const submitText = computed(() => (mode.value === 'edit' ? 'Save Task' : 'Add Task'))
 const charCount = computed(() => description.value.length)
+const timeSpentLabel = computed(() => formatMinutes(timeSpentMinutes.value))
+
+function formatMinutes(total: number) {
+  if (total <= 0) return '0m'
+  const h = Math.floor(total / 60)
+  const m = total % 60
+  if (h <= 0) return `${m}m`
+  if (m <= 0) return `${h}h`
+  return `${h}h ${m}m`
+}
 
 function resetForm() {
   title.value = ''
@@ -72,6 +101,14 @@ function resetForm() {
   descriptionError.value = ''
   events.value = []
   eventsLoaded.value = false
+  statusId.value = ''
+  estimatePoints.value = ''
+  statuses.value = []
+  timeEntries.value = []
+  timeSpentMinutes.value = 0
+  newEntryMinutes.value = ''
+  newEntryNote.value = ''
+  taskWorkflow.value = ''
 }
 
 async function loadMeta() {
@@ -83,6 +120,39 @@ async function loadMeta() {
   projects.value = projs
   allTags.value = tags
   rootTasks.value = list.tasks.filter((t) => !t.parent_id)
+}
+
+async function loadStatusesForProject(pid: number | '') {
+  if (pid === '' || pid == null) {
+    statuses.value = []
+    return
+  }
+  const proj = projects.value.find((p) => p.id === Number(pid))
+  const kanban =
+    taskWorkflow.value === 'kanban' || (proj?.workflow_mode || 'classic') === 'kanban'
+  if (!kanban) {
+    statuses.value = []
+    return
+  }
+  try {
+    statuses.value = await api.listProjectStatuses(Number(pid))
+    if (statusId.value === '' && mode.value === 'add') {
+      const def = statuses.value.find((s) => s.is_default)
+      if (def) statusId.value = def.id
+    }
+  } catch {
+    statuses.value = []
+  }
+}
+
+async function loadTimeEntries(id: number) {
+  try {
+    const entries = await api.listTimeEntries(id)
+    timeEntries.value = entries
+    timeSpentMinutes.value = entries.reduce((sum, e) => sum + e.minutes, 0)
+  } catch {
+    timeEntries.value = []
+  }
 }
 
 async function loadTask(id: number) {
@@ -106,6 +176,16 @@ async function loadTask(id: number) {
     descriptionError.value = ''
     events.value = []
     eventsLoaded.value = false
+    statusId.value = task.status_id ?? ''
+    estimatePoints.value = task.estimate_points ?? ''
+    timeSpentMinutes.value = task.time_spent_minutes ?? 0
+    taskWorkflow.value = task.project_workflow || ''
+    await loadStatusesForProject(projectId.value)
+    if (taskWorkflow.value === 'kanban' || isKanbanTask.value) {
+      await loadTimeEntries(id)
+    } else {
+      timeEntries.value = []
+    }
   } catch (err) {
     toast.push(err instanceof APIError ? err.message : 'Failed to load task', 'error')
     close()
@@ -166,6 +246,12 @@ async function save(keepOpen = false) {
         priority: priority.value,
         due_date: dueDate.value || undefined,
         tag_ids: tagIds,
+        ...(isKanbanTask.value && statusId.value !== ''
+          ? { status_id: Number(statusId.value) }
+          : {}),
+        ...(isKanbanTask.value && estimatePoints.value !== ''
+          ? { estimate_points: Number(estimatePoints.value) }
+          : {}),
       })
       notifySaved(created, !keepOpen)
       toast.push(isSubtask.value ? 'Subtask created' : 'Task created', 'success')
@@ -197,6 +283,11 @@ async function save(keepOpen = false) {
     }
     if (dueDate.value) payload.due_date = dueDate.value
     else payload.clear_due_date = true
+    if (isKanbanTask.value) {
+      if (statusId.value !== '') payload.status_id = Number(statusId.value)
+      payload.estimate_points =
+        estimatePoints.value === '' ? null : Number(estimatePoints.value)
+    }
     const updated = await api.patchTask(taskId.value, payload)
     notifySaved(updated, true)
     toast.push('Task saved', 'success')
@@ -246,6 +337,14 @@ async function loadEvents() {
 
 watch(description, validateDescription)
 
+async function onProjectChange() {
+  taskWorkflow.value = ''
+  if (statusId.value !== '' && !statuses.value.some((s) => s.id === statusId.value)) {
+    statusId.value = ''
+  }
+  await loadStatusesForProject(projectId.value)
+}
+
 watch(
   () => ({
     isOpen: open.value,
@@ -271,6 +370,7 @@ watch(
         const p = rootTasks.value.find((t) => t.id === parent)
         if (p?.project_id) projectId.value = p.project_id
       }
+      await loadStatusesForProject(projectId.value)
       await nextTick()
       titleInput.value?.focus()
     }
@@ -278,7 +378,7 @@ watch(
   { immediate: true },
 )
 
-function onParentChange() {
+async function onParentChange() {
   if (!isSubtask.value) {
     parentTitle.value = ''
     return
@@ -287,6 +387,47 @@ function onParentChange() {
   parentTitle.value = p?.title || ''
   if (p?.project_id) projectId.value = p.project_id
   else projectId.value = ''
+  taskWorkflow.value = p?.project_workflow || ''
+  await loadStatusesForProject(projectId.value)
+}
+
+async function addTimeEntry() {
+  if (!taskId.value || readOnly.value) return
+  const minutes = Number(newEntryMinutes.value)
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    toast.push('Enter minutes greater than 0', 'error')
+    return
+  }
+  addingTime.value = true
+  try {
+    await api.addTimeEntry(taskId.value, minutes, newEntryNote.value.trim())
+    newEntryMinutes.value = ''
+    newEntryNote.value = ''
+    toast.push('Time logged', 'success')
+    await loadTimeEntries(taskId.value)
+  } catch (err) {
+    toast.push(err instanceof APIError ? err.message : 'Could not add time entry', 'error')
+  } finally {
+    addingTime.value = false
+  }
+}
+
+async function removeTimeEntry(entryId: number) {
+  if (!taskId.value || readOnly.value) return
+  const ok = await askConfirm({
+    title: 'Delete time entry?',
+    message: 'Remove this time entry?',
+    confirmLabel: 'Delete',
+    danger: true,
+  })
+  if (!ok) return
+  try {
+    await api.deleteTimeEntry(taskId.value, entryId)
+    toast.push('Time entry deleted', 'info')
+    await loadTimeEntries(taskId.value)
+  } catch (err) {
+    toast.push(err instanceof APIError ? err.message : 'Could not delete time entry', 'error')
+  }
 }
 </script>
 
@@ -363,10 +504,40 @@ function onParentChange() {
         </div>
         <div class="form-group mt-2">
           <label for="project_id">Project (optional):</label>
-          <select id="project_id" v-model="projectId" class="form-select" :disabled="readOnly || isSubtask">
+          <select
+            id="project_id"
+            v-model="projectId"
+            class="form-select"
+            :disabled="readOnly || isSubtask"
+            @change="onProjectChange"
+          >
             <option value="">No project</option>
             <option v-for="p in projects" :key="p.id" :value="p.id">{{ projectOptionLabel(p) }}</option>
           </select>
+        </div>
+        <div v-if="isKanbanTask" class="form-group mt-2">
+          <label for="status_id">Status:</label>
+          <select id="status_id" v-model="statusId" class="form-select" :disabled="readOnly">
+            <option v-if="!statuses.length" value="">No statuses</option>
+            <option v-for="s in statuses" :key="s.id" :value="s.id">
+              {{ s.name }}{{ s.is_done ? ' (done)' : '' }}{{ s.is_default ? ' (default)' : '' }}
+            </option>
+          </select>
+        </div>
+        <div v-if="isKanbanTask" class="form-group mt-2">
+          <label for="estimate_points">Estimate (points):</label>
+          <input
+            id="estimate_points"
+            v-model="estimatePoints"
+            type="number"
+            class="form-control"
+            min="0"
+            max="100"
+            step="1"
+            :disabled="readOnly"
+            :readonly="readOnly"
+            placeholder="0–100"
+          />
         </div>
         <div class="form-group mt-2">
           <label for="priority">Priority:</label>
@@ -414,6 +585,69 @@ function onParentChange() {
             maxlength="200"
           />
           <small class="form-hint">New tag names are created on save (max 5 tags per task).</small>
+        </div>
+
+        <div
+          v-if="isKanbanTask && (mode === 'edit' || mode === 'view')"
+          class="form-group mt-3 border-top pt-3"
+        >
+          <label class="d-block">Time tracking</label>
+          <p class="small text-muted mb-2">
+            Total logged: <strong>{{ timeSpentLabel }}</strong>
+            <span v-if="timeSpentMinutes">({{ timeSpentMinutes }} min)</span>
+          </p>
+          <form v-if="!readOnly" class="row g-2 align-items-end mb-2" @submit.prevent="addTimeEntry">
+            <div class="col-4">
+              <label class="form-label small mb-0" for="time_minutes">Minutes</label>
+              <input
+                id="time_minutes"
+                v-model="newEntryMinutes"
+                type="number"
+                class="form-control form-control-sm"
+                min="1"
+                max="1440"
+                required
+              />
+            </div>
+            <div class="col-5">
+              <label class="form-label small mb-0" for="time_note">Note</label>
+              <input
+                id="time_note"
+                v-model="newEntryNote"
+                type="text"
+                class="form-control form-control-sm"
+                maxlength="200"
+                placeholder="Optional"
+              />
+            </div>
+            <div class="col-3">
+              <button class="btn btn-sm btn-outline-primary w-100" type="submit" :disabled="addingTime">
+                Add
+              </button>
+            </div>
+          </form>
+          <ul v-if="timeEntries.length" class="list-unstyled small mb-0">
+            <li
+              v-for="entry in timeEntries"
+              :key="entry.id"
+              class="d-flex justify-content-between align-items-start gap-2 mb-1"
+            >
+              <span>
+                <strong>{{ entry.minutes }}m</strong>
+                <span v-if="entry.note"> — {{ entry.note }}</span>
+                <span class="text-muted"> · {{ entry.user_name || entry.user_email || 'user' }}</span>
+              </span>
+              <button
+                v-if="!readOnly"
+                class="btn btn-sm btn-link text-danger p-0"
+                type="button"
+                @click="removeTimeEntry(entry.id)"
+              >
+                Delete
+              </button>
+            </li>
+          </ul>
+          <p v-else class="small text-muted mb-0">No time entries yet.</p>
         </div>
 
         <!-- Form Submit Action Buttons -->

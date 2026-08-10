@@ -17,13 +17,37 @@ export type Tag = {
   color: string
 }
 
+export type WorkflowMode = 'classic' | 'kanban'
+
 export type Project = {
   id: number
   name: string
+  workflow_mode?: WorkflowMode
   role?: 'owner' | 'editor' | 'viewer'
   owner_email?: string
   owner_user_name?: string
   owner_user_id?: number
+}
+
+export type ProjectStatus = {
+  id: number
+  project_id: number
+  name: string
+  position: number
+  is_done: boolean
+  is_default: boolean
+  created_at: string
+}
+
+export type TaskTimeEntry = {
+  id: number
+  task_id: number
+  user_id: number
+  minutes: number
+  note: string
+  created_at: string
+  user_email?: string
+  user_name?: string
 }
 
 export type ProjectMember = {
@@ -103,6 +127,11 @@ export type Task = {
   tags: Tag[]
   created_at: string
   modified_at: string
+  status_id?: number | null
+  status_name?: string
+  estimate_points?: number | null
+  time_spent_minutes?: number
+  project_workflow?: WorkflowMode | string
 }
 
 export type TaskEvent = {
