@@ -176,6 +176,10 @@ func apiV1PatchAdminSettings(w http.ResponseWriter, r *http.Request) {
 		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "site_name and default_timezone are required.")
 		return
 	}
+	if !utils.IsValidTimezone(next.DefaultTimezone) {
+		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid timezone.")
+		return
+	}
 	if len(next.GlobalAnnouncementText) > 500 {
 		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Global announcement text must be 500 characters or less.")
 		return

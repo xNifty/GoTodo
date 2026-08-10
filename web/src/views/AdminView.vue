@@ -6,6 +6,7 @@ import { APIError } from '@/api/types'
 import { useSite } from '@/composables/useSite'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import TimezoneSelect from '@/components/TimezoneSelect.vue'
 
 const toast = useToast()
 const { askConfirm } = useConfirm()
@@ -172,8 +173,8 @@ onMounted(load)
             <input v-model="settings.site_name" type="text" class="form-control" required />
           </div>
           <div class="mb-3">
-            <label class="form-label">Default timezone</label>
-            <input v-model="settings.default_timezone" type="text" class="form-control" required />
+            <label for="admin-default-timezone" class="form-label">Default timezone</label>
+            <TimezoneSelect id="admin-default-timezone" v-model="settings.default_timezone" required />
           </div>
           <div class="mb-3">
             <label class="form-label">Meta description</label>
