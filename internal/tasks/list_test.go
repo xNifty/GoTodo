@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	embeddedpostgres "github.com/fergusstrange/embedded-postgres"
@@ -15,10 +16,13 @@ func TestMain(m *testing.M) {
 	os.Setenv("SESSION_KEY", "test-session-key-for-unit-tests-32chars!!")
 	port := uint32(5438)
 	// Pin a Maven-published binary version (DefaultConfig alone can drift and 404).
+	// Isolate RuntimePath for parallel go test ./... against other packages.
+	runtimePath := filepath.Join(os.TempDir(), "gotodo-embedded-pg-tasks")
 	db := embeddedpostgres.NewDatabase(embeddedpostgres.DefaultConfig().
 		Version(embeddedpostgres.V16).
 		Port(port).
-		Database("gotodo_test"))
+		Database("gotodo_test").
+		RuntimePath(runtimePath))
 	if err := db.Start(); err != nil {
 		fmt.Fprintf(os.Stderr, "start postgres: %v\n", err)
 		os.Exit(1)

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"GoTodo/internal/storage"
@@ -16,10 +17,14 @@ import (
 func TestMain(m *testing.M) {
 	os.Setenv("SESSION_KEY", "test-session-key-for-unit-tests-32chars!!")
 	port := uint32(5441)
+	// Isolate RuntimePath so go test ./... can run this package in parallel with
+	// internal/tasks (which also starts embedded-postgres).
+	runtimePath := filepath.Join(os.TempDir(), "gotodo-embedded-pg-domain")
 	db := embeddedpostgres.NewDatabase(embeddedpostgres.DefaultConfig().
 		Version(embeddedpostgres.V16).
 		Port(port).
-		Database("gotodo_workflow_test"))
+		Database("gotodo_workflow_test").
+		RuntimePath(runtimePath))
 	if err := db.Start(); err != nil {
 		fmt.Fprintf(os.Stderr, "start postgres: %v\n", err)
 		os.Exit(1)
