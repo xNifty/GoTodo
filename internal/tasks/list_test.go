@@ -41,7 +41,7 @@ func TestMain(m *testing.M) {
 	}
 
 	_, err = pool.Exec(context.Background(), `
-		CREATE TABLE users (id SERIAL PRIMARY KEY, email TEXT);
+		CREATE TABLE users (id SERIAL PRIMARY KEY, email TEXT, user_name TEXT);
 		CREATE TABLE saved_views (
 			id SERIAL PRIMARY KEY,
 			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -97,7 +97,8 @@ func TestMain(m *testing.M) {
 			date_modified TIMESTAMP,
 			due_date DATE,
 			status_id INTEGER,
-			estimate_points INTEGER
+			estimate_points INTEGER,
+			claimed_by INTEGER
 		);
 		CREATE TABLE task_tags (
 			task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,

@@ -22,6 +22,7 @@ import type {
   ShareLinkView,
   SiteInfo,
   Tag,
+  NotificationList,
   Task,
   TaskEvent,
   TaskList,
@@ -406,6 +407,34 @@ export const api = {
     return request<void>(`/api/v1/tasks/${taskId}/time-entries/${entryId}`, {
       method: 'DELETE',
     })
+  },
+
+  claimTask(taskId: number) {
+    return request<Task>(`/api/v1/tasks/${taskId}/claim`, { method: 'POST' })
+  },
+
+  unclaimTask(taskId: number) {
+    return request<Task>(`/api/v1/tasks/${taskId}/claim`, { method: 'DELETE' })
+  },
+
+  listNotifications(params: { page?: number; per_page?: number } = {}) {
+    const qs = new URLSearchParams()
+    if (params.page) qs.set('page', String(params.page))
+    if (params.per_page) qs.set('per_page', String(params.per_page))
+    const q = qs.toString()
+    return request<NotificationList>(`/api/v1/notifications${q ? `?${q}` : ''}`)
+  },
+
+  unreadNotificationCount() {
+    return request<{ unread_count: number }>('/api/v1/notifications/unread-count')
+  },
+
+  markNotificationRead(id: number) {
+    return request<void>(`/api/v1/notifications/${id}/read`, { method: 'POST' })
+  },
+
+  markAllNotificationsRead() {
+    return request<void>('/api/v1/notifications/read-all', { method: 'POST' })
   },
 
   deleteProject(id: number) {

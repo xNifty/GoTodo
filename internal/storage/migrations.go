@@ -171,6 +171,14 @@ func RunMigrations() error {
 		fmt.Printf("migration: MigrateTasksAddWorkflowFields failed: %v\n", err)
 		errCount++
 	}
+	if err := MigrateTasksAddClaimedBy(); err != nil {
+		fmt.Printf("migration: MigrateTasksAddClaimedBy failed: %v\n", err)
+		errCount++
+	}
+	if err := CreateUserNotificationsTable(); err != nil {
+		fmt.Printf("migration: CreateUserNotificationsTable failed: %v\n", err)
+		errCount++
+	}
 
 	// Ensure password_reset table exists
 	if err := CreatePasswordResetTable(); err != nil {

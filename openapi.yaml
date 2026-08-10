@@ -20,6 +20,7 @@ tags:
   - name: Profile
   - name: API Keys
   - name: Tasks
+  - name: Notifications
   - name: Projects
   - name: Tags
   - name: Saved Views
@@ -594,6 +595,14 @@ paths:
           in: query
           schema:
             type: string
+        - name: workflow_claim_scope
+          in: query
+          schema:
+            type: string
+            enum: [mine, all]
+          description: >
+            When mine, hide unclaimed kanban-project tasks (classic tasks unchanged).
+            Use all for the kanban board backlog. Default is no claim filter when omitted.
       responses:
         "200":
           description: Paginated task list
@@ -1022,6 +1031,119 @@ paths:
       responses:
         "204":
           description: Deleted
+
+  /api/v1/tasks/{id}/claim:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      tags: [Tasks]
+      summary: Claim a kanban task (or take over from another claimer)
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Tasks]
+      summary: Release claim on a kanban task
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/notifications:
+    get:
+      tags: [Notifications]
+      summary: List in-app notifications
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Notification list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationList"
+
+  /api/v1/notifications/unread-count:
+    get:
+      tags: [Notifications]
+      summary: Unread notification count
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  unread_count:
+                    type: integer
+
+  /api/v1/notifications/read-all:
+    post:
+      tags: [Notifications]
+      summary: Mark all notifications read
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "204":
+          description: Marked read
+
+  /api/v1/notifications/{id}/read:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      tags: [Notifications]
+      summary: Mark one notification read
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "204":
+          description: Marked read
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /api/v1/tasks/{id}/time-entries:
     parameters:
@@ -2471,6 +2593,56 @@ components:
         project_workflow:
           type: string
           enum: [classic, kanban]
+        claimed_by:
+          type: integer
+          nullable: true
+          description: User id of the claimer for kanban tasks; null when unclaimed
+        claimed_by_name:
+          type: string
+          description: Display name of the claimer
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+        project_id:
+          type: integer
+          nullable: true
+        task_id:
+          type: integer
+          nullable: true
+        project_name:
+          type: string
+        actor_name:
+          type: string
+        read_at:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+
+    NotificationList:
+      type: object
+      properties:
+        notifications:
+          type: array
+          items:
+            $ref: "#/components/schemas/Notification"
+        total:
+          type: integer
+        page:
+          type: integer
+        per_page:
+          type: integer
+        unread_count:
+          type: integer
 
     TaskList:
       type: object

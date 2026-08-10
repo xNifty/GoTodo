@@ -132,6 +132,9 @@ func CreateTask(ctx context.Context, userID int, in CreateTaskInput) (int, error
 			}
 		}
 		_ = storage.LogTaskEvent(newID, userID, "created", map[string]interface{}{"parent_id": *in.ParentID})
+		if pid, ok := projectArg.(int); ok && pid > 0 {
+			NotifyProjectMembersTaskCreated(newID, userID, pid, title)
+		}
 		return newID, nil
 	}
 
@@ -181,6 +184,9 @@ func CreateTask(ctx context.Context, userID int, in CreateTaskInput) (int, error
 		}
 	}
 	_ = storage.LogTaskEvent(newID, userID, "created", nil)
+	if pid, ok := projectArg.(int); ok && pid > 0 {
+		NotifyProjectMembersTaskCreated(newID, userID, pid, title)
+	}
 	return newID, nil
 }
 

@@ -27,16 +27,25 @@
     <template v-if="isKanban">
       <h4 class="h6">Statuses</h4>
       <p class="small text-muted mb-2">
-        Up to {{ maxStatuses }} columns. One must be default (new tasks) and at least one must be done
-        (completed).
+        Up to {{ maxStatuses }} columns. Drag to set board column order. One must be default (new tasks)
+        and at least one must be done (completed).
       </p>
 
-      <ul class="list-unstyled mb-3">
+      <ul ref="statusListEl" class="list-unstyled mb-3 status-reorder-list">
         <li
-          v-for="s in statuses"
+          v-for="(s, index) in statuses"
           :key="s.id"
-          class="d-flex flex-wrap align-items-center gap-2 mb-2 pb-2 border-bottom"
+          class="status-reorder-item d-flex flex-wrap align-items-center gap-2 mb-2 pb-2 border-bottom"
+          :data-status-id="s.id"
         >
+          <span
+            class="status-drag-handle text-muted"
+            title="Drag to reorder"
+            aria-label="Drag to reorder status"
+          >
+            <i class="bi bi-grip-vertical" />
+          </span>
+
           <template v-if="renameId === s.id">
             <form class="d-flex align-items-center gap-1 flex-wrap flex-grow-1" @submit.prevent="saveRename(s)">
               <input
@@ -75,6 +84,28 @@
           </template>
 
           <div class="d-flex flex-wrap align-items-center gap-2 ms-auto">
+            <div class="btn-group btn-group-sm" role="group" aria-label="Move status">
+              <button
+                type="button"
+                class="btn btn-outline-secondary"
+                :disabled="index === 0 || reordering"
+                title="Move up"
+                aria-label="Move status up"
+                @click="moveStatus(index, -1)"
+              >
+                <i class="bi bi-arrow-up" />
+              </button>
+              <button
+                type="button"
+                class="btn btn-outline-secondary"
+                :disabled="index === statuses.length - 1 || reordering"
+                title="Move down"
+                aria-label="Move status down"
+                @click="moveStatus(index, 1)"
+              >
+                <i class="bi bi-arrow-down" />
+              </button>
+            </div>
             <div class="form-check form-check-inline m-0">
               <input
                 :id="`default-${s.id}`"
@@ -160,7 +191,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import Sortable from 'sortablejs'
 import { api } from '@/api/client'
 import type { Project, ProjectStatus } from '@/api/types'
 import { APIError } from '@/api/types'
@@ -174,26 +206,94 @@ const statuses = ref<ProjectStatus[]>([])
 const savingMode = ref(false)
 const adding = ref(false)
 const deleting = ref(false)
+const reordering = ref(false)
 const newStatusName = ref('')
 const newStatusDone = ref(false)
 const renameId = ref<number | null>(null)
 const renameValue = ref('')
 const deleteTarget = ref<ProjectStatus | null>(null)
 const moveToStatusId = ref(0)
+const statusListEl = ref<HTMLElement | null>(null)
 const toast = useToast()
+let sortable: Sortable | null = null
 
 const isKanban = computed(() => (props.project.workflow_mode || 'classic') === 'kanban')
 const moveOptions = computed(() =>
   statuses.value.filter((s) => s.id !== deleteTarget.value?.id),
 )
 
+function destroySortable() {
+  sortable?.destroy()
+  sortable = null
+}
+
+function collectOrderedIds(el: HTMLElement): number[] {
+  return Array.from(el.querySelectorAll(':scope > .status-reorder-item'))
+    .map((node) => parseInt((node as HTMLElement).dataset.statusId || '', 10))
+    .filter((id) => !Number.isNaN(id))
+}
+
+async function persistOrder(orderedIds: number[]) {
+  if (reordering.value) return
+  const current = statuses.value.map((s) => s.id)
+  if (
+    orderedIds.length !== current.length ||
+    orderedIds.every((id, i) => id === current[i])
+  ) {
+    return
+  }
+  const previous = [...statuses.value]
+  const byId = new Map(statuses.value.map((s) => [s.id, s]))
+  statuses.value = orderedIds.map((id) => byId.get(id)!).filter(Boolean)
+  reordering.value = true
+  try {
+    await api.reorderProjectStatuses(props.project.id, orderedIds)
+    emit('changed')
+  } catch (err) {
+    statuses.value = previous
+    toast.push(err instanceof APIError ? err.message : 'Could not reorder statuses', 'error')
+    await nextTick()
+    initSortable()
+  } finally {
+    reordering.value = false
+  }
+}
+
+function initSortable() {
+  destroySortable()
+  if (!statusListEl.value || !isKanban.value || statuses.value.length < 2) return
+  sortable = Sortable.create(statusListEl.value, {
+    handle: '.status-drag-handle',
+    draggable: '.status-reorder-item',
+    animation: 150,
+    onEnd(evt) {
+      const el = evt.to as HTMLElement
+      void persistOrder(collectOrderedIds(el))
+    },
+  })
+}
+
+async function moveStatus(index: number, delta: number) {
+  const next = index + delta
+  if (next < 0 || next >= statuses.value.length) return
+  const ordered = statuses.value.map((s) => s.id)
+  const [id] = ordered.splice(index, 1)
+  ordered.splice(next, 0, id)
+  await persistOrder(ordered)
+  await nextTick()
+  initSortable()
+}
+
 async function loadStatuses() {
   if (!isKanban.value) {
     statuses.value = []
+    destroySortable()
     return
   }
   try {
     statuses.value = await api.listProjectStatuses(props.project.id)
+    await nextTick()
+    initSortable()
   } catch (err) {
     toast.push(err instanceof APIError ? err.message : 'Failed to load statuses', 'error')
   }
@@ -321,4 +421,24 @@ watch(
 )
 
 onMounted(loadStatuses)
+
+onBeforeUnmount(() => {
+  destroySortable()
+})
 </script>
+
+<style scoped>
+.status-drag-handle {
+  cursor: grab;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.2rem;
+  opacity: 0.65;
+}
+.status-drag-handle:active {
+  cursor: grabbing;
+}
+.status-reorder-item {
+  user-select: none;
+}
+</style>

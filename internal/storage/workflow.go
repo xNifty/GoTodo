@@ -52,6 +52,8 @@ type TaskWorkflowFields struct {
 	EstimatePoints    *int
 	TimeSpentMinutes  int
 	ProjectWorkflow   string
+	ClaimedBy         int
+	ClaimedByName     string
 }
 
 // CreateProjectWorkflowTables creates statuses and time-entry tables.
@@ -158,6 +160,41 @@ func MigrateTasksAddWorkflowFields() error {
 		if err != nil {
 			return fmt.Errorf("failed to add status FK: %v", err)
 		}
+	}
+	return nil
+}
+
+// MigrateTasksAddClaimedBy adds claimed_by for kanban task ownership.
+func MigrateTasksAddClaimedBy() error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return err
+	}
+	defer CloseDatabase(pool)
+
+	if _, err := pool.Exec(context.Background(),
+		`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS claimed_by INTEGER`); err != nil {
+		return fmt.Errorf("failed to add claimed_by: %v", err)
+	}
+
+	var exists bool
+	err = pool.QueryRow(context.Background(),
+		`SELECT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_tasks_claimed_by')`).Scan(&exists)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		_, err = pool.Exec(context.Background(),
+			`ALTER TABLE tasks ADD CONSTRAINT fk_tasks_claimed_by
+			 FOREIGN KEY (claimed_by) REFERENCES users(id) ON DELETE SET NULL`)
+		if err != nil {
+			return fmt.Errorf("failed to add claimed_by FK: %v", err)
+		}
+	}
+
+	if _, err := pool.Exec(context.Background(),
+		`CREATE INDEX IF NOT EXISTS idx_tasks_claimed_by ON tasks(claimed_by)`); err != nil {
+		return fmt.Errorf("failed to index claimed_by: %v", err)
 	}
 	return nil
 }
@@ -617,10 +654,12 @@ func GetWorkflowFieldsForTasks(taskIDs []int) (map[int]TaskWorkflowFields, error
 	rows, err := pool.Query(context.Background(),
 		`SELECT t.id, t.status_id, COALESCE(s.name, ''), t.estimate_points,
 		        COALESCE(p.workflow_mode, 'classic'),
-		        COALESCE((SELECT SUM(minutes) FROM task_time_entries e WHERE e.task_id = t.id), 0)
+		        COALESCE((SELECT SUM(minutes) FROM task_time_entries e WHERE e.task_id = t.id), 0),
+		        t.claimed_by, COALESCE(cu.user_name, cu.email, '')
 		 FROM tasks t
 		 LEFT JOIN project_statuses s ON s.id = t.status_id
 		 LEFT JOIN projects p ON p.id = t.project_id
+		 LEFT JOIN users cu ON cu.id = t.claimed_by
 		 WHERE t.id = ANY($1)`, taskIDs)
 	if err != nil {
 		return nil, err
@@ -634,13 +673,16 @@ func GetWorkflowFieldsForTasks(taskIDs []int) (map[int]TaskWorkflowFields, error
 		var estimate sql.NullInt64
 		var mode string
 		var spent int
-		if err := rows.Scan(&id, &statusID, &statusName, &estimate, &mode, &spent); err != nil {
+		var claimedBy sql.NullInt64
+		var claimedByName string
+		if err := rows.Scan(&id, &statusID, &statusName, &estimate, &mode, &spent, &claimedBy, &claimedByName); err != nil {
 			return nil, err
 		}
 		f := TaskWorkflowFields{
 			StatusName:       statusName,
 			TimeSpentMinutes: spent,
 			ProjectWorkflow:  mode,
+			ClaimedByName:    claimedByName,
 		}
 		if statusID.Valid {
 			f.StatusID = int(statusID.Int64)
@@ -649,9 +691,50 @@ func GetWorkflowFieldsForTasks(taskIDs []int) (map[int]TaskWorkflowFields, error
 			v := int(estimate.Int64)
 			f.EstimatePoints = &v
 		}
+		if claimedBy.Valid {
+			f.ClaimedBy = int(claimedBy.Int64)
+		}
 		out[id] = f
 	}
 	return out, rows.Err()
+}
+
+// SetTaskClaimedBy sets or clears the claimer for a task.
+func SetTaskClaimedBy(taskID int, claimedBy *int) error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return err
+	}
+	defer CloseDatabase(pool)
+
+	var arg interface{}
+	if claimedBy != nil && *claimedBy > 0 {
+		arg = *claimedBy
+	}
+	_, err = pool.Exec(context.Background(),
+		`UPDATE tasks SET claimed_by = $1, date_modified = NOW() AT TIME ZONE 'UTC' WHERE id = $2`,
+		arg, taskID)
+	return err
+}
+
+// GetTaskClaimedBy returns the current claimer user id (0 if none).
+func GetTaskClaimedBy(taskID int) (int, error) {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return 0, err
+	}
+	defer CloseDatabase(pool)
+
+	var claimed sql.NullInt64
+	err = pool.QueryRow(context.Background(),
+		`SELECT claimed_by FROM tasks WHERE id = $1`, taskID).Scan(&claimed)
+	if err != nil {
+		return 0, err
+	}
+	if !claimed.Valid {
+		return 0, nil
+	}
+	return int(claimed.Int64), nil
 }
 
 // ListTaskTimeEntries returns time entries for a task newest first.

@@ -111,7 +111,11 @@ const allSelected = computed(
 )
 const isSearching = computed(() => filters.search !== '')
 const showTaskTable = computed(
-  () => total.value > 0 || favoriteTasks.value.length > 0 || hasActiveFilters.value,
+  () =>
+    total.value > 0 ||
+    favoriteTasks.value.length > 0 ||
+    hasActiveFilters.value ||
+    isKanbanProjectView.value,
 )
 
 const activeProjectObj = computed(() => {
@@ -154,12 +158,37 @@ const showBoardView = computed(
 )
 
 function setViewMode(mode: TaskViewMode) {
+  if (viewMode.value === mode) return
   viewMode.value = mode
   try {
     localStorage.setItem(VIEW_MODE_KEY, mode)
   } catch {
     /* ignore */
   }
+  void reloadInitial()
+}
+
+function listApiParams(page: number, perPage: number) {
+  // Board needs the full backlog (including unclaimed). List/home only show
+  // kanban tasks the current user has claimed.
+  const onKanbanBoard = isKanbanProjectView.value && viewMode.value === 'board'
+  return {
+    ...toApiParams(page, perPage),
+    workflow_claim_scope: onKanbanBoard ? 'all' : 'mine',
+  }
+}
+
+/** Prefer board when entering a kanban project so unclaimed backlog is visible. */
+function ensureKanbanBoardDefault() {
+  if (!isKanbanProjectView.value) return false
+  if (viewMode.value === 'board') return false
+  viewMode.value = 'board'
+  try {
+    localStorage.setItem(VIEW_MODE_KEY, 'board')
+  } catch {
+    /* ignore */
+  }
+  return true
 }
 
 function canWriteTask(task: Task): boolean {
@@ -424,6 +453,7 @@ function syncFiltersFromRoute() {
       activeViewId.value = String(view.id)
       applySavedViewFilters(view.filter || {})
       search.value = filters.search
+      ensureKanbanBoardDefault()
       return
     }
   }
@@ -431,6 +461,7 @@ function syncFiltersFromRoute() {
   if (qProject !== null) {
     activeViewId.value = null
     setFilter('project', qProject)
+    ensureKanbanBoardDefault()
     return
   }
 }
@@ -441,7 +472,7 @@ async function reloadInitial() {
   selected.value = []
   try {
     const perPage = user.value?.items_per_page || 50
-    const list = await api.listTasks(toApiParams(1, perPage))
+    const list = await api.listTasks(listApiParams(1, perPage))
     tasks.value = list.tasks
     loadedPage.value = 1
     total.value = list.total
@@ -464,7 +495,7 @@ async function loadMore() {
   try {
     const perPage = user.value?.items_per_page || 50
     const nextPage = loadedPage.value + 1
-    const list = await api.listTasks(toApiParams(nextPage, perPage))
+    const list = await api.listTasks(listApiParams(nextPage, perPage))
     const existingIds = new Set(tasks.value.map((t) => t.id))
     const newTasks = list.tasks.filter((t) => !existingIds.has(t.id))
     tasks.value = [...tasks.value, ...newTasks]
@@ -713,9 +744,12 @@ function selectProjectFilter(id: string) {
   activeViewId.value = null
   if (filters.project === id) {
     setFilterAndReload('project', '')
-  } else {
-    setFilterAndReload('project', id)
+    return
   }
+  setFilter('project', id)
+  // Switch to board before reload so claim-scope=all is used for kanban projects.
+  ensureKanbanBoardDefault()
+  void reloadInitial()
 }
 
 function selectSavedViewFilter(id: string) {
@@ -1309,16 +1343,26 @@ onUnmounted(() => {
                 </div>
               </div>
 
-              <!-- Empty Search Results -->
+              <!-- Empty Search Results / unclaimed kanban backlog -->
               <div
-                v-if="!tasks.length && hasActiveFilters"
+                v-if="!tasks.length && (hasActiveFilters || isKanbanProjectView)"
                 class="text-center py-5 rounded-3 border"
                 style="background: var(--ordryn-card-bg); color: var(--ordryn-text); border-color: var(--ordryn-card-border) !important;"
               >
-                <p class="text-muted mb-2">No tasks match your active filters.</p>
-                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill" @click="clearFilters">
-                  <i class="bi bi-x-circle me-1" />Clear filters
-                </button>
+                <template v-if="isKanbanProjectView">
+                  <p class="text-muted mb-2">
+                    No claimed tasks in your list. Unclaimed work lives on the board — claim a task to see it here.
+                  </p>
+                  <button type="button" class="btn btn-sm btn-primary rounded-pill" @click="setViewMode('board')">
+                    <i class="bi bi-kanban me-1" />Open board
+                  </button>
+                </template>
+                <template v-else>
+                  <p class="text-muted mb-2">No tasks match your active filters.</p>
+                  <button type="button" class="btn btn-sm btn-outline-primary rounded-pill" @click="clearFilters">
+                    <i class="bi bi-x-circle me-1" />Clear filters
+                  </button>
+                </template>
               </div>
 
               <!-- Infinite Scroll Sentinel -->

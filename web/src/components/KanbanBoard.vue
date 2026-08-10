@@ -69,6 +69,33 @@
                     >
                       {{ task.estimate_points }} pts
                     </span>
+                    <span
+                      class="badge border"
+                      :class="task.claimed_by ? 'text-bg-primary' : 'text-bg-light text-muted'"
+                      title="Claimed by"
+                    >
+                      <i class="bi bi-person me-1" />{{ claimerLabel(task) }}
+                    </span>
+                  </div>
+                  <div v-if="canDrag" class="mt-2">
+                    <button
+                      v-if="!task.claimed_by || task.claimed_by !== user?.id"
+                      type="button"
+                      class="btn btn-sm btn-outline-primary py-0 px-2"
+                      :disabled="claimingId === task.id"
+                      @click.stop="claimTask(task)"
+                    >
+                      {{ task.claimed_by ? 'Take over' : 'Claim' }}
+                    </button>
+                    <button
+                      v-else
+                      type="button"
+                      class="btn btn-sm btn-outline-secondary py-0 px-2"
+                      :disabled="claimingId === task.id"
+                      @click.stop="unclaimTask(task)"
+                    >
+                      Release
+                    </button>
                   </div>
                 </div>
               </div>
@@ -86,6 +113,7 @@ import Sortable from 'sortablejs'
 import { api } from '@/api/client'
 import type { ProjectStatus, Task } from '@/api/types'
 import { APIError } from '@/api/types'
+import { useAuth } from '@/composables/useAuth'
 import { useToast } from '@/composables/useToast'
 
 const props = defineProps<{
@@ -100,12 +128,44 @@ const emit = defineEmits<{
 }>()
 
 const toast = useToast()
+const { user } = useAuth()
 const statuses = ref<ProjectStatus[]>([])
 const loading = ref(true)
+const claimingId = ref<number | null>(null)
 const columnEls = new Map<number, HTMLElement>()
 const sortables: Sortable[] = []
 
 const canDrag = computed(() => props.role !== 'viewer')
+
+function claimerLabel(task: Task) {
+  if (!task.claimed_by) return 'Unclaimed'
+  if (user.value?.id && task.claimed_by === user.value.id) return 'You'
+  return task.claimed_by_name || `User #${task.claimed_by}`
+}
+
+async function claimTask(task: Task) {
+  claimingId.value = task.id
+  try {
+    await api.claimTask(task.id)
+    emit('changed')
+  } catch (err) {
+    toast.push(err instanceof APIError ? err.message : 'Could not claim task', 'error')
+  } finally {
+    claimingId.value = null
+  }
+}
+
+async function unclaimTask(task: Task) {
+  claimingId.value = task.id
+  try {
+    await api.unclaimTask(task.id)
+    emit('changed')
+  } catch (err) {
+    toast.push(err instanceof APIError ? err.message : 'Could not release task', 'error')
+  } finally {
+    claimingId.value = null
+  }
+}
 
 function setColumnEl(statusId: number, el: unknown) {
   if (el instanceof HTMLElement) {
@@ -115,8 +175,24 @@ function setColumnEl(statusId: number, el: unknown) {
   }
 }
 
+const statusIdSet = computed(() => new Set(statuses.value.map((s) => s.id)))
+
+const defaultStatusId = computed(() => {
+  const def = statuses.value.find((s) => s.is_default)
+  return def?.id ?? statuses.value[0]?.id ?? 0
+})
+
 function tasksForStatus(statusId: number): Task[] {
-  return props.tasks.filter((t) => !t.parent_id && t.status_id === statusId)
+  const known = statusIdSet.value
+  return props.tasks.filter((t) => {
+    if (t.parent_id) return false
+    // Place tasks with missing/unknown status into the default column so they
+    // never disappear from the board after workflow changes.
+    if (!t.status_id || !known.has(t.status_id)) {
+      return statusId === defaultStatusId.value
+    }
+    return t.status_id === statusId
+  })
 }
 
 function priorityLabel(p: number) {

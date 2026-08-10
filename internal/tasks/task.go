@@ -36,6 +36,8 @@ type Task struct {
 	EstimatePoints     *int
 	TimeSpentMinutes   int
 	ProjectWorkflow    string
+	ClaimedBy          int
+	ClaimedByName      string
 }
 
 func (t *Task) Validate() error {

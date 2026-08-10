@@ -4,6 +4,7 @@ import { api } from '@/api/client'
 import type { Project, ProjectStatus, Tag, Task, TaskEvent, TaskTimeEntry } from '@/api/types'
 import { APIError } from '@/api/types'
 import ParentTaskCombobox from '@/components/ParentTaskCombobox.vue'
+import { useAuth } from '@/composables/useAuth'
 import { useTaskSidebar } from '@/composables/useTaskSidebar'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
@@ -22,6 +23,7 @@ const {
 } = useTaskSidebar()
 const toast = useToast()
 const { askConfirm } = useConfirm()
+const { user } = useAuth()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -53,6 +55,9 @@ const newTags = ref('')
 const completed = ref(false)
 const statusId = ref<number | ''>('')
 const estimatePoints = ref<number | ''>('')
+const claimedBy = ref<number | null>(null)
+const claimedByName = ref('')
+const claiming = ref(false)
 const isSubtask = computed(() => parentId.value !== '' && Number(parentId.value) > 0)
 const readOnly = computed(() => mode.value === 'view')
 const parentOptions = computed(() => rootTasks.value.filter((r) => r.id !== taskId.value))
@@ -77,6 +82,11 @@ const sidebarTitle = computed(() => {
 const submitText = computed(() => (mode.value === 'edit' ? 'Save Task' : 'Add Task'))
 const charCount = computed(() => description.value.length)
 const timeSpentLabel = computed(() => formatMinutes(timeSpentMinutes.value))
+const claimerLabel = computed(() => {
+  if (!claimedBy.value) return 'Unclaimed'
+  if (user.value?.id && claimedBy.value === user.value.id) return 'You'
+  return claimedByName.value || `User #${claimedBy.value}`
+})
 
 function formatMinutes(total: number) {
   if (total <= 0) return '0m'
@@ -103,6 +113,8 @@ function resetForm() {
   eventsLoaded.value = false
   statusId.value = ''
   estimatePoints.value = ''
+  claimedBy.value = null
+  claimedByName.value = ''
   statuses.value = []
   timeEntries.value = []
   timeSpentMinutes.value = 0
@@ -115,7 +127,7 @@ async function loadMeta() {
   const [projs, tags, list] = await Promise.all([
     api.listProjects(),
     api.listTags(),
-    api.listTasks({ page: 1, per_page: 100 }),
+    api.listTasks({ page: 1, per_page: 100, workflow_claim_scope: 'all' }),
   ])
   projects.value = projs
   allTags.value = tags
@@ -178,6 +190,8 @@ async function loadTask(id: number) {
     eventsLoaded.value = false
     statusId.value = task.status_id ?? ''
     estimatePoints.value = task.estimate_points ?? ''
+    claimedBy.value = task.claimed_by ?? null
+    claimedByName.value = task.claimed_by_name || ''
     timeSpentMinutes.value = task.time_spent_minutes ?? 0
     taskWorkflow.value = task.project_workflow || ''
     await loadStatusesForProject(projectId.value)
@@ -391,6 +405,38 @@ async function onParentChange() {
   await loadStatusesForProject(projectId.value)
 }
 
+async function claimCurrentTask() {
+  if (!taskId.value || readOnly.value) return
+  claiming.value = true
+  try {
+    const task = await api.claimTask(taskId.value)
+    claimedBy.value = task.claimed_by ?? null
+    claimedByName.value = task.claimed_by_name || ''
+    toast.push('Task claimed', 'success')
+    notifySaved(task, false)
+  } catch (err) {
+    toast.push(err instanceof APIError ? err.message : 'Could not claim task', 'error')
+  } finally {
+    claiming.value = false
+  }
+}
+
+async function unclaimCurrentTask() {
+  if (!taskId.value || readOnly.value) return
+  claiming.value = true
+  try {
+    const task = await api.unclaimTask(taskId.value)
+    claimedBy.value = task.claimed_by ?? null
+    claimedByName.value = task.claimed_by_name || ''
+    toast.push('Task released', 'success')
+    notifySaved(task, false)
+  } catch (err) {
+    toast.push(err instanceof APIError ? err.message : 'Could not release task', 'error')
+  } finally {
+    claiming.value = false
+  }
+}
+
 async function addTimeEntry() {
   if (!taskId.value || readOnly.value) return
   const minutes = Number(newEntryMinutes.value)
@@ -523,6 +569,34 @@ async function removeTimeEntry(entryId: number) {
               {{ s.name }}{{ s.is_done ? ' (done)' : '' }}{{ s.is_default ? ' (default)' : '' }}
             </option>
           </select>
+        </div>
+        <div v-if="isKanbanTask && (mode === 'edit' || mode === 'view')" class="form-group mt-2">
+          <label class="d-block">Claimed by</label>
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span class="badge border" :class="claimedBy ? 'text-bg-primary' : 'text-bg-light text-muted'">
+              <i class="bi bi-person me-1" />{{ claimerLabel }}
+            </span>
+            <template v-if="!readOnly && taskId">
+              <button
+                v-if="!claimedBy || claimedBy !== user?.id"
+                type="button"
+                class="btn btn-sm btn-outline-primary"
+                :disabled="claiming"
+                @click="claimCurrentTask"
+              >
+                {{ claimedBy ? 'Take over' : 'Claim' }}
+              </button>
+              <button
+                v-else
+                type="button"
+                class="btn btn-sm btn-outline-secondary"
+                :disabled="claiming"
+                @click="unclaimCurrentTask"
+              >
+                Release
+              </button>
+            </template>
+          </div>
         </div>
         <div v-if="isKanbanTask" class="form-group mt-2">
           <label for="estimate_points">Estimate (points):</label>

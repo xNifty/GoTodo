@@ -108,6 +108,17 @@ function formatDueDate(dateStr?: string): string {
   const dateObj = new Date(dateStr + 'T00:00:00')
   return dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
+
+const isKanbanTask = () => props.task.project_workflow === 'kanban'
+
+function formatMinutes(total: number) {
+  if (total <= 0) return '0m'
+  const h = Math.floor(total / 60)
+  const m = total % 60
+  if (h <= 0) return `${m}m`
+  if (m <= 0) return `${h}h`
+  return `${h}h ${m}m`
+}
 </script>
 
 <template>
@@ -251,6 +262,24 @@ function formatDueDate(dateStr?: string): string {
               <i class="bi bi-folder2 me-1" />{{ task.project }}
             </span>
 
+            <!-- Kanban status -->
+            <span
+              v-if="isKanbanTask() && task.status_name"
+              class="ordryn-badge ordryn-badge-status text-nowrap"
+              title="Status"
+            >
+              {{ task.status_name }}
+            </span>
+
+            <!-- Kanban claimer -->
+            <span
+              v-if="isKanbanTask() && task.claimed_by_name"
+              class="ordryn-badge text-nowrap text-bg-primary"
+              title="Claimed by"
+            >
+              <i class="bi bi-person" />{{ task.claimed_by_name }}
+            </span>
+
             <!-- Tag Badges -->
             <template v-if="task.tags && task.tags.length > 0">
               <span
@@ -293,6 +322,23 @@ function formatDueDate(dateStr?: string): string {
           <i v-if="density !== 'dense'" class="bi bi-calendar-event opacity-75" />
           <span>{{ formatDueDate(task.due_date) }}</span>
         </div>
+
+        <!-- Kanban estimate / time logged -->
+        <span
+          v-if="isKanbanTask() && task.estimate_points != null"
+          class="badge text-bg-light text-muted border text-nowrap"
+          title="Estimate"
+        >
+          {{ task.estimate_points }} pts
+        </span>
+        <span
+          v-if="isKanbanTask() && (task.time_spent_minutes ?? 0) > 0"
+          class="d-flex align-items-center gap-1 text-muted small text-nowrap"
+          title="Time logged"
+        >
+          <i v-if="density !== 'dense'" class="bi bi-clock opacity-75" />
+          <span>{{ formatMinutes(task.time_spent_minutes ?? 0) }}</span>
+        </span>
 
         <!-- Priority Pill -->
         <span
@@ -342,10 +388,24 @@ function formatDueDate(dateStr?: string): string {
     <!-- Mobile Action Row (Placed below task on mobile screens) -->
     <div class="d-md-none mobile-actions-wrapper">
       <div class="d-flex align-items-center gap-2 justify-content-between w-100">
-        <div class="d-flex align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
           <div v-if="task.due_date" class="text-muted small">
             <i v-if="density !== 'dense'" class="bi bi-calendar-event me-1" />{{ formatDueDate(task.due_date) }}
           </div>
+          <span
+            v-if="isKanbanTask() && task.estimate_points != null"
+            class="badge text-bg-light text-muted border"
+            title="Estimate"
+          >
+            {{ task.estimate_points }} pts
+          </span>
+          <span
+            v-if="isKanbanTask() && (task.time_spent_minutes ?? 0) > 0"
+            class="text-muted small"
+            title="Time logged"
+          >
+            <i v-if="density !== 'dense'" class="bi bi-clock me-1" />{{ formatMinutes(task.time_spent_minutes ?? 0) }}
+          </span>
           <span
             v-if="priorityLabel(task.priority)"
             class="ordryn-badge"

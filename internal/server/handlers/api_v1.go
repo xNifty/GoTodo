@@ -43,6 +43,8 @@ type apiTaskJSON struct {
 	EstimatePoints     *int          `json:"estimate_points,omitempty"`
 	TimeSpentMinutes   int           `json:"time_spent_minutes,omitempty"`
 	ProjectWorkflow    string        `json:"project_workflow,omitempty"`
+	ClaimedBy          *int          `json:"claimed_by,omitempty"`
+	ClaimedByName      string        `json:"claimed_by_name,omitempty"`
 }
 
 type apiTaskListResponse struct {
@@ -195,6 +197,7 @@ func taskToAPIJSON(t tasks.Task) apiTaskJSON {
 		EstimatePoints:    t.EstimatePoints,
 		TimeSpentMinutes:  t.TimeSpentMinutes,
 		ProjectWorkflow:   t.ProjectWorkflow,
+		ClaimedByName:     t.ClaimedByName,
 	}
 	if t.ParentID > 0 {
 		pid := t.ParentID
@@ -210,6 +213,10 @@ func taskToAPIJSON(t tasks.Task) apiTaskJSON {
 	if t.StatusID > 0 {
 		sid := t.StatusID
 		out.StatusID = &sid
+	}
+	if t.ClaimedBy > 0 {
+		cid := t.ClaimedBy
+		out.ClaimedBy = &cid
 	}
 	if len(t.Children) > 0 {
 		out.Children = make([]apiTaskJSON, 0, len(t.Children))
@@ -286,6 +293,13 @@ func APIV1TasksRouter(w http.ResponseWriter, r *http.Request) {
 			return
 		case "time-entries":
 			handleTaskTimeEntries(w, r, id, parts[2:])
+			return
+		case "claim":
+			if len(parts) != 2 {
+				utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid task path.")
+				return
+			}
+			apiV1TaskClaim(w, r, id)
 			return
 		}
 		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid task path.")

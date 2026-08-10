@@ -7,13 +7,14 @@ import (
 
 // ListFilters holds query filters for task list and search endpoints.
 type ListFilters struct {
-	ProjectFilter   *int
-	StatusFilter    string
-	DueFilter       string
-	CompletedFilter string
-	PriorityFilter  *int
-	TagFilter       *int
-	Sort            string
+	ProjectFilter       *int
+	StatusFilter        string
+	DueFilter           string
+	CompletedFilter     string
+	PriorityFilter      *int
+	TagFilter           *int
+	Sort                string
+	WorkflowClaimScope  string // "mine" | "all" | ""
 }
 
 func (f ListFilters) projectCondition(tablePrefix string) string {
@@ -78,6 +79,25 @@ func (f ListFilters) orderByClause(tablePrefix string) string {
 	return fmt.Sprintf(" ORDER BY %sposition", prefix)
 }
 
-func (f ListFilters) appendConditions(baseWhere string, timezone string, tablePrefix string, args []interface{}) (string, []interface{}) {
-	return appendFilterSQL(baseWhere, args, f, timezone, tablePrefix)
+// workflowClaimCondition hides unclaimed kanban tasks when scope is "mine".
+func (f ListFilters) workflowClaimCondition(tablePrefix string, argIdx int) string {
+	if strings.ToLower(strings.TrimSpace(f.WorkflowClaimScope)) != "mine" {
+		return ""
+	}
+	prefix := ""
+	if tablePrefix != "" {
+		prefix = tablePrefix + "."
+	}
+	return fmt.Sprintf(` AND (
+		%sproject_id IS NULL
+		OR NOT EXISTS (
+			SELECT 1 FROM projects p
+			WHERE p.id = %sproject_id AND COALESCE(p.workflow_mode, 'classic') = 'kanban'
+		)
+		OR %sclaimed_by = $%d
+	)`, prefix, prefix, prefix, argIdx)
+}
+
+func (f ListFilters) appendConditions(baseWhere string, timezone string, tablePrefix string, args []interface{}, userID int) (string, []interface{}) {
+	return appendFilterSQL(baseWhere, args, f, timezone, tablePrefix, userID)
 }

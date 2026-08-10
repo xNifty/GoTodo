@@ -132,6 +132,29 @@ export type Task = {
   estimate_points?: number | null
   time_spent_minutes?: number
   project_workflow?: WorkflowMode | string
+  claimed_by?: number | null
+  claimed_by_name?: string
+}
+
+export type Notification = {
+  id: number
+  type: string
+  title: string
+  body: string
+  project_id?: number | null
+  task_id?: number | null
+  project_name?: string
+  actor_name?: string
+  read_at?: string | null
+  created_at: string
+}
+
+export type NotificationList = {
+  notifications: Notification[]
+  total: number
+  page: number
+  per_page: number
+  unread_count: number
 }
 
 export type TaskEvent = {

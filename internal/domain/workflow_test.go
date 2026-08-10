@@ -103,6 +103,14 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "task workflow: %v\n", err)
 		os.Exit(1)
 	}
+	if err := storage.MigrateTasksAddClaimedBy(); err != nil {
+		fmt.Fprintf(os.Stderr, "claimed_by: %v\n", err)
+		os.Exit(1)
+	}
+	if err := storage.CreateUserNotificationsTable(); err != nil {
+		fmt.Fprintf(os.Stderr, "notifications: %v\n", err)
+		os.Exit(1)
+	}
 	if err := storage.CreateTaskEventsTable(); err != nil {
 		fmt.Fprintf(os.Stderr, "task events: %v\n", err)
 		os.Exit(1)
@@ -115,7 +123,8 @@ func TestMain(m *testing.M) {
 	_, err = pool.Exec(context.Background(), `
 		INSERT INTO users (id, email, password, role_id) VALUES
 			(1, 'owner@example.com', 'x', 1),
-			(2, 'editor@example.com', 'x', 1)
+			(2, 'editor@example.com', 'x', 1),
+			(3, 'viewer@example.com', 'x', 1)
 		ON CONFLICT DO NOTHING;
 		SELECT setval(pg_get_serial_sequence('users','id'), (SELECT MAX(id) FROM users));
 	`)
