@@ -48,7 +48,21 @@ func TestMain(m *testing.M) {
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 			UNIQUE (user_id, name)
 		);
-		CREATE TABLE projects (id SERIAL PRIMARY KEY, user_id INT, name TEXT);
+		CREATE TABLE projects (
+			id SERIAL PRIMARY KEY,
+			user_id INT,
+			name TEXT,
+			workflow_mode VARCHAR(16) NOT NULL DEFAULT 'classic'
+		);
+		CREATE TABLE project_statuses (
+			id SERIAL PRIMARY KEY,
+			project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+			name TEXT NOT NULL,
+			position INTEGER NOT NULL DEFAULT 0,
+			is_done BOOLEAN NOT NULL DEFAULT FALSE,
+			is_default BOOLEAN NOT NULL DEFAULT FALSE,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
 		CREATE TABLE project_members (
 			project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
 			user_id INTEGER NOT NULL,
@@ -77,12 +91,22 @@ func TestMain(m *testing.M) {
 			project_id INTEGER,
 			parent_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE,
 			date_modified TIMESTAMP,
-			due_date DATE
+			due_date DATE,
+			status_id INTEGER,
+			estimate_points INTEGER
 		);
 		CREATE TABLE task_tags (
 			task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
 			tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
 			PRIMARY KEY (task_id, tag_id)
+		);
+		CREATE TABLE task_time_entries (
+			id SERIAL PRIMARY KEY,
+			task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+			user_id INTEGER NOT NULL,
+			minutes INTEGER NOT NULL,
+			note TEXT NOT NULL DEFAULT '',
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);
 		CREATE TABLE task_events (
 			id SERIAL PRIMARY KEY,

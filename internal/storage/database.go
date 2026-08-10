@@ -210,6 +210,7 @@ func CreateProjectsTable() error {
 		"id SERIAL PRIMARY KEY",
 		"user_id INTEGER NOT NULL",
 		"name TEXT NOT NULL",
+		"workflow_mode VARCHAR(16) NOT NULL DEFAULT 'classic'",
 		"created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
 		"updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
 	}

@@ -31,6 +31,11 @@ type Task struct {
 	ChildCount         int
 	ChildrenCompleted  int
 	Children           []Task
+	StatusID           int
+	StatusName         string
+	EstimatePoints     *int
+	TimeSpentMinutes   int
+	ProjectWorkflow    string
 }
 
 func (t *Task) Validate() error {

@@ -24,11 +24,13 @@ type CreateTaskInput struct {
 	// Ignored when ParentID is set (project is copied from parent).
 	ProjectID *int
 	// ParentID: nil = root; &n = nest under root task n.
-	ParentID  *int
-	Priority  int
-	Completed bool
-	Favorite  bool
-	TagIDs    []int
+	ParentID       *int
+	Priority       int
+	Completed      bool
+	Favorite       bool
+	TagIDs         []int
+	StatusID       *int
+	EstimatePoints *int
 }
 
 // UpdateTaskInput is a partial update. Nil pointer fields are left unchanged.
@@ -45,6 +47,10 @@ type UpdateTaskInput struct {
 	Completed *bool
 	Favorite  *bool
 	TagIDs    *[]int
+	// StatusID: nil = leave; non-nil with *nil or 0 = reject on kanban; non-nil with id = set.
+	StatusID **int
+	// EstimatePoints: nil = leave; non-nil with *nil = clear; non-nil with value = set.
+	EstimatePoints **int
 }
 
 // UpdateResult summarizes what changed for audit logging in handlers.
@@ -70,6 +76,11 @@ func CreateTask(ctx context.Context, userID int, in CreateTaskInput) (int, error
 	}
 	if in.Priority < 0 || in.Priority > 3 {
 		return 0, fmt.Errorf("%w: priority must be 0-3", ErrValidation)
+	}
+	if in.EstimatePoints != nil {
+		if *in.EstimatePoints < 0 || *in.EstimatePoints > storage.MaxEstimatePoints {
+			return 0, fmt.Errorf("%w: estimate_points must be 0-%d", ErrValidation, storage.MaxEstimatePoints)
+		}
 	}
 	dueDate := strings.TrimSpace(in.DueDate)
 
@@ -110,6 +121,9 @@ func CreateTask(ctx context.Context, userID int, in CreateTaskInput) (int, error
 			 VALUES ($1, $2, $3, $4, NOW() AT TIME ZONE 'UTC', $5, $6, $7, $8, $9, $10) RETURNING id`,
 			title, description, in.Completed, userID, nextPos, in.Priority, projectArg, dueArg, favorite, parentArg).Scan(&newID)
 		if err != nil {
+			return 0, err
+		}
+		if err := applyCreateWorkflow(newID, projectArg, in); err != nil {
 			return 0, err
 		}
 		if len(in.TagIDs) > 0 {
@@ -157,6 +171,10 @@ func CreateTask(ctx context.Context, userID int, in CreateTaskInput) (int, error
 		return 0, err
 	}
 
+	if err := applyCreateWorkflow(newID, projectArg, in); err != nil {
+		return 0, err
+	}
+
 	if len(in.TagIDs) > 0 {
 		if err := storage.SetTaskTags(newID, userID, in.TagIDs); err != nil {
 			return 0, fmt.Errorf("%w: %s", ErrValidation, err.Error())
@@ -164,6 +182,47 @@ func CreateTask(ctx context.Context, userID int, in CreateTaskInput) (int, error
 	}
 	_ = storage.LogTaskEvent(newID, userID, "created", nil)
 	return newID, nil
+}
+
+func applyCreateWorkflow(taskID int, projectArg interface{}, in CreateTaskInput) error {
+	projectID := 0
+	switch v := projectArg.(type) {
+	case int:
+		projectID = v
+	case int64:
+		projectID = int(v)
+	}
+	if projectID <= 0 {
+		if in.StatusID != nil || in.EstimatePoints != nil {
+			return fmt.Errorf("%w: status and estimates require a kanban project", ErrValidation)
+		}
+		return nil
+	}
+	mode, err := storage.GetProjectWorkflowMode(projectID)
+	if err != nil {
+		return err
+	}
+	if mode != storage.WorkflowKanban {
+		if in.StatusID != nil || in.EstimatePoints != nil {
+			return fmt.Errorf("%w: status and estimates require a kanban project", ErrValidation)
+		}
+		return nil
+	}
+	if in.StatusID != nil && *in.StatusID > 0 {
+		if err := ApplyStatusChange(taskID, projectID, *in.StatusID); err != nil {
+			return err
+		}
+		// Status may override completed via is_done; if caller also set completed explicitly
+		// and it conflicts, prefer status (already applied).
+	} else {
+		if err := AssignWorkflowOnProjectEnter(taskID, projectID, in.Completed); err != nil {
+			return err
+		}
+	}
+	if in.EstimatePoints != nil {
+		return storage.SetTaskEstimatePoints(taskID, in.EstimatePoints)
+	}
+	return nil
 }
 
 // requireWritableRootParent ensures parentID is a writable root task and returns its project_id.
@@ -221,16 +280,20 @@ func UpdateTask(ctx context.Context, userID, taskID int, in UpdateTaskInput) (*U
 	var title, description, dueDate string
 	var completed, favorite bool
 	var priority int
-	var projectID, parentID sql.NullInt64
+	var projectID, parentID, statusID sql.NullInt64
+	var estimatePoints sql.NullInt64
 	err = pool.QueryRow(ctx,
 		`SELECT title, description, COALESCE(CAST(due_date AS TEXT), ''), completed,
-		 COALESCE(priority,0), COALESCE(is_favorite,false), project_id, parent_id FROM tasks WHERE id = $1`,
-		taskID).Scan(&title, &description, &dueDate, &completed, &priority, &favorite, &projectID, &parentID)
+		 COALESCE(priority,0), COALESCE(is_favorite,false), project_id, parent_id, status_id, estimate_points
+		 FROM tasks WHERE id = $1`,
+		taskID).Scan(&title, &description, &dueDate, &completed, &priority, &favorite, &projectID, &parentID, &statusID, &estimatePoints)
 	if err != nil {
 		return nil, err
 	}
 
 	oldCompleted := completed
+	statusTouched := false
+	completedTouched := in.Completed != nil
 
 	result := &UpdateResult{
 		OldPriority:  priority,
@@ -332,11 +395,91 @@ func UpdateTask(ctx context.Context, userID, taskID int, in UpdateTaskInput) (*U
 		return nil, err
 	}
 
+	projectChanged := result.OldProjectID != nullInt(newProjectID)
+
 	// Keep children project in sync when a root's project changes.
-	if !newParentID.Valid && result.OldProjectID != nullInt(newProjectID) {
+	if !newParentID.Valid && projectChanged {
 		_, _ = pool.Exec(ctx,
 			`UPDATE tasks SET project_id = $1, date_modified = NOW() AT TIME ZONE 'UTC' WHERE parent_id = $2`,
 			newProjectID, taskID)
+	}
+
+	if projectChanged {
+		childIDs, _ := ChildIDsOf(ctx, []int{taskID})
+		allIDs := append([]int{taskID}, childIDs...)
+		if !newProjectID.Valid {
+			_ = storage.ClearTaskWorkflowFieldsForTasks(allIDs)
+		} else {
+			for _, id := range allIDs {
+				var childCompleted bool
+				_ = pool.QueryRow(ctx, `SELECT COALESCE(completed,false) FROM tasks WHERE id = $1`, id).Scan(&childCompleted)
+				if err := AssignWorkflowOnProjectEnter(id, int(newProjectID.Int64), childCompleted); err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+
+	effectiveProjectID := nullInt(newProjectID)
+	if in.StatusID != nil {
+		if *in.StatusID == nil || **in.StatusID == 0 {
+			return nil, fmt.Errorf("%w: status_id is required", ErrValidation)
+		}
+		if effectiveProjectID <= 0 {
+			return nil, fmt.Errorf("%w: status requires a kanban project", ErrValidation)
+		}
+		mode, err := storage.GetProjectWorkflowMode(effectiveProjectID)
+		if err != nil {
+			return nil, err
+		}
+		if mode != storage.WorkflowKanban {
+			return nil, fmt.Errorf("%w: status requires a kanban project", ErrValidation)
+		}
+		if err := ApplyStatusChange(taskID, effectiveProjectID, **in.StatusID); err != nil {
+			return nil, err
+		}
+		statusTouched = true
+		st, _ := storage.GetProjectStatus(effectiveProjectID, **in.StatusID)
+		if st != nil {
+			completed = st.IsDone
+		}
+	} else if completedTouched && oldCompleted != completed && effectiveProjectID > 0 {
+		mode, err := storage.GetProjectWorkflowMode(effectiveProjectID)
+		if err != nil {
+			return nil, err
+		}
+		if mode == storage.WorkflowKanban {
+			if err := ApplyCompletedStatusSync(taskID, effectiveProjectID, completed); err != nil {
+				return nil, err
+			}
+			statusTouched = true
+		}
+	}
+
+	if in.EstimatePoints != nil {
+		if effectiveProjectID <= 0 {
+			return nil, fmt.Errorf("%w: estimates require a kanban project", ErrValidation)
+		}
+		mode, err := storage.GetProjectWorkflowMode(effectiveProjectID)
+		if err != nil {
+			return nil, err
+		}
+		if mode != storage.WorkflowKanban {
+			return nil, fmt.Errorf("%w: estimates require a kanban project", ErrValidation)
+		}
+		if *in.EstimatePoints == nil {
+			if err := storage.SetTaskEstimatePoints(taskID, nil); err != nil {
+				return nil, err
+			}
+		} else {
+			pts := **in.EstimatePoints
+			if pts < 0 || pts > storage.MaxEstimatePoints {
+				return nil, fmt.Errorf("%w: estimate_points must be 0-%d", ErrValidation, storage.MaxEstimatePoints)
+			}
+			if err := storage.SetTaskEstimatePoints(taskID, &pts); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	if in.TagIDs != nil {
@@ -345,18 +488,21 @@ func UpdateTask(ctx context.Context, userID, taskID int, in UpdateTaskInput) (*U
 		}
 	}
 
-	if in.Completed != nil && oldCompleted != completed {
+	if (completedTouched || statusTouched) && oldCompleted != completed {
 		if completed {
 			_ = storage.LogTaskEvent(taskID, userID, "completed", nil)
 		} else {
 			_ = storage.LogTaskEvent(taskID, userID, "reopened", nil)
 		}
 	}
+	if statusTouched {
+		_ = storage.LogTaskEvent(taskID, userID, "status_changed", nil)
+	}
 
 	result.NewPriority = priority
-	result.NewProjectID = nullInt(newProjectID)
+	result.NewProjectID = effectiveProjectID
 	result.PriorityChanged = result.OldPriority != result.NewPriority
-	result.ProjectChanged = result.OldProjectID != result.NewProjectID
+	result.ProjectChanged = projectChanged
 	return result, nil
 }
 
@@ -395,12 +541,30 @@ func SetTaskCompleted(ctx context.Context, userID, taskID int, completed bool) e
 	}
 	defer storage.CloseDatabase(pool)
 
-	canRead, writeRole, _, accessErr := storage.CanUserAccessTask(taskID, userID)
+	canRead, writeRole, projectID, accessErr := storage.CanUserAccessTask(taskID, userID)
 	if accessErr != nil {
 		return accessErr
 	}
 	if !canRead || !storage.RoleCanWrite(writeRole) {
 		return ErrNotFound
+	}
+
+	if projectID > 0 {
+		mode, err := storage.GetProjectWorkflowMode(projectID)
+		if err != nil {
+			return err
+		}
+		if mode == storage.WorkflowKanban {
+			if err := ApplyCompletedStatusSync(taskID, projectID, completed); err != nil {
+				return err
+			}
+			if completed {
+				_ = storage.LogTaskEvent(taskID, userID, "completed", nil)
+			} else {
+				_ = storage.LogTaskEvent(taskID, userID, "reopened", nil)
+			}
+			return nil
+		}
 	}
 
 	tag, err := pool.Exec(ctx,

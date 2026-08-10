@@ -300,6 +300,7 @@ export const api = {
     tag_id?: number
     priority?: number
     due_date?: string
+    status_id?: number
   }) {
     return request<{ ok: boolean; affected: number; undo_token?: string }>('/api/v1/tasks/bulk', {
       method: 'POST',

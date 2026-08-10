@@ -267,6 +267,39 @@ func attachTagsToTasks(taskList []Task) error {
 			}
 		}
 	}
+	return attachWorkflowFieldsToTasks(taskList)
+}
+
+func attachWorkflowFieldsToTasks(taskList []Task) error {
+	if len(taskList) == 0 {
+		return nil
+	}
+	ids := make([]int, 0, len(taskList))
+	for _, t := range taskList {
+		ids = append(ids, t.ID)
+		for _, c := range t.Children {
+			ids = append(ids, c.ID)
+		}
+	}
+	fields, err := storage.GetWorkflowFieldsForTasks(ids)
+	if err != nil {
+		return err
+	}
+	applyWorkflow := func(t *Task) {
+		if f, ok := fields[t.ID]; ok {
+			t.StatusID = f.StatusID
+			t.StatusName = f.StatusName
+			t.EstimatePoints = f.EstimatePoints
+			t.TimeSpentMinutes = f.TimeSpentMinutes
+			t.ProjectWorkflow = f.ProjectWorkflow
+		}
+	}
+	for i := range taskList {
+		applyWorkflow(&taskList[i])
+		for j := range taskList[i].Children {
+			applyWorkflow(&taskList[i].Children[j])
+		}
+	}
 	return nil
 }
 

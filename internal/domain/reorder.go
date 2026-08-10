@@ -43,9 +43,10 @@ func ApplyRelativeReorder(allIDs []int, orderedIDs []int) ([]int, error) {
 	return out, nil
 }
 
-// ReorderTasks validates IDs and renumbers position within a favorite/project/parent group.
+// ReorderTasks validates IDs and renumbers position within a favorite/project/parent/status group.
 // parentID nil or 0 reorders root tasks; otherwise reorders siblings under that parent.
-func ReorderTasks(ctx context.Context, userID int, ids []int, isFav bool, projectFilter *int, parentID *int) error {
+// statusFilter, when set, limits the reorder group to tasks in that kanban column.
+func ReorderTasks(ctx context.Context, userID int, ids []int, isFav bool, projectFilter *int, parentID *int, statusFilter *int) error {
 	if len(ids) == 0 {
 		return fmt.Errorf("%w: empty task_ids", ErrValidation)
 	}
@@ -66,9 +67,9 @@ func ReorderTasks(ctx context.Context, userID int, ids []int, isFav bool, projec
 			return fmt.Errorf("%w: task %d does not belong to user or mismatched favorite group/project", ErrValidation, id)
 		}
 		var isFavorite bool
-		var proj, pid sql.NullInt64
+		var proj, pid, sid sql.NullInt64
 		err := pool.QueryRow(ctx,
-			`SELECT COALESCE(is_favorite,false), project_id, parent_id FROM tasks WHERE id = $1`, id).Scan(&isFavorite, &proj, &pid)
+			`SELECT COALESCE(is_favorite,false), project_id, parent_id, status_id FROM tasks WHERE id = $1`, id).Scan(&isFavorite, &proj, &pid, &sid)
 		if err != nil {
 			return err
 		}
@@ -92,6 +93,11 @@ func ReorderTasks(ctx context.Context, userID int, ids []int, isFav bool, projec
 					return fmt.Errorf("%w: task %d does not belong to user or mismatched favorite group/project", ErrValidation, id)
 				}
 			}
+			if statusFilter != nil {
+				if !sid.Valid || int(sid.Int64) != *statusFilter {
+					return fmt.Errorf("%w: task %d does not belong to user or mismatched favorite group/project", ErrValidation, id)
+				}
+			}
 		}
 	}
 
@@ -104,13 +110,19 @@ func ReorderTasks(ctx context.Context, userID int, ids []int, isFav bool, projec
 		vis := storage.TaskListVisibleCondition("t", "$1", projectFilter)
 		argsAll = []interface{}{userID, isFav}
 		q = "SELECT t.id FROM tasks t WHERE " + vis + " AND COALESCE(t.is_favorite,false) = $2 AND t.parent_id IS NULL"
+		argN := 3
 		if projectFilter != nil {
 			if *projectFilter == 0 {
 				q += " AND t.project_id IS NULL"
 			} else {
-				q += " AND t.project_id = $3"
+				q += fmt.Sprintf(" AND t.project_id = $%d", argN)
 				argsAll = append(argsAll, *projectFilter)
+				argN++
 			}
+		}
+		if statusFilter != nil {
+			q += fmt.Sprintf(" AND t.status_id = $%d", argN)
+			argsAll = append(argsAll, *statusFilter)
 		}
 		q += " ORDER BY t.position ASC, t.id ASC"
 	}

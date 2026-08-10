@@ -853,7 +853,7 @@ paths:
           $ref: "#/components/responses/NotFound"
     patch:
       tags: [Projects]
-      summary: Rename a project (owner only)
+      summary: Update project name and/or workflow mode (owner only)
       security:
         - SessionCookie: []
         - BearerAuth: []
@@ -862,7 +862,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/NameBody"
+              $ref: "#/components/schemas/ProjectPatch"
       responses:
         "200":
           description: Updated
@@ -874,6 +874,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          description: Cannot disable kanban while the project has tasks
     delete:
       tags: [Projects]
       summary: Delete a project (owner only)
@@ -887,6 +889,204 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+
+  /api/v1/projects/{id}/statuses:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      tags: [Projects]
+      summary: List kanban statuses for a project
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Status columns (empty when project is classic)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProjectStatus"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      tags: [Projects]
+      summary: Create a status column (owner, kanban only, max 8)
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  maxLength: 40
+                is_done:
+                  type: boolean
+                is_default:
+                  type: boolean
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectStatus"
+        "409":
+          description: Status limit or name conflict
+
+  /api/v1/projects/{id}/statuses/reorder:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      tags: [Projects]
+      summary: Reorder status columns (owner, kanban only)
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status_ids]
+              properties:
+                status_ids:
+                  type: array
+                  items:
+                    type: integer
+      responses:
+        "200":
+          description: Reordered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+
+  /api/v1/projects/{id}/statuses/{statusId}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+      - name: statusId
+        in: path
+        required: true
+        schema:
+          type: integer
+    patch:
+      tags: [Projects]
+      summary: Update a status column (owner)
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                is_done:
+                  type: boolean
+                is_default:
+                  type: boolean
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectStatus"
+    delete:
+      tags: [Projects]
+      summary: Delete a status column (owner)
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - name: move_to_status_id
+          in: query
+          schema:
+            type: integer
+          description: Required when tasks remain in the column
+      responses:
+        "204":
+          description: Deleted
+
+  /api/v1/tasks/{id}/time-entries:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      tags: [Tasks]
+      summary: List time entries for a kanban task
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Time entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TaskTimeEntry"
+    post:
+      tags: [Tasks]
+      summary: Add a time entry
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [minutes]
+              properties:
+                minutes:
+                  type: integer
+                  minimum: 1
+                  maximum: 1440
+                note:
+                  type: string
+                  maxLength: 200
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskTimeEntry"
+
+  /api/v1/tasks/{id}/time-entries/{entryId}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+      - name: entryId
+        in: path
+        required: true
+        schema:
+          type: integer
+    delete:
+      tags: [Tasks]
+      summary: Delete a time entry (author or project owner)
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "204":
+          description: Deleted
 
   /api/v1/projects/{id}/members:
     parameters:
@@ -1981,6 +2181,10 @@ components:
           type: integer
         name:
           type: string
+        workflow_mode:
+          type: string
+          enum: [classic, kanban]
+          description: Opt-in board workflow; classic keeps boolean completed only
         role:
           type: string
           enum: [owner, editor, viewer]
@@ -1990,6 +2194,57 @@ components:
           type: string
         owner_user_id:
           type: integer
+
+    ProjectPatch:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 50
+        workflow_mode:
+          type: string
+          enum: [classic, kanban]
+      description: At least one field required. Disabling kanban fails with 409 if the project has tasks.
+
+    ProjectStatus:
+      type: object
+      properties:
+        id:
+          type: integer
+        project_id:
+          type: integer
+        name:
+          type: string
+        position:
+          type: integer
+        is_done:
+          type: boolean
+        is_default:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    TaskTimeEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        task_id:
+          type: integer
+        user_id:
+          type: integer
+        minutes:
+          type: integer
+        note:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        user_email:
+          type: string
+        user_name:
+          type: string
 
     ProjectMember:
       type: object
@@ -2203,6 +2458,19 @@ components:
           type: string
         modified_at:
           type: string
+        status_id:
+          type: integer
+          nullable: true
+        status_name:
+          type: string
+        estimate_points:
+          type: integer
+          nullable: true
+        time_spent_minutes:
+          type: integer
+        project_workflow:
+          type: string
+          enum: [classic, kanban]
 
     TaskList:
       type: object
