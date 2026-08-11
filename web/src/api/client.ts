@@ -326,16 +326,16 @@ export const api = {
     return request<Project[]>('/api/v1/projects')
   },
 
-  createProject(name: string) {
+  createProject(name: string, description = '') {
     return request<Project>('/api/v1/projects', {
       method: 'POST',
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, description }),
     })
   },
 
   updateProject(
     id: number,
-    payload: Partial<{ name: string; workflow_mode: WorkflowMode }>,
+    payload: Partial<{ name: string; description: string; workflow_mode: WorkflowMode }>,
   ) {
     return request<Project>(`/api/v1/projects/${id}`, {
       method: 'PATCH',
@@ -347,6 +347,13 @@ export const api = {
     return request<Project>(`/api/v1/projects/${id}`, {
       method: 'PATCH',
       body: JSON.stringify({ name }),
+    })
+  },
+
+  reorderProjects(projectIds: number[]) {
+    return request<{ ok: boolean }>('/api/v1/projects/reorder', {
+      method: 'POST',
+      body: JSON.stringify({ project_ids: projectIds }),
     })
   },
 

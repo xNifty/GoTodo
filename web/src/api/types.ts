@@ -22,6 +22,7 @@ export type WorkflowMode = 'classic' | 'kanban'
 export type Project = {
   id: number
   name: string
+  description?: string
   workflow_mode?: WorkflowMode
   role?: 'owner' | 'editor' | 'viewer'
   owner_email?: string

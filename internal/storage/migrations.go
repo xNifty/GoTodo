@@ -163,6 +163,10 @@ func RunMigrations() error {
 		fmt.Printf("migration: MigrateProjectsAddWorkflowMode failed: %v\n", err)
 		errCount++
 	}
+	if err := MigrateProjectsAddDescriptionAndPosition(); err != nil {
+		fmt.Printf("migration: MigrateProjectsAddDescriptionAndPosition failed: %v\n", err)
+		errCount++
+	}
 	if err := CreateProjectWorkflowTables(); err != nil {
 		fmt.Printf("migration: CreateProjectWorkflowTables failed: %v\n", err)
 		errCount++

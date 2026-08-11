@@ -28,7 +28,9 @@ type ProjectWithAccess struct {
 	ID            int
 	UserID        int
 	Name          string
+	Description   string
 	WorkflowMode  string
+	Position      int
 	Role          string
 	OwnerEmail    string
 	OwnerUserName string
@@ -253,14 +255,19 @@ func GetAccessibleProjects(userID int) ([]ProjectWithAccess, error) {
 	defer CloseDatabase(pool)
 
 	rows, err := pool.Query(context.Background(), `
-		SELECT p.id, p.user_id, p.name, COALESCE(p.workflow_mode, 'classic'), p.created_at, p.updated_at,
+		SELECT p.id, p.user_id, p.name, COALESCE(p.description, ''), COALESCE(p.workflow_mode, 'classic'),
+		       COALESCE(p.position, 0), p.created_at, p.updated_at,
 		       COALESCE(pm.role, CASE WHEN p.user_id = $1 THEN 'owner' END),
 		       u.email, COALESCE(u.user_name, ''), p.user_id
 		FROM projects p
 		LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $1
 		JOIN users u ON u.id = p.user_id
 		WHERE p.user_id = $1 OR pm.user_id = $1
-		ORDER BY p.name`, userID)
+		ORDER BY
+		  CASE WHEN p.user_id = $1 THEN 0 ELSE 1 END,
+		  p.position ASC,
+		  LOWER(p.name) ASC,
+		  p.id ASC`, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query accessible projects: %v", err)
 	}
@@ -269,8 +276,8 @@ func GetAccessibleProjects(userID int) ([]ProjectWithAccess, error) {
 	var out []ProjectWithAccess
 	for rows.Next() {
 		var p ProjectWithAccess
-		if err := rows.Scan(&p.ID, &p.UserID, &p.Name, &p.WorkflowMode, &p.CreatedAt, &p.UpdatedAt,
-			&p.Role, &p.OwnerEmail, &p.OwnerUserName, &p.OwnerUserID); err != nil {
+		if err := rows.Scan(&p.ID, &p.UserID, &p.Name, &p.Description, &p.WorkflowMode, &p.Position,
+			&p.CreatedAt, &p.UpdatedAt, &p.Role, &p.OwnerEmail, &p.OwnerUserName, &p.OwnerUserID); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
@@ -288,7 +295,8 @@ func GetAccessibleProjectByID(projectID, userID int) (*ProjectWithAccess, error)
 
 	var p ProjectWithAccess
 	err = pool.QueryRow(context.Background(), `
-		SELECT p.id, p.user_id, p.name, COALESCE(p.workflow_mode, 'classic'), p.created_at, p.updated_at,
+		SELECT p.id, p.user_id, p.name, COALESCE(p.description, ''), COALESCE(p.workflow_mode, 'classic'),
+		       COALESCE(p.position, 0), p.created_at, p.updated_at,
 		       COALESCE(pm.role, CASE WHEN p.user_id = $2 THEN 'owner' END),
 		       u.email, COALESCE(u.user_name, ''), p.user_id
 		FROM projects p
@@ -296,8 +304,8 @@ func GetAccessibleProjectByID(projectID, userID int) (*ProjectWithAccess, error)
 		JOIN users u ON u.id = p.user_id
 		WHERE p.id = $1 AND (p.user_id = $2 OR pm.user_id = $2)`,
 		projectID, userID).Scan(
-		&p.ID, &p.UserID, &p.Name, &p.WorkflowMode, &p.CreatedAt, &p.UpdatedAt,
-		&p.Role, &p.OwnerEmail, &p.OwnerUserName, &p.OwnerUserID)
+		&p.ID, &p.UserID, &p.Name, &p.Description, &p.WorkflowMode, &p.Position,
+		&p.CreatedAt, &p.UpdatedAt, &p.Role, &p.OwnerEmail, &p.OwnerUserName, &p.OwnerUserID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("project not found")

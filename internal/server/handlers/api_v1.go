@@ -119,6 +119,7 @@ type apiReorderOKResponse struct {
 type apiProjectJSON struct {
 	ID            int    `json:"id"`
 	Name          string `json:"name"`
+	Description   string `json:"description,omitempty"`
 	WorkflowMode  string `json:"workflow_mode,omitempty"`
 	Role          string `json:"role,omitempty"`
 	OwnerEmail    string `json:"owner_email,omitempty"`
@@ -135,12 +136,18 @@ type apiTagPatchRequest struct {
 }
 
 type apiProjectCreateRequest struct {
-	Name string `json:"name"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
 
 type apiProjectPatchRequest struct {
 	Name         *string `json:"name"`
+	Description  *string `json:"description"`
 	WorkflowMode *string `json:"workflow_mode"`
+}
+
+type apiProjectReorderRequest struct {
+	ProjectIDs []int `json:"project_ids"`
 }
 
 type apiBulkRequest struct {
@@ -827,6 +834,14 @@ func APIV1ProjectsRouter(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	if sub == "reorder" {
+		if r.Method != http.MethodPost {
+			utils.APIJSONError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Method not allowed.")
+			return
+		}
+		apiV1ReorderProjects(w, r)
+		return
+	}
 	if handleProjectSubResource(w, r, sub) {
 		return
 	}
@@ -897,7 +912,7 @@ func apiV1CreateProject(w http.ResponseWriter, r *http.Request) {
 		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid JSON body.")
 		return
 	}
-	project, err := domain.CreateProject(r.Context(), userID, req.Name)
+	project, err := domain.CreateProject(r.Context(), userID, req.Name, req.Description)
 	if err != nil {
 		if errors.Is(err, domain.ErrValidation) {
 			utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", err.Error())
@@ -922,11 +937,11 @@ func apiV1PatchProject(w http.ResponseWriter, r *http.Request, projectID int) {
 		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid JSON body.")
 		return
 	}
-	if req.Name == nil && req.WorkflowMode == nil {
+	if req.Name == nil && req.Description == nil && req.WorkflowMode == nil {
 		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Nothing to update.")
 		return
 	}
-	project, err := domain.UpdateProject(r.Context(), userID, projectID, req.Name, req.WorkflowMode)
+	project, err := domain.UpdateProject(r.Context(), userID, projectID, req.Name, req.Description, req.WorkflowMode)
 	if err != nil {
 		if errors.Is(err, domain.ErrValidation) {
 			utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", err.Error())
@@ -949,6 +964,29 @@ func apiV1PatchProject(w http.ResponseWriter, r *http.Request, projectID int) {
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	json.NewEncoder(w).Encode(projectStorageToAPIJSON(project, storage.RoleOwner))
+}
+
+func apiV1ReorderProjects(w http.ResponseWriter, r *http.Request) {
+	userID, ok := apiUserFromRequest(r)
+	if !ok {
+		utils.APIJSONError(w, http.StatusUnauthorized, "unauthorized", "Not authenticated.")
+		return
+	}
+	var req apiProjectReorderRequest
+	if err := decodeJSONBody(r, &req); err != nil {
+		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid JSON body.")
+		return
+	}
+	if err := domain.ReorderProjectsForUser(r.Context(), userID, req.ProjectIDs); err != nil {
+		if errors.Is(err, domain.ErrValidation) {
+			utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", err.Error())
+			return
+		}
+		utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to reorder projects.")
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	json.NewEncoder(w).Encode(apiReorderOKResponse{OK: true})
 }
 
 func apiV1DeleteProject(w http.ResponseWriter, r *http.Request, projectID int) {

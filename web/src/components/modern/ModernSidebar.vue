@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, inject, type Ref } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, ref, watch, type Ref } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
+import Sortable from 'sortablejs'
 import type { Project, SavedView } from '@/api/types'
 import { projectOptionLabel } from '@/utils/projectLabel'
 
-defineProps<{
+const props = defineProps<{
   collapsed: boolean
   mobileOpen: boolean
   projects: Project[]
@@ -21,6 +22,7 @@ const emit = defineEmits<{
   'select-view': [id: string]
   'add-project': []
   'edit-project': [project: Project]
+  'reorder-projects': [projectIds: number[]]
   'add-view': []
 }>()
 
@@ -31,6 +33,60 @@ const pendingInviteCount = inject<Ref<number>>('pendingInviteCount', ref(0))
 
 const projectsCollapsed = ref(false)
 const viewsCollapsed = ref(false)
+const ownedListEl = ref<HTMLElement | null>(null)
+let sortable: Sortable | null = null
+
+const ownedProjects = computed(() =>
+  props.projects.filter((p) => !p.role || p.role === 'owner'),
+)
+const sharedProjects = computed(() =>
+  props.projects.filter((p) => p.role && p.role !== 'owner'),
+)
+
+function isOwner(proj: Project) {
+  return !proj.role || proj.role === 'owner'
+}
+
+function destroySortable() {
+  sortable?.destroy()
+  sortable = null
+}
+
+function collectOwnedIds(el: HTMLElement): number[] {
+  return Array.from(el.querySelectorAll(':scope > .project-reorder-item'))
+    .map((node) => parseInt((node as HTMLElement).dataset.projectId || '', 10))
+    .filter((id) => !Number.isNaN(id))
+}
+
+function initSortable() {
+  destroySortable()
+  if (!ownedListEl.value || ownedProjects.value.length < 2 || props.collapsed) return
+  sortable = Sortable.create(ownedListEl.value, {
+    handle: '.project-drag-handle',
+    draggable: '.project-reorder-item',
+    animation: 150,
+    onEnd(evt) {
+      const el = evt.to as HTMLElement
+      const ids = collectOwnedIds(el)
+      if (ids.length === ownedProjects.value.length) {
+        emit('reorder-projects', ids)
+      }
+    },
+  })
+}
+
+watch(
+  [ownedProjects, () => props.collapsed, projectsCollapsed],
+  async () => {
+    await nextTick()
+    initSortable()
+  },
+  { flush: 'post' },
+)
+
+onBeforeUnmount(() => {
+  destroySortable()
+})
 </script>
 
 <template>
@@ -109,7 +165,7 @@ const viewsCollapsed = ref(false)
       </li>
     </ul>
 
-    <!-- Section: Projects Header (Clickable Link to /projects with hover effect, icon & collapse chevron) -->
+    <!-- Section: Projects Header -->
     <div class="sidebar-section-header d-flex align-items-center justify-content-between">
       <RouterLink
         to="/projects"
@@ -154,36 +210,76 @@ const viewsCollapsed = ref(false)
           <span class="sidebar-text text-truncate">No Project</span>
         </a>
       </li>
+    </ul>
 
-      <!-- User Projects -->
-      <li v-for="proj in projects" :key="proj.id" class="sidebar-nav-item position-relative">
+    <!-- Owned projects (sortable) -->
+    <ul
+      v-if="!projectsCollapsed"
+      ref="ownedListEl"
+      class="sidebar-nav-list"
+    >
+      <li
+        v-for="proj in ownedProjects"
+        :key="proj.id"
+        class="sidebar-nav-item position-relative project-reorder-item"
+        :data-project-id="proj.id"
+      >
         <div class="d-flex align-items-center justify-content-between w-100">
+          <span
+            class="project-drag-handle text-muted d-none d-md-inline-flex me-1 hover-reveal"
+            title="Drag to reorder"
+            aria-label="Drag to reorder project"
+            @click.stop
+          >
+            <i class="bi bi-grip-vertical" style="font-size: 0.85rem;" />
+          </span>
           <a
             href="#"
             class="sidebar-nav-link flex-grow-1 min-w-0"
             :class="{ active: activeProject === String(proj.id) }"
-            :data-tooltip="projectOptionLabel(proj)"
-            :title="projectOptionLabel(proj)"
+            :data-tooltip="proj.description ? `${projectOptionLabel(proj)} — ${proj.description}` : projectOptionLabel(proj)"
+            :title="proj.description ? `${projectOptionLabel(proj)} — ${proj.description}` : projectOptionLabel(proj)"
             @click.prevent="emit('select-project', String(proj.id)); emit('close-mobile')"
           >
             <i class="bi bi-folder2-open" />
             <span class="sidebar-text text-truncate">{{ projectOptionLabel(proj) }}</span>
           </a>
 
-          <!-- Pencil Edit Icon (Desktop Hover Reveal, hidden for non-owner/viewer roles) -->
           <button
-            v-if="!proj.role || proj.role === 'owner'"
+            v-if="isOwner(proj)"
             type="button"
             class="btn btn-sm text-muted p-0 border-0 hover-reveal d-none d-md-inline-block me-2"
-            title="Rename project"
+            title="Edit project"
             @click.stop="emit('edit-project', proj)"
           >
             <i class="bi bi-pencil" style="font-size: 0.85rem;" />
           </button>
         </div>
       </li>
+    </ul>
 
-      <!-- Add Project Action Item -->
+    <!-- Shared projects (not reorderable) + add -->
+    <ul v-if="!projectsCollapsed" class="sidebar-nav-list">
+      <li
+        v-for="proj in sharedProjects"
+        :key="proj.id"
+        class="sidebar-nav-item position-relative"
+      >
+        <div class="d-flex align-items-center justify-content-between w-100">
+          <a
+            href="#"
+            class="sidebar-nav-link flex-grow-1 min-w-0"
+            :class="{ active: activeProject === String(proj.id) }"
+            :data-tooltip="proj.description ? `${projectOptionLabel(proj)} — ${proj.description}` : projectOptionLabel(proj)"
+            :title="proj.description ? `${projectOptionLabel(proj)} — ${proj.description}` : projectOptionLabel(proj)"
+            @click.prevent="emit('select-project', String(proj.id)); emit('close-mobile')"
+          >
+            <i class="bi bi-folder2-open" />
+            <span class="sidebar-text text-truncate">{{ projectOptionLabel(proj) }}</span>
+          </a>
+        </div>
+      </li>
+
       <li class="sidebar-nav-item d-flex align-items-center">
         <button
           type="button"
@@ -198,7 +294,7 @@ const viewsCollapsed = ref(false)
       </li>
     </ul>
 
-    <!-- Section: Views Header (Clickable Link to /views with hover effect, icon & collapse chevron) -->
+    <!-- Section: Views Header -->
     <div class="sidebar-section-header d-flex align-items-center justify-content-between">
       <RouterLink
         to="/views"

@@ -813,7 +813,7 @@ paths:
         - BearerAuth: []
       responses:
         "200":
-          description: Projects
+          description: Projects (owned first by position, then shared by name)
           content:
             application/json:
               schema:
@@ -831,7 +831,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/NameBody"
+              $ref: "#/components/schemas/ProjectCreate"
       responses:
         "201":
           description: Created
@@ -839,6 +839,36 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Project"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/projects/reorder:
+    post:
+      tags: [Projects]
+      summary: Reorder owned projects
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [project_ids]
+              properties:
+                project_ids:
+                  type: array
+                  items:
+                    type: integer
+                  description: Full ordered list of project IDs owned by the caller
+      responses:
+        "200":
+          description: Reordered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OK"
         "400":
           $ref: "#/components/responses/BadRequest"
 
@@ -862,7 +892,7 @@ paths:
           $ref: "#/components/responses/NotFound"
     patch:
       tags: [Projects]
-      summary: Update project name and/or workflow mode (owner only)
+      summary: Update project name, description, and/or workflow mode (owner only)
       security:
         - SessionCookie: []
         - BearerAuth: []
@@ -2303,6 +2333,10 @@ components:
           type: integer
         name:
           type: string
+        description:
+          type: string
+          maxLength: 1000
+          description: Optional project details
         workflow_mode:
           type: string
           enum: [classic, kanban]
@@ -2317,12 +2351,26 @@ components:
         owner_user_id:
           type: integer
 
+    ProjectCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 50
+        description:
+          type: string
+          maxLength: 1000
+
     ProjectPatch:
       type: object
       properties:
         name:
           type: string
           maxLength: 50
+        description:
+          type: string
+          maxLength: 1000
         workflow_mode:
           type: string
           enum: [classic, kanban]

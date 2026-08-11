@@ -11,7 +11,7 @@ import (
 
 func TestClaimTakeoverAndUnclaim(t *testing.T) {
 	ctx := context.Background()
-	proj, err := CreateProject(ctx, 1, "Claim Board")
+	proj, err := CreateProject(ctx, 1, "Claim Board", "")
 	if err != nil {
 		t.Fatalf("create project: %v", err)
 	}
@@ -64,7 +64,7 @@ func TestClaimTakeoverAndUnclaim(t *testing.T) {
 
 func TestClaimRequiresKanban(t *testing.T) {
 	ctx := context.Background()
-	proj, err := CreateProject(ctx, 1, "Classic Claim")
+	proj, err := CreateProject(ctx, 1, "Classic Claim", "")
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -81,7 +81,7 @@ func TestClaimRequiresKanban(t *testing.T) {
 
 func TestWorkflowClaimScopeMineHidesUnclaimed(t *testing.T) {
 	ctx := context.Background()
-	proj, err := CreateProject(ctx, 1, "Filter Board")
+	proj, err := CreateProject(ctx, 1, "Filter Board", "")
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -138,9 +138,95 @@ func TestWorkflowClaimScopeMineHidesUnclaimed(t *testing.T) {
 	}
 }
 
+func TestWorkflowClaimScopeMineHidesCompletedKanban(t *testing.T) {
+	ctx := context.Background()
+	proj, err := CreateProject(ctx, 1, "Done List Board", "")
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if _, err := SetProjectWorkflowMode(ctx, 1, proj.ID, storage.WorkflowKanban); err != nil {
+		t.Fatalf("enable: %v", err)
+	}
+	pid := proj.ID
+	openID, err := CreateTask(ctx, 1, CreateTaskInput{Title: "Open claimed", ProjectID: &pid})
+	if err != nil {
+		t.Fatalf("create open: %v", err)
+	}
+	doneID, err := CreateTask(ctx, 1, CreateTaskInput{Title: "Done claimed", ProjectID: &pid})
+	if err != nil {
+		t.Fatalf("create done: %v", err)
+	}
+	if err := ClaimTaskForUser(ctx, 1, openID); err != nil {
+		t.Fatalf("claim open: %v", err)
+	}
+	if err := ClaimTaskForUser(ctx, 1, doneID); err != nil {
+		t.Fatalf("claim done: %v", err)
+	}
+	if err := SetTaskCompleted(ctx, 1, doneID, true); err != nil {
+		t.Fatalf("complete: %v", err)
+	}
+
+	uid := 1
+	mine := tasks.ListFilters{
+		ProjectFilter:      &pid,
+		WorkflowClaimScope: "mine",
+	}
+	list, _, err := tasks.ReturnPaginationForUserWithFilters(1, 50, &uid, "UTC", mine)
+	if err != nil {
+		t.Fatalf("list mine: %v", err)
+	}
+	ids := map[int]bool{}
+	for _, tsk := range list {
+		ids[tsk.ID] = true
+	}
+	if !ids[openID] {
+		t.Fatal("open claimed task should appear in mine scope")
+	}
+	if ids[doneID] {
+		t.Fatal("completed kanban task should be hidden from mine list by default")
+	}
+
+	mineDone := tasks.ListFilters{
+		ProjectFilter:      &pid,
+		WorkflowClaimScope: "mine",
+		StatusFilter:       "complete",
+	}
+	listDone, _, err := tasks.ReturnPaginationForUserWithFilters(1, 50, &uid, "UTC", mineDone)
+	if err != nil {
+		t.Fatalf("list mine complete: %v", err)
+	}
+	idsDone := map[int]bool{}
+	for _, tsk := range listDone {
+		idsDone[tsk.ID] = true
+	}
+	if !idsDone[doneID] {
+		t.Fatal("completed claimed task should appear when status=complete")
+	}
+	if idsDone[openID] {
+		t.Fatal("open task should not appear in status=complete")
+	}
+
+	// Board/all scope still includes completed work.
+	all := tasks.ListFilters{
+		ProjectFilter:      &pid,
+		WorkflowClaimScope: "all",
+	}
+	listAll, _, err := tasks.ReturnPaginationForUserWithFilters(1, 50, &uid, "UTC", all)
+	if err != nil {
+		t.Fatalf("list all: %v", err)
+	}
+	idsAll := map[int]bool{}
+	for _, tsk := range listAll {
+		idsAll[tsk.ID] = true
+	}
+	if !idsAll[doneID] || !idsAll[openID] {
+		t.Fatal("all scope should keep completed kanban tasks for the board")
+	}
+}
+
 func TestKanbanCreateNotifiesOtherMembers(t *testing.T) {
 	ctx := context.Background()
-	proj, err := CreateProject(ctx, 1, "Notify Board")
+	proj, err := CreateProject(ctx, 1, "Notify Board", "")
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}

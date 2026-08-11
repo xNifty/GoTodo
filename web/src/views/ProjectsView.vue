@@ -42,92 +42,81 @@
               <table class="table table-striped projects-table">
                 <thead>
                   <tr>
+                    <th style="width: 2rem"></th>
                     <th>Name</th>
                     <th style="width: 100px">Role</th>
-                    <th style="width: 220px">Actions</th>
+                    <th style="width: 280px">Actions</th>
                   </tr>
                 </thead>
-                <tbody>
-                  <template v-for="p in ownedProjects" :key="p.id">
-                    <tr>
-                      <td data-label="Name">
-                        <template v-if="renameProjectId === p.id">
-                          <form
-                            class="d-inline-flex align-items-center gap-1 flex-wrap"
-                            @submit.prevent="saveRenameProject"
-                          >
-                            <input
-                              v-model="renameProjectValue"
-                              type="text"
-                              class="form-control form-control-sm"
-                              maxlength="50"
-                              required
-                              aria-label="Project name"
-                            />
-                            <button class="btn btn-sm btn-primary" type="submit" aria-label="Save project name">
-                              <i class="bi bi-check" />
-                            </button>
+                <tbody ref="ownedTbodyEl">
+                  <tr
+                    v-for="p in ownedProjects"
+                    :key="p.id"
+                    class="project-owned-row"
+                    :data-project-id="p.id"
+                  >
+                    <td class="align-middle">
+                      <span
+                        class="project-drag-handle text-muted"
+                        title="Drag to reorder"
+                        aria-label="Drag to reorder project"
+                      >
+                        <i class="bi bi-grip-vertical" />
+                      </span>
+                    </td>
+                    <td data-label="Name">
+                      <div class="d-flex align-items-start gap-1">
+                        <div class="min-w-0 flex-grow-1">
+                          <div class="d-flex align-items-center gap-1 flex-wrap">
+                            <span class="project-name-display fw-semibold">{{ p.name }}</span>
                             <button
-                              class="btn btn-sm btn-secondary"
+                              class="btn btn-sm btn-link edit-project-btn p-0"
                               type="button"
-                              aria-label="Cancel rename"
-                              @click="renameProjectId = null"
+                              aria-label="Edit project"
+                              title="Edit project"
+                              @click="openEditProject(p)"
                             >
-                              <i class="bi bi-x" />
+                              <i class="bi bi-pencil" />
                             </button>
-                          </form>
-                        </template>
-                        <template v-else>
-                          <span class="project-name-display">{{ p.name }}</span>
-                          <button
-                            class="btn btn-sm btn-link edit-project-btn p-0 ms-1"
-                            type="button"
-                            aria-label="Rename project"
-                            @click="beginRenameProject(p)"
-                          >
-                            <i class="bi bi-pencil" />
-                          </button>
-                        </template>
-                      </td>
-                      <td data-label="Role"><span class="badge text-bg-secondary">owner</span></td>
-                      <td data-label="Actions">
-                        <button
-                          class="btn btn-sm btn-outline-primary me-1"
-                          type="button"
-                          @click="toggleSharePanel(p.id)"
-                        >
-                          Share
-                        </button>
-                        <button
-                          class="btn btn-sm btn-outline-secondary me-1"
-                          type="button"
-                          @click="toggleBoardPanel(p.id)"
-                        >
-                          Board
-                        </button>
-                        <button
-                          class="btn btn-sm btn-danger"
-                          type="button"
-                          aria-label="Delete project"
-                          @click="removeProject(p)"
-                        >
-                          <i class="bi bi-trash" />
-                        </button>
-                      </td>
-                    </tr>
-                    <tr v-if="sharePanelId === p.id">
-                      <td colspan="3" class="bg-body-tertiary">
+                          </div>
+                          <div v-if="p.description" class="small text-muted mt-1">{{ p.description }}</div>
+                        </div>
+                      </div>
+                      <div v-if="sharePanelId === p.id" class="mt-3 bg-body-tertiary rounded p-2">
                         <ProjectSharePanel :project="p" @changed="load" />
-                      </td>
-                    </tr>
-                    <tr v-if="boardPanelId === p.id">
-                      <td colspan="3" class="bg-body-tertiary">
+                      </div>
+                      <div v-if="boardPanelId === p.id" class="mt-3 bg-body-tertiary rounded p-2">
                         <ProjectWorkflowPanel :project="p" @changed="load" />
-                      </td>
-                    </tr>
-                  </template>
+                      </div>
+                    </td>
+                    <td data-label="Role"><span class="badge text-bg-secondary">owner</span></td>
+                    <td data-label="Actions">
+                      <button
+                        class="btn btn-sm btn-outline-primary me-1"
+                        type="button"
+                        @click="toggleSharePanel(p.id)"
+                      >
+                        Share
+                      </button>
+                      <button
+                        class="btn btn-sm btn-outline-secondary me-1"
+                        type="button"
+                        @click="toggleBoardPanel(p.id)"
+                      >
+                        Board
+                      </button>
+                      <button
+                        class="btn btn-sm btn-danger"
+                        type="button"
+                        aria-label="Delete project"
+                        @click="removeProject(p)"
+                      >
+                        <i class="bi bi-trash" />
+                      </button>
+                    </td>
+                  </tr>
                   <tr v-if="!ownedProjects.length">
-                    <td colspan="3" class="text-muted">No owned projects yet.</td>
+                    <td colspan="4" class="text-muted">No owned projects yet.</td>
                   </tr>
                 </tbody>
               </table>
@@ -152,7 +141,10 @@
                 </thead>
                 <tbody>
                   <tr v-for="p in sharedProjects" :key="p.id">
-                    <td>{{ p.name }}</td>
+                    <td>
+                      <div>{{ p.name }}</div>
+                      <div v-if="p.description" class="small text-muted">{{ p.description }}</div>
+                    </td>
                     <td class="text-muted small">{{ p.owner_user_name || p.owner_email }}</td>
                     <td><span class="badge text-bg-info">{{ p.role }}</span></td>
                     <td>
@@ -281,6 +273,20 @@
                   <small class="text-muted">{{ name.length }}/50</small>
                 </div>
               </div>
+              <div class="mb-3">
+                <label class="form-label" for="project-description">Description</label>
+                <textarea
+                  id="project-description"
+                  v-model="description"
+                  class="form-control"
+                  rows="3"
+                  maxlength="1000"
+                  placeholder="Optional"
+                />
+                <div class="d-flex justify-content-end">
+                  <small class="text-muted">{{ description.length }}/1000</small>
+                </div>
+              </div>
               <div class="d-flex gap-2">
                 <button class="btn btn-primary" type="submit">Create</button>
                 <RouterLink class="btn btn-secondary" to="/">Cancel</RouterLink>
@@ -290,12 +296,21 @@
         </div>
       </div>
     </div>
+
+    <ProjectSettingsModal
+      :open="showEditModal"
+      :project="editingProject"
+      @close="closeEditProject"
+      @saved="onProjectSettingsSaved"
+      @changed="load"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+import Sortable from 'sortablejs'
 import { api } from '@/api/client'
 import type { Project, ProjectInvite, ShareLink, Tag } from '@/api/types'
 import { APIError } from '@/api/types'
@@ -304,24 +319,86 @@ import { useAuth } from '@/composables/useAuth'
 import { useConfirm } from '@/composables/useConfirm'
 import ProjectSharePanel from '@/components/ProjectSharePanel.vue'
 import ProjectWorkflowPanel from '@/components/ProjectWorkflowPanel.vue'
+import ProjectSettingsModal from '@/components/ProjectSettingsModal.vue'
 
 const projects = ref<Project[]>([])
 const pendingInvites = ref<ProjectInvite[]>([])
 const tags = ref<Tag[]>([])
 const tagLinks = ref<Record<number, ShareLink[]>>({})
 const name = ref('')
-const renameProjectId = ref<number | null>(null)
-const renameProjectValue = ref('')
+const description = ref('')
 const renameTagId = ref<number | null>(null)
 const renameTagValue = ref('')
 const sharePanelId = ref<number | null>(null)
 const boardPanelId = ref<number | null>(null)
+const showEditModal = ref(false)
+const editingProject = ref<Project | null>(null)
+const ownedTbodyEl = ref<HTMLElement | null>(null)
+let sortable: Sortable | null = null
 const toast = useToast()
 const auth = useAuth()
 const { askConfirm } = useConfirm()
 
 const ownedProjects = computed(() => projects.value.filter((p) => (p.role || 'owner') === 'owner'))
 const sharedProjects = computed(() => projects.value.filter((p) => p.role && p.role !== 'owner'))
+
+function destroySortable() {
+  sortable?.destroy()
+  sortable = null
+}
+
+function collectOwnedIds(el: HTMLElement): number[] {
+  return Array.from(el.querySelectorAll(':scope > tr.project-owned-row'))
+    .map((node) => parseInt((node as HTMLElement).dataset.projectId || '', 10))
+    .filter((id) => !Number.isNaN(id))
+}
+
+async function persistOwnedOrder(orderedIds: number[]) {
+  const current = ownedProjects.value.map((p) => p.id)
+  if (
+    orderedIds.length !== current.length ||
+    orderedIds.every((id, i) => id === current[i])
+  ) {
+    return
+  }
+  const previous = [...projects.value]
+  const owned = ownedProjects.value
+  const shared = sharedProjects.value
+  const byId = new Map(owned.map((p) => [p.id, p]))
+  const nextOwned = orderedIds.map((id) => byId.get(id)!).filter(Boolean)
+  projects.value = [...nextOwned, ...shared]
+  try {
+    await api.reorderProjects(orderedIds)
+  } catch (err) {
+    projects.value = previous
+    toast.push(err instanceof APIError ? err.message : 'Could not reorder projects', 'error')
+    await nextTick()
+    initSortable()
+  }
+}
+
+function initSortable() {
+  destroySortable()
+  if (!ownedTbodyEl.value || ownedProjects.value.length < 2) return
+  sortable = Sortable.create(ownedTbodyEl.value, {
+    handle: '.project-drag-handle',
+    draggable: 'tr.project-owned-row',
+    animation: 150,
+    onStart() {
+      sharePanelId.value = null
+      boardPanelId.value = null
+    },
+    onEnd(evt) {
+      const el = evt.to as HTMLElement
+      void persistOwnedOrder(collectOwnedIds(el))
+    },
+  })
+}
+
+watch(ownedProjects, async () => {
+  await nextTick()
+  initSortable()
+})
 
 async function loadTagLinks(tagList: Tag[]) {
   const entries = await Promise.all(
@@ -352,6 +429,10 @@ async function load() {
     tags.value = t
     pendingInvites.value = invites
     await loadTagLinks(t)
+    if (editingProject.value) {
+      const updated = p.find((x) => x.id === editingProject.value!.id)
+      if (updated) editingProject.value = updated
+    }
   } catch (err) {
     toast.push(err instanceof APIError ? err.message : 'Failed to load projects', 'error')
   }
@@ -360,8 +441,9 @@ async function load() {
 async function createProject() {
   if (!name.value.trim()) return
   try {
-    await api.createProject(name.value.trim())
+    await api.createProject(name.value.trim(), description.value.trim())
     name.value = ''
+    description.value = ''
     toast.push('Project created', 'success')
     await load()
   } catch (err) {
@@ -369,22 +451,18 @@ async function createProject() {
   }
 }
 
-function beginRenameProject(p: Project) {
-  renameProjectId.value = p.id
-  renameProjectValue.value = p.name
-  renameTagId.value = null
+function openEditProject(p: Project) {
+  editingProject.value = p
+  showEditModal.value = true
 }
 
-async function saveRenameProject() {
-  if (renameProjectId.value == null || !renameProjectValue.value.trim()) return
-  try {
-    await api.renameProject(renameProjectId.value, renameProjectValue.value.trim())
-    renameProjectId.value = null
-    toast.push('Renamed', 'success')
-    await load()
-  } catch (err) {
-    toast.push(err instanceof APIError ? err.message : 'Rename failed', 'error')
-  }
+function closeEditProject() {
+  showEditModal.value = false
+  editingProject.value = null
+}
+
+async function onProjectSettingsSaved() {
+  await load()
 }
 
 async function removeProject(p: Project) {
@@ -399,6 +477,7 @@ async function removeProject(p: Project) {
     await api.deleteProject(p.id)
     if (sharePanelId.value === p.id) sharePanelId.value = null
     if (boardPanelId.value === p.id) boardPanelId.value = null
+    if (editingProject.value?.id === p.id) closeEditProject()
     toast.push('Project deleted', 'info')
     await load()
   } catch (err) {
@@ -458,7 +537,6 @@ async function declineInvite(inv: ProjectInvite) {
 function beginRenameTag(tag: Tag) {
   renameTagId.value = tag.id
   renameTagValue.value = tag.name
-  renameProjectId.value = null
 }
 
 async function saveRenameTag() {
@@ -527,5 +605,13 @@ async function revokeTagLink(tag: Tag, linkId: number) {
   }
 }
 
-onMounted(load)
+onMounted(async () => {
+  await load()
+  await nextTick()
+  initSortable()
+})
+
+onBeforeUnmount(() => {
+  destroySortable()
+})
 </script>

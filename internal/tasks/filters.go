@@ -80,6 +80,9 @@ func (f ListFilters) orderByClause(tablePrefix string) string {
 }
 
 // workflowClaimCondition hides unclaimed kanban tasks when scope is "mine".
+// The personal list is an active work queue: completed kanban work is also
+// hidden unless the caller explicitly asks for completed tasks (status=complete
+// or completed=week), so done cards stay on the board but leave the list.
 func (f ListFilters) workflowClaimCondition(tablePrefix string, argIdx int) string {
 	if strings.ToLower(strings.TrimSpace(f.WorkflowClaimScope)) != "mine" {
 		return ""
@@ -88,14 +91,20 @@ func (f ListFilters) workflowClaimCondition(tablePrefix string, argIdx int) stri
 	if tablePrefix != "" {
 		prefix = tablePrefix + "."
 	}
+	hideDoneKanban := normalizeListStatusFilter(f.StatusFilter) != "complete" &&
+		strings.TrimSpace(f.CompletedFilter) == ""
+	doneClause := ""
+	if hideDoneKanban {
+		doneClause = fmt.Sprintf(" AND (%scompleted IS NULL OR %scompleted = false)", prefix, prefix)
+	}
 	return fmt.Sprintf(` AND (
 		%sproject_id IS NULL
 		OR NOT EXISTS (
 			SELECT 1 FROM projects p
 			WHERE p.id = %sproject_id AND COALESCE(p.workflow_mode, 'classic') = 'kanban'
 		)
-		OR %sclaimed_by = $%d
-	)`, prefix, prefix, prefix, argIdx)
+		OR (%sclaimed_by = $%d%s)
+	)`, prefix, prefix, prefix, argIdx, doneClause)
 }
 
 func (f ListFilters) appendConditions(baseWhere string, timezone string, tablePrefix string, args []interface{}, userID int) (string, []interface{}) {

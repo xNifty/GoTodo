@@ -4,103 +4,189 @@
       <div class="spinner-border spinner-border-sm me-2" role="status" />
       Loading board…
     </div>
-    <div v-else-if="!statuses.length" class="text-muted small py-3">
-      No status columns yet. Open project Board settings to add statuses.
+
+    <div
+      v-else-if="!statuses.length"
+      class="text-center py-5 rounded-3 border shadow-xs"
+      style="background: var(--ordryn-card-bg); color: var(--ordryn-text); border-color: var(--ordryn-card-border) !important;"
+    >
+      <i class="bi bi-kanban display-4 text-muted opacity-50" />
+      <h4 class="mt-3 fw-bold">No status columns yet</h4>
+      <p class="text-muted mb-0">Open project Board settings to add statuses.</p>
     </div>
-    <div v-else class="kanban-columns d-flex gap-3 overflow-auto pb-2">
+
+    <div
+      v-else-if="!rootTaskCount"
+      class="text-center py-5 rounded-3 border shadow-xs"
+      style="background: var(--ordryn-card-bg); color: var(--ordryn-text); border-color: var(--ordryn-card-border) !important;"
+    >
+      <template v-if="hasActiveFilters">
+        <i class="bi bi-funnel display-4 text-muted opacity-50" />
+        <h4 class="mt-3 fw-bold">No matching tasks</h4>
+        <p class="text-muted mb-2">No tasks on the board match your active filters.</p>
+        <button type="button" class="btn btn-sm btn-outline-primary rounded-pill" @click="emit('clear-filters')">
+          <i class="bi bi-x-circle me-1" />Clear filters
+        </button>
+      </template>
+      <template v-else>
+        <i class="bi bi-kanban display-4 text-muted opacity-50" />
+        <h4 class="mt-3 fw-bold">Board is empty</h4>
+        <p class="text-muted">Add a task to get your board moving.</p>
+        <button
+          v-if="canAdd"
+          type="button"
+          class="btn btn-success rounded-pill px-4"
+          @click="emit('add-task')"
+        >
+          <i class="bi bi-plus-lg me-1" /> Add Task
+        </button>
+      </template>
+    </div>
+
+    <div
+      v-else
+      class="kanban-columns d-flex gap-3 overflow-auto pb-2"
+    >
       <div
         v-for="col in statuses"
         :key="col.id"
         class="kanban-column flex-shrink-0"
+        role="region"
+        :aria-label="`${col.name}, ${tasksForStatus(col.id).length} tasks`"
       >
-        <div class="kanban-column-header d-flex align-items-center justify-content-between mb-2 px-1">
-          <div class="d-flex align-items-center gap-1">
-            <strong class="small">{{ col.name }}</strong>
-            <span v-if="col.is_default" class="badge text-bg-info">default</span>
-            <span v-if="col.is_done" class="badge text-bg-success">done</span>
+        <div class="kanban-column-header d-flex align-items-center justify-content-between gap-2 mb-2 px-1">
+          <div class="d-flex align-items-center gap-1 min-w-0">
+            <strong class="kanban-column-title text-truncate">{{ col.name }}</strong>
+            <span
+              v-if="col.is_default"
+              class="ordryn-badge ordryn-badge-status text-nowrap"
+              title="Default status for new tasks"
+            >
+              default
+            </span>
+            <span
+              v-if="col.is_done"
+              class="ordryn-badge text-nowrap"
+              style="background: var(--badge-status-bg, rgba(25, 135, 84, 0.12)); color: var(--ordryn-accent, #198754);"
+              title="Done column"
+            >
+              done
+            </span>
           </div>
-          <span class="badge text-bg-secondary">{{ tasksForStatus(col.id).length }}</span>
+          <span class="kanban-column-count">{{ tasksForStatus(col.id).length }}</span>
         </div>
-        <div
-          :ref="(el) => setColumnEl(col.id, el)"
-          class="kanban-column-body"
-          :data-status-id="col.id"
-        >
+
+        <div class="kanban-column-body-wrap">
           <div
-            v-for="task in tasksForStatus(col.id)"
-            :key="task.id"
-            class="kanban-card card mb-2"
-            :data-task-id="task.id"
-            :class="{ 'kanban-card-readonly': !canDrag }"
+            v-if="!tasksForStatus(col.id).length"
+            class="kanban-column-empty"
+            aria-hidden="true"
           >
-            <div class="card-body p-2">
-              <div class="d-flex align-items-start gap-1">
-                <span
-                  v-if="canDrag"
-                  class="drag-handle text-muted pe-1"
-                  title="Drag"
-                  aria-hidden="true"
+            {{ canDrag ? 'Drop tasks here' : 'No tasks' }}
+          </div>
+          <div
+            :ref="(el) => setColumnEl(col.id, el)"
+            class="kanban-column-body"
+            :data-status-id="col.id"
+          >
+            <div
+              v-for="task in tasksForStatus(col.id)"
+              :key="task.id"
+              class="kanban-card ordryn-task-card"
+              :class="[
+                density === 'dense' ? 'density-dense' : 'density-comfortable',
+                { 'kanban-card-readonly': !canDrag },
+              ]"
+              :data-task-id="task.id"
+            >
+            <div class="d-flex align-items-start gap-1">
+              <span
+                v-if="canDrag"
+                class="drag-handle text-muted flex-shrink-0 d-inline-flex align-items-center justify-content-center"
+                title="Drag to move"
+                role="button"
+                tabindex="-1"
+                aria-label="Drag to move"
+              >
+                <i class="bi bi-grip-vertical" />
+              </span>
+
+              <div class="flex-grow-1 min-w-0">
+                <button
+                  type="button"
+                  class="btn btn-link text-start text-decoration-none p-0 kanban-card-title task-title fw-semibold"
+                  @click="emit('open-task', task.id)"
                 >
-                  <i class="bi bi-grip-vertical" />
-                </span>
-                <div class="flex-grow-1 min-w-0">
-                  <button
-                    type="button"
-                    class="btn btn-link text-start text-decoration-none p-0 fw-semibold text-body kanban-card-title"
-                    @click="emit('open-task', task.id)"
+                  {{ task.title }}
+                </button>
+
+                <div class="d-flex flex-wrap gap-1 mt-1 align-items-center">
+                  <span
+                    v-if="priorityLabel(task.priority)"
+                    class="ordryn-badge text-nowrap"
+                    :class="{
+                      'ordryn-badge-priority-low': task.priority === 1,
+                      'ordryn-badge-priority-med': task.priority === 2,
+                      'ordryn-badge-priority-high': task.priority === 3,
+                    }"
                   >
-                    {{ task.title }}
+                    {{ priorityLabel(task.priority) }}
+                  </span>
+
+                  <span
+                    v-if="task.due_date"
+                    class="kanban-meta text-nowrap"
+                    :class="{ 'is-overdue': isOverdue(task.due_date) }"
+                    title="Due date"
+                  >
+                    <i class="bi bi-calendar-event opacity-75" />
+                    {{ formatDueDate(task.due_date) }}
+                  </span>
+
+                  <span
+                    v-if="task.estimate_points != null"
+                    class="ordryn-badge text-nowrap"
+                    style="background: var(--ordryn-muted-bg); color: var(--ordryn-muted);"
+                    title="Estimate"
+                  >
+                    {{ task.estimate_points }} pts
+                  </span>
+
+                  <span
+                    v-if="task.claimed_by"
+                    class="ordryn-badge text-nowrap text-bg-primary"
+                    title="Claimed by"
+                  >
+                    <i class="bi bi-person me-1" />{{ claimerLabel(task) }}
+                  </span>
+                </div>
+
+                <div v-if="canDrag" class="kanban-claim-row mt-2">
+                  <button
+                    v-if="!task.claimed_by || task.claimed_by !== user?.id"
+                    type="button"
+                    class="btn btn-sm btn-outline-primary py-0 px-2 hover-reveal"
+                    :class="{ 'is-visible': claimingId === task.id }"
+                    :disabled="claimingId === task.id"
+                    @click.stop="claimTask(task)"
+                  >
+                    {{ task.claimed_by ? 'Take over' : 'Claim' }}
                   </button>
-                  <div class="d-flex flex-wrap gap-1 mt-1">
-                    <span
-                      v-if="task.priority > 0"
-                      class="badge"
-                      :class="priorityClass(task.priority)"
-                    >
-                      {{ priorityLabel(task.priority) }}
-                    </span>
-                    <span v-if="task.due_date" class="badge text-bg-light text-muted border">
-                      {{ task.due_date }}
-                    </span>
-                    <span
-                      v-if="task.estimate_points != null"
-                      class="badge text-bg-light text-muted border"
-                      title="Estimate"
-                    >
-                      {{ task.estimate_points }} pts
-                    </span>
-                    <span
-                      class="badge border"
-                      :class="task.claimed_by ? 'text-bg-primary' : 'text-bg-light text-muted'"
-                      title="Claimed by"
-                    >
-                      <i class="bi bi-person me-1" />{{ claimerLabel(task) }}
-                    </span>
-                  </div>
-                  <div v-if="canDrag" class="mt-2">
-                    <button
-                      v-if="!task.claimed_by || task.claimed_by !== user?.id"
-                      type="button"
-                      class="btn btn-sm btn-outline-primary py-0 px-2"
-                      :disabled="claimingId === task.id"
-                      @click.stop="claimTask(task)"
-                    >
-                      {{ task.claimed_by ? 'Take over' : 'Claim' }}
-                    </button>
-                    <button
-                      v-else
-                      type="button"
-                      class="btn btn-sm btn-outline-secondary py-0 px-2"
-                      :disabled="claimingId === task.id"
-                      @click.stop="unclaimTask(task)"
-                    >
-                      Release
-                    </button>
-                  </div>
+                  <button
+                    v-else
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary py-0 px-2 hover-reveal"
+                    :class="{ 'is-visible': claimingId === task.id }"
+                    :disabled="claimingId === task.id"
+                    @click.stop="unclaimTask(task)"
+                  >
+                    Release
+                  </button>
                 </div>
               </div>
             </div>
           </div>
+        </div>
         </div>
       </div>
     </div>
@@ -115,16 +201,31 @@ import type { ProjectStatus, Task } from '@/api/types'
 import { APIError } from '@/api/types'
 import { useAuth } from '@/composables/useAuth'
 import { useToast } from '@/composables/useToast'
+import type { ViewDensity } from '@/composables/useViewDensity'
 
-const props = defineProps<{
-  projectId: number
-  tasks: Task[]
-  role?: 'owner' | 'editor' | 'viewer'
-}>()
+const props = withDefaults(
+  defineProps<{
+    projectId: number
+    tasks: Task[]
+    role?: 'owner' | 'editor' | 'viewer'
+    density?: ViewDensity
+    hasActiveFilters?: boolean
+    canAdd?: boolean
+  }>(),
+  {
+    density: 'comfortable',
+    hasActiveFilters: false,
+    canAdd: true,
+  },
+)
 
 const emit = defineEmits<{
   'open-task': [id: number]
   changed: []
+  'task-updated': [task: Task]
+  'board-reorder': [payload: { statusId: number; taskIds: number[] }]
+  'add-task': []
+  'clear-filters': []
 }>()
 
 const toast = useToast()
@@ -137,19 +238,47 @@ const sortables: Sortable[] = []
 
 const canDrag = computed(() => props.role !== 'viewer')
 
+const rootTaskCount = computed(() => props.tasks.filter((t) => !t.parent_id).length)
+
 function claimerLabel(task: Task) {
   if (!task.claimed_by) return 'Unclaimed'
   if (user.value?.id && task.claimed_by === user.value.id) return 'You'
   return task.claimed_by_name || `User #${task.claimed_by}`
 }
 
+function priorityLabel(p: number) {
+  if (p === 3) return 'High'
+  if (p === 2) return 'Med'
+  if (p === 1) return 'Low'
+  return ''
+}
+
+function formatDueDate(dateStr?: string): string {
+  if (!dateStr) return ''
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const currentYear = new Date().getFullYear().toString()
+  const isPast = dateStr < todayStr
+  const year = dateStr.slice(0, 4)
+  if (isPast || year !== currentYear) {
+    return dateStr
+  }
+  const dateObj = new Date(dateStr + 'T00:00:00')
+  return dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function isOverdue(dateStr?: string): boolean {
+  if (!dateStr) return false
+  return dateStr < new Date().toISOString().slice(0, 10)
+}
+
 async function claimTask(task: Task) {
   claimingId.value = task.id
   try {
-    await api.claimTask(task.id)
-    emit('changed')
+    const updated = await api.claimTask(task.id)
+    emit('task-updated', updated)
   } catch (err) {
     toast.push(err instanceof APIError ? err.message : 'Could not claim task', 'error')
+    emit('changed')
   } finally {
     claimingId.value = null
   }
@@ -158,10 +287,11 @@ async function claimTask(task: Task) {
 async function unclaimTask(task: Task) {
   claimingId.value = task.id
   try {
-    await api.unclaimTask(task.id)
-    emit('changed')
+    const updated = await api.unclaimTask(task.id)
+    emit('task-updated', updated)
   } catch (err) {
     toast.push(err instanceof APIError ? err.message : 'Could not release task', 'error')
+    emit('changed')
   } finally {
     claimingId.value = null
   }
@@ -193,20 +323,6 @@ function tasksForStatus(statusId: number): Task[] {
     }
     return t.status_id === statusId
   })
-}
-
-function priorityLabel(p: number) {
-  if (p === 3) return 'High'
-  if (p === 2) return 'Medium'
-  if (p === 1) return 'Low'
-  return ''
-}
-
-function priorityClass(p: number) {
-  if (p === 3) return 'text-bg-danger'
-  if (p === 2) return 'text-bg-warning'
-  if (p === 1) return 'text-bg-secondary'
-  return 'text-bg-light'
 }
 
 async function loadStatuses() {
@@ -244,10 +360,15 @@ async function onCardDrop(evt: Sortable.SortableEvent) {
   const taskId = parseInt((evt.item as HTMLElement).dataset.taskId || '', 10)
   const fromStatusId = parseInt(from.dataset.statusId || '', 10)
   const orderedIds = collectIds(to)
+  const statusChanged = !Number.isNaN(taskId) && fromStatusId !== statusId
+
+  // Optimistic local update before API round-trip
+  emit('board-reorder', { statusId, taskIds: orderedIds })
 
   try {
-    if (!Number.isNaN(taskId) && fromStatusId !== statusId) {
-      await api.patchTask(taskId, { status_id: statusId })
+    if (statusChanged) {
+      const updated = await api.patchTask(taskId, { status_id: statusId })
+      emit('task-updated', updated)
     }
     await api.reorderTasks({
       task_ids: orderedIds,
@@ -255,7 +376,6 @@ async function onCardDrop(evt: Sortable.SortableEvent) {
       status_id: statusId,
       project: String(props.projectId),
     })
-    emit('changed')
   } catch (err) {
     toast.push(err instanceof APIError ? err.message : 'Could not update board', 'error')
     emit('changed')
@@ -277,6 +397,9 @@ function initSortables() {
         delayOnTouchOnly: true,
         touchStartThreshold: coarse ? 5 : 1,
         emptyInsertThreshold: 24,
+        ghostClass: 'kanban-sortable-ghost',
+        chosenClass: 'kanban-sortable-chosen',
+        dragClass: 'kanban-sortable-drag',
         onEnd(evt) {
           void onCardDrop(evt)
         },
@@ -309,33 +432,194 @@ onBeforeUnmount(destroySortables)
 </script>
 
 <style scoped>
+.kanban-columns {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
 .kanban-column {
   width: min(280px, 85vw);
-  background: var(--bs-tertiary-bg, var(--ordryn-card-bg, #f8f9fa));
-  border: 1px solid var(--bs-border-color, var(--ordryn-card-border, #dee2e6));
-  border-radius: 0.5rem;
+  scroll-snap-align: start;
+  background: var(--ordryn-muted-bg, var(--bs-tertiary-bg, #f8f9fa));
+  border: 1px solid var(--ordryn-card-border, var(--bs-border-color, #dee2e6));
+  border-radius: 12px;
   padding: 0.5rem;
   min-height: 12rem;
+  display: flex;
+  flex-direction: column;
+  max-height: min(70vh, 42rem);
 }
+
+.kanban-column-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--ordryn-muted-bg, var(--bs-tertiary-bg, #f8f9fa));
+  padding-top: 0.15rem;
+  padding-bottom: 0.15rem;
+}
+
+.kanban-column-title {
+  font-size: 0.85rem;
+  color: var(--ordryn-text, inherit);
+  letter-spacing: 0.01em;
+}
+
+.kanban-column-count {
+  flex-shrink: 0;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 0.45rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--ordryn-muted, #6c757d);
+  background: var(--ordryn-card-bg, #fff);
+  border: 1px solid var(--ordryn-card-border, #dee2e6);
+}
+
+.kanban-column-body-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 8rem;
+  display: flex;
+  flex-direction: column;
+}
+
 .kanban-column-body {
   min-height: 8rem;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  position: relative;
+  z-index: 1;
 }
-.kanban-card {
+
+.kanban-column-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-size: 0.8rem;
+  color: var(--ordryn-muted, #6c757d);
+  border: 1px dashed var(--ordryn-card-border, #dee2e6);
+  border-radius: 10px;
+  margin: 0.15rem 0;
+  min-height: 7rem;
+  z-index: 0;
+}
+
+/* Slim board cards reuse Ordryn task-card tokens via shared class name */
+.kanban-card.ordryn-task-card {
   cursor: default;
-  border-color: var(--bs-border-color, var(--ordryn-card-border, #dee2e6));
-  background: var(--bs-body-bg, var(--ordryn-card-bg, #fff));
+  margin-bottom: 0.5rem;
+  background-color: var(--ordryn-card-bg);
+  border: 1px solid var(--ordryn-card-border);
+  border-radius: 12px;
+  box-shadow: var(--ordryn-card-shadow);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  position: relative;
+  overflow: visible;
 }
+
+.kanban-card.density-comfortable {
+  padding: 0.65rem 0.7rem;
+}
+
+.kanban-card.density-dense {
+  padding: 0.4rem 0.55rem;
+}
+
+.kanban-card:hover {
+  box-shadow: var(--ordryn-card-hover-shadow);
+  border-color: var(--ordryn-card-hover-border);
+}
+
 .kanban-card .drag-handle {
   cursor: grab;
-  line-height: 1.2;
+  opacity: 0.5;
+  line-height: 1;
+  padding: 0.15rem 0;
+  min-width: 1.25rem;
+  min-height: 1.5rem;
 }
+
+.kanban-card .drag-handle i {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
 .kanban-card-title {
   white-space: normal;
   word-break: break-word;
   font-size: 0.9rem;
   line-height: 1.3;
+  color: var(--ordryn-text) !important;
 }
+
+.kanban-card.density-dense .kanban-card-title {
+  font-size: 0.85rem;
+}
+
+.kanban-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--ordryn-muted);
+}
+
+.kanban-meta.is-overdue {
+  color: var(--bs-danger, #dc3545);
+  font-weight: 600;
+}
+
 .kanban-card-readonly {
   opacity: 0.98;
+}
+
+.kanban-claim-row {
+  min-height: 1.5rem;
+}
+
+/* Sortable visual states */
+:deep(.kanban-sortable-ghost) {
+  opacity: 0.45;
+  border-style: dashed !important;
+  border-color: var(--ordryn-accent, #0d6efd) !important;
+  box-shadow: none !important;
+}
+
+:deep(.kanban-sortable-chosen) {
+  border-color: var(--ordryn-accent, #0d6efd) !important;
+  box-shadow: var(--ordryn-card-hover-shadow);
+}
+
+:deep(.kanban-sortable-drag) {
+  opacity: 0.95;
+}
+
+@media (pointer: coarse) {
+  .kanban-card .drag-handle {
+    min-width: 1.75rem;
+    min-height: 2rem;
+    opacity: 0.7;
+  }
+
+  .kanban-claim-row .btn {
+    min-height: 2rem;
+    padding-left: 0.65rem !important;
+    padding-right: 0.65rem !important;
+  }
+
+  /* Always show claim on touch devices (no hover) */
+  .kanban-card .hover-reveal {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
 }
 </style>

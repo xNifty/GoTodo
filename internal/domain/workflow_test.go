@@ -141,7 +141,7 @@ func TestMain(m *testing.M) {
 
 func TestKanbanEnableDisableAndStatusCap(t *testing.T) {
 	ctx := context.Background()
-	proj, err := CreateProject(ctx, 1, "Board Proj")
+	proj, err := CreateProject(ctx, 1, "Board Proj", "")
 	if err != nil {
 		t.Fatalf("create project: %v", err)
 	}
@@ -244,7 +244,7 @@ func TestKanbanEnableDisableAndStatusCap(t *testing.T) {
 
 func TestKanbanEditorCannotManageStatuses(t *testing.T) {
 	ctx := context.Background()
-	proj, err := CreateProject(ctx, 1, "Shared Board")
+	proj, err := CreateProject(ctx, 1, "Shared Board", "")
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}

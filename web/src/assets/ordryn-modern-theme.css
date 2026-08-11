@@ -688,3 +688,11 @@ body {
     border-top: 1px dashed var(--ordryn-card-border);
   }
 }
+
+/* Kanban board cards: keep claim actions available without hover on coarse pointers */
+@media (pointer: coarse) {
+  .kanban-card .hover-reveal {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+}
