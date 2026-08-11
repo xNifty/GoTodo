@@ -44,7 +44,7 @@
                   <tr>
                     <th>Name</th>
                     <th style="width: 100px">Role</th>
-                    <th style="width: 160px">Actions</th>
+                    <th style="width: 220px">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -99,6 +99,13 @@
                           Share
                         </button>
                         <button
+                          class="btn btn-sm btn-outline-secondary me-1"
+                          type="button"
+                          @click="toggleBoardPanel(p.id)"
+                        >
+                          Board
+                        </button>
+                        <button
                           class="btn btn-sm btn-danger"
                           type="button"
                           aria-label="Delete project"
@@ -111,6 +118,11 @@
                     <tr v-if="sharePanelId === p.id">
                       <td colspan="3" class="bg-body-tertiary">
                         <ProjectSharePanel :project="p" @changed="load" />
+                      </td>
+                    </tr>
+                    <tr v-if="boardPanelId === p.id">
+                      <td colspan="3" class="bg-body-tertiary">
+                        <ProjectWorkflowPanel :project="p" @changed="load" />
                       </td>
                     </tr>
                   </template>
@@ -291,6 +303,7 @@ import { useToast } from '@/composables/useToast'
 import { useAuth } from '@/composables/useAuth'
 import { useConfirm } from '@/composables/useConfirm'
 import ProjectSharePanel from '@/components/ProjectSharePanel.vue'
+import ProjectWorkflowPanel from '@/components/ProjectWorkflowPanel.vue'
 
 const projects = ref<Project[]>([])
 const pendingInvites = ref<ProjectInvite[]>([])
@@ -302,6 +315,7 @@ const renameProjectValue = ref('')
 const renameTagId = ref<number | null>(null)
 const renameTagValue = ref('')
 const sharePanelId = ref<number | null>(null)
+const boardPanelId = ref<number | null>(null)
 const toast = useToast()
 const auth = useAuth()
 const { askConfirm } = useConfirm()
@@ -384,6 +398,7 @@ async function removeProject(p: Project) {
   try {
     await api.deleteProject(p.id)
     if (sharePanelId.value === p.id) sharePanelId.value = null
+    if (boardPanelId.value === p.id) boardPanelId.value = null
     toast.push('Project deleted', 'info')
     await load()
   } catch (err) {
@@ -393,6 +408,12 @@ async function removeProject(p: Project) {
 
 function toggleSharePanel(id: number) {
   sharePanelId.value = sharePanelId.value === id ? null : id
+  if (sharePanelId.value != null) boardPanelId.value = null
+}
+
+function toggleBoardPanel(id: number) {
+  boardPanelId.value = boardPanelId.value === id ? null : id
+  if (boardPanelId.value != null) sharePanelId.value = null
 }
 
 async function leaveProject(p: Project) {

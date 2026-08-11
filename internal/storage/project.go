@@ -8,11 +8,12 @@ import (
 
 // Project represents a user-owned project that can contain tasks.
 type Project struct {
-	ID        int
-	UserID    int
-	Name      string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID           int
+	UserID       int
+	Name         string
+	WorkflowMode string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 // CreateProject inserts a new project for the given user and returns it.
@@ -24,9 +25,15 @@ func CreateProject(userID int, name string) (*Project, error) {
 	defer CloseDatabase(pool)
 
 	var p Project
-	err = pool.QueryRow(context.Background(), "INSERT INTO projects (user_id, name) VALUES ($1, $2) RETURNING id, user_id, name, created_at, updated_at", userID, name).Scan(&p.ID, &p.UserID, &p.Name, &p.CreatedAt, &p.UpdatedAt)
+	err = pool.QueryRow(context.Background(),
+		`INSERT INTO projects (user_id, name) VALUES ($1, $2)
+		 RETURNING id, user_id, name, COALESCE(workflow_mode, 'classic'), created_at, updated_at`,
+		userID, name).Scan(&p.ID, &p.UserID, &p.Name, &p.WorkflowMode, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create project: %v", err)
+	}
+	if p.WorkflowMode == "" {
+		p.WorkflowMode = WorkflowClassic
 	}
 	if err := EnsureProjectOwnerMember(p.ID, userID); err != nil {
 		return nil, fmt.Errorf("failed to create project owner membership: %v", err)
@@ -72,7 +79,9 @@ func GetProjectsForUser(userID int) ([]Project, error) {
 	}
 	defer CloseDatabase(pool)
 
-	rows, err := pool.Query(context.Background(), "SELECT id, user_id, name, created_at, updated_at FROM projects WHERE user_id = $1 ORDER BY name", userID)
+	rows, err := pool.Query(context.Background(),
+		`SELECT id, user_id, name, COALESCE(workflow_mode, 'classic'), created_at, updated_at
+		 FROM projects WHERE user_id = $1 ORDER BY name`, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query projects: %v", err)
 	}
@@ -81,7 +90,7 @@ func GetProjectsForUser(userID int) ([]Project, error) {
 	var out []Project
 	for rows.Next() {
 		var p Project
-		if err := rows.Scan(&p.ID, &p.UserID, &p.Name, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.UserID, &p.Name, &p.WorkflowMode, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("failed to scan project row: %v", err)
 		}
 		out = append(out, p)
@@ -98,7 +107,10 @@ func GetProjectByID(id int, userID int) (*Project, error) {
 	defer CloseDatabase(pool)
 
 	var p Project
-	err = pool.QueryRow(context.Background(), "SELECT id, user_id, name, created_at, updated_at FROM projects WHERE id = $1 AND user_id = $2", id, userID).Scan(&p.ID, &p.UserID, &p.Name, &p.CreatedAt, &p.UpdatedAt)
+	err = pool.QueryRow(context.Background(),
+		`SELECT id, user_id, name, COALESCE(workflow_mode, 'classic'), created_at, updated_at
+		 FROM projects WHERE id = $1 AND user_id = $2`, id, userID).Scan(
+		&p.ID, &p.UserID, &p.Name, &p.WorkflowMode, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get project: %v", err)
 	}

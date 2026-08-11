@@ -9,4 +9,6 @@ var (
 	ErrValidation = errors.New("validation")
 	// ErrForbidden indicates the user lacks permission for the action.
 	ErrForbidden = errors.New("forbidden")
+	// ErrConflict indicates the action cannot proceed due to current state.
+	ErrConflict = errors.New("conflict")
 )

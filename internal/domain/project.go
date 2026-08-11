@@ -26,14 +26,23 @@ func CreateProject(ctx context.Context, userID int, name string) (*storage.Proje
 
 // RenameProject updates a project name (owner only) and returns the updated project.
 func RenameProject(ctx context.Context, userID, projectID int, name string) (*storage.Project, error) {
+	return UpdateProject(ctx, userID, projectID, &name, nil)
+}
+
+// UpdateProject patches name and/or workflow_mode (owner only).
+func UpdateProject(ctx context.Context, userID, projectID int, name *string, workflowMode *string) (*storage.Project, error) {
 	_ = ctx
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return nil, fmt.Errorf("%w: project name is required", ErrValidation)
+	var trimmedName string
+	if name != nil {
+		trimmedName = strings.TrimSpace(*name)
+		if trimmedName == "" {
+			return nil, fmt.Errorf("%w: project name is required", ErrValidation)
+		}
+		if len(trimmedName) > MaxProjectNameLength {
+			return nil, fmt.Errorf("%w: project name must be %d characters or less", ErrValidation, MaxProjectNameLength)
+		}
 	}
-	if len(name) > MaxProjectNameLength {
-		return nil, fmt.Errorf("%w: project name must be %d characters or less", ErrValidation, MaxProjectNameLength)
-	}
+
 	proj, err := storage.GetAccessibleProjectByID(projectID, userID)
 	if err != nil {
 		return nil, ErrNotFound
@@ -41,9 +50,19 @@ func RenameProject(ctx context.Context, userID, projectID int, name string) (*st
 	if !storage.RoleCanManage(proj.Role) {
 		return nil, ErrForbidden
 	}
-	if err := storage.UpdateProject(projectID, proj.OwnerUserID, name); err != nil {
-		return nil, err
+
+	if name != nil {
+		if err := storage.UpdateProject(projectID, proj.OwnerUserID, trimmedName); err != nil {
+			return nil, err
+		}
 	}
+
+	if workflowMode != nil {
+		if _, err := SetProjectWorkflowMode(ctx, userID, projectID, *workflowMode); err != nil {
+			return nil, err
+		}
+	}
+
 	return storage.GetProjectByID(projectID, proj.OwnerUserID)
 }
 

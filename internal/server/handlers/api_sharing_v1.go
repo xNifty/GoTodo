@@ -139,6 +139,9 @@ func handleProjectSubResource(w http.ResponseWriter, r *http.Request, sub string
 			apiV1ProjectEvents(w, r, projectID)
 			return true
 		}
+	case "statuses":
+		handleProjectStatusesResource(w, r, projectID, parts[2:])
+		return true
 	}
 	return false
 }
