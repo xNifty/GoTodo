@@ -118,6 +118,12 @@ func formatEventLabel(eventType string, meta map[string]interface{}) string {
 			return "Priority · " + to
 		}
 		return "Priority changed"
+	case "claimed":
+		return "Claimed"
+	case "unclaimed":
+		return "Unclaimed"
+	case "status_changed":
+		return "Status changed"
 	default:
 		return eventType
 	}

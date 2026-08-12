@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 )
 
 const (
@@ -90,7 +91,7 @@ func ReturnPaginationForUserWithFilters(page, pageSize int, userID *int, timezon
 	visT := storage.TaskListVisibleCondition("t", "$1", filters.ProjectFilter)
 	favArgs := []interface{}{*userID, timezone}
 	favWhere := "WHERE " + visT + " AND t.is_favorite = true" + rootCondT
-	favWhere, favArgs = appendFilterSQL(favWhere, favArgs, filters, timezone, "t")
+	favWhere, favArgs = appendFilterSQL(favWhere, favArgs, filters, timezone, "t", *userID)
 	favRows, err := pool.Query(context.Background(), taskSelect+favWhere+filters.orderByClause("t"), favArgs...)
 	if err != nil {
 		return nil, 0, err
@@ -108,7 +109,7 @@ func ReturnPaginationForUserWithFilters(page, pageSize int, userID *int, timezon
 
 	countArgs := []interface{}{*userID}
 	countWhere := "WHERE " + storage.TaskListVisibleCondition("", "$1", filters.ProjectFilter) + nonFavoriteCond + rootCond
-	countWhere, countArgs = appendFilterSQL(countWhere, countArgs, filters, timezone, "")
+	countWhere, countArgs = appendFilterSQL(countWhere, countArgs, filters, timezone, "", *userID)
 	var totalTasks int
 	if err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks "+countWhere, countArgs...).Scan(&totalTasks); err != nil {
 		return nil, 0, err
@@ -121,7 +122,7 @@ func ReturnPaginationForUserWithFilters(page, pageSize int, userID *int, timezon
 
 	nonFavArgs := []interface{}{pageSize, timezone, *userID, offset}
 	nonFavWhere := "WHERE " + storage.TaskListVisibleCondition("t", "$3", filters.ProjectFilter) + " AND (t.is_favorite IS NULL OR t.is_favorite = false)" + rootCondT
-	nonFavWhere, nonFavArgs = appendFilterSQL(nonFavWhere, nonFavArgs, filters, timezone, "t")
+	nonFavWhere, nonFavArgs = appendFilterSQL(nonFavWhere, nonFavArgs, filters, timezone, "t", *userID)
 	rows, err := pool.Query(
 		context.Background(),
 		nonFavSelect+nonFavWhere+filters.orderByClause("t")+" LIMIT $1 OFFSET $4",
@@ -174,7 +175,7 @@ func SearchTasksForUserWithFilters(page, pageSize int, searchQuery string, userI
 	countArgs := []interface{}{searchPattern, *userID}
 	countWhere := "WHERE " + storage.TaskListVisibleCondition("", "$2", filters.ProjectFilter) + rootCond +
 		" AND (" + searchMatchClause("") + " OR EXISTS (SELECT 1 FROM tasks c WHERE c.parent_id = id AND " + childSearch + "))"
-	countWhere, countArgs = appendFilterSQL(countWhere, countArgs, filters, timezone, "")
+	countWhere, countArgs = appendFilterSQL(countWhere, countArgs, filters, timezone, "", *userID)
 	var totalTasks int
 	if err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks "+countWhere, countArgs...).Scan(&totalTasks); err != nil {
 		return nil, 0, err
@@ -186,7 +187,7 @@ func SearchTasksForUserWithFilters(page, pageSize int, searchQuery string, userI
 			SELECT 1 FROM task_tags tt JOIN tags tg ON tt.tag_id = tg.id
 			WHERE tt.task_id = t.id AND tg.name ILIKE $1))
 		 OR EXISTS (SELECT 1 FROM tasks c WHERE c.parent_id = t.id AND ` + childSearch + `))`
-	selectWhere, selectArgs = appendFilterSQL(selectWhere, selectArgs, filters, timezone, "t")
+	selectWhere, selectArgs = appendFilterSQL(selectWhere, selectArgs, filters, timezone, "t", *userID)
 
 	query := taskSelectSQL() + selectWhere + filters.orderByClause("t") + " LIMIT $3 OFFSET $5"
 
@@ -213,13 +214,17 @@ func SearchTasksForUserWithFilters(page, pageSize int, searchQuery string, userI
 	return taskList, totalTasks, nil
 }
 
-func appendFilterSQL(where string, args []interface{}, filters ListFilters, timezone, tablePrefix string) (string, []interface{}) {
+func appendFilterSQL(where string, args []interface{}, filters ListFilters, timezone, tablePrefix string, userID int) (string, []interface{}) {
 	where += filters.projectCondition(tablePrefix)
 	where += filters.statusCondition(tablePrefix)
 	where, args = appendDueDateCondition(where, args, filters.DueFilter, timezone, tablePrefix)
 	where, args = appendCompletedWeekCondition(where, args, filters.CompletedFilter, timezone, tablePrefix)
 	where += filters.priorityCondition(tablePrefix)
 	where, args = appendTagCondition(where, args, filters.TagFilter, tablePrefix)
+	if strings.ToLower(strings.TrimSpace(filters.WorkflowClaimScope)) == "mine" {
+		args = append(args, userID)
+		where += filters.workflowClaimCondition(tablePrefix, len(args))
+	}
 	return where, args
 }
 
@@ -265,6 +270,41 @@ func attachTagsToTasks(taskList []Task) error {
 			for j, tg := range tags {
 				taskList[i].Tags[j] = Tag{ID: tg.ID, Name: tg.Name, Color: tg.Color}
 			}
+		}
+	}
+	return attachWorkflowFieldsToTasks(taskList)
+}
+
+func attachWorkflowFieldsToTasks(taskList []Task) error {
+	if len(taskList) == 0 {
+		return nil
+	}
+	ids := make([]int, 0, len(taskList))
+	for _, t := range taskList {
+		ids = append(ids, t.ID)
+		for _, c := range t.Children {
+			ids = append(ids, c.ID)
+		}
+	}
+	fields, err := storage.GetWorkflowFieldsForTasks(ids)
+	if err != nil {
+		return err
+	}
+	applyWorkflow := func(t *Task) {
+		if f, ok := fields[t.ID]; ok {
+			t.StatusID = f.StatusID
+			t.StatusName = f.StatusName
+			t.EstimatePoints = f.EstimatePoints
+			t.TimeSpentMinutes = f.TimeSpentMinutes
+			t.ProjectWorkflow = f.ProjectWorkflow
+			t.ClaimedBy = f.ClaimedBy
+			t.ClaimedByName = f.ClaimedByName
+		}
+	}
+	for i := range taskList {
+		applyWorkflow(&taskList[i])
+		for j := range taskList[i].Children {
+			applyWorkflow(&taskList[i].Children[j])
 		}
 	}
 	return nil
@@ -476,7 +516,7 @@ func TaskMatchesFilters(taskID, userID int, timezone string, filters ListFilters
 		args = []interface{}{taskID, userID}
 		countWhere = "WHERE id = $1 AND " + visNoSearch
 	}
-	countWhere, args = appendFilterSQL(countWhere, args, filters, timezone, "")
+	countWhere, args = appendFilterSQL(countWhere, args, filters, timezone, "", userID)
 
 	var count int
 	err = pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks "+countWhere, args...).Scan(&count)

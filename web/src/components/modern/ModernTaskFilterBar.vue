@@ -3,16 +3,24 @@ import { ref } from 'vue'
 import type { Tag } from '@/api/types'
 import type { ViewDensity } from '@/composables/useViewDensity'
 
-defineProps<{
-  status: string
-  tag: string
-  priority: string
-  dueDatePreset: string
-  sort: string
-  search: string
-  density: ViewDensity
-  tags: Tag[]
-}>()
+withDefaults(
+  defineProps<{
+    status: string
+    tag: string
+    priority: string
+    dueDatePreset: string
+    sort: string
+    search: string
+    density: ViewDensity
+    tags: Tag[]
+    showViewMode?: boolean
+    viewMode?: 'list' | 'board'
+  }>(),
+  {
+    showViewMode: false,
+    viewMode: 'list',
+  },
+)
 
 const emit = defineEmits<{
   'update:status': [val: string]
@@ -22,6 +30,7 @@ const emit = defineEmits<{
   'update:sort': [val: string]
   'update:search': [val: string]
   'update:density': [val: ViewDensity]
+  'update:viewMode': [val: 'list' | 'board']
   'clear-filters': []
 }>()
 
@@ -70,39 +79,73 @@ function getDueDateLabel(preset: string) {
         </button>
       </div>
 
-      <!-- Right: View Density Toggle Switch -->
-      <div class="d-flex align-items-center gap-2">
-        <span class="small fw-medium text-muted">Density:</span>
-        <div class="btn-group btn-group-sm p-1 rounded-pill" style="background: var(--ordryn-muted-bg);">
-          <button
-            type="button"
-            class="btn btn-sm rounded-pill px-2.5 py-0.5 border-0 fw-medium transition-all"
-            :class="density === 'comfortable' ? 'shadow-xs fw-bold' : 'text-muted'"
-            :style="density === 'comfortable' ? 'background: var(--ordryn-card-bg); color: var(--ordryn-text);' : ''"
-            @click="emit('update:density', 'comfortable')"
+      <!-- Right: View mode + Density -->
+      <div class="d-flex align-items-center gap-3 flex-wrap justify-content-md-end">
+        <div
+          v-if="showViewMode"
+          class="d-flex align-items-center gap-2"
+        >
+          <span class="small fw-medium text-muted">View:</span>
+          <div
+            class="btn-group btn-group-sm p-1 rounded-pill"
+            style="background: var(--ordryn-muted-bg);"
+            role="group"
+            aria-label="View mode"
           >
-            <i class="bi bi-view-list me-1" />Comfortable
-          </button>
-          <button
-            type="button"
-            class="btn btn-sm rounded-pill px-2.5 py-0.5 border-0 fw-medium transition-all"
-            :class="density === 'dense' ? 'shadow-xs fw-bold' : 'text-muted'"
-            :style="density === 'dense' ? 'background: var(--ordryn-card-bg); color: var(--ordryn-text);' : ''"
-            @click="emit('update:density', 'dense')"
-          >
-            <i class="bi bi-list-task me-1" />Dense
-          </button>
+            <button
+              type="button"
+              class="btn btn-sm rounded-pill px-2.5 py-0.5 border-0 fw-medium transition-all"
+              :class="viewMode === 'list' ? 'shadow-xs fw-bold' : 'text-muted'"
+              :style="viewMode === 'list' ? 'background: var(--ordryn-card-bg); color: var(--ordryn-text);' : ''"
+              @click="emit('update:viewMode', 'list')"
+            >
+              <i class="bi bi-list-ul me-1" />List
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm rounded-pill px-2.5 py-0.5 border-0 fw-medium transition-all"
+              :class="viewMode === 'board' ? 'shadow-xs fw-bold' : 'text-muted'"
+              :style="viewMode === 'board' ? 'background: var(--ordryn-card-bg); color: var(--ordryn-text);' : ''"
+              @click="emit('update:viewMode', 'board')"
+            >
+              <i class="bi bi-kanban me-1" />Board
+            </button>
+          </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+          <span class="small fw-medium text-muted">Density:</span>
+          <div class="btn-group btn-group-sm p-1 rounded-pill" style="background: var(--ordryn-muted-bg);">
+            <button
+              type="button"
+              class="btn btn-sm rounded-pill px-2.5 py-0.5 border-0 fw-medium transition-all"
+              :class="density === 'comfortable' ? 'shadow-xs fw-bold' : 'text-muted'"
+              :style="density === 'comfortable' ? 'background: var(--ordryn-card-bg); color: var(--ordryn-text);' : ''"
+              @click="emit('update:density', 'comfortable')"
+            >
+              <i class="bi bi-view-list me-1" />Comfortable
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm rounded-pill px-2.5 py-0.5 border-0 fw-medium transition-all"
+              :class="density === 'dense' ? 'shadow-xs fw-bold' : 'text-muted'"
+              :style="density === 'dense' ? 'background: var(--ordryn-card-bg); color: var(--ordryn-text);' : ''"
+              @click="emit('update:density', 'dense')"
+            >
+              <i class="bi bi-list-task me-1" />Dense
+            </button>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Foldable Filter Pills Row -->
     <div v-if="showFilterPills" class="filter-pills-container mt-2">
-      <!-- Status Dropdown Pill -->
+      <!-- Status Dropdown Pill (default: incomplete) -->
       <div class="dropdown d-inline-block">
         <button
           class="filter-pill-btn dropdown-toggle"
-          :class="{ active: status !== '' }"
+          :class="{ active: status !== 'incomplete' }"
           type="button"
           data-bs-toggle="dropdown"
         >

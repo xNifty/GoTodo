@@ -7,13 +7,14 @@ import (
 
 // ListFilters holds query filters for task list and search endpoints.
 type ListFilters struct {
-	ProjectFilter   *int
-	StatusFilter    string
-	DueFilter       string
-	CompletedFilter string
-	PriorityFilter  *int
-	TagFilter       *int
-	Sort            string
+	ProjectFilter       *int
+	StatusFilter        string
+	DueFilter           string
+	CompletedFilter     string
+	PriorityFilter      *int
+	TagFilter           *int
+	Sort                string
+	WorkflowClaimScope  string // "mine" | "all" | ""
 }
 
 func (f ListFilters) projectCondition(tablePrefix string) string {
@@ -78,6 +79,34 @@ func (f ListFilters) orderByClause(tablePrefix string) string {
 	return fmt.Sprintf(" ORDER BY %sposition", prefix)
 }
 
-func (f ListFilters) appendConditions(baseWhere string, timezone string, tablePrefix string, args []interface{}) (string, []interface{}) {
-	return appendFilterSQL(baseWhere, args, f, timezone, tablePrefix)
+// workflowClaimCondition hides unclaimed kanban tasks when scope is "mine".
+// The personal list is an active work queue: completed kanban work is also
+// hidden unless the caller explicitly asks for completed tasks (status=complete
+// or completed=week), so done cards stay on the board but leave the list.
+func (f ListFilters) workflowClaimCondition(tablePrefix string, argIdx int) string {
+	if strings.ToLower(strings.TrimSpace(f.WorkflowClaimScope)) != "mine" {
+		return ""
+	}
+	prefix := ""
+	if tablePrefix != "" {
+		prefix = tablePrefix + "."
+	}
+	hideDoneKanban := normalizeListStatusFilter(f.StatusFilter) != "complete" &&
+		strings.TrimSpace(f.CompletedFilter) == ""
+	doneClause := ""
+	if hideDoneKanban {
+		doneClause = fmt.Sprintf(" AND (%scompleted IS NULL OR %scompleted = false)", prefix, prefix)
+	}
+	return fmt.Sprintf(` AND (
+		%sproject_id IS NULL
+		OR NOT EXISTS (
+			SELECT 1 FROM projects p
+			WHERE p.id = %sproject_id AND COALESCE(p.workflow_mode, 'classic') = 'kanban'
+		)
+		OR (%sclaimed_by = $%d%s)
+	)`, prefix, prefix, prefix, argIdx, doneClause)
+}
+
+func (f ListFilters) appendConditions(baseWhere string, timezone string, tablePrefix string, args []interface{}, userID int) (string, []interface{}) {
+	return appendFilterSQL(baseWhere, args, f, timezone, tablePrefix, userID)
 }

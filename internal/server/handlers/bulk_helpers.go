@@ -152,14 +152,23 @@ func parentAlsoSelected(ctx context.Context, db *pgxpool.Pool, childID int, sele
 }
 
 func bulkSetCompleted(ctx context.Context, db *pgxpool.Pool, ids []int, userID int, completed bool) error {
+	_ = db
 	for _, id := range ids {
-		if _, err := db.Exec(ctx, "UPDATE tasks SET completed = $1, date_modified = NOW() AT TIME ZONE 'UTC' WHERE id = $2", completed, id); err != nil {
+		if err := domain.SetTaskCompleted(ctx, userID, id, completed); err != nil {
 			return err
 		}
-		if completed {
-			logTaskEvent(id, userID, "completed", nil)
-		} else {
-			logTaskEvent(id, userID, "reopened", nil)
+	}
+	return nil
+}
+
+func bulkSetStatus(ctx context.Context, db *pgxpool.Pool, ids []int, userID, statusID int) error {
+	_ = db
+	for _, id := range ids {
+		sid := statusID
+		statusPtr := &sid
+		in := domain.UpdateTaskInput{StatusID: &statusPtr}
+		if _, err := domain.UpdateTask(ctx, userID, id, in); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -206,10 +215,14 @@ func bulkSetDueDate(ctx context.Context, db *pgxpool.Pool, ids []int, userID int
 }
 
 func bulkMoveProject(ctx context.Context, db *pgxpool.Pool, ids []int, userID int, projectIDStr string) error {
+	_ = db
 	projectName := projectDisplayName(userID, projectIDFromForm(projectIDStr))
 	if projectIDStr == "" || projectIDStr == "0" {
 		for _, id := range ids {
-			if _, err := db.Exec(ctx, "UPDATE tasks SET project_id = NULL, date_modified = NOW() AT TIME ZONE 'UTC' WHERE id = $1", id); err != nil {
+			var clear *int
+			projectPtr := &clear
+			in := domain.UpdateTaskInput{ProjectID: projectPtr}
+			if _, err := domain.UpdateTask(ctx, userID, id, in); err != nil {
 				return err
 			}
 			logTaskEvent(id, userID, "moved_project", map[string]interface{}{"project": projectName})
@@ -224,7 +237,10 @@ func bulkMoveProject(ctx context.Context, db *pgxpool.Pool, ids []int, userID in
 		return fmt.Errorf("invalid project selection")
 	}
 	for _, id := range ids {
-		if _, err := db.Exec(ctx, "UPDATE tasks SET project_id = $1, date_modified = NOW() AT TIME ZONE 'UTC' WHERE id = $2", pid, id); err != nil {
+		p := pid
+		projectPtr := &p
+		in := domain.UpdateTaskInput{ProjectID: &projectPtr}
+		if _, err := domain.UpdateTask(ctx, userID, id, in); err != nil {
 			return err
 		}
 		logTaskEvent(id, userID, "moved_project", map[string]interface{}{"project": projectName})

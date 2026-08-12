@@ -101,6 +101,8 @@ func registerAPIV1Routes() {
 	v1 := utils.APIChain
 	handleBoth("/api/v1/tasks", v1(handlers.APIV1TasksRouter))
 	handleBoth("/api/v1/tasks/", v1(handlers.APIV1TasksRouter))
+	handleBoth("/api/v1/notifications", v1(handlers.APIV1NotificationsRouter))
+	handleBoth("/api/v1/notifications/", v1(handlers.APIV1NotificationsRouter))
 	handleBoth("/api/v1/projects", v1(handlers.APIV1ProjectsRouter))
 	handleBoth("/api/v1/projects/", v1(handlers.APIV1ProjectsRouter))
 	handleBoth("/api/v1/project-invites", v1(handlers.APIV1ProjectInvitesRouter))

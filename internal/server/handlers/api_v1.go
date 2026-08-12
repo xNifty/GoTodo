@@ -21,23 +21,30 @@ type apiTagJSON struct {
 }
 
 type apiTaskJSON struct {
-	ID                 int          `json:"id"`
-	Title              string       `json:"title"`
-	Description        string       `json:"description"`
-	Completed          bool         `json:"completed"`
-	DueDate            string       `json:"due_date"`
-	ProjectID          *int         `json:"project_id,omitempty"`
-	Project            string       `json:"project,omitempty"`
-	Priority           int          `json:"priority"`
-	Favorite           bool         `json:"favorite"`
-	Position           int          `json:"position"`
-	ParentID           *int         `json:"parent_id"`
-	ChildCount         int          `json:"child_count"`
-	ChildrenCompleted  int          `json:"children_completed"`
+	ID                 int           `json:"id"`
+	Title              string        `json:"title"`
+	Description        string        `json:"description"`
+	Completed          bool          `json:"completed"`
+	DueDate            string        `json:"due_date"`
+	ProjectID          *int          `json:"project_id,omitempty"`
+	Project            string        `json:"project,omitempty"`
+	Priority           int           `json:"priority"`
+	Favorite           bool          `json:"favorite"`
+	Position           int           `json:"position"`
+	ParentID           *int          `json:"parent_id"`
+	ChildCount         int           `json:"child_count"`
+	ChildrenCompleted  int           `json:"children_completed"`
 	Children           []apiTaskJSON `json:"children,omitempty"`
-	Tags               []apiTagJSON `json:"tags"`
-	CreatedAt          string       `json:"created_at"`
-	ModifiedAt         string       `json:"modified_at"`
+	Tags               []apiTagJSON  `json:"tags"`
+	CreatedAt          string        `json:"created_at"`
+	ModifiedAt         string        `json:"modified_at"`
+	StatusID           *int          `json:"status_id,omitempty"`
+	StatusName         string        `json:"status_name,omitempty"`
+	EstimatePoints     *int          `json:"estimate_points,omitempty"`
+	TimeSpentMinutes   int           `json:"time_spent_minutes,omitempty"`
+	ProjectWorkflow    string        `json:"project_workflow,omitempty"`
+	ClaimedBy          *int          `json:"claimed_by,omitempty"`
+	ClaimedByName      string        `json:"claimed_by_name,omitempty"`
 }
 
 type apiTaskListResponse struct {
@@ -51,28 +58,48 @@ type apiTaskListResponse struct {
 }
 
 type apiTaskCreateRequest struct {
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	DueDate     string `json:"due_date"`
-	ProjectID   *int   `json:"project_id"`
-	ParentID    *int   `json:"parent_id"`
-	Priority    *int   `json:"priority"`
-	Completed   *bool  `json:"completed"`
-	Favorite    *bool  `json:"favorite"`
-	TagIDs      []int  `json:"tag_ids"`
+	Title          string `json:"title"`
+	Description    string `json:"description"`
+	DueDate        string `json:"due_date"`
+	ProjectID      *int   `json:"project_id"`
+	ParentID       *int   `json:"parent_id"`
+	Priority       *int   `json:"priority"`
+	Completed      *bool  `json:"completed"`
+	Favorite       *bool  `json:"favorite"`
+	TagIDs         []int  `json:"tag_ids"`
+	StatusID       *int   `json:"status_id"`
+	EstimatePoints *int   `json:"estimate_points"`
 }
 
 type apiTaskPatchRequest struct {
-	Title       *string `json:"title"`
-	Description *string `json:"description"`
-	DueDate     *string `json:"due_date"`
-	ProjectID   **int   `json:"project_id"`
-	ParentID    **int   `json:"parent_id"`
-	Priority    *int    `json:"priority"`
-	Completed   *bool   `json:"completed"`
-	Favorite    *bool   `json:"favorite"`
-	TagIDs      *[]int  `json:"tag_ids"`
-	ClearDue    *bool   `json:"clear_due_date"`
+	Title          *string     `json:"title"`
+	Description    *string     `json:"description"`
+	DueDate        *string     `json:"due_date"`
+	ProjectID      **int       `json:"project_id"`
+	ParentID       **int       `json:"parent_id"`
+	Priority       *int        `json:"priority"`
+	Completed      *bool       `json:"completed"`
+	Favorite       *bool       `json:"favorite"`
+	TagIDs         *[]int      `json:"tag_ids"`
+	ClearDue       *bool       `json:"clear_due_date"`
+	StatusID       **int       `json:"status_id"`
+	EstimatePoints *optionalInt `json:"estimate_points"`
+}
+
+// optionalInt distinguishes omitted / null / value for JSON patch fields.
+type optionalInt struct {
+	Set   bool
+	Null  bool
+	Value int
+}
+
+func (o *optionalInt) UnmarshalJSON(b []byte) error {
+	o.Set = true
+	if string(b) == "null" {
+		o.Null = true
+		return nil
+	}
+	return json.Unmarshal(b, &o.Value)
 }
 
 type apiTaskReorderRequest struct {
@@ -82,6 +109,7 @@ type apiTaskReorderRequest struct {
 	Page     *int    `json:"page"`
 	PerPage  *int    `json:"per_page"`
 	Project  *string `json:"project"`
+	StatusID *int    `json:"status_id"`
 }
 
 type apiReorderOKResponse struct {
@@ -91,6 +119,8 @@ type apiReorderOKResponse struct {
 type apiProjectJSON struct {
 	ID            int    `json:"id"`
 	Name          string `json:"name"`
+	Description   string `json:"description,omitempty"`
+	WorkflowMode  string `json:"workflow_mode,omitempty"`
 	Role          string `json:"role,omitempty"`
 	OwnerEmail    string `json:"owner_email,omitempty"`
 	OwnerUserName string `json:"owner_user_name,omitempty"`
@@ -106,11 +136,18 @@ type apiTagPatchRequest struct {
 }
 
 type apiProjectCreateRequest struct {
-	Name string `json:"name"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
 
 type apiProjectPatchRequest struct {
-	Name string `json:"name"`
+	Name         *string `json:"name"`
+	Description  *string `json:"description"`
+	WorkflowMode *string `json:"workflow_mode"`
+}
+
+type apiProjectReorderRequest struct {
+	ProjectIDs []int `json:"project_ids"`
 }
 
 type apiBulkRequest struct {
@@ -120,6 +157,7 @@ type apiBulkRequest struct {
 	TagID     *int    `json:"tag_id"`
 	Priority  *int    `json:"priority"`
 	DueDate   *string `json:"due_date"`
+	StatusID  *int    `json:"status_id"`
 }
 
 type apiUndoRequest struct {
@@ -162,6 +200,11 @@ func taskToAPIJSON(t tasks.Task) apiTaskJSON {
 		Tags:              tags,
 		CreatedAt:         t.DateCreated,
 		ModifiedAt:        t.DateModified,
+		StatusName:        t.StatusName,
+		EstimatePoints:    t.EstimatePoints,
+		TimeSpentMinutes:  t.TimeSpentMinutes,
+		ProjectWorkflow:   t.ProjectWorkflow,
+		ClaimedByName:     t.ClaimedByName,
 	}
 	if t.ParentID > 0 {
 		pid := t.ParentID
@@ -173,6 +216,14 @@ func taskToAPIJSON(t tasks.Task) apiTaskJSON {
 		out.Project = t.ProjectName
 	} else if t.ProjectName != "" {
 		out.Project = t.ProjectName
+	}
+	if t.StatusID > 0 {
+		sid := t.StatusID
+		out.StatusID = &sid
+	}
+	if t.ClaimedBy > 0 {
+		cid := t.ClaimedBy
+		out.ClaimedBy = &cid
 	}
 	if len(t.Children) > 0 {
 		out.Children = make([]apiTaskJSON, 0, len(t.Children))
@@ -232,19 +283,33 @@ func APIV1TasksRouter(w http.ResponseWriter, r *http.Request) {
 		apiV1UndoTasks(w, r)
 		return
 	}
-	if strings.HasSuffix(sub, "/events") {
-		idStr := strings.TrimSuffix(sub, "/events")
-		idStr = strings.TrimSuffix(idStr, "/")
-		id, err := strconv.Atoi(idStr)
+	if strings.Contains(sub, "/") {
+		parts := strings.Split(sub, "/")
+		id, err := strconv.Atoi(parts[0])
 		if err != nil || id <= 0 {
 			utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid task id.")
 			return
 		}
-		if r.Method != http.MethodGet {
-			utils.APIJSONError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Method not allowed.")
+		switch parts[1] {
+		case "events":
+			if len(parts) != 2 || r.Method != http.MethodGet {
+				utils.APIJSONError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Method not allowed.")
+				return
+			}
+			apiV1TaskEvents(w, r, id)
+			return
+		case "time-entries":
+			handleTaskTimeEntries(w, r, id, parts[2:])
+			return
+		case "claim":
+			if len(parts) != 2 {
+				utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid task path.")
+				return
+			}
+			apiV1TaskClaim(w, r, id)
 			return
 		}
-		apiV1TaskEvents(w, r, id)
+		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid task path.")
 		return
 	}
 	id, err := strconv.Atoi(sub)
@@ -350,15 +415,17 @@ func apiV1CreateTask(w http.ResponseWriter, r *http.Request) {
 		favorite = *req.Favorite
 	}
 	in := domain.CreateTaskInput{
-		Title:       req.Title,
-		Description: req.Description,
-		DueDate:     req.DueDate,
-		ProjectID:   req.ProjectID,
-		ParentID:    req.ParentID,
-		Priority:    priority,
-		Completed:   completed,
-		Favorite:    favorite,
-		TagIDs:      req.TagIDs,
+		Title:          req.Title,
+		Description:    req.Description,
+		DueDate:        req.DueDate,
+		ProjectID:      req.ProjectID,
+		ParentID:       req.ParentID,
+		Priority:       priority,
+		Completed:      completed,
+		Favorite:       favorite,
+		TagIDs:         req.TagIDs,
+		StatusID:       req.StatusID,
+		EstimatePoints: req.EstimatePoints,
 	}
 	newID, err := domain.CreateTask(r.Context(), userID, in)
 	if err != nil {
@@ -407,9 +474,20 @@ func apiV1PatchTask(w http.ResponseWriter, r *http.Request, taskID int) {
 		TagIDs:      req.TagIDs,
 		ProjectID:   req.ProjectID,
 		ParentID:    req.ParentID,
+		StatusID:    req.StatusID,
 	}
 	if req.ClearDue != nil && *req.ClearDue {
 		in.ClearDue = true
+	}
+	if req.EstimatePoints != nil && req.EstimatePoints.Set {
+		if req.EstimatePoints.Null {
+			var clear *int
+			in.EstimatePoints = &clear
+		} else {
+			v := req.EstimatePoints.Value
+			ptr := &v
+			in.EstimatePoints = &ptr
+		}
 	}
 
 	if _, err := domain.UpdateTask(r.Context(), userID, taskID, in); err != nil {
@@ -423,6 +501,10 @@ func apiV1PatchTask(w http.ResponseWriter, r *http.Request, taskID int) {
 		}
 		if errors.Is(err, domain.ErrForbidden) {
 			utils.APIJSONError(w, http.StatusForbidden, "forbidden", "Forbidden.")
+			return
+		}
+		if errors.Is(err, domain.ErrConflict) {
+			utils.APIJSONError(w, http.StatusConflict, "conflict", err.Error())
 			return
 		}
 		utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to update task.")
@@ -587,6 +669,12 @@ func apiV1BulkTasks(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		err = bulkSetDueDate(ctx, db, req.TaskIDs, userID, dueDate)
+	case "set_status":
+		if req.StatusID == nil || *req.StatusID <= 0 {
+			utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "status_id is required.")
+			return
+		}
+		err = bulkSetStatus(ctx, db, req.TaskIDs, userID, *req.StatusID)
 	case "delete":
 		undoToken, err = deleteTasksForAPI(ctx, db, r, w, req.TaskIDs, userID)
 	default:
@@ -719,7 +807,7 @@ func apiV1ReorderTasks(w http.ResponseWriter, r *http.Request) {
 		projectFilter = parseProjectFilter(*req.Project)
 	}
 
-	if err := domain.ReorderTasks(r.Context(), userID, req.TaskIDs, *req.Favorite, projectFilter, req.ParentID); err != nil {
+	if err := domain.ReorderTasks(r.Context(), userID, req.TaskIDs, *req.Favorite, projectFilter, req.ParentID, req.StatusID); err != nil {
 		if errors.Is(err, domain.ErrValidation) {
 			utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Task does not belong to user or mismatched favorite group/project.")
 			return
@@ -744,6 +832,14 @@ func APIV1ProjectsRouter(w http.ResponseWriter, r *http.Request) {
 		default:
 			utils.APIJSONError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Method not allowed.")
 		}
+		return
+	}
+	if sub == "reorder" {
+		if r.Method != http.MethodPost {
+			utils.APIJSONError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Method not allowed.")
+			return
+		}
+		apiV1ReorderProjects(w, r)
 		return
 	}
 	if handleProjectSubResource(w, r, sub) {
@@ -783,15 +879,8 @@ func apiV1ListProjects(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := make([]apiProjectJSON, 0, len(projects))
-	for _, p := range projects {
-		out = append(out, apiProjectJSON{
-			ID:            p.ID,
-			Name:          p.Name,
-			Role:          p.Role,
-			OwnerEmail:    p.OwnerEmail,
-			OwnerUserName: p.OwnerUserName,
-			OwnerUserID:   p.OwnerUserID,
-		})
+	for i := range projects {
+		out = append(out, projectToAPIJSON(&projects[i]))
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	json.NewEncoder(w).Encode(out)
@@ -809,14 +898,7 @@ func apiV1GetProject(w http.ResponseWriter, r *http.Request, projectID int) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	json.NewEncoder(w).Encode(apiProjectJSON{
-		ID:            p.ID,
-		Name:          p.Name,
-		Role:          p.Role,
-		OwnerEmail:    p.OwnerEmail,
-		OwnerUserName: p.OwnerUserName,
-		OwnerUserID:   p.OwnerUserID,
-	})
+	json.NewEncoder(w).Encode(projectToAPIJSON(p))
 }
 
 func apiV1CreateProject(w http.ResponseWriter, r *http.Request) {
@@ -830,7 +912,7 @@ func apiV1CreateProject(w http.ResponseWriter, r *http.Request) {
 		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid JSON body.")
 		return
 	}
-	project, err := domain.CreateProject(r.Context(), userID, req.Name)
+	project, err := domain.CreateProject(r.Context(), userID, req.Name, req.Description)
 	if err != nil {
 		if errors.Is(err, domain.ErrValidation) {
 			utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", err.Error())
@@ -841,12 +923,7 @@ func apiV1CreateProject(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(apiProjectJSON{
-		ID:          project.ID,
-		Name:        project.Name,
-		Role:        storage.RoleOwner,
-		OwnerUserID: userID,
-	})
+	json.NewEncoder(w).Encode(projectStorageToAPIJSON(project, storage.RoleOwner))
 }
 
 func apiV1PatchProject(w http.ResponseWriter, r *http.Request, projectID int) {
@@ -860,25 +937,56 @@ func apiV1PatchProject(w http.ResponseWriter, r *http.Request, projectID int) {
 		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid JSON body.")
 		return
 	}
-	project, err := domain.RenameProject(r.Context(), userID, projectID, req.Name)
+	if req.Name == nil && req.Description == nil && req.WorkflowMode == nil {
+		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Nothing to update.")
+		return
+	}
+	project, err := domain.UpdateProject(r.Context(), userID, projectID, req.Name, req.Description, req.WorkflowMode)
 	if err != nil {
 		if errors.Is(err, domain.ErrValidation) {
 			utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", err.Error())
 			return
 		}
 		if errors.Is(err, domain.ErrForbidden) {
-			utils.APIJSONError(w, http.StatusForbidden, "forbidden", "Only the owner can rename this project.")
+			utils.APIJSONError(w, http.StatusForbidden, "forbidden", "Only the owner can update this project.")
 			return
 		}
 		if errors.Is(err, domain.ErrNotFound) {
 			utils.APIJSONError(w, http.StatusNotFound, "not_found", "Project not found.")
 			return
 		}
+		if errors.Is(err, domain.ErrConflict) {
+			utils.APIJSONError(w, http.StatusConflict, "conflict", err.Error())
+			return
+		}
 		utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to update project.")
 		return
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	json.NewEncoder(w).Encode(apiProjectJSON{ID: project.ID, Name: project.Name, Role: storage.RoleOwner, OwnerUserID: project.UserID})
+	json.NewEncoder(w).Encode(projectStorageToAPIJSON(project, storage.RoleOwner))
+}
+
+func apiV1ReorderProjects(w http.ResponseWriter, r *http.Request) {
+	userID, ok := apiUserFromRequest(r)
+	if !ok {
+		utils.APIJSONError(w, http.StatusUnauthorized, "unauthorized", "Not authenticated.")
+		return
+	}
+	var req apiProjectReorderRequest
+	if err := decodeJSONBody(r, &req); err != nil {
+		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid JSON body.")
+		return
+	}
+	if err := domain.ReorderProjectsForUser(r.Context(), userID, req.ProjectIDs); err != nil {
+		if errors.Is(err, domain.ErrValidation) {
+			utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", err.Error())
+			return
+		}
+		utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to reorder projects.")
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	json.NewEncoder(w).Encode(apiReorderOKResponse{OK: true})
 }
 
 func apiV1DeleteProject(w http.ResponseWriter, r *http.Request, projectID int) {

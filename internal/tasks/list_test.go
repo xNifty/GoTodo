@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	embeddedpostgres "github.com/fergusstrange/embedded-postgres"
@@ -15,10 +16,13 @@ func TestMain(m *testing.M) {
 	os.Setenv("SESSION_KEY", "test-session-key-for-unit-tests-32chars!!")
 	port := uint32(5438)
 	// Pin a Maven-published binary version (DefaultConfig alone can drift and 404).
+	// Isolate RuntimePath for parallel go test ./... against other packages.
+	runtimePath := filepath.Join(os.TempDir(), "gotodo-embedded-pg-tasks")
 	db := embeddedpostgres.NewDatabase(embeddedpostgres.DefaultConfig().
 		Version(embeddedpostgres.V16).
 		Port(port).
-		Database("gotodo_test"))
+		Database("gotodo_test").
+		RuntimePath(runtimePath))
 	if err := db.Start(); err != nil {
 		fmt.Fprintf(os.Stderr, "start postgres: %v\n", err)
 		os.Exit(1)
@@ -37,7 +41,7 @@ func TestMain(m *testing.M) {
 	}
 
 	_, err = pool.Exec(context.Background(), `
-		CREATE TABLE users (id SERIAL PRIMARY KEY, email TEXT);
+		CREATE TABLE users (id SERIAL PRIMARY KEY, email TEXT, user_name TEXT);
 		CREATE TABLE saved_views (
 			id SERIAL PRIMARY KEY,
 			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -48,7 +52,21 @@ func TestMain(m *testing.M) {
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 			UNIQUE (user_id, name)
 		);
-		CREATE TABLE projects (id SERIAL PRIMARY KEY, user_id INT, name TEXT);
+		CREATE TABLE projects (
+			id SERIAL PRIMARY KEY,
+			user_id INT,
+			name TEXT,
+			workflow_mode VARCHAR(16) NOT NULL DEFAULT 'classic'
+		);
+		CREATE TABLE project_statuses (
+			id SERIAL PRIMARY KEY,
+			project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+			name TEXT NOT NULL,
+			position INTEGER NOT NULL DEFAULT 0,
+			is_done BOOLEAN NOT NULL DEFAULT FALSE,
+			is_default BOOLEAN NOT NULL DEFAULT FALSE,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
 		CREATE TABLE project_members (
 			project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
 			user_id INTEGER NOT NULL,
@@ -77,12 +95,23 @@ func TestMain(m *testing.M) {
 			project_id INTEGER,
 			parent_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE,
 			date_modified TIMESTAMP,
-			due_date DATE
+			due_date DATE,
+			status_id INTEGER,
+			estimate_points INTEGER,
+			claimed_by INTEGER
 		);
 		CREATE TABLE task_tags (
 			task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
 			tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
 			PRIMARY KEY (task_id, tag_id)
+		);
+		CREATE TABLE task_time_entries (
+			id SERIAL PRIMARY KEY,
+			task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+			user_id INTEGER NOT NULL,
+			minutes INTEGER NOT NULL,
+			note TEXT NOT NULL DEFAULT '',
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);
 		CREATE TABLE task_events (
 			id SERIAL PRIMARY KEY,

@@ -7,8 +7,10 @@ import { APIError } from '@/api/types'
 import ModernSidebar from '@/components/modern/ModernSidebar.vue'
 import ModernTaskFilterBar from '@/components/modern/ModernTaskFilterBar.vue'
 import ModernTaskCard from '@/components/modern/ModernTaskCard.vue'
+import KanbanBoard from '@/components/KanbanBoard.vue'
 import DeleteTaskDialog from '@/components/DeleteTaskDialog.vue'
 import AppFooter from '@/components/AppFooter.vue'
+import ProjectSettingsModal from '@/components/ProjectSettingsModal.vue'
 import { useAuth } from '@/composables/useAuth'
 import { useInfiniteScroll } from '@/composables/useInfiniteScroll'
 import { useTaskListFilters } from '@/composables/useTaskListFilters'
@@ -65,11 +67,11 @@ const newViewName = ref('')
 // Add Project Modal state
 const showAddProjectModal = ref(false)
 const newProjectName = ref('')
+const newProjectDescription = ref('')
 
 // Edit Project Modal state
 const showEditProjectModal = ref(false)
 const editingProject = ref<Project | null>(null)
-const editedProjectName = ref('')
 
 // Bulk Control Panel State
 const bulkProject = ref('')
@@ -110,7 +112,11 @@ const allSelected = computed(
 )
 const isSearching = computed(() => filters.search !== '')
 const showTaskTable = computed(
-  () => total.value > 0 || favoriteTasks.value.length > 0 || hasActiveFilters.value,
+  () =>
+    total.value > 0 ||
+    favoriteTasks.value.length > 0 ||
+    hasActiveFilters.value ||
+    isKanbanProjectView.value,
 )
 
 const activeProjectObj = computed(() => {
@@ -123,6 +129,111 @@ const activeProjectObj = computed(() => {
 const isViewerProjectView = computed(
   () => activeProjectObj.value?.role === 'viewer',
 )
+
+const VIEW_MODE_KEY = 'gotodo.viewMode'
+type TaskViewMode = 'list' | 'board'
+
+function readStoredViewMode(): TaskViewMode {
+  try {
+    const v = localStorage.getItem(VIEW_MODE_KEY)
+    return v === 'board' ? 'board' : 'list'
+  } catch {
+    return 'list'
+  }
+}
+
+const viewMode = ref<TaskViewMode>(readStoredViewMode())
+
+const isKanbanProjectView = computed(() => {
+  const p = activeProjectObj.value
+  if (!p) return false
+  if (p.workflow_mode === 'kanban') return true
+  // Fallback: any loaded task for this project reports kanban workflow
+  return tasks.value.some(
+    (t) => t.project_id === p.id && t.project_workflow === 'kanban',
+  )
+})
+
+const showBoardView = computed(
+  () => isKanbanProjectView.value && viewMode.value === 'board',
+)
+
+function setViewMode(mode: TaskViewMode) {
+  if (viewMode.value === mode) return
+  viewMode.value = mode
+  try {
+    localStorage.setItem(VIEW_MODE_KEY, mode)
+  } catch {
+    /* ignore */
+  }
+  void reloadInitial()
+}
+
+/** Keep column order + status_id in sync without a full reload after drag. */
+function applyBoardReorder(payload: { statusId: number; taskIds: number[] }) {
+  const { statusId, taskIds } = payload
+  const byId = new Map(tasks.value.map((t) => [t.id, t]))
+  const columnSet = new Set(taskIds)
+  const orderedColumn = taskIds
+    .map((id) => byId.get(id))
+    .filter((t): t is Task => !!t)
+    .map((t) => ({ ...t, status_id: statusId }))
+
+  const result: Task[] = []
+  let inserted = false
+  for (const t of tasks.value) {
+    if (columnSet.has(t.id)) {
+      if (!inserted) {
+        result.push(...orderedColumn)
+        inserted = true
+      }
+      continue
+    }
+    result.push(t)
+  }
+  if (!inserted) {
+    result.push(...orderedColumn)
+  }
+  tasks.value = result
+}
+
+/** Board has no infinite-scroll sentinel — fetch remaining pages after the first. */
+async function loadAllForBoard() {
+  if (!showBoardView.value) return
+  while (showBoardView.value && hasMore.value && !loading.value) {
+    const before = loadedPage.value
+    await loadMore()
+    if (loadedPage.value === before) break
+  }
+}
+
+function listApiParams(page: number, perPage: number) {
+  // Board needs the full backlog (including unclaimed). List/home only show
+  // kanban tasks the current user has claimed.
+  const onKanbanBoard = isKanbanProjectView.value && viewMode.value === 'board'
+  const params: Record<string, string | number> = {
+    ...toApiParams(page, perPage),
+    workflow_claim_scope: onKanbanBoard ? 'all' : 'mine',
+  }
+  // List defaults to incomplete; board still needs done-column cards.
+  if (onKanbanBoard && params.status === 'incomplete') {
+    delete params.status
+  }
+  return params
+}
+
+/** Prefer board when entering a kanban project so unclaimed backlog is visible. */
+function ensureKanbanBoardDefault() {
+  if (!isKanbanProjectView.value) return false
+  if (viewMode.value === 'board') return false
+  viewMode.value = 'board'
+  try {
+    localStorage.setItem(VIEW_MODE_KEY, 'board')
+  } catch {
+    /* ignore */
+  }
+  return true
+}
 
 function canWriteTask(task: Task): boolean {
   if (isViewerProjectView.value) return false
@@ -242,6 +353,11 @@ function removeTaskLocally(task: Task) {
 }
 
 function taskMatchesStatusFilter(task: Task) {
+  // Board keeps done-column cards even when the list default is incomplete.
+  if (showBoardView.value) {
+    if (filters.status === 'complete') return task.completed
+    return true
+  }
   if (filters.status === 'complete') return task.completed
   if (filters.status === 'incomplete') return !task.completed
   return true
@@ -386,6 +502,7 @@ function syncFiltersFromRoute() {
       activeViewId.value = String(view.id)
       applySavedViewFilters(view.filter || {})
       search.value = filters.search
+      ensureKanbanBoardDefault()
       return
     }
   }
@@ -393,6 +510,7 @@ function syncFiltersFromRoute() {
   if (qProject !== null) {
     activeViewId.value = null
     setFilter('project', qProject)
+    ensureKanbanBoardDefault()
     return
   }
 }
@@ -403,7 +521,7 @@ async function reloadInitial() {
   selected.value = []
   try {
     const perPage = user.value?.items_per_page || 50
-    const list = await api.listTasks(toApiParams(1, perPage))
+    const list = await api.listTasks(listApiParams(1, perPage))
     tasks.value = list.tasks
     loadedPage.value = 1
     total.value = list.total
@@ -417,6 +535,9 @@ async function reloadInitial() {
     loading.value = false
     await nextTick()
     refreshSortable()
+    if (showBoardView.value) {
+      void loadAllForBoard()
+    }
   }
 }
 
@@ -426,7 +547,7 @@ async function loadMore() {
   try {
     const perPage = user.value?.items_per_page || 50
     const nextPage = loadedPage.value + 1
-    const list = await api.listTasks(toApiParams(nextPage, perPage))
+    const list = await api.listTasks(listApiParams(nextPage, perPage))
     const existingIds = new Set(tasks.value.map((t) => t.id))
     const newTasks = list.tasks.filter((t) => !existingIds.has(t.id))
     tasks.value = [...tasks.value, ...newTasks]
@@ -675,9 +796,12 @@ function selectProjectFilter(id: string) {
   activeViewId.value = null
   if (filters.project === id) {
     setFilterAndReload('project', '')
-  } else {
-    setFilterAndReload('project', id)
+    return
   }
+  setFilter('project', id)
+  // Switch to board before reload so claim-scope=all is used for kanban projects.
+  ensureKanbanBoardDefault()
+  void reloadInitial()
 }
 
 function selectSavedViewFilter(id: string) {
@@ -718,9 +842,10 @@ async function saveCurrentView() {
 async function createProject() {
   if (!newProjectName.value.trim()) return
   try {
-    await api.createProject(newProjectName.value.trim())
+    await api.createProject(newProjectName.value.trim(), newProjectDescription.value.trim())
     toast.push('Project created!', 'success')
     newProjectName.value = ''
+    newProjectDescription.value = ''
     showAddProjectModal.value = false
     await loadMeta()
   } catch (err) {
@@ -730,22 +855,45 @@ async function createProject() {
 
 function openEditProject(proj: Project) {
   editingProject.value = proj
-  editedProjectName.value = proj.name
   showEditProjectModal.value = true
 }
 
-async function renameProject() {
-  if (!editingProject.value || !editedProjectName.value.trim()) return
+function closeEditProject() {
+  showEditProjectModal.value = false
+  editingProject.value = null
+}
+
+async function onProjectSettingsSaved() {
+  await loadMeta()
+  await reloadInitial()
+  // Keep modal open but refresh project reference from list
+  if (editingProject.value) {
+    const updated = projects.value.find((p) => p.id === editingProject.value!.id)
+    if (updated) editingProject.value = updated
+  }
+}
+
+async function onProjectSettingsChanged() {
+  await loadMeta()
+  await reloadInitial()
+  if (editingProject.value) {
+    const updated = projects.value.find((p) => p.id === editingProject.value!.id)
+    if (updated) editingProject.value = updated
+  }
+}
+
+async function onReorderProjects(projectIds: number[]) {
+  const previous = [...projects.value]
+  const owned = projects.value.filter((p) => !p.role || p.role === 'owner')
+  const shared = projects.value.filter((p) => p.role && p.role !== 'owner')
+  const byId = new Map(owned.map((p) => [p.id, p]))
+  const nextOwned = projectIds.map((id) => byId.get(id)!).filter(Boolean)
+  projects.value = [...nextOwned, ...shared]
   try {
-    await api.renameProject(editingProject.value.id, editedProjectName.value.trim())
-    toast.push('Project renamed!', 'success')
-    editingProject.value = null
-    editedProjectName.value = ''
-    showEditProjectModal.value = false
-    await loadMeta()
-    await reloadInitial()
+    await api.reorderProjects(projectIds)
   } catch (err) {
-    toast.push(err instanceof APIError ? err.message : 'Failed to rename project', 'error')
+    projects.value = previous
+    toast.push(err instanceof APIError ? err.message : 'Could not reorder projects', 'error')
   }
 }
 
@@ -870,6 +1018,7 @@ onUnmounted(() => {
       @select-view="selectSavedViewFilter"
       @add-project="showAddProjectModal = true"
       @edit-project="openEditProject"
+      @reorder-projects="onReorderProjects"
       @add-view="showSaveViewModal = true"
     />
 
@@ -953,7 +1102,7 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- Modern Filter Bar (Search, Folded Filters, Density Toggle) -->
+        <!-- Modern Filter Bar (Search, Folded Filters, Density + List/Board) -->
         <ModernTaskFilterBar
           :status="filters.status"
           :tag="filters.tag"
@@ -963,6 +1112,8 @@ onUnmounted(() => {
           :search="search"
           :density="density"
           :tags="tags"
+          :show-view-mode="isKanbanProjectView"
+          :view-mode="viewMode"
           @update:status="setFilterAndReload('status', $event)"
           @update:tag="setFilterAndReload('tag', $event)"
           @update:priority="setFilterAndReload('priority', $event)"
@@ -970,12 +1121,38 @@ onUnmounted(() => {
           @update:sort="setFilterAndReload('sort', $event)"
           @update:search="search = $event; setFilter('search', $event); reloadInitial()"
           @update:density="density = $event"
+          @update:view-mode="setViewMode($event)"
           @clear-filters="clearFilters"
         />
 
+        <!-- Kanban board -->
+        <div v-if="showBoardView" class="mb-3">
+          <div v-if="loading && !tasks.length" class="text-center py-5 text-muted">
+            <div class="spinner-border spinner-border-sm me-2" role="status" />Loading tasks…
+          </div>
+          <KanbanBoard
+            v-else-if="activeProjectObj"
+            :project-id="activeProjectObj.id"
+            :tasks="tasks"
+            :role="activeProjectObj.role"
+            :density="density"
+            :has-active-filters="hasActiveFilters"
+            :can-add="!isViewerProjectView"
+            @open-task="openEdit"
+            @changed="reloadInitial"
+            @task-updated="applyTaskUpdate"
+            @board-reorder="applyBoardReorder"
+            @add-task="openAdd(undefined, filters.project)"
+            @clear-filters="clearFilters"
+          />
+          <div v-if="loadingMore" class="text-center py-2 text-muted small">
+            <span class="spinner-border spinner-border-sm me-2" />Loading more tasks…
+          </div>
+        </div>
+
         <!-- Sleek Bulk Actions Bar -->
         <div
-          v-if="selected.length && !isViewerProjectView"
+          v-if="!showBoardView && selected.length && !isViewerProjectView"
           class="bulk-action-bar alert alert-info py-1.5 px-3 rounded-3 shadow-sm d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2"
         >
           <span class="fw-semibold small">{{ selected.length }} task{{ selected.length === 1 ? '' : 's' }} selected</span>
@@ -1094,7 +1271,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Task Lists Container -->
-        <div id="task-container" aria-live="polite">
+        <div v-if="!showBoardView" id="task-container" aria-live="polite">
           <div v-if="loading && !tasks.length" class="text-center py-5 text-muted">
             <div class="spinner-border spinner-border-sm me-2" role="status" />Loading tasks…
           </div>
@@ -1231,16 +1408,26 @@ onUnmounted(() => {
                 </div>
               </div>
 
-              <!-- Empty Search Results -->
+              <!-- Empty Search Results / unclaimed kanban backlog -->
               <div
-                v-if="!tasks.length && hasActiveFilters"
+                v-if="!tasks.length && (hasActiveFilters || isKanbanProjectView)"
                 class="text-center py-5 rounded-3 border"
                 style="background: var(--ordryn-card-bg); color: var(--ordryn-text); border-color: var(--ordryn-card-border) !important;"
               >
-                <p class="text-muted mb-2">No tasks match your active filters.</p>
-                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill" @click="clearFilters">
-                  <i class="bi bi-x-circle me-1" />Clear filters
-                </button>
+                <template v-if="isKanbanProjectView">
+                  <p class="text-muted mb-2">
+                    No claimed tasks in your list. Unclaimed work lives on the board — claim a task to see it here.
+                  </p>
+                  <button type="button" class="btn btn-sm btn-primary rounded-pill" @click="setViewMode('board')">
+                    <i class="bi bi-kanban me-1" />Open board
+                  </button>
+                </template>
+                <template v-else>
+                  <p class="text-muted mb-2">No tasks match your active filters.</p>
+                  <button type="button" class="btn btn-sm btn-outline-primary rounded-pill" @click="clearFilters">
+                    <i class="bi bi-x-circle me-1" />Clear filters
+                  </button>
+                </template>
               </div>
 
               <!-- Infinite Scroll Sentinel -->
@@ -1331,8 +1518,20 @@ onUnmounted(() => {
                   v-model="newProjectName"
                   type="text"
                   class="form-control"
+                  maxlength="50"
                   placeholder="e.g., Marketing Campaign"
                   @keyup.enter="createProject"
+                />
+              </div>
+              <div class="mb-3">
+                <label for="new-project-description" class="form-label small fw-bold">Description</label>
+                <textarea
+                  id="new-project-description"
+                  v-model="newProjectDescription"
+                  class="form-control"
+                  rows="3"
+                  maxlength="1000"
+                  placeholder="Optional details about this project"
                 />
               </div>
             </div>
@@ -1344,37 +1543,13 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- Edit Project Modal -->
-      <div v-if="showEditProjectModal" class="modal fade show d-block" style="background: rgba(0,0,0,0.5);" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-          <div
-            class="modal-content border-0 shadow"
-            style="background: var(--ordryn-card-bg); color: var(--ordryn-text);"
-          >
-            <div class="modal-header border-0 pb-0">
-              <h5 class="modal-title fw-bold">Rename Project</h5>
-              <button type="button" class="btn-close" @click="showEditProjectModal = false" />
-            </div>
-            <div class="modal-body py-3">
-              <div class="mb-3">
-                <label for="edit-project-name" class="form-label small fw-bold">Project Name</label>
-                <input
-                  id="edit-project-name"
-                  v-model="editedProjectName"
-                  type="text"
-                  class="form-control"
-                  placeholder="Project Name"
-                  @keyup.enter="renameProject"
-                />
-              </div>
-            </div>
-            <div class="modal-footer border-0 pt-0 justify-content-end gap-2">
-              <button type="button" class="btn btn-sm btn-outline-secondary" @click="showEditProjectModal = false">Cancel</button>
-              <button type="button" class="btn btn-sm btn-primary px-3" :disabled="!editedProjectName.trim()" @click="renameProject">Save Name</button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <ProjectSettingsModal
+        :open="showEditProjectModal"
+        :project="editingProject"
+        @close="closeEditProject"
+        @saved="onProjectSettingsSaved"
+        @changed="onProjectSettingsChanged"
+      />
 
       <DeleteTaskDialog
         :open="deleteDialogOpen"

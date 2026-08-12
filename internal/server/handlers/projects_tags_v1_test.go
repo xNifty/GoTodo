@@ -56,6 +56,62 @@ func TestAPIV1ProjectsPatchValidation(t *testing.T) {
 	}
 }
 
+func TestAPIV1ProjectsPatchNothingToUpdate(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/projects/1", bytes.NewBufferString(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	req = utils.SetAPIUserID(req, 1)
+	rec := httptest.NewRecorder()
+	APIV1ProjectsRouter(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
+	}
+}
+
+func TestAPIV1ProjectsReorderValidation(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+	}{
+		{name: "empty ids", body: `{"project_ids":[]}`},
+		{name: "missing ids", body: `{}`},
+		{name: "invalid json", body: `{`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/projects/reorder", bytes.NewBufferString(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			req = utils.SetAPIUserID(req, 1)
+			rec := httptest.NewRecorder()
+			APIV1ProjectsRouter(rec, req)
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
+			}
+		})
+	}
+}
+
+func TestAPIV1ProjectsReorderMethodNotAllowed(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/projects/reorder", nil)
+	req = utils.SetAPIUserID(req, 1)
+	rec := httptest.NewRecorder()
+	APIV1ProjectsRouter(rec, req)
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+	}
+}
+
+func TestAPIV1ProjectsCreateDescriptionTooLong(t *testing.T) {
+	body := `{"name":"ok","description":"` + strings.Repeat("d", 1001) + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/projects", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = utils.SetAPIUserID(req, 1)
+	rec := httptest.NewRecorder()
+	APIV1ProjectsRouter(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
+	}
+}
+
 func TestAPIV1ProjectsInvalidID(t *testing.T) {
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/projects/abc", nil)
 	req = utils.SetAPIUserID(req, 1)

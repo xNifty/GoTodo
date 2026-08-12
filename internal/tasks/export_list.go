@@ -40,7 +40,7 @@ func FetchAllTasksForUserWithFilters(userID *int, timezone string, filters ListF
 		searchPattern := "%" + search + "%"
 		args := []interface{}{searchPattern, timezone, *userID}
 		where := "WHERE (t.title ILIKE $1 OR t.description ILIKE $1 OR EXISTS (SELECT 1 FROM task_tags tt JOIN tags tg ON tt.tag_id = tg.id WHERE tt.task_id = t.id AND tg.name ILIKE $1)) AND t.user_id = $3"
-		where, args = appendFilterSQL(where, args, filters, timezone, "t")
+		where, args = appendFilterSQL(where, args, filters, timezone, "t", *userID)
 		query := taskSelect + where + filters.orderByClause("t") + fmt.Sprintf(" LIMIT %d", ExportMaxTasks)
 		r, err := pool.Query(context.Background(), query, args...)
 		if err != nil {
@@ -50,7 +50,7 @@ func FetchAllTasksForUserWithFilters(userID *int, timezone string, filters ListF
 	} else {
 		args := []interface{}{*userID, timezone}
 		where := "WHERE t.user_id = $1"
-		where, args = appendFilterSQL(where, args, filters, timezone, "t")
+		where, args = appendFilterSQL(where, args, filters, timezone, "t", *userID)
 		query := taskSelect + where + filters.orderByClause("t") + fmt.Sprintf(" LIMIT %d", ExportMaxTasks)
 		r, err := pool.Query(context.Background(), query, args...)
 		if err != nil {

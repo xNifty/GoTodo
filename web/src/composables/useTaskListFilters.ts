@@ -1,8 +1,15 @@
 import { computed, reactive } from 'vue'
 import type { SavedViewFilter } from '@/api/types'
 
-export const taskListFilters = reactive({
-  status: '',
+/** Default list filter: incomplete only, so the queue stays uncluttered. */
+export const DEFAULT_TASK_LIST_STATUS = 'incomplete'
+
+const filterKeys = ['status', 'due', 'completed', 'priority', 'tag', 'sort', 'project', 'search'] as const
+type FilterKey = (typeof filterKeys)[number]
+type TaskListFilterState = Record<FilterKey, string>
+
+const defaultFilters: TaskListFilterState = {
+  status: DEFAULT_TASK_LIST_STATUS,
   due: '',
   completed: '',
   priority: '',
@@ -10,13 +17,13 @@ export const taskListFilters = reactive({
   sort: '',
   project: '',
   search: '',
-})
+}
 
-const filterKeys = ['status', 'due', 'completed', 'priority', 'tag', 'sort', 'project', 'search'] as const
+export const taskListFilters = reactive<TaskListFilterState>({ ...defaultFilters })
 
 export function useTaskListFilters() {
   const hasActiveFilters = computed(() =>
-    filterKeys.some((k) => taskListFilters[k] !== ''),
+    filterKeys.some((k) => taskListFilters[k] !== defaultFilters[k]),
   )
 
   function toApiParams(page: number, perPage: number) {
@@ -38,12 +45,12 @@ export function useTaskListFilters() {
     return s ? `&${s}` : ''
   }
 
-  function setFilter(key: (typeof filterKeys)[number], value: string) {
+  function setFilter(key: FilterKey, value: string) {
     taskListFilters[key] = value
   }
 
   function clearFilters() {
-    for (const key of filterKeys) taskListFilters[key] = ''
+    for (const key of filterKeys) taskListFilters[key] = defaultFilters[key]
   }
 
   function applySavedView(filter: SavedViewFilter) {

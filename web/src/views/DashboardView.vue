@@ -60,11 +60,12 @@ function sortByDueDate(tasks: Task[]): Task[] {
 }
 
 async function loadSectionLists() {
+  const claimScope = { workflow_claim_scope: 'mine' as const }
   const [overdueList, todayList, weekList, doneList] = await Promise.all([
-    api.listTasks({ due: 'overdue', page: 1, per_page: 50 }),
-    api.listTasks({ due: 'today', status: 'incomplete', page: 1, per_page: 50 }),
-    api.listTasks({ due: 'through_week', page: 1, per_page: 50 }),
-    api.listTasks({ completed: 'week', page: 1, per_page: 50 }),
+    api.listTasks({ due: 'overdue', page: 1, per_page: 50, ...claimScope }),
+    api.listTasks({ due: 'today', status: 'incomplete', page: 1, per_page: 50, ...claimScope }),
+    api.listTasks({ due: 'through_week', page: 1, per_page: 50, ...claimScope }),
+    api.listTasks({ completed: 'week', page: 1, per_page: 50, ...claimScope }),
   ])
   overdueTasks.value = sortByDueDate(overdueList.tasks)
   dueTodayTasks.value = sortByDueDate(todayList.tasks)

@@ -12,15 +12,16 @@ import (
 
 // FilterContext holds active list filters for API task queries.
 type FilterContext struct {
-	Project   string
-	Status    string
-	Due       string
-	Completed string
-	Priority  string
-	Tag       string
-	Sort      string
-	Search    string
-	Page      int
+	Project             string
+	Status              string
+	Due                 string
+	Completed           string
+	Priority            string
+	Tag                 string
+	Sort                string
+	Search              string
+	Page                int
+	WorkflowClaimScope  string
 }
 
 func firstNonEmpty(values ...string) string {
@@ -94,16 +95,26 @@ func requestStatusFilter(r *http.Request) string {
 	return normalizeStatusFilter(r.FormValue("status"))
 }
 
+func normalizeWorkflowClaimScope(scope string) string {
+	switch strings.ToLower(strings.TrimSpace(scope)) {
+	case "mine", "all":
+		return strings.ToLower(strings.TrimSpace(scope))
+	default:
+		return ""
+	}
+}
+
 func filterContextFromRequest(r *http.Request) FilterContext {
 	fc := FilterContext{
-		Project:   firstNonEmpty(r.URL.Query().Get("project"), r.FormValue("project")),
-		Status:    requestStatusFilter(r),
-		Due:       normalizeDueFilter(firstNonEmpty(r.URL.Query().Get("due"), r.FormValue("due"))),
-		Completed: normalizeCompletedFilter(firstNonEmpty(r.URL.Query().Get("completed"), r.FormValue("completed"))),
-		Sort:      normalizeSortFilter(firstNonEmpty(r.URL.Query().Get("sort"), r.FormValue("sort"))),
-		Priority:  normalizePriorityFilter(firstNonEmpty(r.URL.Query().Get("priority"), r.FormValue("priority"))),
-		Tag:       normalizeTagFilter(firstNonEmpty(r.URL.Query().Get("tag"), r.FormValue("tag"))),
-		Search:    strings.TrimSpace(firstNonEmpty(r.URL.Query().Get("search"), r.FormValue("search"))),
+		Project:            firstNonEmpty(r.URL.Query().Get("project"), r.FormValue("project")),
+		Status:             requestStatusFilter(r),
+		Due:                normalizeDueFilter(firstNonEmpty(r.URL.Query().Get("due"), r.FormValue("due"))),
+		Completed:          normalizeCompletedFilter(firstNonEmpty(r.URL.Query().Get("completed"), r.FormValue("completed"))),
+		Sort:               normalizeSortFilter(firstNonEmpty(r.URL.Query().Get("sort"), r.FormValue("sort"))),
+		Priority:           normalizePriorityFilter(firstNonEmpty(r.URL.Query().Get("priority"), r.FormValue("priority"))),
+		Tag:                normalizeTagFilter(firstNonEmpty(r.URL.Query().Get("tag"), r.FormValue("tag"))),
+		Search:             strings.TrimSpace(firstNonEmpty(r.URL.Query().Get("search"), r.FormValue("search"))),
+		WorkflowClaimScope: normalizeWorkflowClaimScope(firstNonEmpty(r.URL.Query().Get("workflow_claim_scope"), r.FormValue("workflow_claim_scope"))),
 	}
 	if pageParam := firstNonEmpty(r.URL.Query().Get("page"), r.FormValue("page"), r.FormValue("currentPage")); pageParam != "" {
 		if page, err := strconv.Atoi(pageParam); err == nil && page > 0 {
@@ -115,11 +126,12 @@ func filterContextFromRequest(r *http.Request) FilterContext {
 
 func (fc FilterContext) ToListFilters() tasks.ListFilters {
 	lf := tasks.ListFilters{
-		ProjectFilter:   parseProjectFilter(fc.Project),
-		StatusFilter:    fc.Status,
-		DueFilter:       fc.Due,
-		CompletedFilter: fc.Completed,
-		Sort:            fc.Sort,
+		ProjectFilter:      parseProjectFilter(fc.Project),
+		StatusFilter:       fc.Status,
+		DueFilter:          fc.Due,
+		CompletedFilter:    fc.Completed,
+		Sort:               fc.Sort,
+		WorkflowClaimScope: fc.WorkflowClaimScope,
 	}
 	if fc.Priority != "" {
 		if p, err := strconv.Atoi(fc.Priority); err == nil {

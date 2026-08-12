@@ -210,10 +210,55 @@ func CreateProjectsTable() error {
 		"id SERIAL PRIMARY KEY",
 		"user_id INTEGER NOT NULL",
 		"name TEXT NOT NULL",
+		"description TEXT NOT NULL DEFAULT ''",
+		"workflow_mode VARCHAR(16) NOT NULL DEFAULT 'classic'",
+		"position INTEGER NOT NULL DEFAULT 0",
 		"created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
 		"updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
 	}
 	return CreateTable("projects", columns)
+}
+
+// MigrateProjectsAddDescriptionAndPosition adds description and position columns,
+// backfilling position by current name order per owner.
+func MigrateProjectsAddDescriptionAndPosition() error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return err
+	}
+	defer CloseDatabase(pool)
+
+	_, err = pool.Exec(context.Background(),
+		`ALTER TABLE projects ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT ''`)
+	if err != nil {
+		return fmt.Errorf("failed to add description: %v", err)
+	}
+
+	_, err = pool.Exec(context.Background(),
+		`ALTER TABLE projects ADD COLUMN IF NOT EXISTS position INTEGER NOT NULL DEFAULT 0`)
+	if err != nil {
+		return fmt.Errorf("failed to add position: %v", err)
+	}
+
+	// Backfill positions for owners that still have all zeros (legacy alphabetical lists).
+	_, err = pool.Exec(context.Background(), `
+		WITH ranked AS (
+			SELECT id,
+			       ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY LOWER(name) ASC, id ASC) - 1 AS pos
+			FROM projects
+		)
+		UPDATE projects p
+		SET position = ranked.pos
+		FROM ranked
+		WHERE p.id = ranked.id
+		  AND NOT EXISTS (
+			SELECT 1 FROM projects p2
+			WHERE p2.user_id = p.user_id AND p2.position <> 0
+		  )`)
+	if err != nil {
+		return fmt.Errorf("failed to backfill project positions: %v", err)
+	}
+	return nil
 }
 
 // MigrateTasksTable adds a user_id column and a foreign key constraint to the tasks table

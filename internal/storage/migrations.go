@@ -159,6 +159,31 @@ func RunMigrations() error {
 		errCount++
 	}
 
+	if err := MigrateProjectsAddWorkflowMode(); err != nil {
+		fmt.Printf("migration: MigrateProjectsAddWorkflowMode failed: %v\n", err)
+		errCount++
+	}
+	if err := MigrateProjectsAddDescriptionAndPosition(); err != nil {
+		fmt.Printf("migration: MigrateProjectsAddDescriptionAndPosition failed: %v\n", err)
+		errCount++
+	}
+	if err := CreateProjectWorkflowTables(); err != nil {
+		fmt.Printf("migration: CreateProjectWorkflowTables failed: %v\n", err)
+		errCount++
+	}
+	if err := MigrateTasksAddWorkflowFields(); err != nil {
+		fmt.Printf("migration: MigrateTasksAddWorkflowFields failed: %v\n", err)
+		errCount++
+	}
+	if err := MigrateTasksAddClaimedBy(); err != nil {
+		fmt.Printf("migration: MigrateTasksAddClaimedBy failed: %v\n", err)
+		errCount++
+	}
+	if err := CreateUserNotificationsTable(); err != nil {
+		fmt.Printf("migration: CreateUserNotificationsTable failed: %v\n", err)
+		errCount++
+	}
+
 	// Ensure password_reset table exists
 	if err := CreatePasswordResetTable(); err != nil {
 		fmt.Printf("migration: CreatePasswordResetTable failed: %v\n", err)

@@ -20,6 +20,7 @@ tags:
   - name: Profile
   - name: API Keys
   - name: Tasks
+  - name: Notifications
   - name: Projects
   - name: Tags
   - name: Saved Views
@@ -594,6 +595,14 @@ paths:
           in: query
           schema:
             type: string
+        - name: workflow_claim_scope
+          in: query
+          schema:
+            type: string
+            enum: [mine, all]
+          description: >
+            When mine, hide unclaimed kanban-project tasks (classic tasks unchanged).
+            Use all for the kanban board backlog. Default is no claim filter when omitted.
       responses:
         "200":
           description: Paginated task list
@@ -804,7 +813,7 @@ paths:
         - BearerAuth: []
       responses:
         "200":
-          description: Projects
+          description: Projects (owned first by position, then shared by name)
           content:
             application/json:
               schema:
@@ -822,7 +831,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/NameBody"
+              $ref: "#/components/schemas/ProjectCreate"
       responses:
         "201":
           description: Created
@@ -830,6 +839,36 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Project"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/projects/reorder:
+    post:
+      tags: [Projects]
+      summary: Reorder owned projects
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [project_ids]
+              properties:
+                project_ids:
+                  type: array
+                  items:
+                    type: integer
+                  description: Full ordered list of project IDs owned by the caller
+      responses:
+        "200":
+          description: Reordered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OK"
         "400":
           $ref: "#/components/responses/BadRequest"
 
@@ -853,7 +892,7 @@ paths:
           $ref: "#/components/responses/NotFound"
     patch:
       tags: [Projects]
-      summary: Rename a project (owner only)
+      summary: Update project name, description, and/or workflow mode (owner only)
       security:
         - SessionCookie: []
         - BearerAuth: []
@@ -862,7 +901,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/NameBody"
+              $ref: "#/components/schemas/ProjectPatch"
       responses:
         "200":
           description: Updated
@@ -874,6 +913,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          description: Cannot disable kanban while the project has tasks
     delete:
       tags: [Projects]
       summary: Delete a project (owner only)
@@ -887,6 +928,317 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+
+  /api/v1/projects/{id}/statuses:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      tags: [Projects]
+      summary: List kanban statuses for a project
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Status columns (empty when project is classic)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProjectStatus"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      tags: [Projects]
+      summary: Create a status column (owner, kanban only, max 8)
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  maxLength: 40
+                is_done:
+                  type: boolean
+                is_default:
+                  type: boolean
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectStatus"
+        "409":
+          description: Status limit or name conflict
+
+  /api/v1/projects/{id}/statuses/reorder:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      tags: [Projects]
+      summary: Reorder status columns (owner, kanban only)
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status_ids]
+              properties:
+                status_ids:
+                  type: array
+                  items:
+                    type: integer
+      responses:
+        "200":
+          description: Reordered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+
+  /api/v1/projects/{id}/statuses/{statusId}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+      - name: statusId
+        in: path
+        required: true
+        schema:
+          type: integer
+    patch:
+      tags: [Projects]
+      summary: Update a status column (owner)
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                is_done:
+                  type: boolean
+                is_default:
+                  type: boolean
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectStatus"
+    delete:
+      tags: [Projects]
+      summary: Delete a status column (owner)
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - name: move_to_status_id
+          in: query
+          schema:
+            type: integer
+          description: Required when tasks remain in the column
+      responses:
+        "204":
+          description: Deleted
+
+  /api/v1/tasks/{id}/claim:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      tags: [Tasks]
+      summary: Claim a kanban task (or take over from another claimer)
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Tasks]
+      summary: Release claim on a kanban task
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/notifications:
+    get:
+      tags: [Notifications]
+      summary: List in-app notifications
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Notification list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationList"
+
+  /api/v1/notifications/unread-count:
+    get:
+      tags: [Notifications]
+      summary: Unread notification count
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  unread_count:
+                    type: integer
+
+  /api/v1/notifications/read-all:
+    post:
+      tags: [Notifications]
+      summary: Mark all notifications read
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "204":
+          description: Marked read
+
+  /api/v1/notifications/{id}/read:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      tags: [Notifications]
+      summary: Mark one notification read
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "204":
+          description: Marked read
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/tasks/{id}/time-entries:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      tags: [Tasks]
+      summary: List time entries for a kanban task
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Time entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TaskTimeEntry"
+    post:
+      tags: [Tasks]
+      summary: Add a time entry
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [minutes]
+              properties:
+                minutes:
+                  type: integer
+                  minimum: 1
+                  maximum: 1440
+                note:
+                  type: string
+                  maxLength: 200
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskTimeEntry"
+
+  /api/v1/tasks/{id}/time-entries/{entryId}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+      - name: entryId
+        in: path
+        required: true
+        schema:
+          type: integer
+    delete:
+      tags: [Tasks]
+      summary: Delete a time entry (author or project owner)
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "204":
+          description: Deleted
 
   /api/v1/projects/{id}/members:
     parameters:
@@ -1981,6 +2333,14 @@ components:
           type: integer
         name:
           type: string
+        description:
+          type: string
+          maxLength: 1000
+          description: Optional project details
+        workflow_mode:
+          type: string
+          enum: [classic, kanban]
+          description: Opt-in board workflow; classic keeps boolean completed only
         role:
           type: string
           enum: [owner, editor, viewer]
@@ -1990,6 +2350,71 @@ components:
           type: string
         owner_user_id:
           type: integer
+
+    ProjectCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 50
+        description:
+          type: string
+          maxLength: 1000
+
+    ProjectPatch:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 50
+        description:
+          type: string
+          maxLength: 1000
+        workflow_mode:
+          type: string
+          enum: [classic, kanban]
+      description: At least one field required. Disabling kanban fails with 409 if the project has tasks.
+
+    ProjectStatus:
+      type: object
+      properties:
+        id:
+          type: integer
+        project_id:
+          type: integer
+        name:
+          type: string
+        position:
+          type: integer
+        is_done:
+          type: boolean
+        is_default:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    TaskTimeEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        task_id:
+          type: integer
+        user_id:
+          type: integer
+        minutes:
+          type: integer
+        note:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        user_email:
+          type: string
+        user_name:
+          type: string
 
     ProjectMember:
       type: object
@@ -2203,6 +2628,69 @@ components:
           type: string
         modified_at:
           type: string
+        status_id:
+          type: integer
+          nullable: true
+        status_name:
+          type: string
+        estimate_points:
+          type: integer
+          nullable: true
+        time_spent_minutes:
+          type: integer
+        project_workflow:
+          type: string
+          enum: [classic, kanban]
+        claimed_by:
+          type: integer
+          nullable: true
+          description: User id of the claimer for kanban tasks; null when unclaimed
+        claimed_by_name:
+          type: string
+          description: Display name of the claimer
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+        project_id:
+          type: integer
+          nullable: true
+        task_id:
+          type: integer
+          nullable: true
+        project_name:
+          type: string
+        actor_name:
+          type: string
+        read_at:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+
+    NotificationList:
+      type: object
+      properties:
+        notifications:
+          type: array
+          items:
+            $ref: "#/components/schemas/Notification"
+        total:
+          type: integer
+        page:
+          type: integer
+        per_page:
+          type: integer
+        unread_count:
+          type: integer
 
     TaskList:
       type: object

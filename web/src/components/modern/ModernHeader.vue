@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
+import { api } from '@/api/client'
+import type { Notification } from '@/api/types'
 import { useAuth } from '@/composables/useAuth'
 import { useSite } from '@/composables/useSite'
 import { useTheme } from '@/composables/useTheme'
@@ -17,6 +19,108 @@ const { push } = useToast()
 const router = useRouter()
 
 const showChangelog = computed(() => siteInfo.value?.show_changelog !== false)
+
+const notifications = ref<Notification[]>([])
+const unreadCount = ref(0)
+const notifLoading = ref(false)
+let pollTimer: ReturnType<typeof setInterval> | null = null
+
+async function refreshUnreadCount() {
+  if (!isAuthenticated.value) {
+    unreadCount.value = 0
+    return
+  }
+  try {
+    const res = await api.unreadNotificationCount()
+    unreadCount.value = res.unread_count
+  } catch {
+    /* ignore polling errors */
+  }
+}
+
+async function loadNotifications() {
+  if (!isAuthenticated.value) return
+  notifLoading.value = true
+  try {
+    const list = await api.listNotifications({ page: 1, per_page: 15 })
+    notifications.value = list.notifications
+    unreadCount.value = list.unread_count
+  } catch {
+    /* ignore */
+  } finally {
+    notifLoading.value = false
+  }
+}
+
+async function onOpenNotifications() {
+  await loadNotifications()
+}
+
+async function markOneRead(n: Notification) {
+  if (n.read_at) return
+  try {
+    await api.markNotificationRead(n.id)
+    n.read_at = new Date().toISOString()
+    unreadCount.value = Math.max(0, unreadCount.value - 1)
+  } catch {
+    /* ignore */
+  }
+}
+
+async function markAllRead() {
+  try {
+    await api.markAllNotificationsRead()
+    notifications.value = notifications.value.map((n) => ({
+      ...n,
+      read_at: n.read_at || new Date().toISOString(),
+    }))
+    unreadCount.value = 0
+  } catch (err) {
+    push(err instanceof Error ? err.message : 'Could not mark notifications read', 'error')
+  }
+}
+
+async function openNotification(n: Notification) {
+  await markOneRead(n)
+  if (n.project_id) {
+    await router.push({ name: 'tasks', query: { project: String(n.project_id) } })
+  } else if (n.task_id) {
+    await router.push({ name: 'tasks', query: { task: String(n.task_id) } })
+  }
+}
+
+function startPolling() {
+  stopPolling()
+  if (!isAuthenticated.value) return
+  void refreshUnreadCount()
+  pollTimer = setInterval(() => {
+    void refreshUnreadCount()
+  }, 60000)
+}
+
+function stopPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+watch(isAuthenticated, (ok) => {
+  if (ok) startPolling()
+  else {
+    stopPolling()
+    notifications.value = []
+    unreadCount.value = 0
+  }
+})
+
+onMounted(() => {
+  if (isAuthenticated.value) startPolling()
+})
+
+onBeforeUnmount(() => {
+  stopPolling()
+})
 
 async function onLogout() {
   try {
@@ -107,6 +211,57 @@ async function onLogout() {
         </div>
 
         <template v-if="isAuthenticated">
+          <div class="dropdown me-1">
+            <button
+              class="btn btn-sm btn-outline-secondary position-relative d-flex align-items-center"
+              type="button"
+              data-bs-toggle="dropdown"
+              aria-expanded="false"
+              aria-label="Notifications"
+              title="Notifications"
+              @click="onOpenNotifications"
+            >
+              <i class="bi bi-bell" />
+              <span
+                v-if="unreadCount > 0"
+                class="position-absolute top-0 start-100 translate-middle badge rounded-pill text-bg-danger"
+                style="font-size: 0.65rem;"
+              >
+                {{ unreadCount > 99 ? '99+' : unreadCount }}
+              </span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end shadow border-0 p-0 notif-dropdown">
+              <div class="d-flex align-items-center justify-content-between px-3 py-2 border-bottom">
+                <strong class="small">Notifications</strong>
+                <button
+                  v-if="unreadCount > 0"
+                  type="button"
+                  class="btn btn-link btn-sm p-0 text-decoration-none"
+                  @click.stop="markAllRead"
+                >
+                  Mark all read
+                </button>
+              </div>
+              <div class="notif-list">
+                <div v-if="notifLoading" class="px-3 py-3 text-muted small">Loading…</div>
+                <div v-else-if="!notifications.length" class="px-3 py-3 text-muted small">
+                  No notifications yet.
+                </div>
+                <button
+                  v-for="n in notifications"
+                  :key="n.id"
+                  type="button"
+                  class="dropdown-item notif-item text-wrap"
+                  :class="{ 'notif-unread': !n.read_at }"
+                  @click="openNotification(n)"
+                >
+                  <div class="fw-semibold small">{{ n.title }}</div>
+                  <div class="small text-muted">{{ n.body }}</div>
+                  <div v-if="n.actor_name" class="small text-muted mt-1">{{ n.actor_name }}</div>
+                </button>
+              </div>
+            </div>
+          </div>
           <span class="text-muted small d-none d-lg-inline me-1">{{ user?.user_name || user?.email }}</span>
           <RouterLink to="/settings" class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1" title="Profile Settings">
             <i class="bi bi-person-circle" />
@@ -133,5 +288,20 @@ async function onLogout() {
 .brand-logo-icon {
   width: 32px;
   height: 32px;
+}
+.notif-dropdown {
+  width: min(22rem, 92vw);
+}
+.notif-list {
+  max-height: 20rem;
+  overflow-y: auto;
+}
+.notif-item {
+  white-space: normal;
+  border-bottom: 1px solid color-mix(in srgb, var(--ordryn-muted) 18%, transparent);
+  padding: 0.65rem 1rem;
+}
+.notif-unread {
+  background: color-mix(in srgb, var(--ordryn-accent) 10%, transparent);
 }
 </style>
