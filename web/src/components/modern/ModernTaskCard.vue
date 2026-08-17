@@ -45,30 +45,9 @@ const childProgress = () => {
   return `${done}/${total}`
 }
 
-// Inline Editing State (Desktop)
-const isEditingTitle = ref(false)
-const titleVal = ref('')
+// Inline Editing State (Desktop) — description only; title opens task details
 const isEditingDesc = ref(false)
 const descVal = ref('')
-
-function startEditTitle() {
-  if (!props.canWrite) return
-  titleVal.value = props.task.title
-  isEditingTitle.value = true
-}
-
-function saveTitle() {
-  if (!isEditingTitle.value) return
-  isEditingTitle.value = false
-  const trimmed = titleVal.value.trim()
-  if (trimmed && trimmed !== props.task.title) {
-    emit('patch-task', { id: props.task.id, title: trimmed })
-  }
-}
-
-function cancelEditTitle() {
-  isEditingTitle.value = false
-}
 
 function startEditDesc() {
   if (!props.canWrite) return
@@ -219,24 +198,12 @@ function formatMinutes(total: number) {
         <!-- Title & Badges Container -->
         <div class="d-flex flex-column gap-1 min-w-0 flex-grow-1 ms-1">
           <div class="d-flex align-items-center gap-2 flex-wrap">
-            <!-- Inline Title Editor (Desktop) -->
-            <input
-              v-if="isEditingTitle && canWrite"
-              v-model="titleVal"
-              type="text"
-              class="inline-edit-input"
-              @blur="saveTitle"
-              @keyup.enter="saveTitle"
-              @keyup.escape="cancelEditTitle"
-            />
-            <!-- Title Display (Single click inline edit) -->
+            <!-- Title — click opens task details -->
             <span
-              v-else
               class="task-title fw-semibold text-truncate"
-              style="color: var(--ordryn-text);"
-              :style="{ cursor: canWrite ? 'pointer' : 'default' }"
-              :title="canWrite ? 'Click to rename task' : undefined"
-              @click="startEditTitle"
+              style="color: var(--ordryn-text); cursor: pointer;"
+              title="Open task details"
+              @click="emit('edit')"
             >
               {{ task.title }}
             </span>

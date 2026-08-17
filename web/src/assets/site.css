@@ -1447,47 +1447,6 @@ textarea {
    SIDEBAR & THEME TOGGLE STYLES
    ======================================== */
 
-/* Sidebar Styles */
-#sidebar {
-    position: fixed;
-    top: 0;
-    right: -400px; /* Hidden off-screen by default */
-    height: 100%;
-    width: 400px;
-    background-color: var(--sidebar-bg);
-    color: var(--text-color);
-    box-shadow: -2px 0 5px var(--table-box-shadow);
-    transition: right 0.3s ease, background-color var(--transition-time), color var(--transition-time); 
-    z-index: 1040;
-    overflow-y: auto;
-}
-
-#sidebar.active {
-    right: 0; /* Slide into view when active */
-}
-
-#sidebar .sidebar-header {
-    padding: 1.5rem;
-    border-bottom: 1px solid var(--box-border);
-    transition: border-color var(--transition-time);
-}
-
-#sidebar .sidebar-body {
-    padding: 1rem;
-}
-
-[data-theme="dark"] #sidebar .sidebar-header {
-    border-bottom-color: #444;
-}
-
-[data-theme="dark"] #sidebar label {
-    color: var(--text-color);
-}
-
-[data-theme="dark"] #sidebar .form-hint {
-    color: #adb5bd;
-}
-
 /* Theme toggle button styles */
 .theme-toggle {
     cursor: pointer;
@@ -2448,39 +2407,6 @@ body.htmx-loading #htmx-loading-bar {
     }
     to {
         opacity: 1;
-    }
-}
-
-/* Sidebar backdrop */
-.sidebar-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.35);
-    z-index: 1035;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.3s ease, visibility 0.3s ease;
-}
-
-.sidebar-backdrop.active {
-    opacity: 1;
-    visibility: visible;
-}
-
-.sidebar-loading {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.75rem;
-    padding: 2rem 1rem;
-    color: var(--text-muted, #6c757d);
-}
-
-@media (max-width: 520px) {
-    #sidebar {
-        width: 100%;
-        right: -100%;
     }
 }
 

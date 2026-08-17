@@ -168,43 +168,35 @@ async function loadTimeEntries(id: number) {
 }
 
 async function loadTask(id: number) {
-  loading.value = true
-  try {
-    const task = await api.getTask(id)
-    title.value = task.title
-    description.value = task.description || ''
-    projectId.value = task.project_id ?? ''
-    parentId.value = task.parent_id ?? ''
-    parentTitle.value = ''
-    if (task.parent_id) {
-      const parent = rootTasks.value.find((t) => t.id === task.parent_id)
-      parentTitle.value = parent?.title || `Task #${task.parent_id}`
-    }
-    priority.value = task.priority
-    dueDate.value = task.due_date || ''
-    selectedTagIds.value = task.tags?.map((t) => t.id) ?? []
-    newTags.value = ''
-    completed.value = task.completed
-    descriptionError.value = ''
-    events.value = []
-    eventsLoaded.value = false
-    statusId.value = task.status_id ?? ''
-    estimatePoints.value = task.estimate_points ?? ''
-    claimedBy.value = task.claimed_by ?? null
-    claimedByName.value = task.claimed_by_name || ''
-    timeSpentMinutes.value = task.time_spent_minutes ?? 0
-    taskWorkflow.value = task.project_workflow || ''
-    await loadStatusesForProject(projectId.value)
-    if (taskWorkflow.value === 'kanban' || isKanbanTask.value) {
-      await loadTimeEntries(id)
-    } else {
-      timeEntries.value = []
-    }
-  } catch (err) {
-    toast.push(err instanceof APIError ? err.message : 'Failed to load task', 'error')
-    close()
-  } finally {
-    loading.value = false
+  const task = await api.getTask(id)
+  title.value = task.title
+  description.value = task.description || ''
+  projectId.value = task.project_id ?? ''
+  parentId.value = task.parent_id ?? ''
+  parentTitle.value = ''
+  if (task.parent_id) {
+    const parent = rootTasks.value.find((t) => t.id === task.parent_id)
+    parentTitle.value = parent?.title || `Task #${task.parent_id}`
+  }
+  priority.value = task.priority
+  dueDate.value = task.due_date || ''
+  selectedTagIds.value = task.tags?.map((t) => t.id) ?? []
+  newTags.value = ''
+  completed.value = task.completed
+  descriptionError.value = ''
+  events.value = []
+  eventsLoaded.value = false
+  statusId.value = task.status_id ?? ''
+  estimatePoints.value = task.estimate_points ?? ''
+  claimedBy.value = task.claimed_by ?? null
+  claimedByName.value = task.claimed_by_name || ''
+  timeSpentMinutes.value = task.time_spent_minutes ?? 0
+  taskWorkflow.value = task.project_workflow || ''
+  await loadStatusesForProject(projectId.value)
+  if (taskWorkflow.value === 'kanban' || isKanbanTask.value) {
+    await loadTimeEntries(id)
+  } else {
+    timeEntries.value = []
   }
 }
 
@@ -359,6 +351,8 @@ async function onProjectChange() {
   await loadStatusesForProject(projectId.value)
 }
 
+let loadSeq = 0
+
 watch(
   () => ({
     isOpen: open.value,
@@ -370,21 +364,40 @@ watch(
     parentLabel: defaultParentTitle.value,
   }),
   async ({ isOpen, m, id, due, proj, parent, parentLabel }) => {
-    if (!isOpen) return
-    await loadMeta()
-    if ((m === 'edit' || m === 'view') && id) {
-      await loadTask(id)
-    } else {
-      resetForm()
-      if (due) dueDate.value = due
-      if (proj) projectId.value = Number(proj)
-      if (parent) {
-        parentId.value = parent
-        parentTitle.value = parentLabel || rootTasks.value.find((t) => t.id === parent)?.title || ''
-        const p = rootTasks.value.find((t) => t.id === parent)
-        if (p?.project_id) projectId.value = p.project_id
+    if (!isOpen) {
+      loading.value = false
+      return
+    }
+    // Show spinner immediately so the modal never flashes empty/stale form content.
+    const seq = ++loadSeq
+    loading.value = true
+    try {
+      await loadMeta()
+      if (seq !== loadSeq) return
+      if ((m === 'edit' || m === 'view') && id) {
+        await loadTask(id)
+      } else {
+        resetForm()
+        if (due) dueDate.value = due
+        if (proj) projectId.value = Number(proj)
+        if (parent) {
+          parentId.value = parent
+          parentTitle.value = parentLabel || rootTasks.value.find((t) => t.id === parent)?.title || ''
+          const p = rootTasks.value.find((t) => t.id === parent)
+          if (p?.project_id) projectId.value = p.project_id
+        }
+        await loadStatusesForProject(projectId.value)
       }
-      await loadStatusesForProject(projectId.value)
+    } catch (err) {
+      if (seq !== loadSeq) return
+      toast.push(err instanceof APIError ? err.message : 'Failed to load task', 'error')
+      close()
+      return
+    } finally {
+      if (seq === loadSeq) loading.value = false
+    }
+    if (seq !== loadSeq || !open.value) return
+    if (m === 'add') {
       await nextTick()
       titleInput.value?.focus()
     }
@@ -479,19 +492,26 @@ async function removeTimeEntry(entryId: number) {
 
 <template>
   <div
-    id="sidebar-backdrop"
-    class="sidebar-backdrop"
-    :class="{ active: open }"
-    :aria-hidden="!open"
-    @click="close"
-  />
-  <div id="sidebar" :class="{ active: open }">
-    <div class="sidebar-header">
-      <button type="button" class="btn-close float-end" id="closeSidebar" aria-label="Close sidebar" @click="close" />
-      <h5>{{ sidebarTitle }}</h5>
-    </div>
-    <div class="sidebar-body">
-      <div v-if="loading" class="sidebar-loading" aria-busy="true">
+    v-if="open"
+    id="taskModal"
+    class="modal show d-block"
+    style="background: rgba(0,0,0,0.5);"
+    tabindex="-1"
+    role="dialog"
+    aria-modal="true"
+    @click.self="close"
+  >
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+      <div
+        class="modal-content border-0 shadow"
+        style="background: var(--ordryn-card-bg); color: var(--ordryn-text);"
+      >
+        <div class="modal-header border-0 pb-0">
+          <h5 class="modal-title fw-bold">{{ sidebarTitle }}</h5>
+          <button type="button" class="btn-close" id="closeSidebar" aria-label="Close" @click="close" />
+        </div>
+        <div class="modal-body py-3">
+      <div v-if="loading" class="d-flex flex-column align-items-center justify-content-center gap-2 py-5" aria-busy="true">
         <div class="spinner-border text-primary" role="status">
           <span class="visually-hidden">Loading task…</span>
         </div>
@@ -757,6 +777,8 @@ async function removeTimeEntry(entryId: number) {
           </div>
         </details>
       </form>
+        </div>
+      </div>
     </div>
   </div>
 </template>
