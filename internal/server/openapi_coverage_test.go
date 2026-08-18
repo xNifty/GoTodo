@@ -34,6 +34,7 @@ var requiredOpenAPIPaths = []string{
 	"/api/v1/tasks/bulk",
 	"/api/v1/tasks/undo",
 	"/api/v1/tasks/{id}/events",
+	"/api/v1/users/search",
 	"/api/v1/projects",
 	"/api/v1/projects/reorder",
 	"/api/v1/projects/{id}",

@@ -24,17 +24,8 @@
     <h4 class="h6">Invite</h4>
     <form class="row g-2 align-items-end mb-3" @submit.prevent="sendInvite">
       <div class="col-sm-6">
-        <label class="form-label small mb-0">Username</label>
-        <input
-          v-model="inviteUsername"
-          type="text"
-          class="form-control form-control-sm"
-          autocomplete="username"
-          minlength="3"
-          maxlength="32"
-          pattern="[A-Za-z0-9_]+"
-          required
-        />
+        <label class="form-label small mb-0" for="invite-username">Username</label>
+        <UserSearchCombobox v-model="inviteUsername" :exclude-usernames="excludeUsernames" />
       </div>
       <div class="col-sm-3">
         <label class="form-label small mb-0">Role</label>
@@ -122,12 +113,13 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { api } from '@/api/client'
 import type { Project, ProjectEvent, ProjectInvite, ProjectMember, ShareLink } from '@/api/types'
 import { APIError } from '@/api/types'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import UserSearchCombobox from '@/components/UserSearchCombobox.vue'
 
 const props = defineProps<{ project: Project }>()
 const emit = defineEmits<{ changed: [] }>()
@@ -141,6 +133,17 @@ const inviteRole = ref<'editor' | 'viewer'>('editor')
 const activityOpen = ref(false)
 const toast = useToast()
 const { askConfirm } = useConfirm()
+
+const excludeUsernames = computed(() => {
+  const names: string[] = []
+  for (const m of members.value) {
+    if (m.user_name) names.push(m.user_name)
+  }
+  for (const inv of invites.value) {
+    if (inv.user_name) names.push(inv.user_name)
+  }
+  return names
+})
 
 async function loadPanel() {
   try {

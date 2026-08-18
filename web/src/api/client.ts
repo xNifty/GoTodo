@@ -31,6 +31,7 @@ import type {
   TaskList,
   TaskTimeEntry,
   User,
+  UserSearchHit,
   WorkflowMode,
 } from './types'
 import { APIError, type APIErrorBody } from './types'
@@ -527,6 +528,11 @@ export const api = {
 
   listProjectInvites(projectId: number) {
     return request<ProjectInvite[]>(`/api/v1/projects/${projectId}/invites`)
+  },
+
+  searchUsers(q: string, init: RequestInit = {}) {
+    const qs = new URLSearchParams({ q })
+    return request<UserSearchHit[]>(`/api/v1/users/search?${qs}`, init)
   },
 
   createProjectInvite(projectId: number, username: string, role: 'editor' | 'viewer') {

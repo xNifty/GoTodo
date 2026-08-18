@@ -10,6 +10,65 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+const userSearchDefaultLimit = 10
+
+// EscapeLikePattern escapes \, %, and _ so they are literal in a PostgreSQL LIKE pattern
+// that uses ESCAPE E'\\'.
+func EscapeLikePattern(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `%`, `\%`)
+	s = strings.ReplaceAll(s, `_`, `\_`)
+	return s
+}
+
+// SearchUsersByUsernamePrefix returns usernames whose user_name starts with q
+// (case-insensitive). Excludes excludeUserID (0 = none), banned users, users who
+// opted out of project invites, and empty usernames. Limit is capped at 10.
+func SearchUsersByUsernamePrefix(q string, excludeUserID, limit int) ([]string, error) {
+	q = strings.TrimSpace(q)
+	if q == "" {
+		return []string{}, nil
+	}
+	if limit <= 0 || limit > userSearchDefaultLimit {
+		limit = userSearchDefaultLimit
+	}
+
+	pool, err := OpenDatabase()
+	if err != nil {
+		return nil, err
+	}
+	defer CloseDatabase(pool)
+
+	pattern := EscapeLikePattern(q) + "%"
+	rows, err := pool.Query(context.Background(), `
+		SELECT COALESCE(user_name, '')
+		FROM users
+		WHERE TRIM(COALESCE(user_name, '')) <> ''
+		  AND COALESCE(is_banned, FALSE) = FALSE
+		  AND COALESCE(allow_project_invites, TRUE) = TRUE
+		  AND ($2 = 0 OR id <> $2)
+		  AND LOWER(user_name) LIKE LOWER($1) ESCAPE E'\\'
+		ORDER BY LOWER(user_name) ASC
+		LIMIT $3`,
+		pattern, excludeUserID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]string, 0, limit)
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		if name != "" {
+			out = append(out, name)
+		}
+	}
+	return out, rows.Err()
+}
+
 // GetUserByUsername loads a user by username (case-insensitive).
 func GetUserByUsername(name string) (*User, error) {
 	pool, err := OpenDatabase()
