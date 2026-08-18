@@ -111,6 +111,15 @@ export type ShareLinkView = {
   }>
 }
 
+export type TaskGitHubIssue = {
+  issue_number: number
+  issue_id: number
+  issue_url: string
+  issue_state: string
+  issue_title?: string
+  last_sync_error?: string
+}
+
 export type Task = {
   id: number
   title: string
@@ -136,6 +145,26 @@ export type Task = {
   project_workflow?: WorkflowMode | string
   claimed_by?: number | null
   claimed_by_name?: string
+  github?: TaskGitHubIssue | null
+}
+
+export type GitHubConnection = {
+  connected: boolean
+  github_login?: string
+  auth_method?: 'oauth' | 'pat' | string
+  connected_at?: string
+}
+
+export type ProjectGitHubRepo = {
+  linked: boolean
+  owner?: string
+  repo?: string
+  full_name?: string
+  html_url?: string
+  repo_id?: number
+  linked_by_user_id?: number
+  webhook_secret?: string
+  linked_at?: string
 }
 
 export type Notification = {
@@ -187,6 +216,7 @@ export type SiteInfo = {
   enable_global_announcement: boolean
   global_announcement_text: string
   announcement_dismissed: boolean
+  github_oauth_configured?: boolean
 }
 
 export type ChangelogEntry = {
@@ -290,12 +320,16 @@ export type AdminSettings = {
   email_smtp_username: string
   email_smtp_password_set: boolean
   email_smtp_tls: boolean
+  github_oauth_client_id: string
+  github_oauth_client_secret_set: boolean
+  github_oauth_configured: boolean
 }
 
 /** Write-only secret fields accepted by PATCH /admin/settings. */
 export type AdminSettingsPatch = Partial<AdminSettings> & {
   email_mailgun_api_key?: string
   email_smtp_password?: string
+  github_oauth_client_secret?: string
 }
 
 export type AdminUser = {

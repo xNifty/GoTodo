@@ -127,6 +127,26 @@ func formatEventLabel(eventType string, meta map[string]interface{}) string {
 			return "Status changed · " + name
 		}
 		return "Status changed"
+	case "github_issue_created":
+		if n, ok := meta["issue_number"]; ok {
+			return fmt.Sprintf("GitHub issue created · #%v", n)
+		}
+		return "GitHub issue created"
+	case "github_issue_linked":
+		if n, ok := meta["issue_number"]; ok {
+			return fmt.Sprintf("GitHub issue linked · #%v", n)
+		}
+		return "GitHub issue linked"
+	case "github_issue_unlinked":
+		if n, ok := meta["issue_number"]; ok {
+			return fmt.Sprintf("GitHub issue unlinked · #%v", n)
+		}
+		return "GitHub issue unlinked"
+	case "github_issue_synced":
+		if state, ok := meta["issue_state"].(string); ok && state != "" {
+			return "GitHub issue synced · " + state
+		}
+		return "GitHub issue synced"
 	default:
 		return eventType
 	}

@@ -382,6 +382,13 @@ func formatProjectEventLabel(eventType string, metadata map[string]interface{}) 
 		return "Project renamed"
 	case "description_updated":
 		return "Description updated"
+	case "github_repo_linked":
+		if full := metadataString(metadata, "full_name"); full != "" {
+			return "GitHub repo linked · " + full
+		}
+		return "GitHub repo linked"
+	case "github_repo_unlinked":
+		return "GitHub repo unlinked"
 	default:
 		return eventType
 	}

@@ -1,17 +1,21 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { api } from '@/api/client'
-import type { APIKey, CalendarInfo, Tag } from '@/api/types'
+import type { APIKey, CalendarInfo, GitHubConnection, Tag } from '@/api/types'
 import { APIError } from '@/api/types'
 import TimezoneSelect from '@/components/TimezoneSelect.vue'
+import { useSite } from '@/composables/useSite'
+import { useRoute } from 'vue-router'
 
 const { user, updateProfile } = useAuth()
 const { push } = useToast()
 const { askConfirm } = useConfirm()
+const { siteInfo, refresh: refreshSite } = useSite()
+const route = useRoute()
 const timezone = ref('UTC')
 const itemsPerPage = ref(15)
 const digestEnabled = ref(false)
@@ -36,6 +40,11 @@ const mintedKey = ref('')
 const renameKeyId = ref<number | null>(null)
 const renameKeyValue = ref('')
 
+const github = ref<GitHubConnection | null>(null)
+const githubPAT = ref('')
+const githubBusy = ref(false)
+const githubOAuthEnabled = computed(() => !!siteInfo.value?.github_oauth_configured)
+
 watch(
   user,
   (u) => {
@@ -51,12 +60,63 @@ watch(
 
 async function loadExtras() {
   try {
-    const [t, c, k] = await Promise.all([api.listTags(), api.getCalendar(), api.listAPIKeys()])
+    const [t, c, k, g] = await Promise.all([
+      api.listTags(),
+      api.getCalendar(),
+      api.listAPIKeys(),
+      api.getGitHubConnection(),
+    ])
     tags.value = t
     calendar.value = c
     keys.value = k
+    github.value = g
   } catch (err) {
     push(err instanceof APIError ? err.message : 'Failed to load settings extras', 'error')
+  }
+}
+
+async function connectGitHubPAT() {
+  if (!githubPAT.value.trim()) return
+  githubBusy.value = true
+  try {
+    github.value = await api.connectGitHubPAT(githubPAT.value.trim())
+    githubPAT.value = ''
+    push('GitHub connected', 'success')
+  } catch (err) {
+    push(err instanceof APIError ? err.message : 'GitHub connect failed', 'error')
+  } finally {
+    githubBusy.value = false
+  }
+}
+
+async function connectGitHubOAuth() {
+  githubBusy.value = true
+  try {
+    const { authorize_url } = await api.startGitHubOAuth()
+    window.location.href = authorize_url
+  } catch (err) {
+    push(err instanceof APIError ? err.message : 'Could not start GitHub OAuth', 'error')
+    githubBusy.value = false
+  }
+}
+
+async function disconnectGitHub() {
+  const ok = await askConfirm({
+    title: 'Disconnect GitHub?',
+    message: 'You will need to reconnect before linking repositories or creating issues.',
+    confirmLabel: 'Disconnect',
+    danger: true,
+  })
+  if (!ok) return
+  githubBusy.value = true
+  try {
+    await api.disconnectGitHub()
+    github.value = { connected: false }
+    push('GitHub disconnected', 'info')
+  } catch (err) {
+    push(err instanceof APIError ? err.message : 'Disconnect failed', 'error')
+  } finally {
+    githubBusy.value = false
   }
 }
 
@@ -238,7 +298,14 @@ async function revokeKey(key: APIKey) {
 
 onMounted(() => {
   document.body.classList.add('profile-page')
+  void refreshSite()
   void loadExtras()
+  const gh = String(route.query.github || '')
+  if (gh === 'connected') {
+    push('GitHub connected', 'success')
+  } else if (gh === 'error') {
+    push('GitHub connection failed', 'error')
+  }
 })
 
 onUnmounted(() => {
@@ -325,6 +392,61 @@ onUnmounted(() => {
           </div>
           <button type="submit" class="btn btn-primary">Change password</button>
         </form>
+      </div>
+    </div>
+
+    <div id="github-section" class="card mb-4">
+      <div class="card-header"><h3 class="card-title mb-0">GitHub</h3></div>
+      <div class="card-body">
+        <p class="text-muted small">
+          Connect GitHub to link repositories on projects you own and create or attach issues from board tasks.
+        </p>
+        <div v-if="github?.connected" class="d-flex flex-wrap align-items-center gap-2 mb-3">
+          <span class="badge text-bg-success">Connected as @{{ github.github_login }}</span>
+          <span v-if="github.auth_method" class="text-muted small">via {{ github.auth_method }}</span>
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-danger"
+            :disabled="githubBusy"
+            @click="disconnectGitHub"
+          >
+            Disconnect
+          </button>
+        </div>
+        <template v-else>
+          <div v-if="githubOAuthEnabled" class="mb-3">
+            <button
+              type="button"
+              class="btn btn-primary"
+              :disabled="githubBusy"
+              @click="connectGitHubOAuth"
+            >
+              {{ githubBusy ? 'Redirecting…' : 'Connect with GitHub' }}
+            </button>
+          </div>
+          <form class="row g-2" @submit.prevent="connectGitHubPAT">
+            <div class="col-12">
+              <label class="form-label" for="github-pat">Personal access token</label>
+              <input
+                id="github-pat"
+                v-model="githubPAT"
+                type="password"
+                class="form-control"
+                autocomplete="off"
+                placeholder="ghp_… or github_pat_…"
+                :disabled="githubBusy"
+              />
+              <div class="form-text">
+                Needs access to the repositories you will link (fine-grained: Contents metadata + Issues read/write; classic: <code>repo</code>).
+              </div>
+            </div>
+            <div class="col-12">
+              <button type="submit" class="btn btn-outline-primary" :disabled="githubBusy || !githubPAT.trim()">
+                {{ githubBusy ? 'Connecting…' : 'Connect with token' }}
+              </button>
+            </div>
+          </form>
+        </template>
       </div>
     </div>
 
