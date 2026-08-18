@@ -16,7 +16,7 @@
     </div>
 
     <div
-      v-else-if="!rootTaskCount"
+      v-else-if="!boardTaskCount"
       class="text-center py-5 rounded-3 border shadow-xs"
       style="background: var(--ordryn-card-bg); color: var(--ordryn-text); border-color: var(--ordryn-card-border) !important;"
     >
@@ -128,8 +128,24 @@
                 >
                   {{ task.title }}
                 </button>
+                <button
+                  v-if="task.parent_id"
+                  type="button"
+                  class="btn btn-link kanban-subtask-link text-start text-decoration-none p-0 d-block"
+                  @click.stop="openParent(task)"
+                >
+                  Subtask of {{ parentTitleFor(task) }}
+                </button>
 
                 <div class="d-flex flex-wrap gap-1 mt-1 align-items-center">
+                  <span
+                    v-if="!task.parent_id && childCount(task)"
+                    class="ordryn-badge text-nowrap"
+                    style="background: var(--ordryn-muted-bg); color: var(--ordryn-muted);"
+                    :title="`${childCount(task)} subtask${childCount(task) === 1 ? '' : 's'}`"
+                  >
+                    {{ childCount(task) }} subtask{{ childCount(task) === 1 ? '' : 's' }}
+                  </span>
                   <span
                     v-if="priorityLabel(task.priority)"
                     class="ordryn-badge text-nowrap"
@@ -247,7 +263,52 @@ const sortables: Sortable[] = []
 
 const canDrag = computed(() => props.role !== 'viewer')
 
-const rootTaskCount = computed(() => props.tasks.filter((t) => !t.parent_id).length)
+const parentTitleById = computed(() => {
+  const titles = new Map<number, string>()
+  for (const t of props.tasks) {
+    if (!t.parent_id) titles.set(t.id, t.title)
+  }
+  return titles
+})
+
+const boardTasks = computed(() => {
+  const out: Task[] = []
+  const seen = new Set<number>()
+  for (const t of props.tasks) {
+    if (t.parent_id) {
+      if (!seen.has(t.id)) {
+        out.push(t)
+        seen.add(t.id)
+      }
+      continue
+    }
+    if (!seen.has(t.id)) {
+      out.push(t)
+      seen.add(t.id)
+    }
+    for (const child of t.children || []) {
+      if (seen.has(child.id)) continue
+      out.push(child)
+      seen.add(child.id)
+    }
+  }
+  return out
+})
+
+const boardTaskCount = computed(() => boardTasks.value.length)
+
+function parentTitleFor(task: Task): string {
+  if (!task.parent_id) return ''
+  return parentTitleById.value.get(task.parent_id) || `Task #${task.parent_id}`
+}
+
+function childCount(task: Task): number {
+  return task.child_count ?? task.children?.length ?? 0
+}
+
+function openParent(task: Task) {
+  if (task.parent_id) emit('open-task', task.parent_id)
+}
 
 function claimerLabel(task: Task) {
   if (!task.claimed_by) return 'Unclaimed'
@@ -323,8 +384,7 @@ const defaultStatusId = computed(() => {
 
 function tasksForStatus(statusId: number): Task[] {
   const known = statusIdSet.value
-  return props.tasks.filter((t) => {
-    if (t.parent_id) return false
+  return boardTasks.value.filter((t) => {
     // Place tasks with missing/unknown status into the default column so they
     // never disappear from the board after workflow changes.
     if (!t.status_id || !known.has(t.status_id)) {
@@ -377,6 +437,10 @@ async function onCardDrop(evt: Sortable.SortableEvent) {
   const fromStatusId = parseInt(from.dataset.statusId || '', 10)
   const orderedIds = collectIds(to)
   const statusChanged = !Number.isNaN(taskId) && fromStatusId !== statusId
+  const rootIds = orderedIds.filter((id) => {
+    const t = boardTasks.value.find((task) => task.id === id)
+    return !!t && !t.parent_id
+  })
 
   // Optimistic local update before API round-trip
   emit('board-reorder', { statusId, taskIds: orderedIds })
@@ -386,12 +450,14 @@ async function onCardDrop(evt: Sortable.SortableEvent) {
       const updated = await api.patchTask(taskId, { status_id: statusId })
       emit('task-updated', updated)
     }
-    await api.reorderTasks({
-      task_ids: orderedIds,
-      favorite: false,
-      status_id: statusId,
-      project: String(props.projectId),
-    })
+    if (rootIds.length) {
+      await api.reorderTasks({
+        task_ids: rootIds,
+        favorite: false,
+        status_id: statusId,
+        project: String(props.projectId),
+      })
+    }
   } catch (err) {
     toast.push(err instanceof APIError ? err.message : 'Could not update board', 'error')
     emit('changed')
@@ -588,6 +654,12 @@ onBeforeUnmount(destroySortables)
   font-size: 0.9rem;
   line-height: 1.3;
   color: var(--ordryn-text) !important;
+}
+
+.kanban-subtask-link {
+  font-size: 0.75rem;
+  line-height: 1.3;
+  color: var(--ordryn-muted, #6c757d) !important;
 }
 
 .kanban-card.density-dense .kanban-card-title {

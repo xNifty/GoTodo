@@ -404,6 +404,30 @@ func GetProjectStatus(projectID, statusID int) (*ProjectStatus, error) {
 	return &s, nil
 }
 
+// GetTaskProjectStatus returns the kanban status currently assigned to a task.
+// Returns nil, nil when the task has no status_id.
+func GetTaskProjectStatus(taskID int) (*ProjectStatus, error) {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return nil, err
+	}
+	defer CloseDatabase(pool)
+
+	var s ProjectStatus
+	err = scanProjectStatus(pool.QueryRow(context.Background(),
+		`SELECT s.id, s.project_id, s.name, s.description, s.position, s.is_done, s.is_default, s.created_at
+		 FROM project_statuses s
+		 INNER JOIN tasks t ON t.status_id = s.id
+		 WHERE t.id = $1`, taskID), &s)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &s, nil
+}
+
 // GetDefaultProjectStatus returns the default column for a project.
 func GetDefaultProjectStatus(projectID int) (*ProjectStatus, error) {
 	pool, err := OpenDatabase()

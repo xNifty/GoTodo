@@ -20,6 +20,8 @@ const {
   defaultParentTitle,
   close,
   notifySaved,
+  openEdit,
+  openView,
 } = useTaskSidebar()
 const toast = useToast()
 const { askConfirm } = useConfirm()
@@ -30,6 +32,7 @@ const saving = ref(false)
 const projects = ref<Project[]>([])
 const allTags = ref<Tag[]>([])
 const rootTasks = ref<Task[]>([])
+const currentTask = ref<Task | null>(null)
 const events = ref<TaskEvent[]>([])
 const eventsLoaded = ref(false)
 const eventsLoading = ref(false)
@@ -74,12 +77,20 @@ const readOnly = computed(() => {
   if (mode.value === 'edit' && selectedProject.value?.role === 'viewer') return true
   return false
 })
-const parentOptions = computed(() => rootTasks.value.filter((r) => r.id !== taskId.value))
+const parentOptions = computed(() =>
+  rootTasks.value.filter((r) => r.id !== taskId.value && taskInSelectedProject(r)),
+)
 const parentPickerDisabled = computed(
   () =>
     readOnly.value ||
-    (mode.value === 'edit' && (rootTasks.value.find((t) => t.id === taskId.value)?.child_count || 0) > 0),
+    (mode.value === 'edit' && (currentTask.value?.child_count || currentTask.value?.children?.length || 0) > 0),
 )
+const relatedParent = computed(() => {
+  if (!isSubtask.value) return null
+  const id = Number(parentId.value)
+  return { id, title: parentTitle.value || rootTasks.value.find((t) => t.id === id)?.title || `Task #${id}` }
+})
+const relatedChildren = computed(() => currentTask.value?.children ?? [])
 const isKanbanTask = computed(() => {
   if (taskWorkflow.value === 'kanban') return true
   return (selectedProject.value?.workflow_mode || 'classic') === 'kanban'
@@ -107,12 +118,35 @@ function formatMinutes(total: number) {
   return `${h}h ${m}m`
 }
 
+function taskInSelectedProject(t: Task): boolean {
+  if (projectId.value === '') return t.project_id == null || t.project_id === 0
+  return t.project_id === Number(projectId.value)
+}
+
+function stubParentTask(id: number, titleText: string, pid: number | ''): Task {
+  return {
+    id,
+    title: titleText,
+    description: '',
+    completed: false,
+    due_date: '',
+    project_id: pid === '' ? null : Number(pid),
+    priority: 0,
+    favorite: false,
+    position: 0,
+    tags: [],
+    created_at: '',
+    modified_at: '',
+  }
+}
+
 function resetForm() {
   title.value = ''
   description.value = ''
   projectId.value = ''
   parentId.value = ''
   parentTitle.value = ''
+  currentTask.value = null
   priority.value = 0
   dueDate.value = ''
   selectedTagIds.value = []
@@ -138,14 +172,37 @@ function resetForm() {
 }
 
 async function loadMeta() {
-  const [projs, tags, list] = await Promise.all([
-    api.listProjects(),
-    api.listTags(),
-    api.listTasks({ page: 1, per_page: 100, workflow_claim_scope: 'all' }),
-  ])
+  const [projs, tags] = await Promise.all([api.listProjects(), api.listTags()])
   projects.value = projs
   allTags.value = tags
-  rootTasks.value = list.tasks.filter((t) => !t.parent_id)
+}
+
+async function loadParentCandidates(pid: number | '', keepParentId: number | null = null) {
+  const list = await api.listTasks({
+    page: 1,
+    per_page: 100,
+    workflow_claim_scope: 'all',
+    project: pid === '' || pid == null ? 0 : pid,
+  })
+  let loaded = list.tasks.filter((t) => !t.parent_id)
+  if (keepParentId && !loaded.some((t) => t.id === keepParentId)) {
+    const cached = rootTasks.value.find((t) => t.id === keepParentId && !t.parent_id)
+    if (cached) {
+      loaded = [cached, ...loaded]
+    } else {
+      try {
+        const parent = await api.getTask(keepParentId)
+        if (!parent.parent_id) {
+          loaded = [parent, ...loaded]
+        }
+      } catch {
+        if (parentTitle.value) {
+          loaded = [stubParentTask(keepParentId, parentTitle.value, pid), ...loaded]
+        }
+      }
+    }
+  }
+  rootTasks.value = loaded
 }
 
 async function loadStatusesForProject(pid: number | '') {
@@ -192,16 +249,34 @@ async function refreshProjectGitHub(pid: number | '') {
   }
 }
 
+async function resolveParentTitle(parentTaskId: number) {
+  const cached = rootTasks.value.find((t) => t.id === parentTaskId)
+  if (cached) {
+    parentTitle.value = cached.title
+    return
+  }
+  try {
+    const parent = await api.getTask(parentTaskId)
+    parentTitle.value = parent.title
+    if (!parent.parent_id && !rootTasks.value.some((t) => t.id === parent.id)) {
+      rootTasks.value = [parent, ...rootTasks.value]
+    }
+  } catch {
+    parentTitle.value = `Task #${parentTaskId}`
+  }
+}
+
 async function loadTask(id: number) {
   const task = await api.getTask(id)
+  currentTask.value = task
   title.value = task.title
   description.value = task.description || ''
   projectId.value = task.project_id ?? ''
   parentId.value = task.parent_id ?? ''
   parentTitle.value = ''
+  await loadParentCandidates(projectId.value, task.parent_id ?? null)
   if (task.parent_id) {
-    const parent = rootTasks.value.find((t) => t.id === task.parent_id)
-    parentTitle.value = parent?.title || `Task #${task.parent_id}`
+    await resolveParentTitle(task.parent_id)
   }
   priority.value = task.priority
   dueDate.value = task.due_date || ''
@@ -379,6 +454,12 @@ async function onProjectChange() {
   }
   await loadStatusesForProject(projectId.value)
   await refreshProjectGitHub(projectId.value)
+  const previousParent = isSubtask.value ? Number(parentId.value) : null
+  await loadParentCandidates(projectId.value)
+  if (previousParent && !parentOptions.value.some((t) => t.id === previousParent)) {
+    parentId.value = ''
+    parentTitle.value = ''
+  }
 }
 
 let loadSeq = 0
@@ -412,9 +493,17 @@ watch(
         if (proj) projectId.value = Number(proj)
         if (parent) {
           parentId.value = parent
-          parentTitle.value = parentLabel || rootTasks.value.find((t) => t.id === parent)?.title || ''
+          parentTitle.value = parentLabel || ''
+          await loadParentCandidates(projectId.value, parent)
           const p = rootTasks.value.find((t) => t.id === parent)
-          if (p?.project_id) projectId.value = p.project_id
+          parentTitle.value = parentLabel || p?.title || ''
+          const inheritedProject = p?.project_id ?? ''
+          if (inheritedProject !== projectId.value) {
+            projectId.value = inheritedProject
+            await loadParentCandidates(projectId.value, parent)
+          }
+        } else {
+          await loadParentCandidates(projectId.value)
         }
         await loadStatusesForProject(projectId.value)
         await refreshProjectGitHub(projectId.value)
@@ -448,6 +537,11 @@ async function onParentChange() {
   taskWorkflow.value = p?.project_workflow || ''
   await loadStatusesForProject(projectId.value)
   await refreshProjectGitHub(projectId.value)
+}
+
+function openRelated(id: number) {
+  if (mode.value === 'view') openView(id)
+  else openEdit(id)
 }
 
 async function claimCurrentTask() {
@@ -641,12 +735,42 @@ async function removeTimeEntry(entryId: number) {
             input-id="parent_id"
             :options="parentOptions"
             :disabled="parentPickerDisabled"
-            placeholder="Type to search parent tasks or projects…"
+            placeholder="Type to search parent tasks…"
             @change="onParentChange"
           />
           <small v-if="isSubtask" class="form-hint d-block mt-1">
             Subtask of {{ parentTitle || 'selected parent' }}. Project is inherited.
           </small>
+        </div>
+        <div
+          v-if="(mode === 'edit' || mode === 'view') && (relatedParent || relatedChildren.length)"
+          class="form-group mt-2"
+        >
+          <label class="d-block">Related tasks</label>
+          <div v-if="relatedParent" class="mb-1">
+            <span class="form-hint d-block">Parent</span>
+            <button
+              type="button"
+              class="btn btn-link text-start text-decoration-none p-0"
+              @click="openRelated(relatedParent.id)"
+            >
+              {{ relatedParent.title }}
+            </button>
+          </div>
+          <div v-if="relatedChildren.length">
+            <span class="form-hint d-block">Subtasks</span>
+            <ul class="list-unstyled mb-0">
+              <li v-for="child in relatedChildren" :key="child.id">
+                <button
+                  type="button"
+                  class="btn btn-link text-start text-decoration-none p-0"
+                  @click="openRelated(child.id)"
+                >
+                  {{ child.title }}
+                </button>
+              </li>
+            </ul>
+          </div>
         </div>
         <div class="form-group mt-2">
           <label for="project_id">Project (optional):</label>
