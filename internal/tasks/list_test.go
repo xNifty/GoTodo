@@ -122,6 +122,18 @@ func TestMain(m *testing.M) {
 			metadata JSONB DEFAULT '{}',
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		);
+		CREATE TABLE task_github_issues (
+			task_id INTEGER PRIMARY KEY REFERENCES tasks(id) ON DELETE CASCADE,
+			issue_id BIGINT NOT NULL DEFAULT 0,
+			issue_number INTEGER NOT NULL,
+			issue_url TEXT NOT NULL DEFAULT '',
+			issue_state VARCHAR(16) NOT NULL DEFAULT 'open',
+			issue_title TEXT NOT NULL DEFAULT '',
+			last_synced_at TIMESTAMPTZ,
+			last_sync_error TEXT NOT NULL DEFAULT '',
+			UNIQUE (issue_id),
+			CHECK (issue_number > 0)
+		);
 		INSERT INTO users (id, email) VALUES
 			(1, 'user@example.com'),
 			(2, 'other@example.com'),
