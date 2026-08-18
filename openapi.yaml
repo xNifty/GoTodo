@@ -2889,6 +2889,10 @@ components:
                 type: integer
               project:
                 type: string
+              description:
+                type: string
+              status_name:
+                type: string
               tags:
                 type: array
                 items:

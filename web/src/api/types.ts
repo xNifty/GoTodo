@@ -101,18 +101,22 @@ export type ShareLink = {
   created_at: string
 }
 
+export type ShareLinkTask = {
+  id: number
+  title: string
+  description?: string
+  completed: boolean
+  due_date: string
+  priority: number
+  project?: string
+  tags?: Tag[]
+  status_name?: string
+}
+
 export type ShareLinkView = {
   scope_type: string
   scope_id: number
-  tasks: Array<{
-    id: number
-    title: string
-    completed: boolean
-    due_date: string
-    priority: number
-    project?: string
-    tags?: Tag[]
-  }>
+  tasks: ShareLinkTask[]
 }
 
 export type TaskGitHubIssue = {
