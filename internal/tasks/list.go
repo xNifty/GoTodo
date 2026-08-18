@@ -307,6 +307,40 @@ func attachWorkflowFieldsToTasks(taskList []Task) error {
 			applyWorkflow(&taskList[i].Children[j])
 		}
 	}
+	return attachGitHubFieldsToTasks(taskList)
+}
+
+func attachGitHubFieldsToTasks(taskList []Task) error {
+	if len(taskList) == 0 {
+		return nil
+	}
+	ids := make([]int, 0, len(taskList))
+	for _, t := range taskList {
+		ids = append(ids, t.ID)
+		for _, c := range t.Children {
+			ids = append(ids, c.ID)
+		}
+	}
+	issues, err := storage.GetGitHubIssuesForTasks(ids)
+	if err != nil {
+		return err
+	}
+	applyGitHub := func(t *Task) {
+		if issue, ok := issues[t.ID]; ok {
+			t.GitHubIssueNumber = issue.IssueNumber
+			t.GitHubIssueID = issue.IssueID
+			t.GitHubIssueURL = issue.IssueURL
+			t.GitHubIssueState = issue.IssueState
+			t.GitHubIssueTitle = issue.IssueTitle
+			t.GitHubLastSyncError = issue.LastSyncError
+		}
+	}
+	for i := range taskList {
+		applyGitHub(&taskList[i])
+		for j := range taskList[i].Children {
+			applyGitHub(&taskList[i].Children[j])
+		}
+	}
 	return nil
 }
 

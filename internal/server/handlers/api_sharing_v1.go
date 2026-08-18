@@ -142,6 +142,11 @@ func handleProjectSubResource(w http.ResponseWriter, r *http.Request, sub string
 	case "statuses":
 		handleProjectStatusesResource(w, r, projectID, parts[2:])
 		return true
+	case "github":
+		if len(parts) == 2 {
+			apiV1ProjectGitHub(w, r, projectID)
+			return true
+		}
 	}
 	return false
 }

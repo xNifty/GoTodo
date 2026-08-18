@@ -188,6 +188,15 @@ func RunMigrations() error {
 		errCount++
 	}
 
+	if err := CreateGitHubTables(); err != nil {
+		fmt.Printf("migration: CreateGitHubTables failed: %v\n", err)
+		errCount++
+	}
+	if err := MigrateSiteSettingsAddGitHubOAuth(); err != nil {
+		fmt.Printf("migration: MigrateSiteSettingsAddGitHubOAuth failed: %v\n", err)
+		errCount++
+	}
+
 	// Ensure password_reset table exists
 	if err := CreatePasswordResetTable(); err != nil {
 		fmt.Printf("migration: CreatePasswordResetTable failed: %v\n", err)
