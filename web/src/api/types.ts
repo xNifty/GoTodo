@@ -8,7 +8,11 @@ export type User = {
   digest_enabled: boolean
   digest_hour: number
   allow_project_invites: boolean
-  username_change_available: boolean
+        username_change_available: boolean
+}
+
+export type UserSearchHit = {
+  user_name: string
 }
 
 export type Tag = {

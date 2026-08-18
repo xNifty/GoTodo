@@ -484,6 +484,36 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  /api/v1/users/search:
+    get:
+      tags: [Projects]
+      summary: Search usernames for project invites
+      description: |
+        Case-insensitive username prefix match. Excludes the current user, banned
+        users, and users who opted out of project invites. Empty `q` or queries
+        shorter than 2 characters return `[]`. Does not return emails. Rate limited
+        more tightly than other read endpoints.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Matching usernames
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserSearchHit"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
   /api/v1/me/github:
     get:
       tags: [GitHub]
@@ -2512,6 +2542,13 @@ components:
         username_change_available:
           type: boolean
           description: When true, the user may call POST /api/v1/me/username once
+
+    UserSearchHit:
+      type: object
+      required: [user_name]
+      properties:
+        user_name:
+          type: string
 
     UserPatch:
       type: object
