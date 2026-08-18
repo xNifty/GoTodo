@@ -172,16 +172,26 @@ function setViewMode(mode: TaskViewMode) {
 /** Keep column order + status_id in sync without a full reload after drag. */
 function applyBoardReorder(payload: { statusId: number; taskIds: number[] }) {
   const { statusId, taskIds } = payload
+  const idSet = new Set(taskIds)
   const byId = new Map(tasks.value.map((t) => [t.id, t]))
-  const columnSet = new Set(taskIds)
-  const orderedColumn = taskIds
-    .map((id) => byId.get(id))
-    .filter((t): t is Task => !!t)
-    .map((t) => ({ ...t, status_id: statusId }))
+  const columnRootIds = taskIds.filter((id) => byId.has(id))
+  const columnSet = new Set(columnRootIds)
+
+  const updatedRoots: Task[] = tasks.value.map((t) => {
+    const next: Task = idSet.has(t.id) ? { ...t, status_id: statusId } : { ...t }
+    const kids = (next.children || []).map((c) =>
+      idSet.has(c.id) ? { ...c, status_id: statusId } : c,
+    )
+    return { ...next, children: kids }
+  })
+
+  const orderedColumn = columnRootIds
+    .map((id) => updatedRoots.find((t) => t.id === id))
+    .filter((t): t is Task => t != null)
 
   const result: Task[] = []
   let inserted = false
-  for (const t of tasks.value) {
+  for (const t of updatedRoots) {
     if (columnSet.has(t.id)) {
       if (!inserted) {
         result.push(...orderedColumn)
