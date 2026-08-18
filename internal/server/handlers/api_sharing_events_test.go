@@ -1,0 +1,42 @@
+package handlers
+
+import (
+	"testing"
+)
+
+func TestFormatProjectEventLabel(t *testing.T) {
+	tests := []struct {
+		eventType string
+		metadata  map[string]interface{}
+		want      string
+	}{
+		{eventType: "invited", want: "Invited member"},
+		{eventType: "accepted", want: "Invite accepted"},
+		{eventType: "role_changed", want: "Role changed"},
+		{eventType: "removed", want: "Member removed"},
+		{eventType: "left", want: "Member left"},
+		{eventType: "link_created", want: "Share link created"},
+		{eventType: "link_revoked", want: "Share link revoked"},
+		{eventType: "invite_revoked", want: "Invite revoked"},
+		{eventType: "status_added", metadata: map[string]interface{}{"name": "Review"}, want: "Status added · Review"},
+		{eventType: "status_added", want: "Status added"},
+		{eventType: "status_updated", metadata: map[string]interface{}{"name": "Review"}, want: "Status updated · Review"},
+		{eventType: "status_updated", want: "Status updated"},
+		{eventType: "status_deleted", metadata: map[string]interface{}{"name": "Review"}, want: "Status deleted · Review"},
+		{eventType: "status_deleted", want: "Status deleted"},
+		{eventType: "workflow_changed", metadata: map[string]interface{}{"mode": "kanban"}, want: "Workflow set to kanban"},
+		{eventType: "workflow_changed", want: "Workflow changed"},
+		{eventType: "renamed", metadata: map[string]interface{}{"name": "Roadmap"}, want: "Project renamed · Roadmap"},
+		{eventType: "renamed", want: "Project renamed"},
+		{eventType: "description_updated", want: "Description updated"},
+		{eventType: "unknown_event", want: "unknown_event"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.eventType+"/"+tt.want, func(t *testing.T) {
+			got := formatProjectEventLabel(tt.eventType, tt.metadata)
+			if got != tt.want {
+				t.Fatalf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

@@ -47,40 +47,59 @@
           </span>
 
           <template v-if="renameId === s.id">
-            <form class="d-flex align-items-center gap-1 flex-wrap flex-grow-1" @submit.prevent="saveRename(s)">
+            <form class="d-flex flex-column gap-1 flex-grow-1" @submit.prevent="saveRename(s)">
+              <div class="d-flex align-items-center gap-1 flex-wrap">
+                <input
+                  v-model="renameValue"
+                  type="text"
+                  class="form-control form-control-sm"
+                  maxlength="40"
+                  required
+                  aria-label="Status name"
+                />
+                <button class="btn btn-sm btn-primary" type="submit" aria-label="Save status">
+                  <i class="bi bi-check" />
+                </button>
+                <button
+                  class="btn btn-sm btn-secondary"
+                  type="button"
+                  aria-label="Cancel edit"
+                  @click="renameId = null"
+                >
+                  <i class="bi bi-x" />
+                </button>
+              </div>
               <input
-                v-model="renameValue"
+                v-model="renameDescription"
                 type="text"
                 class="form-control form-control-sm"
-                maxlength="40"
-                required
-                aria-label="Status name"
+                :maxlength="maxStatusDescription"
+                placeholder="Short description (optional)"
+                aria-label="Status description"
               />
-              <button class="btn btn-sm btn-primary" type="submit" aria-label="Save status name">
-                <i class="bi bi-check" />
-              </button>
-              <button
-                class="btn btn-sm btn-secondary"
-                type="button"
-                aria-label="Cancel rename"
-                @click="renameId = null"
-              >
-                <i class="bi bi-x" />
-              </button>
+              <div class="d-flex justify-content-between">
+                <small class="form-hint">Max {{ maxStatusDescription }} characters</small>
+                <small class="text-muted">{{ renameDescription.length }}/{{ maxStatusDescription }}</small>
+              </div>
             </form>
           </template>
           <template v-else>
-            <strong class="me-1">{{ s.name }}</strong>
-            <span v-if="s.is_default" class="badge text-bg-info">default</span>
-            <span v-if="s.is_done" class="badge text-bg-success">done</span>
-            <button
-              class="btn btn-sm btn-link p-0"
-              type="button"
-              aria-label="Rename status"
-              @click="beginRename(s)"
-            >
-              <i class="bi bi-pencil" />
-            </button>
+            <div class="min-w-0 flex-grow-1">
+              <div class="d-flex align-items-center gap-1 flex-wrap">
+                <strong class="me-1">{{ s.name }}</strong>
+                <span v-if="s.is_default" class="badge text-bg-info">default</span>
+                <span v-if="s.is_done" class="badge text-bg-success">done</span>
+                <button
+                  class="btn btn-sm btn-link p-0"
+                  type="button"
+                  aria-label="Edit status"
+                  @click="beginRename(s)"
+                >
+                  <i class="bi bi-pencil" />
+                </button>
+              </div>
+              <div v-if="s.description" class="small text-muted text-break">{{ s.description }}</div>
+            </div>
           </template>
 
           <div class="d-flex flex-wrap align-items-center gap-2 ms-auto">
@@ -153,13 +172,33 @@
             placeholder="e.g. In review"
           />
         </div>
-        <div class="col-sm-3">
-          <div class="form-check mt-3">
-            <input id="new-status-done" v-model="newStatusDone" class="form-check-input" type="checkbox" />
-            <label class="form-check-label small" for="new-status-done">Done column</label>
+        <div class="col-sm-6">
+          <label class="form-label small mb-0" :for="`new-status-desc-${project.id}`">Description</label>
+          <input
+            :id="`new-status-desc-${project.id}`"
+            v-model="newStatusDescription"
+            type="text"
+            class="form-control form-control-sm"
+            :maxlength="maxStatusDescription"
+            placeholder="What this column is for"
+          />
+          <div class="d-flex justify-content-between">
+            <small class="form-hint">Max {{ maxStatusDescription }} characters</small>
+            <small class="text-muted">{{ newStatusDescription.length }}/{{ maxStatusDescription }}</small>
           </div>
         </div>
-        <div class="col-sm-3">
+        <div class="col-sm-6">
+          <div class="form-check">
+            <input
+              :id="`new-status-done-${project.id}`"
+              v-model="newStatusDone"
+              class="form-check-input"
+              type="checkbox"
+            />
+            <label class="form-check-label small" :for="`new-status-done-${project.id}`">Done column</label>
+          </div>
+        </div>
+        <div class="col-sm-6">
           <button class="btn btn-sm btn-primary w-100" type="submit" :disabled="adding">Add</button>
         </div>
       </form>
@@ -202,15 +241,18 @@ const props = defineProps<{ project: Project }>()
 const emit = defineEmits<{ changed: [] }>()
 
 const maxStatuses = 8
+const maxStatusDescription = 50
 const statuses = ref<ProjectStatus[]>([])
 const savingMode = ref(false)
 const adding = ref(false)
 const deleting = ref(false)
 const reordering = ref(false)
 const newStatusName = ref('')
+const newStatusDescription = ref('')
 const newStatusDone = ref(false)
 const renameId = ref<number | null>(null)
 const renameValue = ref('')
+const renameDescription = ref('')
 const deleteTarget = ref<ProjectStatus | null>(null)
 const moveToStatusId = ref(0)
 const statusListEl = ref<HTMLElement | null>(null)
@@ -319,6 +361,7 @@ async function onToggleMode(enabled: boolean) {
 function beginRename(s: ProjectStatus) {
   renameId.value = s.id
   renameValue.value = s.name
+  renameDescription.value = s.description || ''
   deleteTarget.value = null
 }
 
@@ -326,13 +369,16 @@ async function saveRename(s: ProjectStatus) {
   const name = renameValue.value.trim()
   if (!name) return
   try {
-    await api.updateProjectStatus(props.project.id, s.id, { name })
+    await api.updateProjectStatus(props.project.id, s.id, {
+      name,
+      description: renameDescription.value.trim(),
+    })
     renameId.value = null
-    toast.push('Status renamed', 'success')
+    toast.push('Status updated', 'success')
     await loadStatuses()
     emit('changed')
   } catch (err) {
-    toast.push(err instanceof APIError ? err.message : 'Rename failed', 'error')
+    toast.push(err instanceof APIError ? err.message : 'Update failed', 'error')
   }
 }
 
@@ -368,9 +414,11 @@ async function addStatus() {
   try {
     await api.createProjectStatus(props.project.id, {
       name,
+      description: newStatusDescription.value.trim(),
       is_done: newStatusDone.value,
     })
     newStatusName.value = ''
+    newStatusDescription.value = ''
     newStatusDone.value = false
     toast.push('Status added', 'success')
     await loadStatuses()
@@ -416,6 +464,7 @@ watch(
   () => {
     cancelDelete()
     renameId.value = null
+    renameDescription.value = ''
     void loadStatuses()
   },
 )

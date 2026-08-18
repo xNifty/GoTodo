@@ -309,13 +309,8 @@ func apiV1ProjectEvents(w http.ResponseWriter, r *http.Request, projectID int) {
 		utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to list events.")
 		return
 	}
-	taskEvents, err := storage.GetProjectTaskEvents(projectID, limit)
-	if err != nil {
-		utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to list events.")
-		return
-	}
 
-	out := make([]apiProjectEventJSON, 0, len(projectEvents)+len(taskEvents))
+	out := make([]apiProjectEventJSON, 0, len(projectEvents))
 	for _, ev := range projectEvents {
 		out = append(out, apiProjectEventJSON{
 			ID:            ev.ID,
@@ -330,37 +325,14 @@ func apiV1ProjectEvents(w http.ResponseWriter, r *http.Request, projectID int) {
 			CreatedAt:     formatRFC3339(ev.CreatedAt),
 		})
 	}
-	for _, ev := range taskEvents {
-		tid := ev.TaskID
-		out = append(out, apiProjectEventJSON{
-			ID:          ev.ID,
-			ProjectID:   projectID,
-			ActorUserID: ev.UserID,
-			EventType:   ev.EventType,
-			Source:      "task",
-			TaskID:      &tid,
-			Label:       formatEventLabel(ev.EventType, ev.Metadata),
-			Metadata:    ev.Metadata,
-			CreatedAt:   formatRFC3339(ev.CreatedAt),
-		})
-	}
-	// Newest first (simple insertion merge by created_at string is fine enough; sort by time)
-	for i := 0; i < len(out); i++ {
-		for j := i + 1; j < len(out); j++ {
-			if out[j].CreatedAt > out[i].CreatedAt {
-				out[i], out[j] = out[j], out[i]
-			}
-		}
-	}
-	if len(out) > limit {
-		out = out[:limit]
-	}
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	json.NewEncoder(w).Encode(out)
 }
 
-func formatProjectEventLabel(eventType string, _ map[string]interface{}) string {
+func formatProjectEventLabel(eventType string, metadata map[string]interface{}) string {
+	name := metadataString(metadata, "name")
+	mode := metadataString(metadata, "mode")
 	switch eventType {
 	case "invited":
 		return "Invited member"
@@ -378,9 +350,51 @@ func formatProjectEventLabel(eventType string, _ map[string]interface{}) string 
 		return "Share link revoked"
 	case "invite_revoked":
 		return "Invite revoked"
+	case "status_added":
+		if name != "" {
+			return "Status added · " + name
+		}
+		return "Status added"
+	case "status_updated":
+		if name != "" {
+			return "Status updated · " + name
+		}
+		return "Status updated"
+	case "status_deleted":
+		if name != "" {
+			return "Status deleted · " + name
+		}
+		return "Status deleted"
+	case "workflow_changed":
+		if mode != "" {
+			return "Workflow set to " + mode
+		}
+		return "Workflow changed"
+	case "renamed":
+		if name != "" {
+			return "Project renamed · " + name
+		}
+		return "Project renamed"
+	case "description_updated":
+		return "Description updated"
 	default:
 		return eventType
 	}
+}
+
+func metadataString(metadata map[string]interface{}, key string) string {
+	if metadata == nil {
+		return ""
+	}
+	v, ok := metadata[key]
+	if !ok || v == nil {
+		return ""
+	}
+	s, ok := v.(string)
+	if !ok {
+		return ""
+	}
+	return s
 }
 
 // APIV1ProjectInvitesRouter handles /api/v1/project-invites and accept/decline.

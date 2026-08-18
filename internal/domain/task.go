@@ -55,11 +55,11 @@ type UpdateTaskInput struct {
 
 // UpdateResult summarizes what changed for audit logging in handlers.
 type UpdateResult struct {
-	ChangedFields []string
-	OldPriority   int
-	NewPriority   int
-	OldProjectID  int
-	NewProjectID  int
+	ChangedFields   []string
+	OldPriority     int
+	NewPriority     int
+	OldProjectID    int
+	NewProjectID    int
 	PriorityChanged bool
 	ProjectChanged  bool
 }
@@ -426,6 +426,12 @@ func UpdateTask(ctx context.Context, userID, taskID int, in UpdateTaskInput) (*U
 		}
 	}
 
+	oldStatusID := 0
+	if statusID.Valid {
+		oldStatusID = int(statusID.Int64)
+	}
+	newStatusID := oldStatusID
+
 	effectiveProjectID := nullInt(newProjectID)
 	if in.StatusID != nil {
 		if *in.StatusID == nil || **in.StatusID == 0 {
@@ -448,6 +454,7 @@ func UpdateTask(ctx context.Context, userID, taskID int, in UpdateTaskInput) (*U
 		st, _ := storage.GetProjectStatus(effectiveProjectID, **in.StatusID)
 		if st != nil {
 			completed = st.IsDone
+			newStatusID = st.ID
 		}
 	} else if completedTouched && oldCompleted != completed && effectiveProjectID > 0 {
 		mode, err := storage.GetProjectWorkflowMode(effectiveProjectID)
@@ -459,6 +466,13 @@ func UpdateTask(ctx context.Context, userID, taskID int, in UpdateTaskInput) (*U
 				return nil, err
 			}
 			statusTouched = true
+			if completed {
+				if done, err := storage.GetDoneProjectStatus(effectiveProjectID); err == nil {
+					newStatusID = done.ID
+				}
+			} else if def, err := storage.GetDefaultProjectStatus(effectiveProjectID); err == nil {
+				newStatusID = def.ID
+			}
 		}
 	}
 
@@ -501,8 +515,8 @@ func UpdateTask(ctx context.Context, userID, taskID int, in UpdateTaskInput) (*U
 			_ = storage.LogTaskEvent(taskID, userID, "reopened", nil)
 		}
 	}
-	if statusTouched {
-		_ = storage.LogTaskEvent(taskID, userID, "status_changed", nil)
+	if statusTouched && newStatusID != oldStatusID {
+		_ = storage.LogTaskEvent(taskID, userID, "status_changed", statusChangeMetadata(effectiveProjectID, oldStatusID, newStatusID))
 	}
 
 	result.NewPriority = priority
@@ -510,6 +524,23 @@ func UpdateTask(ctx context.Context, userID, taskID int, in UpdateTaskInput) (*U
 	result.PriorityChanged = result.OldPriority != result.NewPriority
 	result.ProjectChanged = projectChanged
 	return result, nil
+}
+
+func statusChangeMetadata(projectID, oldStatusID, newStatusID int) map[string]interface{} {
+	meta := map[string]interface{}{}
+	if newStatusID > 0 {
+		if st, err := storage.GetProjectStatus(projectID, newStatusID); err == nil && st != nil {
+			meta["to"] = st.Name
+			meta["to_id"] = st.ID
+		}
+	}
+	if oldStatusID > 0 {
+		if st, err := storage.GetProjectStatus(projectID, oldStatusID); err == nil && st != nil {
+			meta["from"] = st.Name
+			meta["from_id"] = st.ID
+		}
+	}
+	return meta
 }
 
 // DeleteTask removes a task the user can write. Returns ErrNotFound if missing.

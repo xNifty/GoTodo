@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"GoTodo/internal/server/utils"
@@ -39,6 +40,51 @@ func TestAPIV1APIKeysCreateValidation(t *testing.T) {
 	APIV1APIKeysRouter(rec, req)
 	if rec.Code != http.StatusBadRequest && rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d, want 400 or 503; body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestNormalizeAPIKeyName(t *testing.T) {
+	name, msg := normalizeAPIKeyName("  Phone  ")
+	if msg != "" || name != "Phone" {
+		t.Fatalf("trim: name=%q msg=%q", name, msg)
+	}
+	if _, msg := normalizeAPIKeyName("   "); msg == "" {
+		t.Fatal("whitespace-only name should be rejected")
+	}
+	if _, msg := normalizeAPIKeyName("\u00a0\u00a0"); msg == "" {
+		t.Fatal("NBSP-only name should be rejected")
+	}
+	if _, msg := normalizeAPIKeyName(strings.Repeat("a", 81)); msg == "" {
+		t.Fatal("name longer than 80 should be rejected")
+	}
+	name, msg = normalizeAPIKeyName(strings.Repeat("a", 80))
+	if msg != "" || len(name) != 80 {
+		t.Fatalf("80-char name should pass: name len=%d msg=%q", len(name), msg)
+	}
+}
+
+func TestAPIV1APIKeysRenameValidation(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+		body string
+	}{
+		{name: "empty name", path: "/api/v1/api-keys/1", body: `{"name":""}`},
+		{name: "whitespace name", path: "/api/v1/api-keys/1", body: `{"name":"   "}`},
+		{name: "too long", path: "/api/v1/api-keys/1", body: `{"name":"` + strings.Repeat("a", 81) + `"}`},
+		{name: "invalid id", path: "/api/v1/api-keys/abc", body: `{"name":"Phone"}`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPatch, tt.path, bytes.NewBufferString(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			req = utils.SetAPIUserID(req, 1)
+			rec := httptest.NewRecorder()
+			APIV1APIKeysRouter(rec, req)
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
+			}
+		})
 	}
 }
 

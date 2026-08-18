@@ -33,6 +33,8 @@ const icsFile = ref<File | null>(null)
 const keys = ref<APIKey[]>([])
 const keyName = ref('')
 const mintedKey = ref('')
+const renameKeyId = ref<number | null>(null)
+const renameKeyValue = ref('')
 
 watch(
   user,
@@ -179,6 +181,14 @@ async function exportTasks(format: 'json' | 'csv') {
   }
 }
 
+function formatKeyTime(iso: string) {
+  try {
+    return new Date(iso).toLocaleString()
+  } catch {
+    return iso
+  }
+}
+
 async function createKey() {
   if (!keyName.value.trim()) return
   try {
@@ -189,6 +199,23 @@ async function createKey() {
     push('API key created — copy it now', 'success')
   } catch (err) {
     push(err instanceof APIError ? err.message : 'Create failed', 'error')
+  }
+}
+
+function beginRenameKey(key: APIKey) {
+  renameKeyId.value = key.id
+  renameKeyValue.value = key.name
+}
+
+async function saveRenameKey() {
+  if (renameKeyId.value == null || !renameKeyValue.value.trim()) return
+  try {
+    await api.renameAPIKey(renameKeyId.value, renameKeyValue.value.trim())
+    renameKeyId.value = null
+    keys.value = await api.listAPIKeys()
+    push('API key renamed', 'success')
+  } catch (err) {
+    push(err instanceof APIError ? err.message : 'Rename failed', 'error')
   }
 }
 
@@ -361,23 +388,57 @@ onUnmounted(() => {
       <div class="card-body">
         <form class="row g-2 mb-3" @submit.prevent="createKey">
           <div class="col-sm-8">
-            <input v-model="keyName" type="text" class="form-control" placeholder="Key name" required />
+            <input v-model="keyName" type="text" class="form-control" placeholder="Key name" required maxlength="80" />
           </div>
           <div class="col-sm-4">
             <button type="submit" class="btn btn-primary w-100">Create key</button>
           </div>
         </form>
-        <p v-if="mintedKey" class="text-break">New key (shown once): <code>{{ mintedKey }}</code></p>
-        <ul class="list-group">
-          <li v-for="key in keys" :key="key.id" class="list-group-item d-flex justify-content-between align-items-center">
-            <div>
-              <strong>{{ key.name }}</strong>
-              <div class="text-muted small">{{ key.key_prefix }}…</div>
+        <div v-if="mintedKey" class="api-key-reveal-panel">
+          <p class="api-key-reveal-title">New key (shown once)</p>
+          <p class="text-break mb-0"><code>{{ mintedKey }}</code></p>
+        </div>
+        <div class="api-key-list">
+          <div v-for="key in keys" :key="key.id" class="api-key-card">
+            <div class="api-key-card-header">
+              <template v-if="renameKeyId === key.id">
+                <input
+                  v-model="renameKeyValue"
+                  type="text"
+                  class="form-control form-control-sm api-key-rename-input"
+                  maxlength="80"
+                  @keyup.enter="saveRenameKey"
+                />
+                <div class="d-flex gap-2">
+                  <button type="button" class="btn btn-sm btn-primary" :disabled="!renameKeyValue.trim()" @click="saveRenameKey">Save</button>
+                  <button type="button" class="btn btn-sm btn-secondary" @click="renameKeyId = null">Cancel</button>
+                </div>
+              </template>
+              <template v-else>
+                <span class="api-key-name">{{ key.name }}</span>
+                <div class="d-flex gap-2">
+                  <button type="button" class="btn btn-sm btn-outline-secondary" @click="beginRenameKey(key)">Rename</button>
+                  <button type="button" class="btn btn-sm btn-outline-danger" @click="revokeKey(key)">Revoke</button>
+                </div>
+              </template>
             </div>
-            <button type="button" class="btn btn-sm btn-outline-danger" @click="revokeKey(key)">Revoke</button>
-          </li>
-          <li v-if="!keys.length" class="list-group-item text-muted">No API keys.</li>
-        </ul>
+            <div class="api-key-card-fields">
+              <div class="api-key-field">
+                <span class="api-key-field-label">Prefix</span>
+                <span class="api-key-field-value api-key-prefix">{{ key.key_prefix }}</span>
+              </div>
+              <div class="api-key-field">
+                <span class="api-key-field-label">Created</span>
+                <span class="api-key-field-value">{{ formatKeyTime(key.created_at) }}</span>
+              </div>
+              <div class="api-key-field">
+                <span class="api-key-field-label">Last used</span>
+                <span class="api-key-field-value">{{ key.last_used_at ? formatKeyTime(key.last_used_at) : 'Never' }}</span>
+              </div>
+            </div>
+          </div>
+          <p v-if="!keys.length" class="text-muted mb-0">No API keys.</p>
+        </div>
       </div>
     </div>
   </div>

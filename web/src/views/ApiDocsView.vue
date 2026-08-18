@@ -81,7 +81,7 @@ onUnmounted(() => {
                             <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/me/username</code></a></td><td>One-time username claim</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/me/password</code></a></td><td>Change password</td></tr>
                             <tr><td><span class="badge bg-success">GET</span> <span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/api-keys</code></a></td><td>List / create API keys</td></tr>
-                            <tr><td><span class="badge bg-danger">DELETE</span></td><td><a href="#session-auth"><code>/api/v1/api-keys/{id}</code></a></td><td>Revoke an API key</td></tr>
+                            <tr><td><span class="badge bg-warning text-dark">PATCH</span> <span class="badge bg-danger">DELETE</span></td><td><a href="#session-auth"><code>/api/v1/api-keys/{id}</code></a></td><td>Rename or revoke an API key</td></tr>
                             <tr><td><span class="badge bg-success">GET</span></td><td><a href="#tasks"><code>/api/v1/tasks</code></a></td><td>List tasks (with filters and pagination)</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#tasks"><code>/api/v1/tasks</code></a></td><td>Create a task</td></tr>
                             <tr><td><span class="badge bg-success">GET</span></td><td><a href="#tasks"><code>/api/v1/tasks/{id}</code></a></td><td>Get one task</td></tr>
@@ -141,7 +141,7 @@ onUnmounted(() => {
                             <tr><td><span class="badge bg-primary">POST</span></td><td><code>/api/v1/me/username</code></td><td>Session cookie or Bearer</td><td>One-time username claim when <code>username_change_available</code></td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><code>/api/v1/me/password</code></td><td>Session cookie or Bearer</td><td>Change password</td></tr>
                             <tr><td><span class="badge bg-success">GET</span> <span class="badge bg-primary">POST</span></td><td><code>/api/v1/api-keys</code></td><td>Session cookie or Bearer</td><td>List or create keys</td></tr>
-                            <tr><td><span class="badge bg-danger">DELETE</span></td><td><code>/api/v1/api-keys/{id}</code></td><td>Session cookie or Bearer</td><td>Revoke a key</td></tr>
+                            <tr><td><span class="badge bg-warning text-dark">PATCH</span> <span class="badge bg-danger">DELETE</span></td><td><code>/api/v1/api-keys/{id}</code></td><td>Session cookie or Bearer</td><td>Rename (label only) or revoke a key</td></tr>
                         </tbody>
                     </table>
                     <pre class="api-docs-pre"><code>POST {{ basePath }}/api/v1/auth/login

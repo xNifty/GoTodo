@@ -531,6 +531,35 @@ paths:
   /api/v1/api-keys/{id}:
     parameters:
       - $ref: "#/components/parameters/ID"
+    patch:
+      tags: [API Keys]
+      summary: Rename an API key
+      description: Changes only the display name. The secret token is unchanged. Names are unique among the user's active keys (case-insensitive).
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  maxLength: 80
+      responses:
+        "200":
+          description: Updated key metadata (no plaintext)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIKey"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
     delete:
       tags: [API Keys]
       summary: Revoke an API key
@@ -1375,7 +1404,8 @@ paths:
       - $ref: "#/components/parameters/ID"
     get:
       tags: [Projects]
-      summary: Project activity feed
+      summary: Project settings activity
+      description: Sharing, membership, status, and other project-settings events. Board/task activity is not included; use GET /api/v1/tasks/{id}/events for a task timeline.
       security:
         - SessionCookie: []
         - BearerAuth: []
@@ -1387,7 +1417,7 @@ paths:
             maximum: 200
       responses:
         "200":
-          description: Events
+          description: Project settings and sharing events
           content:
             application/json:
               schema:
@@ -2895,6 +2925,12 @@ components:
         created_at:
           type: string
           format: date-time
+        actor_user_id:
+          type: integer
+        actor_user_name:
+          type: string
+        actor_email:
+          type: string
 
     SavedViewFilter:
       type: object

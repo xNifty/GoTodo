@@ -15,22 +15,34 @@ const (
 	WorkflowClassic = "classic"
 	WorkflowKanban  = "kanban"
 
-	MaxProjectStatuses = 8
-	MaxEstimatePoints  = 100
-	MaxStatusNameLen   = 40
-	MaxTimeEntryNote   = 200
-	MaxTimeEntryMinutes = 24 * 60
+	MaxProjectStatuses      = 8
+	MaxEstimatePoints       = 100
+	MaxStatusNameLen        = 40
+	MaxStatusDescriptionLen = 50
+	MaxTimeEntryNote        = 200
+	MaxTimeEntryMinutes     = 24 * 60
+
+	projectStatusSelectCols = `id, project_id, name, description, position, is_done, is_default, created_at`
 )
 
 // ProjectStatus is a kanban column within a project.
 type ProjectStatus struct {
-	ID        int
-	ProjectID int
-	Name      string
-	Position  int
-	IsDone    bool
-	IsDefault bool
-	CreatedAt time.Time
+	ID          int
+	ProjectID   int
+	Name        string
+	Description string
+	Position    int
+	IsDone      bool
+	IsDefault   bool
+	CreatedAt   time.Time
+}
+
+type projectStatusScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanProjectStatus(row projectStatusScanner, s *ProjectStatus) error {
+	return row.Scan(&s.ID, &s.ProjectID, &s.Name, &s.Description, &s.Position, &s.IsDone, &s.IsDefault, &s.CreatedAt)
 }
 
 // TaskTimeEntry is a time log against a kanban task.
@@ -47,13 +59,13 @@ type TaskTimeEntry struct {
 
 // TaskWorkflowFields are kanban-related fields attached to tasks.
 type TaskWorkflowFields struct {
-	StatusID          int
-	StatusName        string
-	EstimatePoints    *int
-	TimeSpentMinutes  int
-	ProjectWorkflow   string
-	ClaimedBy         int
-	ClaimedByName     string
+	StatusID         int
+	StatusName       string
+	EstimatePoints   *int
+	TimeSpentMinutes int
+	ProjectWorkflow  string
+	ClaimedBy        int
+	ClaimedByName    string
 }
 
 // CreateProjectWorkflowTables creates statuses and time-entry tables.
@@ -69,6 +81,7 @@ func CreateProjectWorkflowTables() error {
 			id SERIAL PRIMARY KEY,
 			project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
 			name TEXT NOT NULL,
+			description TEXT NOT NULL DEFAULT '',
 			position INTEGER NOT NULL DEFAULT 0,
 			is_done BOOLEAN NOT NULL DEFAULT FALSE,
 			is_default BOOLEAN NOT NULL DEFAULT FALSE,
@@ -125,6 +138,22 @@ func MigrateProjectsAddWorkflowMode() error {
 		if err != nil {
 			return fmt.Errorf("failed to add workflow_mode check: %v", err)
 		}
+	}
+	return nil
+}
+
+// MigrateProjectStatusesAddDescription adds an optional short description on status columns.
+func MigrateProjectStatusesAddDescription() error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return err
+	}
+	defer CloseDatabase(pool)
+
+	_, err = pool.Exec(context.Background(),
+		`ALTER TABLE project_statuses ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT ''`)
+	if err != nil {
+		return fmt.Errorf("failed to add status description: %v", err)
 	}
 	return nil
 }
@@ -253,24 +282,24 @@ func SeedDefaultProjectStatuses(projectID int) ([]ProjectStatus, error) {
 	defer CloseDatabase(pool)
 
 	defaults := []struct {
-		name      string
-		position  int
-		isDone    bool
-		isDefault bool
+		name        string
+		description string
+		position    int
+		isDone      bool
+		isDefault   bool
 	}{
-		{"To Do", 0, false, true},
-		{"In Progress", 1, false, false},
-		{"Done", 2, true, false},
+		{"To Do", "Work that hasn't been started yet", 0, false, true},
+		{"In Progress", "Currently being worked on", 1, false, false},
+		{"Done", "Finished and ready to close", 2, true, false},
 	}
 	out := make([]ProjectStatus, 0, len(defaults))
 	for _, d := range defaults {
 		var s ProjectStatus
-		err = pool.QueryRow(context.Background(),
-			`INSERT INTO project_statuses (project_id, name, position, is_done, is_default)
-			 VALUES ($1, $2, $3, $4, $5)
-			 RETURNING id, project_id, name, position, is_done, is_default, created_at`,
-			projectID, d.name, d.position, d.isDone, d.isDefault).Scan(
-			&s.ID, &s.ProjectID, &s.Name, &s.Position, &s.IsDone, &s.IsDefault, &s.CreatedAt)
+		err = scanProjectStatus(pool.QueryRow(context.Background(),
+			`INSERT INTO project_statuses (project_id, name, description, position, is_done, is_default)
+			 VALUES ($1, $2, $3, $4, $5, $6)
+			 RETURNING `+projectStatusSelectCols,
+			projectID, d.name, d.description, d.position, d.isDone, d.isDefault), &s)
 		if err != nil {
 			return nil, err
 		}
@@ -322,7 +351,7 @@ func ListProjectStatuses(projectID int) ([]ProjectStatus, error) {
 	defer CloseDatabase(pool)
 
 	rows, err := pool.Query(context.Background(),
-		`SELECT id, project_id, name, position, is_done, is_default, created_at
+		`SELECT `+projectStatusSelectCols+`
 		 FROM project_statuses WHERE project_id = $1 ORDER BY position ASC, id ASC`, projectID)
 	if err != nil {
 		return nil, err
@@ -332,7 +361,7 @@ func ListProjectStatuses(projectID int) ([]ProjectStatus, error) {
 	var out []ProjectStatus
 	for rows.Next() {
 		var s ProjectStatus
-		if err := rows.Scan(&s.ID, &s.ProjectID, &s.Name, &s.Position, &s.IsDone, &s.IsDefault, &s.CreatedAt); err != nil {
+		if err := scanProjectStatus(rows, &s); err != nil {
 			return nil, err
 		}
 		out = append(out, s)
@@ -362,11 +391,10 @@ func GetProjectStatus(projectID, statusID int) (*ProjectStatus, error) {
 	defer CloseDatabase(pool)
 
 	var s ProjectStatus
-	err = pool.QueryRow(context.Background(),
-		`SELECT id, project_id, name, position, is_done, is_default, created_at
+	err = scanProjectStatus(pool.QueryRow(context.Background(),
+		`SELECT `+projectStatusSelectCols+`
 		 FROM project_statuses WHERE id = $1 AND project_id = $2`,
-		statusID, projectID).Scan(
-		&s.ID, &s.ProjectID, &s.Name, &s.Position, &s.IsDone, &s.IsDefault, &s.CreatedAt)
+		statusID, projectID), &s)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("status not found")
@@ -385,11 +413,10 @@ func GetDefaultProjectStatus(projectID int) (*ProjectStatus, error) {
 	defer CloseDatabase(pool)
 
 	var s ProjectStatus
-	err = pool.QueryRow(context.Background(),
-		`SELECT id, project_id, name, position, is_done, is_default, created_at
+	err = scanProjectStatus(pool.QueryRow(context.Background(),
+		`SELECT `+projectStatusSelectCols+`
 		 FROM project_statuses WHERE project_id = $1 AND is_default = true
-		 ORDER BY position ASC, id ASC LIMIT 1`, projectID).Scan(
-		&s.ID, &s.ProjectID, &s.Name, &s.Position, &s.IsDone, &s.IsDefault, &s.CreatedAt)
+		 ORDER BY position ASC, id ASC LIMIT 1`, projectID), &s)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("default status not found")
@@ -408,11 +435,10 @@ func GetDoneProjectStatus(projectID int) (*ProjectStatus, error) {
 	defer CloseDatabase(pool)
 
 	var s ProjectStatus
-	err = pool.QueryRow(context.Background(),
-		`SELECT id, project_id, name, position, is_done, is_default, created_at
+	err = scanProjectStatus(pool.QueryRow(context.Background(),
+		`SELECT `+projectStatusSelectCols+`
 		 FROM project_statuses WHERE project_id = $1 AND is_done = true
-		 ORDER BY position ASC, id ASC LIMIT 1`, projectID).Scan(
-		&s.ID, &s.ProjectID, &s.Name, &s.Position, &s.IsDone, &s.IsDefault, &s.CreatedAt)
+		 ORDER BY position ASC, id ASC LIMIT 1`, projectID), &s)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("done status not found")
@@ -423,7 +449,7 @@ func GetDoneProjectStatus(projectID int) (*ProjectStatus, error) {
 }
 
 // CreateProjectStatus inserts a status at the end of the board.
-func CreateProjectStatus(projectID int, name string, isDone, isDefault bool) (*ProjectStatus, error) {
+func CreateProjectStatus(projectID int, name, description string, isDone, isDefault bool) (*ProjectStatus, error) {
 	pool, err := OpenDatabase()
 	if err != nil {
 		return nil, err
@@ -445,12 +471,11 @@ func CreateProjectStatus(projectID int, name string, isDone, isDefault bool) (*P
 	}
 
 	var s ProjectStatus
-	err = pool.QueryRow(context.Background(),
-		`INSERT INTO project_statuses (project_id, name, position, is_done, is_default)
-		 VALUES ($1, $2, $3, $4, $5)
-		 RETURNING id, project_id, name, position, is_done, is_default, created_at`,
-		projectID, name, nextPos, isDone, isDefault).Scan(
-		&s.ID, &s.ProjectID, &s.Name, &s.Position, &s.IsDone, &s.IsDefault, &s.CreatedAt)
+	err = scanProjectStatus(pool.QueryRow(context.Background(),
+		`INSERT INTO project_statuses (project_id, name, description, position, is_done, is_default)
+		 VALUES ($1, $2, $3, $4, $5, $6)
+		 RETURNING `+projectStatusSelectCols,
+		projectID, name, description, nextPos, isDone, isDefault), &s)
 	if err != nil {
 		return nil, err
 	}
@@ -458,7 +483,7 @@ func CreateProjectStatus(projectID int, name string, isDone, isDefault bool) (*P
 }
 
 // UpdateProjectStatus updates mutable status fields.
-func UpdateProjectStatus(projectID, statusID int, name *string, isDone, isDefault *bool) (*ProjectStatus, error) {
+func UpdateProjectStatus(projectID, statusID int, name *string, isDone, isDefault *bool, description *string) (*ProjectStatus, error) {
 	pool, err := OpenDatabase()
 	if err != nil {
 		return nil, err
@@ -481,6 +506,10 @@ func UpdateProjectStatus(projectID, statusID int, name *string, isDone, isDefaul
 	if isDefault != nil {
 		newDefault = *isDefault
 	}
+	newDescription := cur.Description
+	if description != nil {
+		newDescription = *description
+	}
 
 	if newDefault {
 		if _, err := pool.Exec(context.Background(),
@@ -491,8 +520,8 @@ func UpdateProjectStatus(projectID, statusID int, name *string, isDone, isDefaul
 	}
 
 	_, err = pool.Exec(context.Background(),
-		`UPDATE project_statuses SET name = $1, is_done = $2, is_default = $3 WHERE id = $4 AND project_id = $5`,
-		newName, newDone, newDefault, statusID, projectID)
+		`UPDATE project_statuses SET name = $1, description = $2, is_done = $3, is_default = $4 WHERE id = $5 AND project_id = $6`,
+		newName, newDescription, newDone, newDefault, statusID, projectID)
 	if err != nil {
 		return nil, err
 	}

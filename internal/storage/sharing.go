@@ -68,17 +68,17 @@ type ProjectInvite struct {
 
 // ShareLink is a read-only public view token.
 type ShareLink struct {
-	ID         int
-	Token      string
-	CreatedBy  int
-	ScopeType  string
-	ScopeID    int
-	ExpiresAt  *time.Time
-	RevokedAt  *time.Time
-	CreatedAt  time.Time
+	ID        int
+	Token     string
+	CreatedBy int
+	ScopeType string
+	ScopeID   int
+	ExpiresAt *time.Time
+	RevokedAt *time.Time
+	CreatedAt time.Time
 }
 
-// ProjectEvent is an audit entry for project membership/share actions.
+// ProjectEvent is an audit entry for project settings and sharing actions.
 type ProjectEvent struct {
 	ID            int
 	ProjectID     int
@@ -757,45 +757,6 @@ func GetProjectEvents(projectID, limit int) ([]ProjectEvent, error) {
 		var ev ProjectEvent
 		var metaRaw []byte
 		if err := rows.Scan(&ev.ID, &ev.ProjectID, &ev.ActorUserID, &ev.EventType, &metaRaw, &ev.CreatedAt, &ev.ActorEmail, &ev.ActorUserName); err != nil {
-			return nil, err
-		}
-		ev.Metadata = map[string]interface{}{}
-		if len(metaRaw) > 0 {
-			_ = json.Unmarshal(metaRaw, &ev.Metadata)
-		}
-		out = append(out, ev)
-	}
-	return out, nil
-}
-
-// GetProjectTaskEvents returns recent task events for tasks in a project.
-func GetProjectTaskEvents(projectID, limit int) ([]TaskEvent, error) {
-	if limit <= 0 {
-		limit = 50
-	}
-	pool, err := OpenDatabase()
-	if err != nil {
-		return nil, err
-	}
-	defer CloseDatabase(pool)
-
-	rows, err := pool.Query(context.Background(), `
-		SELECT te.id, te.task_id, te.user_id, te.event_type, COALESCE(te.metadata, '{}'), te.created_at
-		FROM task_events te
-		JOIN tasks t ON t.id = te.task_id
-		WHERE t.project_id = $1
-		ORDER BY te.created_at DESC
-		LIMIT $2`, projectID, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var out []TaskEvent
-	for rows.Next() {
-		var ev TaskEvent
-		var metaRaw []byte
-		if err := rows.Scan(&ev.ID, &ev.TaskID, &ev.UserID, &ev.EventType, &metaRaw, &ev.CreatedAt); err != nil {
 			return nil, err
 		}
 		ev.Metadata = map[string]interface{}{}

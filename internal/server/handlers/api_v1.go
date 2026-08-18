@@ -21,40 +21,40 @@ type apiTagJSON struct {
 }
 
 type apiTaskJSON struct {
-	ID                 int           `json:"id"`
-	Title              string        `json:"title"`
-	Description        string        `json:"description"`
-	Completed          bool          `json:"completed"`
-	DueDate            string        `json:"due_date"`
-	ProjectID          *int          `json:"project_id,omitempty"`
-	Project            string        `json:"project,omitempty"`
-	Priority           int           `json:"priority"`
-	Favorite           bool          `json:"favorite"`
-	Position           int           `json:"position"`
-	ParentID           *int          `json:"parent_id"`
-	ChildCount         int           `json:"child_count"`
-	ChildrenCompleted  int           `json:"children_completed"`
-	Children           []apiTaskJSON `json:"children,omitempty"`
-	Tags               []apiTagJSON  `json:"tags"`
-	CreatedAt          string        `json:"created_at"`
-	ModifiedAt         string        `json:"modified_at"`
-	StatusID           *int          `json:"status_id,omitempty"`
-	StatusName         string        `json:"status_name,omitempty"`
-	EstimatePoints     *int          `json:"estimate_points,omitempty"`
-	TimeSpentMinutes   int           `json:"time_spent_minutes,omitempty"`
-	ProjectWorkflow    string        `json:"project_workflow,omitempty"`
-	ClaimedBy          *int          `json:"claimed_by,omitempty"`
-	ClaimedByName      string        `json:"claimed_by_name,omitempty"`
+	ID                int           `json:"id"`
+	Title             string        `json:"title"`
+	Description       string        `json:"description"`
+	Completed         bool          `json:"completed"`
+	DueDate           string        `json:"due_date"`
+	ProjectID         *int          `json:"project_id,omitempty"`
+	Project           string        `json:"project,omitempty"`
+	Priority          int           `json:"priority"`
+	Favorite          bool          `json:"favorite"`
+	Position          int           `json:"position"`
+	ParentID          *int          `json:"parent_id"`
+	ChildCount        int           `json:"child_count"`
+	ChildrenCompleted int           `json:"children_completed"`
+	Children          []apiTaskJSON `json:"children,omitempty"`
+	Tags              []apiTagJSON  `json:"tags"`
+	CreatedAt         string        `json:"created_at"`
+	ModifiedAt        string        `json:"modified_at"`
+	StatusID          *int          `json:"status_id,omitempty"`
+	StatusName        string        `json:"status_name,omitempty"`
+	EstimatePoints    *int          `json:"estimate_points,omitempty"`
+	TimeSpentMinutes  int           `json:"time_spent_minutes,omitempty"`
+	ProjectWorkflow   string        `json:"project_workflow,omitempty"`
+	ClaimedBy         *int          `json:"claimed_by,omitempty"`
+	ClaimedByName     string        `json:"claimed_by_name,omitempty"`
 }
 
 type apiTaskListResponse struct {
-	Tasks            []apiTaskJSON `json:"tasks"`
-	Total            int           `json:"total"`
-	Page             int           `json:"page"`
-	PerPage          int           `json:"per_page"`
-	TotalPages       int           `json:"total_pages"`
-	CompletedCount   int           `json:"completed_count"`
-	IncompleteCount  int           `json:"incomplete_count"`
+	Tasks           []apiTaskJSON `json:"tasks"`
+	Total           int           `json:"total"`
+	Page            int           `json:"page"`
+	PerPage         int           `json:"per_page"`
+	TotalPages      int           `json:"total_pages"`
+	CompletedCount  int           `json:"completed_count"`
+	IncompleteCount int           `json:"incomplete_count"`
 }
 
 type apiTaskCreateRequest struct {
@@ -72,17 +72,17 @@ type apiTaskCreateRequest struct {
 }
 
 type apiTaskPatchRequest struct {
-	Title          *string     `json:"title"`
-	Description    *string     `json:"description"`
-	DueDate        *string     `json:"due_date"`
-	ProjectID      **int       `json:"project_id"`
-	ParentID       **int       `json:"parent_id"`
-	Priority       *int        `json:"priority"`
-	Completed      *bool       `json:"completed"`
-	Favorite       *bool       `json:"favorite"`
-	TagIDs         *[]int      `json:"tag_ids"`
-	ClearDue       *bool       `json:"clear_due_date"`
-	StatusID       **int       `json:"status_id"`
+	Title          *string      `json:"title"`
+	Description    *string      `json:"description"`
+	DueDate        *string      `json:"due_date"`
+	ProjectID      **int        `json:"project_id"`
+	ParentID       **int        `json:"parent_id"`
+	Priority       *int         `json:"priority"`
+	Completed      *bool        `json:"completed"`
+	Favorite       *bool        `json:"favorite"`
+	TagIDs         *[]int       `json:"tag_ids"`
+	ClearDue       *bool        `json:"clear_due_date"`
+	StatusID       **int        `json:"status_id"`
 	EstimatePoints *optionalInt `json:"estimate_points"`
 }
 
@@ -165,12 +165,15 @@ type apiUndoRequest struct {
 }
 
 type apiTaskEventJSON struct {
-	ID        int                    `json:"id"`
-	TaskID    int                    `json:"task_id"`
-	EventType string                 `json:"event_type"`
-	Label     string                 `json:"label"`
-	Metadata  map[string]interface{} `json:"metadata"`
-	CreatedAt string                 `json:"created_at"`
+	ID            int                    `json:"id"`
+	TaskID        int                    `json:"task_id"`
+	EventType     string                 `json:"event_type"`
+	Label         string                 `json:"label"`
+	Metadata      map[string]interface{} `json:"metadata"`
+	CreatedAt     string                 `json:"created_at"`
+	ActorUserID   int                    `json:"actor_user_id,omitempty"`
+	ActorUserName string                 `json:"actor_user_name,omitempty"`
+	ActorEmail    string                 `json:"actor_email,omitempty"`
 }
 
 func tagToAPIJSON(t storage.Tag) apiTagJSON {
@@ -741,8 +744,8 @@ func apiV1UndoTasks(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"ok":        true,
-		"restored":  len(snaps),
+		"ok":       true,
+		"restored": len(snaps),
 	})
 }
 
@@ -769,12 +772,15 @@ func apiV1TaskEvents(w http.ResponseWriter, r *http.Request, taskID int) {
 			meta = map[string]interface{}{}
 		}
 		out = append(out, apiTaskEventJSON{
-			ID:        ev.ID,
-			TaskID:    ev.TaskID,
-			EventType: ev.EventType,
-			Label:     formatEventLabel(ev.EventType, meta),
-			Metadata:  meta,
-			CreatedAt: ev.CreatedAt.UTC().Format("2006-01-02T15:04:05Z07:00"),
+			ID:            ev.ID,
+			TaskID:        ev.TaskID,
+			EventType:     ev.EventType,
+			Label:         formatEventLabel(ev.EventType, meta),
+			Metadata:      meta,
+			CreatedAt:     ev.CreatedAt.UTC().Format("2006-01-02T15:04:05Z07:00"),
+			ActorUserID:   ev.UserID,
+			ActorUserName: ev.ActorUserName,
+			ActorEmail:    ev.ActorEmail,
 		})
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")

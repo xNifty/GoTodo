@@ -75,6 +75,14 @@ func UpdateProject(ctx context.Context, userID, projectID int, name, description
 		if err := storage.UpdateProject(projectID, proj.OwnerUserID, namePtr, trimmedDescription); err != nil {
 			return nil, err
 		}
+		if namePtr != nil && *namePtr != proj.Name {
+			_ = storage.LogProjectEvent(projectID, userID, "renamed", map[string]interface{}{
+				"name": *namePtr,
+			})
+		}
+		if trimmedDescription != nil && *trimmedDescription != proj.Description {
+			_ = storage.LogProjectEvent(projectID, userID, "description_updated", nil)
+		}
 	}
 
 	if workflowMode != nil {

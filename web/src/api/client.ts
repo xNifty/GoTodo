@@ -207,6 +207,13 @@ export const api = {
     })
   },
 
+  renameAPIKey(id: number, name: string) {
+    return request<APIKey>(`/api/v1/api-keys/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name }),
+    })
+  },
+
   revokeAPIKey(id: number) {
     return request<void>(`/api/v1/api-keys/${id}`, { method: 'DELETE' })
   },
@@ -363,7 +370,7 @@ export const api = {
 
   createProjectStatus(
     projectId: number,
-    payload: { name: string; is_done?: boolean; is_default?: boolean },
+    payload: { name: string; description?: string; is_done?: boolean; is_default?: boolean },
   ) {
     return request<ProjectStatus>(`/api/v1/projects/${projectId}/statuses`, {
       method: 'POST',
@@ -374,7 +381,7 @@ export const api = {
   updateProjectStatus(
     projectId: number,
     statusId: number,
-    payload: Partial<{ name: string; is_done: boolean; is_default: boolean }>,
+    payload: Partial<{ name: string; description: string; is_done: boolean; is_default: boolean }>,
   ) {
     return request<ProjectStatus>(`/api/v1/projects/${projectId}/statuses/${statusId}`, {
       method: 'PATCH',

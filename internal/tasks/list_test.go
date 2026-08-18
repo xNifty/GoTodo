@@ -62,6 +62,7 @@ func TestMain(m *testing.M) {
 			id SERIAL PRIMARY KEY,
 			project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
 			name TEXT NOT NULL,
+			description TEXT NOT NULL DEFAULT '',
 			position INTEGER NOT NULL DEFAULT 0,
 			is_done BOOLEAN NOT NULL DEFAULT FALSE,
 			is_default BOOLEAN NOT NULL DEFAULT FALSE,

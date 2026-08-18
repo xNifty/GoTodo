@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -18,7 +19,7 @@ type apiKeyJSON struct {
 	LastUsedAt *string `json:"last_used_at,omitempty"`
 }
 
-type apiKeyCreateRequest struct {
+type apiKeyNameRequest struct {
 	Name string `json:"name"`
 }
 
@@ -28,6 +29,17 @@ type apiKeyCreateResponse struct {
 	KeyPrefix string `json:"key_prefix"`
 	Key       string `json:"key"`
 	CreatedAt string `json:"created_at"`
+}
+
+func normalizeAPIKeyName(raw string) (string, string) {
+	name := strings.TrimSpace(raw)
+	if name == "" {
+		return "", "Key name is required."
+	}
+	if len(name) > 80 {
+		return "", "Key name is too long."
+	}
+	return name, ""
 }
 
 // APIV1APIKeysRouter handles /api/v1/api-keys and /api/v1/api-keys/{id}.
@@ -50,6 +62,8 @@ func APIV1APIKeysRouter(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch r.Method {
+	case http.MethodPatch:
+		apiV1RenameAPIKey(w, r, id)
 	case http.MethodDelete:
 		apiV1RevokeAPIKey(w, r, id)
 	default:
@@ -86,18 +100,14 @@ func apiV1CreateAPIKey(w http.ResponseWriter, r *http.Request) {
 		utils.APIJSONError(w, http.StatusUnauthorized, "unauthorized", "Not authenticated.")
 		return
 	}
-	var req apiKeyCreateRequest
+	var req apiKeyNameRequest
 	if err := decodeJSONBody(r, &req); err != nil {
 		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid JSON body.")
 		return
 	}
-	name := strings.TrimSpace(req.Name)
-	if name == "" {
-		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Key name is required.")
-		return
-	}
-	if len(name) > 80 {
-		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Key name is too long.")
+	name, msg := normalizeAPIKeyName(req.Name)
+	if msg != "" {
+		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", msg)
 		return
 	}
 	plaintext, record, err := storage.CreateOrRotateAPIKey(userID, name)
@@ -116,6 +126,39 @@ func apiV1CreateAPIKey(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func apiV1RenameAPIKey(w http.ResponseWriter, r *http.Request, keyID int) {
+	userID, ok := utils.GetAPIUserID(r)
+	if !ok {
+		utils.APIJSONError(w, http.StatusUnauthorized, "unauthorized", "Not authenticated.")
+		return
+	}
+	var req apiKeyNameRequest
+	if err := decodeJSONBody(r, &req); err != nil {
+		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid JSON body.")
+		return
+	}
+	name, msg := normalizeAPIKeyName(req.Name)
+	if msg != "" {
+		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", msg)
+		return
+	}
+	record, err := storage.UpdateAPIKeyName(keyID, userID, name)
+	if err != nil {
+		if errors.Is(err, storage.ErrAPIKeyNameExists) {
+			utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "An API key with that name already exists.")
+			return
+		}
+		if errors.Is(err, storage.ErrAPIKeyNotFound) {
+			utils.APIJSONError(w, http.StatusNotFound, "not_found", "API key not found.")
+			return
+		}
+		utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to rename API key.")
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_ = json.NewEncoder(w).Encode(apiKeyToJSON(*record))
+}
+
 func apiV1RevokeAPIKey(w http.ResponseWriter, r *http.Request, keyID int) {
 	userID, ok := utils.GetAPIUserID(r)
 	if !ok {
@@ -123,7 +166,11 @@ func apiV1RevokeAPIKey(w http.ResponseWriter, r *http.Request, keyID int) {
 		return
 	}
 	if err := storage.RevokeAPIKey(keyID, userID); err != nil {
-		utils.APIJSONError(w, http.StatusNotFound, "not_found", "API key not found.")
+		if errors.Is(err, storage.ErrAPIKeyNotFound) {
+			utils.APIJSONError(w, http.StatusNotFound, "not_found", "API key not found.")
+			return
+		}
+		utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to revoke API key.")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

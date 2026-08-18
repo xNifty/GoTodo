@@ -771,6 +771,9 @@ async function removeTimeEntry(entryId: number) {
             <ul v-else-if="events.length" class="list-unstyled small mb-0">
               <li v-for="ev in events" :key="ev.id" class="mb-1">
                 <span class="text-muted">{{ ev.created_at }}</span> — {{ ev.label }}
+                <span v-if="ev.actor_user_name || ev.actor_email">
+                  · {{ ev.actor_user_name || ev.actor_email }}
+                </span>
               </li>
             </ul>
             <p v-else class="text-muted small mb-0">No activity recorded.</p>

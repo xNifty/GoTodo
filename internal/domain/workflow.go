@@ -42,6 +42,10 @@ func SetProjectWorkflowMode(ctx context.Context, userID, projectID int, mode str
 		}
 	}
 
+	_ = storage.LogProjectEvent(projectID, userID, "workflow_changed", map[string]interface{}{
+		"mode": mode,
+	})
+
 	return storage.GetAccessibleProjectByID(projectID, userID)
 }
 
@@ -105,9 +109,18 @@ func ListProjectStatusesForUser(ctx context.Context, userID, projectID int) ([]s
 
 // CreateProjectStatusInput is the create payload for a status column.
 type CreateProjectStatusInput struct {
-	Name      string
-	IsDone    bool
-	IsDefault bool
+	Name        string
+	Description string
+	IsDone      bool
+	IsDefault   bool
+}
+
+func normalizeStatusDescription(raw string) (string, error) {
+	desc := strings.TrimSpace(raw)
+	if len(desc) > storage.MaxStatusDescriptionLen {
+		return "", fmt.Errorf("%w: status description must be %d characters or less", ErrValidation, storage.MaxStatusDescriptionLen)
+	}
+	return desc, nil
 }
 
 // CreateProjectStatusForUser adds a status (owner only, max 8).
@@ -126,6 +139,10 @@ func CreateProjectStatusForUser(ctx context.Context, userID, projectID int, in C
 	if len(name) > storage.MaxStatusNameLen {
 		return nil, fmt.Errorf("%w: status name must be %d characters or less", ErrValidation, storage.MaxStatusNameLen)
 	}
+	desc, err := normalizeStatusDescription(in.Description)
+	if err != nil {
+		return nil, err
+	}
 	n, err := storage.CountProjectStatuses(projectID)
 	if err != nil {
 		return nil, err
@@ -133,21 +150,25 @@ func CreateProjectStatusForUser(ctx context.Context, userID, projectID int, in C
 	if n >= storage.MaxProjectStatuses {
 		return nil, fmt.Errorf("%w: a maximum of %d statuses is allowed", ErrConflict, storage.MaxProjectStatuses)
 	}
-	s, err := storage.CreateProjectStatus(projectID, name, in.IsDone, in.IsDefault)
+	s, err := storage.CreateProjectStatus(projectID, name, desc, in.IsDone, in.IsDefault)
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "unique") || strings.Contains(strings.ToLower(err.Error()), "duplicate") {
 			return nil, fmt.Errorf("%w: a status with this name already exists", ErrConflict)
 		}
 		return nil, err
 	}
+	_ = storage.LogProjectEvent(projectID, userID, "status_added", map[string]interface{}{
+		"status_id": s.ID, "name": s.Name,
+	})
 	return s, nil
 }
 
 // UpdateProjectStatusInput is a partial status update.
 type UpdateProjectStatusInput struct {
-	Name      *string
-	IsDone    *bool
-	IsDefault *bool
+	Name        *string
+	Description *string
+	IsDone      *bool
+	IsDefault   *bool
 }
 
 // UpdateProjectStatusForUser updates a status column (owner only).
@@ -165,6 +186,13 @@ func UpdateProjectStatusForUser(ctx context.Context, userID, projectID, statusID
 			return nil, fmt.Errorf("%w: status name must be %d characters or less", ErrValidation, storage.MaxStatusNameLen)
 		}
 		in.Name = &name
+	}
+	if in.Description != nil {
+		desc, err := normalizeStatusDescription(*in.Description)
+		if err != nil {
+			return nil, err
+		}
+		in.Description = &desc
 	}
 
 	cur, err := storage.GetProjectStatus(projectID, statusID)
@@ -192,7 +220,7 @@ func UpdateProjectStatusForUser(ctx context.Context, userID, projectID, statusID
 		}
 	}
 
-	s, err := storage.UpdateProjectStatus(projectID, statusID, in.Name, in.IsDone, in.IsDefault)
+	s, err := storage.UpdateProjectStatus(projectID, statusID, in.Name, in.IsDone, in.IsDefault, in.Description)
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "unique") || strings.Contains(strings.ToLower(err.Error()), "duplicate") {
 			return nil, fmt.Errorf("%w: a status with this name already exists", ErrConflict)
@@ -204,6 +232,9 @@ func UpdateProjectStatusForUser(ctx context.Context, userID, projectID, statusID
 	if in.IsDone != nil && *in.IsDone != cur.IsDone {
 		_ = syncCompletedForStatus(statusID, *in.IsDone)
 	}
+	_ = storage.LogProjectEvent(projectID, userID, "status_updated", map[string]interface{}{
+		"status_id": s.ID, "name": s.Name,
+	})
 	return s, nil
 }
 
@@ -273,7 +304,13 @@ func DeleteProjectStatusForUser(ctx context.Context, userID, projectID, statusID
 		_ = syncCompletedForStatus(target.ID, target.IsDone)
 	}
 
-	return storage.DeleteProjectStatus(projectID, statusID)
+	if err := storage.DeleteProjectStatus(projectID, statusID); err != nil {
+		return err
+	}
+	_ = storage.LogProjectEvent(projectID, userID, "status_deleted", map[string]interface{}{
+		"name": cur.Name,
+	})
+	return nil
 }
 
 // ReorderProjectStatusesForUser reorders status columns (owner only).
