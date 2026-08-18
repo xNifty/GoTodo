@@ -616,7 +616,7 @@ func CreateShareLink(createdBy int, scopeType string, scopeID int, expiresAt *ti
 	return &link, nil
 }
 
-// ListShareLinks returns share links for a scope that the user created or owns.
+// ListShareLinks returns share links for a scope that the user created.
 func ListShareLinks(userID int, scopeType string, scopeID int) ([]ShareLink, error) {
 	pool, err := OpenDatabase()
 	if err != nil {
@@ -629,6 +629,36 @@ func ListShareLinks(userID int, scopeType string, scopeID int) ([]ShareLink, err
 		FROM share_links
 		WHERE created_by = $1 AND scope_type = $2 AND scope_id = $3 AND revoked_at IS NULL
 		ORDER BY created_at DESC`, userID, scopeType, scopeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []ShareLink
+	for rows.Next() {
+		var link ShareLink
+		if err := rows.Scan(&link.ID, &link.Token, &link.CreatedBy, &link.ScopeType, &link.ScopeID,
+			&link.ExpiresAt, &link.RevokedAt, &link.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, link)
+	}
+	return out, nil
+}
+
+// ListShareLinksForScope returns all active share links for a scope.
+func ListShareLinksForScope(scopeType string, scopeID int) ([]ShareLink, error) {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return nil, err
+	}
+	defer CloseDatabase(pool)
+
+	rows, err := pool.Query(context.Background(), `
+		SELECT id, token, created_by, scope_type, scope_id, expires_at, revoked_at, created_at
+		FROM share_links
+		WHERE scope_type = $1 AND scope_id = $2 AND revoked_at IS NULL
+		ORDER BY created_at DESC`, scopeType, scopeID)
 	if err != nil {
 		return nil, err
 	}

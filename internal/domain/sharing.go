@@ -170,6 +170,45 @@ func DeclineProjectInvite(ctx context.Context, userEmail string, inviteID int) e
 	return nil
 }
 
+// ListShareLinksForUser lists share links the caller is allowed to see.
+// Project members see all links for that project; tag links remain creator-only.
+func ListShareLinksForUser(ctx context.Context, userID int, scopeType string, scopeID int) ([]storage.ShareLink, error) {
+	_ = ctx
+	scopeType = strings.TrimSpace(strings.ToLower(scopeType))
+	switch scopeType {
+	case storage.ShareScopeProject:
+		if _, err := storage.GetAccessibleProjectByID(scopeID, userID); err != nil {
+			return nil, ErrNotFound
+		}
+		links, err := storage.ListShareLinksForScope(scopeType, scopeID)
+		if err != nil {
+			return nil, err
+		}
+		if links == nil {
+			links = []storage.ShareLink{}
+		}
+		return links, nil
+	case storage.ShareScopeTag:
+		ok, err := storage.GetTagOwnedByUser(scopeID, userID)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			return nil, ErrNotFound
+		}
+		links, err := storage.ListShareLinks(userID, scopeType, scopeID)
+		if err != nil {
+			return nil, err
+		}
+		if links == nil {
+			links = []storage.ShareLink{}
+		}
+		return links, nil
+	default:
+		return nil, fmt.Errorf("%w: scope_type must be project or tag", ErrValidation)
+	}
+}
+
 // CreateShareLinkForScope creates a read-only share link for a project or tag.
 func CreateShareLinkForScope(ctx context.Context, userID int, scopeType string, scopeID int, expiresAt *time.Time) (*storage.ShareLink, error) {
 	_ = ctx

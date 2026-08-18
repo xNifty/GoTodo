@@ -233,10 +233,6 @@ func apiV1ProjectInvites(w http.ResponseWriter, r *http.Request, projectID int, 
 	if len(rest) == 0 {
 		switch r.Method {
 		case http.MethodGet:
-			if !storage.RoleCanManage(proj.Role) {
-				utils.APIJSONError(w, http.StatusForbidden, "forbidden", "Only the owner can list invites.")
-				return
-			}
 			invites, err := storage.ListProjectInvites(projectID)
 			if err != nil {
 				utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to list invites.")
@@ -508,9 +504,9 @@ func APIV1ShareLinksRouter(w http.ResponseWriter, r *http.Request) {
 				utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "scope_type and scope_id are required.")
 				return
 			}
-			links, err := storage.ListShareLinks(userID, scopeType, scopeID)
+			links, err := domain.ListShareLinksForUser(r.Context(), userID, scopeType, scopeID)
 			if err != nil {
-				utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to list share links.")
+				writeSharingDomainError(w, err)
 				return
 			}
 			out := make([]apiShareLinkJSON, 0, len(links))

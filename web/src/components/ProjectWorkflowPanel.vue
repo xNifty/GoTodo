@@ -13,7 +13,7 @@
           class="form-check-input"
           type="checkbox"
           :checked="isKanban"
-          :disabled="savingMode"
+          :disabled="savingMode || !isOwner"
           @change="onToggleMode(($event.target as HTMLInputElement).checked)"
         />
         <label class="form-check-label" :for="`kanban-toggle-${project.id}`">
@@ -39,6 +39,7 @@
           :data-status-id="s.id"
         >
           <span
+            v-if="isOwner"
             class="status-drag-handle text-muted"
             title="Drag to reorder"
             aria-label="Drag to reorder status"
@@ -90,6 +91,7 @@
                 <span v-if="s.is_default" class="badge text-bg-info">default</span>
                 <span v-if="s.is_done" class="badge text-bg-success">done</span>
                 <button
+                  v-if="isOwner"
                   class="btn btn-sm btn-link p-0"
                   type="button"
                   aria-label="Edit status"
@@ -102,7 +104,7 @@
             </div>
           </template>
 
-          <div class="d-flex flex-wrap align-items-center gap-2 ms-auto">
+          <div v-if="isOwner" class="d-flex flex-wrap align-items-center gap-2 ms-auto">
             <div class="btn-group btn-group-sm" role="group" aria-label="Move status">
               <button
                 type="button"
@@ -159,7 +161,7 @@
         </li>
       </ul>
 
-      <form v-if="statuses.length < maxStatuses" class="row g-2 align-items-end mb-3" @submit.prevent="addStatus">
+      <form v-if="isOwner && statuses.length < maxStatuses" class="row g-2 align-items-end mb-3" @submit.prevent="addStatus">
         <div class="col-sm-6">
           <label class="form-label small mb-0" :for="`new-status-${project.id}`">Add status</label>
           <input
@@ -202,7 +204,7 @@
           <button class="btn btn-sm btn-primary w-100" type="submit" :disabled="adding">Add</button>
         </div>
       </form>
-      <p v-else class="small text-muted mb-3">Maximum of {{ maxStatuses }} statuses reached.</p>
+      <p v-else-if="isOwner" class="small text-muted mb-3">Maximum of {{ maxStatuses }} statuses reached.</p>
 
       <div v-if="deleteTarget" class="border rounded p-2 bg-body mb-2">
         <p class="small mb-2">
@@ -260,6 +262,7 @@ const toast = useToast()
 let sortable: Sortable | null = null
 
 const isKanban = computed(() => (props.project.workflow_mode || 'classic') === 'kanban')
+const isOwner = computed(() => (props.project.role || 'owner') === 'owner')
 const moveOptions = computed(() =>
   statuses.value.filter((s) => s.id !== deleteTarget.value?.id),
 )
@@ -303,7 +306,7 @@ async function persistOrder(orderedIds: number[]) {
 
 function initSortable() {
   destroySortable()
-  if (!statusListEl.value || !isKanban.value || statuses.value.length < 2) return
+  if (!statusListEl.value || !isKanban.value || !isOwner.value || statuses.value.length < 2) return
   sortable = Sortable.create(statusListEl.value, {
     handle: '.status-drag-handle',
     draggable: '.status-reorder-item',
