@@ -277,6 +277,15 @@ onBeforeUnmount(() => {
             <i class="bi bi-folder2-open" />
             <span class="sidebar-text text-truncate">{{ projectOptionLabel(proj) }}</span>
           </a>
+
+          <button
+            type="button"
+            class="btn btn-sm text-muted p-0 border-0 hover-reveal d-none d-md-inline-block me-2"
+            title="Project settings"
+            @click.stop="emit('edit-project', proj)"
+          >
+            <i class="bi bi-pencil" style="font-size: 0.85rem;" />
+          </button>
         </div>
       </li>
 

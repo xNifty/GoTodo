@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { api } from '@/api/client'
 import type { Project } from '@/api/types'
 import { APIError } from '@/api/types'
@@ -23,6 +23,7 @@ const toast = useToast()
 const name = ref('')
 const description = ref('')
 const saving = ref(false)
+const isOwner = computed(() => (props.project?.role || 'owner') === 'owner')
 
 watch(
   () => [props.open, props.project] as const,
@@ -40,7 +41,7 @@ function close() {
 }
 
 async function saveBasics() {
-  if (!props.project || !name.value.trim()) return
+  if (!props.project || !name.value.trim() || !isOwner.value) return
   saving.value = true
   try {
     await api.updateProject(props.project.id, {
@@ -75,7 +76,7 @@ function onPanelChanged() {
         style="background: var(--ordryn-card-bg); color: var(--ordryn-text);"
       >
         <div class="modal-header border-0 pb-0">
-          <h5 class="modal-title fw-bold">Edit Project</h5>
+          <h5 class="modal-title fw-bold">{{ isOwner ? 'Edit Project' : 'Project settings' }}</h5>
           <button type="button" class="btn-close" aria-label="Close" @click="close" />
         </div>
         <div class="modal-body py-3">
@@ -88,6 +89,7 @@ function onPanelChanged() {
               class="form-control"
               maxlength="50"
               placeholder="Project Name"
+              :readonly="!isOwner"
             />
             <div class="d-flex justify-content-between">
               <small class="form-hint">Max 50 characters</small>
@@ -104,13 +106,14 @@ function onPanelChanged() {
               rows="3"
               maxlength="1000"
               placeholder="Optional details about this project"
+              :readonly="!isOwner"
             />
             <div class="d-flex justify-content-end">
               <small class="text-muted">{{ description.length }}/1000</small>
             </div>
           </div>
 
-          <div class="d-flex justify-content-end mb-4">
+          <div v-if="isOwner" class="d-flex justify-content-end mb-4">
             <button
               type="button"
               class="btn btn-sm btn-primary px-3"

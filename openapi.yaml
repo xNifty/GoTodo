@@ -1620,7 +1620,8 @@ paths:
       - $ref: "#/components/parameters/ID"
     get:
       tags: [Projects]
-      summary: List pending project invites (owner only)
+      summary: List pending project invites
+      description: Any project member can list pending invites. Creating and revoking invites remains owner-only.
       security:
         - SessionCookie: []
         - BearerAuth: []
@@ -1764,6 +1765,7 @@ paths:
     get:
       tags: [Projects]
       summary: List share links for a scope
+      description: Project members can list all share links for that project. Tag share links are listed only for tags you own.
       security:
         - SessionCookie: []
         - BearerAuth: []

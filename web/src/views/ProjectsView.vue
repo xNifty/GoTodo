@@ -136,7 +136,7 @@
                     <th>Name</th>
                     <th>Owner</th>
                     <th>Role</th>
-                    <th style="width: 100px">Actions</th>
+                    <th style="width: 140px">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -148,6 +148,15 @@
                     <td class="text-muted small">{{ p.owner_user_name || p.owner_email }}</td>
                     <td><span class="badge text-bg-info">{{ p.role }}</span></td>
                     <td>
+                      <button
+                        class="btn btn-sm btn-outline-secondary me-1"
+                        type="button"
+                        title="Project settings"
+                        aria-label="Project settings"
+                        @click="openEditProject(p)"
+                      >
+                        <i class="bi bi-gear" />
+                      </button>
                       <button
                         v-if="p.role !== 'owner'"
                         class="btn btn-sm btn-outline-secondary"
