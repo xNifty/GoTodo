@@ -486,8 +486,13 @@ func ApplyGitHubIssueWebhookState(ctx context.Context, owner, repoName string, i
 	if err != nil || projectID <= 0 {
 		return nil
 	}
-	if err := ApplyCompletedStatusSync(issue.TaskID, projectID, completed); err != nil {
+	allow, err := kanbanAllowsGitHubStatusSync(issue.TaskID, projectID)
+	if err != nil {
 		log.Printf("github webhook status sync task=%d: %v", issue.TaskID, err)
+	} else if allow {
+		if err := ApplyCompletedStatusSync(issue.TaskID, projectID, completed); err != nil {
+			log.Printf("github webhook status sync task=%d: %v", issue.TaskID, err)
+		}
 	}
 	_ = storage.LogTaskEvent(issue.TaskID, 0, "github_issue_synced", map[string]interface{}{
 		"issue_number": number,
@@ -495,6 +500,26 @@ func ApplyGitHubIssueWebhookState(ctx context.Context, owner, repoName string, i
 		"source":       "github",
 	})
 	return nil
+}
+
+// kanbanAllowsGitHubStatusSync reports whether a GitHub open/close event should
+// move the task to the default or done column. Intermediate columns are left alone.
+func kanbanAllowsGitHubStatusSync(taskID, projectID int) (bool, error) {
+	mode, err := storage.GetProjectWorkflowMode(projectID)
+	if err != nil {
+		return false, err
+	}
+	if mode != storage.WorkflowKanban {
+		return true, nil
+	}
+	st, err := storage.GetTaskProjectStatus(taskID)
+	if err != nil {
+		return false, err
+	}
+	if st == nil {
+		return true, nil
+	}
+	return st.IsDefault || st.IsDone, nil
 }
 
 func secureEqual(a, b string) bool {
