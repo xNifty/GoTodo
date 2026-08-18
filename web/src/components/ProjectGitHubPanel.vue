@@ -22,7 +22,7 @@ const loading = ref(false)
 const saving = ref(false)
 const link = ref<ProjectGitHubRepo | null>(null)
 const repository = ref('')
-const isOwner = computed(() => props.project.role === 'owner' || !props.project.role)
+const isOwner = computed(() => (props.project.role || 'owner') === 'owner')
 
 const webhookURL = computed(() => {
   if (typeof window === 'undefined') return ''

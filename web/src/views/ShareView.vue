@@ -12,11 +12,13 @@
           <p class="text-muted small">
             Viewing a shared {{ view?.scope_type }} list. Sign in to collaborate on shared projects.
           </p>
-          <ul class="list-group list-group-flush">
-            <li
+          <div class="list-group list-group-flush">
+            <button
               v-for="t in view?.tasks || []"
               :key="t.id"
-              class="list-group-item d-flex justify-content-between align-items-start"
+              type="button"
+              class="list-group-item list-group-item-action d-flex justify-content-between align-items-start text-start"
+              @click="selectedTask = t"
             >
               <div>
                 <span :class="{ 'text-decoration-line-through text-muted': t.completed }">{{ t.title }}</span>
@@ -27,12 +29,13 @@
                 </div>
               </div>
               <span v-if="t.completed" class="badge text-bg-success">Done</span>
-            </li>
-            <li v-if="!(view?.tasks || []).length" class="list-group-item text-muted">No tasks in this list.</li>
-          </ul>
+            </button>
+            <div v-if="!(view?.tasks || []).length" class="list-group-item text-muted">No tasks in this list.</div>
+          </div>
         </template>
       </div>
     </div>
+    <ShareTaskModal v-if="selectedTask" :task="selectedTask" @close="selectedTask = null" />
   </div>
 </template>
 
@@ -40,13 +43,15 @@
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '@/api/client'
-import type { ShareLinkView } from '@/api/types'
+import type { ShareLinkTask, ShareLinkView } from '@/api/types'
+import ShareTaskModal from '@/components/ShareTaskModal.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
 
 const route = useRoute()
 const view = ref<ShareLinkView | null>(null)
 const loading = ref(true)
 const notFound = ref(false)
+const selectedTask = ref<ShareLinkTask | null>(null)
 
 onMounted(async () => {
   const token = String(route.params.token || '')

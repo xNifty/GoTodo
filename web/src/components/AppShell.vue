@@ -140,7 +140,7 @@ onUnmounted(() => {
     <ToastHost />
     <GoToTopButton />
     <ConfirmModal />
-    <TaskSidebar v-if="isAuthenticated" />
+    <TaskSidebar v-if="isAuthenticated && route.name !== 'share'" />
     <ChangelogModal v-if="showChangelog" />
     <ShortcutsModal />
   </div>

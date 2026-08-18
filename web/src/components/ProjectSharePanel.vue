@@ -5,7 +5,7 @@
       <li v-for="m in members" :key="m.user_id" class="d-flex flex-wrap align-items-center gap-2 mb-1">
         <span>{{ m.user_name || m.email }}</span>
         <span class="badge text-bg-secondary">{{ m.role }}</span>
-        <template v-if="m.role !== 'owner'">
+        <template v-if="isOwner && m.role !== 'owner'">
           <select
             class="form-select form-select-sm w-auto"
             :value="m.role"
@@ -21,30 +21,37 @@
       </li>
     </ul>
 
-    <h4 class="h6">Invite</h4>
-    <form class="row g-2 align-items-end mb-3" @submit.prevent="sendInvite">
-      <div class="col-sm-6">
-        <label class="form-label small mb-0" for="invite-username">Username</label>
-        <UserSearchCombobox v-model="inviteUsername" :exclude-usernames="excludeUsernames" />
-      </div>
-      <div class="col-sm-3">
-        <label class="form-label small mb-0">Role</label>
-        <select v-model="inviteRole" class="form-select form-select-sm">
-          <option value="editor">editor</option>
-          <option value="viewer">viewer</option>
-        </select>
-      </div>
-      <div class="col-sm-3">
-        <button class="btn btn-sm btn-primary w-100" type="submit">Invite</button>
-      </div>
-    </form>
+    <template v-if="isOwner">
+      <h4 class="h6">Invite</h4>
+      <form class="row g-2 align-items-end mb-3" @submit.prevent="sendInvite">
+        <div class="col-sm-6">
+          <label class="form-label small mb-0" for="invite-username">Username</label>
+          <UserSearchCombobox v-model="inviteUsername" :exclude-usernames="excludeUsernames" />
+        </div>
+        <div class="col-sm-3">
+          <label class="form-label small mb-0">Role</label>
+          <select v-model="inviteRole" class="form-select form-select-sm">
+            <option value="editor">editor</option>
+            <option value="viewer">viewer</option>
+          </select>
+        </div>
+        <div class="col-sm-3">
+          <button class="btn btn-sm btn-primary w-100" type="submit">Invite</button>
+        </div>
+      </form>
+    </template>
 
     <div v-if="invites.length" class="mb-3">
       <h4 class="h6">Pending invites</h4>
       <ul class="list-unstyled mb-0">
         <li v-for="inv in invites" :key="inv.id" class="d-flex justify-content-between align-items-center mb-1">
           <span class="small">{{ inv.user_name || inv.email }} ({{ inv.role }})</span>
-          <button class="btn btn-sm btn-link text-danger" type="button" @click="revokeInvite(inv.id)">Revoke</button>
+          <button
+            v-if="isOwner"
+            class="btn btn-sm btn-link text-danger"
+            type="button"
+            @click="revokeInvite(inv.id)"
+          >Revoke</button>
         </li>
       </ul>
     </div>
@@ -55,13 +62,14 @@
     </p>
     <div class="mb-3">
       <button
-        v-if="!links.length"
+        v-if="isOwner && !links.length"
         class="btn btn-sm btn-outline-primary"
         type="button"
         @click="createLink"
       >
         Create link
       </button>
+      <p v-else-if="!isOwner && !links.length" class="small text-muted mb-0">No share link.</p>
       <ul v-else class="list-unstyled mb-2">
         <li
           v-for="link in links"
@@ -72,13 +80,18 @@
           <button class="btn btn-sm btn-outline-secondary" type="button" @click="copyLink(link.url)">
             Copy
           </button>
-          <button class="btn btn-sm btn-outline-danger" type="button" @click="revokeLink(link.id)">
+          <button
+            v-if="isOwner"
+            class="btn btn-sm btn-outline-danger"
+            type="button"
+            @click="revokeLink(link.id)"
+          >
             Make private
           </button>
         </li>
       </ul>
       <button
-        v-if="links.length"
+        v-if="isOwner && links.length"
         class="btn btn-sm btn-link px-0"
         type="button"
         @click="createLink"
@@ -133,6 +146,7 @@ const inviteRole = ref<'editor' | 'viewer'>('editor')
 const activityOpen = ref(false)
 const toast = useToast()
 const { askConfirm } = useConfirm()
+const isOwner = computed(() => (props.project.role || 'owner') === 'owner')
 
 const excludeUsernames = computed(() => {
   const names: string[] = []

@@ -616,7 +616,7 @@ func CreateShareLink(createdBy int, scopeType string, scopeID int, expiresAt *ti
 	return &link, nil
 }
 
-// ListShareLinks returns share links for a scope that the user created or owns.
+// ListShareLinks returns share links for a scope that the user created.
 func ListShareLinks(userID int, scopeType string, scopeID int) ([]ShareLink, error) {
 	pool, err := OpenDatabase()
 	if err != nil {
@@ -629,6 +629,36 @@ func ListShareLinks(userID int, scopeType string, scopeID int) ([]ShareLink, err
 		FROM share_links
 		WHERE created_by = $1 AND scope_type = $2 AND scope_id = $3 AND revoked_at IS NULL
 		ORDER BY created_at DESC`, userID, scopeType, scopeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []ShareLink
+	for rows.Next() {
+		var link ShareLink
+		if err := rows.Scan(&link.ID, &link.Token, &link.CreatedBy, &link.ScopeType, &link.ScopeID,
+			&link.ExpiresAt, &link.RevokedAt, &link.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, link)
+	}
+	return out, nil
+}
+
+// ListShareLinksForScope returns all active share links for a scope.
+func ListShareLinksForScope(scopeType string, scopeID int) ([]ShareLink, error) {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return nil, err
+	}
+	defer CloseDatabase(pool)
+
+	rows, err := pool.Query(context.Background(), `
+		SELECT id, token, created_by, scope_type, scope_id, expires_at, revoked_at, created_at
+		FROM share_links
+		WHERE scope_type = $1 AND scope_id = $2 AND revoked_at IS NULL
+		ORDER BY created_at DESC`, scopeType, scopeID)
 	if err != nil {
 		return nil, err
 	}
@@ -861,17 +891,19 @@ func ListTasksForShareLink(scopeType string, scopeID, createdBy int) ([]map[stri
 	case ShareScopeProject:
 		rows, err = pool.Query(context.Background(), `
 			SELECT t.id, t.title, t.completed, COALESCE(CAST(t.due_date AS TEXT), ''), COALESCE(t.priority,0),
-			       COALESCE(p.name, '')
+			       COALESCE(p.name, ''), COALESCE(t.description, ''), COALESCE(s.name, '')
 			FROM tasks t
 			LEFT JOIN projects p ON p.id = t.project_id
+			LEFT JOIN project_statuses s ON s.id = t.status_id
 			WHERE t.project_id = $1
 			ORDER BY t.completed ASC, t.position ASC, t.id ASC`, scopeID)
 	case ShareScopeTag:
 		rows, err = pool.Query(context.Background(), `
 			SELECT t.id, t.title, t.completed, COALESCE(CAST(t.due_date AS TEXT), ''), COALESCE(t.priority,0),
-			       COALESCE(p.name, '')
+			       COALESCE(p.name, ''), COALESCE(t.description, ''), COALESCE(s.name, '')
 			FROM tasks t
 			LEFT JOIN projects p ON p.id = t.project_id
+			LEFT JOIN project_statuses s ON s.id = t.status_id
 			JOIN task_tags tt ON tt.task_id = t.id
 			JOIN tags tg ON tg.id = tt.tag_id
 			WHERE tg.id = $1 AND tg.user_id = $2
@@ -887,20 +919,24 @@ func ListTasksForShareLink(scopeType string, scopeID, createdBy int) ([]map[stri
 	var out []map[string]interface{}
 	for rows.Next() {
 		var id, priority int
-		var title, due, projectName string
+		var title, due, projectName, description, statusName string
 		var completed bool
-		if err := rows.Scan(&id, &title, &completed, &due, &priority, &projectName); err != nil {
+		if err := rows.Scan(&id, &title, &completed, &due, &priority, &projectName, &description, &statusName); err != nil {
 			return nil, err
 		}
 		item := map[string]interface{}{
-			"id":        id,
-			"title":     title,
-			"completed": completed,
-			"due_date":  due,
-			"priority":  priority,
+			"id":          id,
+			"title":       title,
+			"description": description,
+			"completed":   completed,
+			"due_date":    due,
+			"priority":    priority,
 		}
 		if projectName != "" {
 			item["project"] = projectName
+		}
+		if statusName != "" {
+			item["status_name"] = statusName
 		}
 		// Attach tags for this task
 		tagRows, err := pool.Query(context.Background(), `
