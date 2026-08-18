@@ -326,7 +326,7 @@ func apiV1TaskGitHubIssue(w http.ResponseWriter, r *http.Request, taskID int) {
 				return
 			}
 		}
-		taskURL := utils.AbsoluteURLForRequest(r, "/tasks?task="+strconv.Itoa(taskID))
+		taskURL := utils.AbsoluteURLForRequest(r, "/tasks/"+strconv.Itoa(taskID))
 		issue, err := domain.CreateGitHubIssueForTask(r.Context(), userID, taskID, req.Title, req.Body, taskURL)
 		if err != nil {
 			writeGitHubDomainError(w, err)
