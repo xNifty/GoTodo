@@ -861,17 +861,19 @@ func ListTasksForShareLink(scopeType string, scopeID, createdBy int) ([]map[stri
 	case ShareScopeProject:
 		rows, err = pool.Query(context.Background(), `
 			SELECT t.id, t.title, t.completed, COALESCE(CAST(t.due_date AS TEXT), ''), COALESCE(t.priority,0),
-			       COALESCE(p.name, '')
+			       COALESCE(p.name, ''), COALESCE(t.description, ''), COALESCE(s.name, '')
 			FROM tasks t
 			LEFT JOIN projects p ON p.id = t.project_id
+			LEFT JOIN project_statuses s ON s.id = t.status_id
 			WHERE t.project_id = $1
 			ORDER BY t.completed ASC, t.position ASC, t.id ASC`, scopeID)
 	case ShareScopeTag:
 		rows, err = pool.Query(context.Background(), `
 			SELECT t.id, t.title, t.completed, COALESCE(CAST(t.due_date AS TEXT), ''), COALESCE(t.priority,0),
-			       COALESCE(p.name, '')
+			       COALESCE(p.name, ''), COALESCE(t.description, ''), COALESCE(s.name, '')
 			FROM tasks t
 			LEFT JOIN projects p ON p.id = t.project_id
+			LEFT JOIN project_statuses s ON s.id = t.status_id
 			JOIN task_tags tt ON tt.task_id = t.id
 			JOIN tags tg ON tg.id = tt.tag_id
 			WHERE tg.id = $1 AND tg.user_id = $2
@@ -887,20 +889,24 @@ func ListTasksForShareLink(scopeType string, scopeID, createdBy int) ([]map[stri
 	var out []map[string]interface{}
 	for rows.Next() {
 		var id, priority int
-		var title, due, projectName string
+		var title, due, projectName, description, statusName string
 		var completed bool
-		if err := rows.Scan(&id, &title, &completed, &due, &priority, &projectName); err != nil {
+		if err := rows.Scan(&id, &title, &completed, &due, &priority, &projectName, &description, &statusName); err != nil {
 			return nil, err
 		}
 		item := map[string]interface{}{
-			"id":        id,
-			"title":     title,
-			"completed": completed,
-			"due_date":  due,
-			"priority":  priority,
+			"id":          id,
+			"title":       title,
+			"description": description,
+			"completed":   completed,
+			"due_date":    due,
+			"priority":    priority,
 		}
 		if projectName != "" {
 			item["project"] = projectName
+		}
+		if statusName != "" {
+			item["status_name"] = statusName
 		}
 		// Attach tags for this task
 		tagRows, err := pool.Query(context.Background(), `
