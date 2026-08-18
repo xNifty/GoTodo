@@ -1404,7 +1404,8 @@ paths:
       - $ref: "#/components/parameters/ID"
     get:
       tags: [Projects]
-      summary: Project activity feed
+      summary: Project settings activity
+      description: Sharing, membership, status, and other project-settings events. Board/task activity is not included; use GET /api/v1/tasks/{id}/events for a task timeline.
       security:
         - SessionCookie: []
         - BearerAuth: []
@@ -1416,7 +1417,7 @@ paths:
             maximum: 200
       responses:
         "200":
-          description: Events
+          description: Project settings and sharing events
           content:
             application/json:
               schema:

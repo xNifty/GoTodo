@@ -42,6 +42,10 @@ func SetProjectWorkflowMode(ctx context.Context, userID, projectID int, mode str
 		}
 	}
 
+	_ = storage.LogProjectEvent(projectID, userID, "workflow_changed", map[string]interface{}{
+		"mode": mode,
+	})
+
 	return storage.GetAccessibleProjectByID(projectID, userID)
 }
 
@@ -153,6 +157,9 @@ func CreateProjectStatusForUser(ctx context.Context, userID, projectID int, in C
 		}
 		return nil, err
 	}
+	_ = storage.LogProjectEvent(projectID, userID, "status_added", map[string]interface{}{
+		"status_id": s.ID, "name": s.Name,
+	})
 	return s, nil
 }
 
@@ -225,6 +232,9 @@ func UpdateProjectStatusForUser(ctx context.Context, userID, projectID, statusID
 	if in.IsDone != nil && *in.IsDone != cur.IsDone {
 		_ = syncCompletedForStatus(statusID, *in.IsDone)
 	}
+	_ = storage.LogProjectEvent(projectID, userID, "status_updated", map[string]interface{}{
+		"status_id": s.ID, "name": s.Name,
+	})
 	return s, nil
 }
 
@@ -294,7 +304,13 @@ func DeleteProjectStatusForUser(ctx context.Context, userID, projectID, statusID
 		_ = syncCompletedForStatus(target.ID, target.IsDone)
 	}
 
-	return storage.DeleteProjectStatus(projectID, statusID)
+	if err := storage.DeleteProjectStatus(projectID, statusID); err != nil {
+		return err
+	}
+	_ = storage.LogProjectEvent(projectID, userID, "status_deleted", map[string]interface{}{
+		"name": cur.Name,
+	})
+	return nil
 }
 
 // ReorderProjectStatusesForUser reorders status columns (owner only).
