@@ -12,32 +12,38 @@ type Tag struct {
 }
 
 type Task struct {
-	ID           int
-	Title        string
-	Description  string
-	Completed    bool
-	DateAdded    string // time_stamp formatted for display
-	DueDate      string // Due date (YYYY-MM-DD format)
-	DateCreated  string // time_stamp formatted for tooltip
-	DateModified string // date_modified formatted for tooltip
-	Page         int
-	IsFavorite   bool
-	Position     int
-	ProjectID    int
-	ProjectName  string
-	Priority     int
-	Tags         []Tag
-	ParentID           int // 0 = root
-	ChildCount         int
-	ChildrenCompleted  int
-	Children           []Task
-	StatusID           int
-	StatusName         string
-	EstimatePoints     *int
-	TimeSpentMinutes   int
-	ProjectWorkflow    string
-	ClaimedBy          int
-	ClaimedByName      string
+	ID                  int
+	Title               string
+	Description         string
+	Completed           bool
+	DateAdded           string // time_stamp formatted for display
+	DueDate             string // Due date (YYYY-MM-DD format)
+	DateCreated         string // time_stamp formatted for tooltip
+	DateModified        string // date_modified formatted for tooltip
+	Page                int
+	IsFavorite          bool
+	Position            int
+	ProjectID           int
+	ProjectName         string
+	Priority            int
+	Tags                []Tag
+	ParentID            int // 0 = root
+	ChildCount          int
+	ChildrenCompleted   int
+	Children            []Task
+	StatusID            int
+	StatusName          string
+	EstimatePoints      *int
+	TimeSpentMinutes    int
+	ProjectWorkflow     string
+	ClaimedBy           int
+	ClaimedByName       string
+	GitHubIssueNumber   int
+	GitHubIssueID       int64
+	GitHubIssueURL      string
+	GitHubIssueState    string
+	GitHubIssueTitle    string
+	GitHubLastSyncError string
 }
 
 func (t *Task) Validate() error {

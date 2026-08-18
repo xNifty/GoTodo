@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { api } from '@/api/client'
-import type { Project, ProjectStatus, Tag, Task, TaskEvent, TaskTimeEntry } from '@/api/types'
+import type { Project, ProjectStatus, Tag, Task, TaskEvent, TaskGitHubIssue, TaskTimeEntry } from '@/api/types'
 import { APIError } from '@/api/types'
 import ParentTaskCombobox from '@/components/ParentTaskCombobox.vue'
 import { useAuth } from '@/composables/useAuth'
@@ -58,6 +58,10 @@ const estimatePoints = ref<number | ''>('')
 const claimedBy = ref<number | null>(null)
 const claimedByName = ref('')
 const claiming = ref(false)
+const githubIssue = ref<TaskGitHubIssue | null>(null)
+const projectHasGitHub = ref(false)
+const githubIssueRef = ref('')
+const githubBusy = ref(false)
 const isSubtask = computed(() => parentId.value !== '' && Number(parentId.value) > 0)
 const readOnly = computed(() => mode.value === 'view')
 const parentOptions = computed(() => rootTasks.value.filter((r) => r.id !== taskId.value))
@@ -121,6 +125,9 @@ function resetForm() {
   newEntryMinutes.value = ''
   newEntryNote.value = ''
   taskWorkflow.value = ''
+  githubIssue.value = null
+  projectHasGitHub.value = false
+  githubIssueRef.value = ''
 }
 
 async function loadMeta() {
@@ -167,6 +174,17 @@ async function loadTimeEntries(id: number) {
   }
 }
 
+async function refreshProjectGitHub(pid: number | '') {
+  projectHasGitHub.value = false
+  if (pid === '' || pid == null) return
+  try {
+    const link = await api.getProjectGitHub(Number(pid))
+    projectHasGitHub.value = !!link.linked
+  } catch {
+    projectHasGitHub.value = false
+  }
+}
+
 async function loadTask(id: number) {
   const task = await api.getTask(id)
   title.value = task.title
@@ -192,7 +210,10 @@ async function loadTask(id: number) {
   claimedByName.value = task.claimed_by_name || ''
   timeSpentMinutes.value = task.time_spent_minutes ?? 0
   taskWorkflow.value = task.project_workflow || ''
+  githubIssue.value = task.github ?? null
+  githubIssueRef.value = ''
   await loadStatusesForProject(projectId.value)
+  await refreshProjectGitHub(projectId.value)
   if (taskWorkflow.value === 'kanban' || isKanbanTask.value) {
     await loadTimeEntries(id)
   } else {
@@ -349,6 +370,7 @@ async function onProjectChange() {
     statusId.value = ''
   }
   await loadStatusesForProject(projectId.value)
+  await refreshProjectGitHub(projectId.value)
 }
 
 let loadSeq = 0
@@ -387,6 +409,7 @@ watch(
           if (p?.project_id) projectId.value = p.project_id
         }
         await loadStatusesForProject(projectId.value)
+        await refreshProjectGitHub(projectId.value)
       }
     } catch (err) {
       if (seq !== loadSeq) return
@@ -416,6 +439,7 @@ async function onParentChange() {
   else projectId.value = ''
   taskWorkflow.value = p?.project_workflow || ''
   await loadStatusesForProject(projectId.value)
+  await refreshProjectGitHub(projectId.value)
 }
 
 async function claimCurrentTask() {
@@ -447,6 +471,54 @@ async function unclaimCurrentTask() {
     toast.push(err instanceof APIError ? err.message : 'Could not release task', 'error')
   } finally {
     claiming.value = false
+  }
+}
+
+async function createGitHubIssue() {
+  if (!taskId.value || readOnly.value) return
+  githubBusy.value = true
+  try {
+    githubIssue.value = await api.createTaskGitHubIssue(taskId.value)
+    toast.push(`Created GitHub issue #${githubIssue.value.issue_number}`, 'success')
+  } catch (err) {
+    toast.push(err instanceof APIError ? err.message : 'Could not create GitHub issue', 'error')
+  } finally {
+    githubBusy.value = false
+  }
+}
+
+async function linkGitHubIssue() {
+  if (!taskId.value || readOnly.value || !githubIssueRef.value.trim()) return
+  githubBusy.value = true
+  try {
+    githubIssue.value = await api.linkTaskGitHubIssue(taskId.value, githubIssueRef.value.trim())
+    githubIssueRef.value = ''
+    toast.push(`Linked GitHub issue #${githubIssue.value.issue_number}`, 'success')
+  } catch (err) {
+    toast.push(err instanceof APIError ? err.message : 'Could not link GitHub issue', 'error')
+  } finally {
+    githubBusy.value = false
+  }
+}
+
+async function unlinkGitHubIssue() {
+  if (!taskId.value || readOnly.value) return
+  const ok = await askConfirm({
+    title: 'Unlink GitHub issue?',
+    message: 'The GitHub issue itself is not deleted.',
+    confirmLabel: 'Unlink',
+    danger: true,
+  })
+  if (!ok) return
+  githubBusy.value = true
+  try {
+    await api.unlinkTaskGitHubIssue(taskId.value)
+    githubIssue.value = null
+    toast.push('GitHub issue unlinked', 'info')
+  } catch (err) {
+    toast.push(err instanceof APIError ? err.message : 'Could not unlink GitHub issue', 'error')
+  } finally {
+    githubBusy.value = false
   }
 }
 
@@ -632,6 +704,74 @@ async function removeTimeEntry(entryId: number) {
             :readonly="readOnly"
             placeholder="0–100"
           />
+        </div>
+        <div
+          v-if="(mode === 'edit' || mode === 'view') && projectHasGitHub"
+          class="form-group mt-3"
+        >
+          <label class="d-block">GitHub issue</label>
+          <div v-if="githubIssue" class="d-flex flex-column gap-2">
+            <div class="d-flex flex-wrap align-items-center gap-2">
+              <a
+                :href="githubIssue.issue_url"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="fw-semibold"
+              >
+                #{{ githubIssue.issue_number }}
+                <span v-if="githubIssue.issue_title"> — {{ githubIssue.issue_title }}</span>
+              </a>
+              <span
+                class="badge"
+                :class="githubIssue.issue_state === 'closed' ? 'text-bg-secondary' : 'text-bg-success'"
+              >
+                {{ githubIssue.issue_state }}
+              </span>
+            </div>
+            <p v-if="githubIssue.last_sync_error" class="text-danger small mb-0">
+              Sync error: {{ githubIssue.last_sync_error }}
+            </p>
+            <button
+              v-if="!readOnly"
+              type="button"
+              class="btn btn-sm btn-outline-secondary align-self-start"
+              :disabled="githubBusy"
+              @click="unlinkGitHubIssue"
+            >
+              Unlink
+            </button>
+          </div>
+          <div v-else-if="!readOnly" class="d-flex flex-column gap-2">
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-primary align-self-start"
+              :disabled="githubBusy"
+              @click="createGitHubIssue"
+            >
+              {{ githubBusy ? 'Working…' : 'Create GitHub issue' }}
+            </button>
+            <div class="input-group input-group-sm">
+              <input
+                v-model="githubIssueRef"
+                type="text"
+                class="form-control"
+                placeholder="Issue # or URL"
+                :disabled="githubBusy"
+              />
+              <button
+                type="button"
+                class="btn btn-outline-secondary"
+                :disabled="githubBusy || !githubIssueRef.trim()"
+                @click="linkGitHubIssue"
+              >
+                Link existing
+              </button>
+            </div>
+            <div class="form-hint mb-0">
+              Creates or links an issue in the project’s GitHub repository. Does not import issues as tasks.
+            </div>
+          </div>
+          <p v-else class="text-muted small mb-0">No linked GitHub issue.</p>
         </div>
         <div class="form-group mt-2">
           <label for="priority">Priority:</label>

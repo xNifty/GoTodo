@@ -10,8 +10,11 @@ import type {
   DashboardStats,
   DeviceDecisionResult,
   DeviceStatus,
+  GitHubConnection,
   Invite,
   Project,
+  ProjectGitHubRepo,
+  TaskGitHubIssue,
   ProjectEvent,
   ProjectInvite,
   ProjectMember,
@@ -327,6 +330,58 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     })
+  },
+
+  getGitHubConnection() {
+    return request<GitHubConnection>('/api/v1/me/github')
+  },
+
+  connectGitHubPAT(token: string) {
+    return request<GitHubConnection>('/api/v1/me/github/pat', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    })
+  },
+
+  disconnectGitHub() {
+    return request<{ ok: boolean }>('/api/v1/me/github', { method: 'DELETE' })
+  },
+
+  startGitHubOAuth() {
+    return request<{ authorize_url: string; redirect_uri: string }>('/api/v1/me/github/oauth/start')
+  },
+
+  getProjectGitHub(projectId: number) {
+    return request<ProjectGitHubRepo>(`/api/v1/projects/${projectId}/github`)
+  },
+
+  linkProjectGitHub(projectId: number, repository: string) {
+    return request<ProjectGitHubRepo>(`/api/v1/projects/${projectId}/github`, {
+      method: 'PUT',
+      body: JSON.stringify({ repository }),
+    })
+  },
+
+  unlinkProjectGitHub(projectId: number) {
+    return request<{ ok: boolean }>(`/api/v1/projects/${projectId}/github`, { method: 'DELETE' })
+  },
+
+  createTaskGitHubIssue(taskId: number, payload: { title?: string; body?: string } = {}) {
+    return request<TaskGitHubIssue>(`/api/v1/tasks/${taskId}/github-issue`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  linkTaskGitHubIssue(taskId: number, issue: string) {
+    return request<TaskGitHubIssue>(`/api/v1/tasks/${taskId}/github-issue`, {
+      method: 'PUT',
+      body: JSON.stringify({ issue }),
+    })
+  },
+
+  unlinkTaskGitHubIssue(taskId: number) {
+    return request<{ ok: boolean }>(`/api/v1/tasks/${taskId}/github-issue`, { method: 'DELETE' })
   },
 
   listProjects() {

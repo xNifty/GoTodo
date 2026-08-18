@@ -27,16 +27,20 @@ type adminSettingsJSON struct {
 	GlobalAnnouncementText   string `json:"global_announcement_text"`
 	EnableAPI                bool   `json:"enable_api"`
 
-	EmailProvider           string `json:"email_provider"`
-	EmailFromAddress        string `json:"email_from_address"`
-	EmailFromName           string `json:"email_from_name"`
-	EmailMailgunDomain      string `json:"email_mailgun_domain"`
-	EmailMailgunAPIKeySet   bool   `json:"email_mailgun_api_key_set"`
-	EmailSMTPHost           string `json:"email_smtp_host"`
-	EmailSMTPPort           int    `json:"email_smtp_port"`
-	EmailSMTPUsername       string `json:"email_smtp_username"`
-	EmailSMTPPasswordSet    bool   `json:"email_smtp_password_set"`
-	EmailSMTPTLS           bool   `json:"email_smtp_tls"`
+	EmailProvider         string `json:"email_provider"`
+	EmailFromAddress      string `json:"email_from_address"`
+	EmailFromName         string `json:"email_from_name"`
+	EmailMailgunDomain    string `json:"email_mailgun_domain"`
+	EmailMailgunAPIKeySet bool   `json:"email_mailgun_api_key_set"`
+	EmailSMTPHost         string `json:"email_smtp_host"`
+	EmailSMTPPort         int    `json:"email_smtp_port"`
+	EmailSMTPUsername     string `json:"email_smtp_username"`
+	EmailSMTPPasswordSet  bool   `json:"email_smtp_password_set"`
+	EmailSMTPTLS          bool   `json:"email_smtp_tls"`
+
+	GitHubOAuthClientID        string `json:"github_oauth_client_id"`
+	GitHubOAuthClientSecretSet bool   `json:"github_oauth_client_secret_set"`
+	GitHubOAuthConfigured      bool   `json:"github_oauth_configured"`
 }
 
 type adminSettingsPatch struct {
@@ -50,16 +54,19 @@ type adminSettingsPatch struct {
 	GlobalAnnouncementText   *string `json:"global_announcement_text"`
 	EnableAPI                *bool   `json:"enable_api"`
 
-	EmailProvider        *string `json:"email_provider"`
-	EmailFromAddress     *string `json:"email_from_address"`
-	EmailFromName        *string `json:"email_from_name"`
-	EmailMailgunDomain   *string `json:"email_mailgun_domain"`
-	EmailMailgunAPIKey   *string `json:"email_mailgun_api_key"`
-	EmailSMTPHost        *string `json:"email_smtp_host"`
-	EmailSMTPPort        *int    `json:"email_smtp_port"`
-	EmailSMTPUsername    *string `json:"email_smtp_username"`
-	EmailSMTPPassword    *string `json:"email_smtp_password"`
-	EmailSMTPTLS        *bool   `json:"email_smtp_tls"`
+	EmailProvider      *string `json:"email_provider"`
+	EmailFromAddress   *string `json:"email_from_address"`
+	EmailFromName      *string `json:"email_from_name"`
+	EmailMailgunDomain *string `json:"email_mailgun_domain"`
+	EmailMailgunAPIKey *string `json:"email_mailgun_api_key"`
+	EmailSMTPHost      *string `json:"email_smtp_host"`
+	EmailSMTPPort      *int    `json:"email_smtp_port"`
+	EmailSMTPUsername  *string `json:"email_smtp_username"`
+	EmailSMTPPassword  *string `json:"email_smtp_password"`
+	EmailSMTPTLS       *bool   `json:"email_smtp_tls"`
+
+	GitHubOAuthClientID     *string `json:"github_oauth_client_id"`
+	GitHubOAuthClientSecret *string `json:"github_oauth_client_secret"`
 }
 
 // APIV1AdminSettings handles GET/PATCH /api/v1/admin/settings.
@@ -172,6 +179,22 @@ func apiV1PatchAdminSettings(w http.ResponseWriter, r *http.Request) {
 	if req.EmailSMTPTLS != nil {
 		next.EmailSMTPTLS = *req.EmailSMTPTLS
 	}
+	if req.GitHubOAuthClientID != nil {
+		next.GitHubOAuthClientID = strings.TrimSpace(*req.GitHubOAuthClientID)
+	}
+	if req.GitHubOAuthClientSecret != nil {
+		sec := *req.GitHubOAuthClientSecret
+		if sec == "" {
+			next.GitHubOAuthClientSecretEnc = ""
+		} else {
+			enc, err := secret.Encrypt(sec)
+			if err != nil {
+				utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to encrypt GitHub OAuth client secret.")
+				return
+			}
+			next.GitHubOAuthClientSecretEnc = enc
+		}
+	}
 	if next.SiteName == "" || next.DefaultTimezone == "" {
 		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "site_name and default_timezone are required.")
 		return
@@ -260,26 +283,29 @@ func validateEmailSettings(s *storage.SiteSettings) string {
 func writeAdminSettings(w http.ResponseWriter, s *storage.SiteSettings) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	_ = json.NewEncoder(w).Encode(adminSettingsJSON{
-		SiteName:                 s.SiteName,
-		DefaultTimezone:          s.DefaultTimezone,
-		ShowChangelog:            s.ShowChangelog,
-		SiteVersion:              version.Version, // baked into binary; not from DB
-		EnableRegistration:       s.EnableRegistration,
-		InviteOnly:               s.InviteOnly,
-		MetaDescription:          s.MetaDescription,
-		EnableGlobalAnnouncement: s.EnableGlobalAnnouncement,
-		GlobalAnnouncementText:   s.GlobalAnnouncementText,
-		EnableAPI:                s.EnableAPI,
-		EmailProvider:            s.EmailProvider,
-		EmailFromAddress:         s.EmailFromAddress,
-		EmailFromName:            s.EmailFromName,
-		EmailMailgunDomain:       s.EmailMailgunDomain,
-		EmailMailgunAPIKeySet:    s.EmailMailgunAPIKeyEnc != "",
-		EmailSMTPHost:            s.EmailSMTPHost,
-		EmailSMTPPort:            s.EmailSMTPPort,
-		EmailSMTPUsername:        s.EmailSMTPUsername,
-		EmailSMTPPasswordSet:     s.EmailSMTPPasswordEnc != "",
-		EmailSMTPTLS:            s.EmailSMTPTLS,
+		SiteName:                   s.SiteName,
+		DefaultTimezone:            s.DefaultTimezone,
+		ShowChangelog:              s.ShowChangelog,
+		SiteVersion:                version.Version, // baked into binary; not from DB
+		EnableRegistration:         s.EnableRegistration,
+		InviteOnly:                 s.InviteOnly,
+		MetaDescription:            s.MetaDescription,
+		EnableGlobalAnnouncement:   s.EnableGlobalAnnouncement,
+		GlobalAnnouncementText:     s.GlobalAnnouncementText,
+		EnableAPI:                  s.EnableAPI,
+		EmailProvider:              s.EmailProvider,
+		EmailFromAddress:           s.EmailFromAddress,
+		EmailFromName:              s.EmailFromName,
+		EmailMailgunDomain:         s.EmailMailgunDomain,
+		EmailMailgunAPIKeySet:      s.EmailMailgunAPIKeyEnc != "",
+		EmailSMTPHost:              s.EmailSMTPHost,
+		EmailSMTPPort:              s.EmailSMTPPort,
+		EmailSMTPUsername:          s.EmailSMTPUsername,
+		EmailSMTPPasswordSet:       s.EmailSMTPPasswordEnc != "",
+		EmailSMTPTLS:               s.EmailSMTPTLS,
+		GitHubOAuthClientID:        s.GitHubOAuthClientID,
+		GitHubOAuthClientSecretSet: s.GitHubOAuthClientSecretEnc != "",
+		GitHubOAuthConfigured:      strings.TrimSpace(s.GitHubOAuthClientID) != "" && s.GitHubOAuthClientSecretEnc != "",
 	})
 }
 

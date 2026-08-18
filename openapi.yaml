@@ -25,6 +25,7 @@ tags:
   - name: Tags
   - name: Saved Views
   - name: Device Auth
+  - name: GitHub
 
 paths:
   /api/v1/health:
@@ -482,6 +483,133 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/me/github:
+    get:
+      tags: [GitHub]
+      summary: GitHub connection status for the current user
+      responses:
+        "200":
+          description: Connection status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubConnection"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    delete:
+      tags: [GitHub]
+      summary: Disconnect GitHub
+      responses:
+        "200":
+          description: Disconnected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OK"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/me/github/pat:
+    post:
+      tags: [GitHub]
+      summary: Connect GitHub with a personal access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+      responses:
+        "200":
+          description: Connected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubConnection"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/APIError"
+
+  /api/v1/me/github/oauth/start:
+    get:
+      tags: [GitHub]
+      summary: Start GitHub OAuth (requires admin-configured OAuth App)
+      responses:
+        "200":
+          description: Authorize URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  authorize_url:
+                    type: string
+                  redirect_uri:
+                    type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/APIError"
+
+  /api/v1/auth/github/callback:
+    get:
+      tags: [GitHub]
+      summary: GitHub OAuth callback (public redirect)
+      security: []
+      parameters:
+        - name: code
+          in: query
+          schema:
+            type: string
+        - name: state
+          in: query
+          schema:
+            type: string
+      responses:
+        "303":
+          description: Redirects to Settings
+
+  /api/v1/webhooks/github:
+    post:
+      tags: [GitHub]
+      summary: GitHub issues webhook (updates linked tasks only; never creates tasks)
+      security: []
+      parameters:
+        - name: X-Ordryn-Webhook-Secret
+          in: header
+          schema:
+            type: string
+        - name: X-Hub-Signature-256
+          in: header
+          schema:
+            type: string
+        - name: X-GitHub-Event
+          in: header
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OK"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/APIError"
 
   /api/v1/api-keys:
     get:
@@ -958,6 +1086,63 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /api/v1/projects/{id}/github:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      tags: [GitHub]
+      summary: Get linked GitHub repository for a project
+      responses:
+        "200":
+          description: Link status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectGitHubRepo"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [GitHub]
+      summary: Link a GitHub repository (owner; requires admin on the repo)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [repository]
+              properties:
+                repository:
+                  type: string
+                  description: owner/repo or GitHub URL
+      responses:
+        "200":
+          description: Linked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectGitHubRepo"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/APIError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [GitHub]
+      summary: Unlink GitHub repository (clears task issue links; does not delete GH issues)
+      responses:
+        "200":
+          description: Unlinked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OK"
+        "403":
+          $ref: "#/components/responses/APIError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /api/v1/projects/{id}/statuses:
     parameters:
       - $ref: "#/components/parameters/ID"
@@ -1090,6 +1275,75 @@ paths:
       responses:
         "204":
           description: Deleted
+
+  /api/v1/tasks/{id}/github-issue:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      tags: [GitHub]
+      summary: Create a GitHub issue from this task and link it
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                body:
+                  type: string
+      responses:
+        "201":
+          description: Issue created and linked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskGitHubIssue"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/APIError"
+    put:
+      tags: [GitHub]
+      summary: Link an existing GitHub issue (never creates an Ordryn task)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [issue]
+              properties:
+                issue:
+                  type: string
+                  description: Issue number or GitHub issue URL in the linked repo
+      responses:
+        "200":
+          description: Linked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskGitHubIssue"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/APIError"
+    delete:
+      tags: [GitHub]
+      summary: Unlink GitHub issue from task (does not delete the issue on GitHub)
+      responses:
+        "200":
+          description: Unlinked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OK"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /api/v1/tasks/{id}/claim:
     parameters:
@@ -2678,6 +2932,64 @@ components:
         claimed_by_name:
           type: string
           description: Display name of the claimer
+        github:
+          $ref: "#/components/schemas/TaskGitHubIssue"
+
+    GitHubConnection:
+      type: object
+      properties:
+        connected:
+          type: boolean
+        github_login:
+          type: string
+        auth_method:
+          type: string
+          enum: [oauth, pat]
+        connected_at:
+          type: string
+          format: date-time
+
+    ProjectGitHubRepo:
+      type: object
+      properties:
+        linked:
+          type: boolean
+        owner:
+          type: string
+        repo:
+          type: string
+        full_name:
+          type: string
+        html_url:
+          type: string
+        repo_id:
+          type: integer
+          format: int64
+        linked_by_user_id:
+          type: integer
+        webhook_secret:
+          type: string
+          description: Present for project owners only
+        linked_at:
+          type: string
+          format: date-time
+
+    TaskGitHubIssue:
+      type: object
+      properties:
+        issue_number:
+          type: integer
+        issue_id:
+          type: integer
+          format: int64
+        issue_url:
+          type: string
+        issue_state:
+          type: string
+        issue_title:
+          type: string
+        last_sync_error:
+          type: string
 
     Notification:
       type: object

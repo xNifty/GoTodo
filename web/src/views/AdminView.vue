@@ -18,6 +18,8 @@ const editingUsernameId = ref<number | null>(null)
 const editUsernameValue = ref('')
 const mailgunApiKeyInput = ref('')
 const smtpPasswordInput = ref('')
+const githubOAuthSecretInput = ref('')
+const githubBusy = ref(false)
 const settings = reactive<AdminSettings>({
   site_name: '',
   default_timezone: 'UTC',
@@ -39,6 +41,9 @@ const settings = reactive<AdminSettings>({
   email_smtp_username: '',
   email_smtp_password_set: false,
   email_smtp_tls: true,
+  github_oauth_client_id: '',
+  github_oauth_client_secret_set: false,
+  github_oauth_configured: false,
 })
 
 async function load() {
@@ -47,6 +52,7 @@ async function load() {
     Object.assign(settings, s)
     mailgunApiKeyInput.value = ''
     smtpPasswordInput.value = ''
+    githubOAuthSecretInput.value = ''
     users.value = u
   } catch (err) {
     toast.push(err instanceof APIError ? err.message : 'Failed to load admin data', 'error')
@@ -105,6 +111,27 @@ async function saveEmailSettings() {
     toast.push(err instanceof APIError ? err.message : 'Save failed', 'error')
   } finally {
     emailBusy.value = false
+  }
+}
+
+async function saveGitHubOAuthSettings() {
+  githubBusy.value = true
+  try {
+    const payload: AdminSettingsPatch = {
+      github_oauth_client_id: settings.github_oauth_client_id,
+    }
+    if (githubOAuthSecretInput.value !== '') {
+      payload.github_oauth_client_secret = githubOAuthSecretInput.value
+    }
+    const saved = await api.patchAdminSettings(payload)
+    Object.assign(settings, saved)
+    githubOAuthSecretInput.value = ''
+    await refreshSite()
+    toast.push('GitHub OAuth settings saved', 'success')
+  } catch (err) {
+    toast.push(err instanceof APIError ? err.message : 'Save failed', 'error')
+  } finally {
+    githubBusy.value = false
   }
 }
 
@@ -208,6 +235,53 @@ onMounted(load)
           <p class="text-muted">Site Version: {{ settings.site_version || '—' }}</p>
           <button type="submit" class="btn btn-primary" :disabled="busy">
             {{ busy ? 'Saving…' : 'Save settings' }}
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card mb-4">
+      <div class="card-header"><h2 class="h5 mb-0">GitHub OAuth</h2></div>
+      <div class="card-body">
+        <p class="text-muted small">
+          Optional. When configured, users can connect GitHub via OAuth in Settings.
+          Create an OAuth App on GitHub with callback
+          <code>/api/v1/auth/github/callback</code>
+          (include your site base path if applicable). Users can always connect with a personal access token instead.
+        </p>
+        <form @submit.prevent="saveGitHubOAuthSettings">
+          <div class="mb-3">
+            <label class="form-label" for="github-oauth-client-id">Client ID</label>
+            <input
+              id="github-oauth-client-id"
+              v-model="settings.github_oauth_client_id"
+              type="text"
+              class="form-control"
+              autocomplete="off"
+            />
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="github-oauth-client-secret">Client secret</label>
+            <input
+              id="github-oauth-client-secret"
+              v-model="githubOAuthSecretInput"
+              type="password"
+              class="form-control"
+              autocomplete="new-password"
+              :placeholder="
+                settings.github_oauth_client_secret_set
+                  ? '•••• configured (leave blank to keep)'
+                  : 'Enter client secret'
+              "
+            />
+          </div>
+          <p class="small mb-3">
+            Status:
+            <span v-if="settings.github_oauth_configured" class="text-success">Configured</span>
+            <span v-else class="text-muted">Not configured</span>
+          </p>
+          <button type="submit" class="btn btn-primary" :disabled="githubBusy">
+            {{ githubBusy ? 'Saving…' : 'Save GitHub OAuth' }}
           </button>
         </form>
       </div>

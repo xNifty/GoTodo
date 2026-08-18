@@ -2,6 +2,8 @@
 
 Vue 3 + TypeScript + Vite client for `/api/v1`. The UI uses **Bootstrap 5**, **Bootstrap Icons**, and the original `site.css` theme (Fira Code, light/dark toggle) from the HTMX app.
 
+Operator install, reverse proxy, and API docs: [Ordryn wiki](https://github.com/SentientTD-Studios/Ordryn/wiki).
+
 ## Develop
 
 Terminal 1 — API (API must be enabled + Redis):

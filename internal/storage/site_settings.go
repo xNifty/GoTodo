@@ -41,7 +41,10 @@ type SiteSettings struct {
 	EmailSMTPPort         int
 	EmailSMTPUsername     string
 	EmailSMTPPasswordEnc  string
-	EmailSMTPTLS         bool
+	EmailSMTPTLS          bool
+
+	GitHubOAuthClientID        string
+	GitHubOAuthClientSecretEnc string
 }
 
 // CreateSiteSettingsTable ensures the site_settings table exists.
@@ -103,7 +106,9 @@ func GetSiteSettings() (*SiteSettings, error) {
 			COALESCE(email_smtp_port, 587),
 			COALESCE(email_smtp_username, ''),
 			COALESCE(email_smtp_password_enc, ''),
-			COALESCE(email_smtp_tls, TRUE)
+			COALESCE(email_smtp_tls, TRUE),
+			COALESCE(github_oauth_client_id, ''),
+			COALESCE(github_oauth_client_secret_enc, '')
 		FROM site_settings WHERE id = 1`)
 	if err := row.Scan(
 		&s.SiteName, &s.DefaultTimezone, &s.ShowChangelog, &s.SiteVersion,
@@ -113,6 +118,7 @@ func GetSiteSettings() (*SiteSettings, error) {
 		&s.EmailMailgunDomain, &s.EmailMailgunAPIKeyEnc,
 		&s.EmailSMTPHost, &s.EmailSMTPPort, &s.EmailSMTPUsername,
 		&s.EmailSMTPPasswordEnc, &s.EmailSMTPTLS,
+		&s.GitHubOAuthClientID, &s.GitHubOAuthClientSecretEnc,
 	); err != nil {
 		return nil, err
 	}
@@ -139,9 +145,10 @@ func UpsertSiteSettings(s SiteSettings) error {
 			email_provider, email_from_address, email_from_name,
 			email_mailgun_domain, email_mailgun_api_key_enc,
 			email_smtp_host, email_smtp_port, email_smtp_username,
-			email_smtp_password_enc, email_smtp_tls
+			email_smtp_password_enc, email_smtp_tls,
+			github_oauth_client_id, github_oauth_client_secret_enc
 		)
-        VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+        VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
         ON CONFLICT (id) DO UPDATE SET
             site_name = EXCLUDED.site_name,
             default_timezone = EXCLUDED.default_timezone,
@@ -162,14 +169,17 @@ func UpsertSiteSettings(s SiteSettings) error {
 			email_smtp_port = EXCLUDED.email_smtp_port,
 			email_smtp_username = EXCLUDED.email_smtp_username,
 			email_smtp_password_enc = EXCLUDED.email_smtp_password_enc,
-			email_smtp_tls = EXCLUDED.email_smtp_tls
+			email_smtp_tls = EXCLUDED.email_smtp_tls,
+			github_oauth_client_id = EXCLUDED.github_oauth_client_id,
+			github_oauth_client_secret_enc = EXCLUDED.github_oauth_client_secret_enc
     `, s.SiteName, s.DefaultTimezone, s.ShowChangelog, s.SiteVersion,
 		s.EnableRegistration, s.InviteOnly, s.MetaDescription,
 		s.EnableGlobalAnnouncement, s.GlobalAnnouncementText, s.EnableAPI,
 		s.EmailProvider, s.EmailFromAddress, s.EmailFromName,
 		s.EmailMailgunDomain, s.EmailMailgunAPIKeyEnc,
 		s.EmailSMTPHost, s.EmailSMTPPort, s.EmailSMTPUsername,
-		s.EmailSMTPPasswordEnc, s.EmailSMTPTLS)
+		s.EmailSMTPPasswordEnc, s.EmailSMTPTLS,
+		s.GitHubOAuthClientID, s.GitHubOAuthClientSecretEnc)
 	if err != nil {
 		return fmt.Errorf("failed to upsert site_settings: %v", err)
 	}
@@ -266,6 +276,26 @@ func MigrateSiteSettingsAddEmailSettings() error {
 	return nil
 }
 
+// MigrateSiteSettingsAddGitHubOAuth adds GitHub OAuth app credential columns.
+func MigrateSiteSettingsAddGitHubOAuth() error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return err
+	}
+	defer CloseDatabase(pool)
+
+	alters := []string{
+		"ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS github_oauth_client_id TEXT DEFAULT ''",
+		"ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS github_oauth_client_secret_enc TEXT DEFAULT ''",
+	}
+	for _, q := range alters {
+		if _, err := pool.Exec(context.Background(), q); err != nil {
+			return fmt.Errorf("failed to migrate site_settings github oauth columns: %v", err)
+		}
+	}
+	return nil
+}
+
 // MaybeImportEmailSettingsFromEnv seeds Mailgun settings from legacy env vars when
 // the DB has no email provider configured yet. Safe to call repeatedly.
 func MaybeImportEmailSettingsFromEnv() error {
@@ -287,7 +317,7 @@ func MaybeImportEmailSettingsFromEnv() error {
 			EnableRegistration: true,
 			InviteOnly:         true,
 			EmailSMTPPort:      587,
-			EmailSMTPTLS:      true,
+			EmailSMTPTLS:       true,
 		}
 	}
 	if current == nil {

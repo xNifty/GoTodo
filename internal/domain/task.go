@@ -514,9 +514,13 @@ func UpdateTask(ctx context.Context, userID, taskID int, in UpdateTaskInput) (*U
 		} else {
 			_ = storage.LogTaskEvent(taskID, userID, "reopened", nil)
 		}
+		go SyncGitHubIssueFromOrdrynState(context.Background(), userID, taskID, completed)
 	}
 	if statusTouched && newStatusID != oldStatusID {
 		_ = storage.LogTaskEvent(taskID, userID, "status_changed", statusChangeMetadata(effectiveProjectID, oldStatusID, newStatusID))
+		if oldCompleted == completed {
+			go SyncGitHubIssueFromOrdrynState(context.Background(), userID, taskID, completed)
+		}
 	}
 
 	result.NewPriority = priority
@@ -600,6 +604,7 @@ func SetTaskCompleted(ctx context.Context, userID, taskID int, completed bool) e
 			} else {
 				_ = storage.LogTaskEvent(taskID, userID, "reopened", nil)
 			}
+			go SyncGitHubIssueFromOrdrynState(context.Background(), userID, taskID, completed)
 			return nil
 		}
 	}
@@ -618,6 +623,7 @@ func SetTaskCompleted(ctx context.Context, userID, taskID int, completed bool) e
 	} else {
 		_ = storage.LogTaskEvent(taskID, userID, "reopened", nil)
 	}
+	go SyncGitHubIssueFromOrdrynState(context.Background(), userID, taskID, completed)
 	return nil
 }
 

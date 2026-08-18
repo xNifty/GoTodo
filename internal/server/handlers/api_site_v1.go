@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"GoTodo/internal/domain"
 	"GoTodo/internal/server/utils"
 	"GoTodo/internal/storage"
 )
@@ -14,6 +15,7 @@ type apiSiteResponse struct {
 	EnableGlobalAnnouncement bool   `json:"enable_global_announcement"`
 	GlobalAnnouncementText   string `json:"global_announcement_text"`
 	AnnouncementDismissed    bool   `json:"announcement_dismissed"`
+	GitHubOAuthConfigured    bool   `json:"github_oauth_configured"`
 }
 
 // APIV1Site returns public site metadata for the SPA shell.
@@ -41,5 +43,6 @@ func APIV1Site(w http.ResponseWriter, r *http.Request) {
 		EnableGlobalAnnouncement: settings.EnableGlobalAnnouncement,
 		GlobalAnnouncementText:   settings.GlobalAnnouncementText,
 		AnnouncementDismissed:    dismissed,
+		GitHubOAuthConfigured:    domain.GitHubOAuthConfigured(),
 	})
 }
