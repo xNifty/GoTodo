@@ -513,17 +513,21 @@ func mapGitHubErr(err error, fallback string) error {
 		return nil
 	}
 	if apiErr, ok := err.(*githubclient.APIError); ok {
+		detail := strings.TrimSpace(apiErr.Message)
+		if detail == "" {
+			detail = fallback
+		} else if fallback != "" && !strings.EqualFold(detail, fallback) {
+			detail = fallback + " " + detail
+		}
 		switch apiErr.Status {
 		case http.StatusUnauthorized, http.StatusForbidden:
-			return fmt.Errorf("%w: %s", ErrForbidden, fallback)
+			return fmt.Errorf("%w: %s", ErrForbidden, detail)
 		case http.StatusNotFound:
-			return fmt.Errorf("%w: %s", ErrNotFound, fallback)
+			return fmt.Errorf("%w: %s", ErrNotFound, detail)
 		case http.StatusUnprocessableEntity:
-			return fmt.Errorf("%w: %s", ErrValidation, apiErr.Message)
+			return fmt.Errorf("%w: %s", ErrValidation, detail)
 		}
-		if apiErr.Message != "" {
-			return fmt.Errorf("%w: %s", ErrValidation, apiErr.Message)
-		}
+		return fmt.Errorf("%w: %s", ErrValidation, detail)
 	}
 	return fmt.Errorf("%w: %s", ErrValidation, fallback)
 }
