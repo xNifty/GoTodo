@@ -207,6 +207,13 @@ export const api = {
     })
   },
 
+  renameAPIKey(id: number, name: string) {
+    return request<APIKey>(`/api/v1/api-keys/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name }),
+    })
+  },
+
   revokeAPIKey(id: number) {
     return request<void>(`/api/v1/api-keys/${id}`, { method: 'DELETE' })
   },

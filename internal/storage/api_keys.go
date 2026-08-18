@@ -5,8 +5,17 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5"
+)
+
+var (
+	ErrAPIKeyNotFound   = errors.New("api key not found")
+	ErrAPIKeyNameExists = errors.New("an API key with that name already exists")
 )
 
 // APIKey is a stored API key record (hash only; plaintext shown once at creation).
@@ -167,9 +176,54 @@ func RevokeAPIKey(keyID, userID int) error {
 		return err
 	}
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("api key not found")
+		return ErrAPIKeyNotFound
 	}
 	return nil
+}
+
+// UpdateAPIKeyName renames an active key owned by the user. The secret is unchanged.
+func UpdateAPIKeyName(keyID, userID int, name string) (*APIKey, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, fmt.Errorf("key name is required")
+	}
+	if len(name) > 80 {
+		return nil, fmt.Errorf("key name is too long")
+	}
+
+	pool, err := OpenDatabase()
+	if err != nil {
+		return nil, err
+	}
+	defer CloseDatabase(pool)
+
+	var exists bool
+	err = pool.QueryRow(context.Background(),
+		`SELECT EXISTS(
+			SELECT 1 FROM api_keys
+			WHERE user_id = $1 AND LOWER(name) = LOWER($2) AND revoked_at IS NULL AND id != $3
+		)`, userID, name, keyID).Scan(&exists)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return nil, ErrAPIKeyNameExists
+	}
+
+	var k APIKey
+	err = pool.QueryRow(context.Background(),
+		`UPDATE api_keys SET name = $3
+		 WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL
+		 RETURNING id, user_id, name, key_prefix, created_at, last_used_at, revoked_at`,
+		keyID, userID, name).Scan(
+		&k.ID, &k.UserID, &k.Name, &k.KeyPrefix, &k.CreatedAt, &k.LastUsedAt, &k.RevokedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrAPIKeyNotFound
+		}
+		return nil, err
+	}
+	return &k, nil
 }
 
 // LookupAPIKeyUserID validates a bearer token and returns the owning user ID.

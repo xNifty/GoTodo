@@ -531,6 +531,35 @@ paths:
   /api/v1/api-keys/{id}:
     parameters:
       - $ref: "#/components/parameters/ID"
+    patch:
+      tags: [API Keys]
+      summary: Rename an API key
+      description: Changes only the display name. The secret token is unchanged. Names are unique among the user's active keys (case-insensitive).
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  maxLength: 80
+      responses:
+        "200":
+          description: Updated key metadata (no plaintext)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIKey"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
     delete:
       tags: [API Keys]
       summary: Revoke an API key
