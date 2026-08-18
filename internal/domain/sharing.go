@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -261,4 +262,18 @@ func RevokeShareLinkForUser(ctx context.Context, userID, linkID int) error {
 		})
 	}
 	return nil
+}
+
+// PublicSharePathForTask returns an app-relative path to the task on the
+// project's public share page, or "" if there is no active project share.
+func PublicSharePathForTask(taskID int) string {
+	projectID, err := storage.GetTaskProjectID(taskID)
+	if err != nil || projectID <= 0 {
+		return ""
+	}
+	link, err := storage.GetLatestActiveShareLinkForScope(storage.ShareScopeProject, projectID)
+	if err != nil || link == nil || link.Token == "" {
+		return ""
+	}
+	return "/s/" + link.Token + "?task=" + strconv.Itoa(taskID)
 }
