@@ -51,6 +51,7 @@ const parentTitle = ref('')
 const priority = ref(0)
 const dueDate = ref('')
 const selectedTagIds = ref<number[]>([])
+const taskTags = ref<Tag[]>([])
 const newTags = ref('')
 const completed = ref(false)
 const statusId = ref<number | ''>('')
@@ -63,23 +64,28 @@ const projectHasGitHub = ref(false)
 const githubIssueRef = ref('')
 const githubBusy = ref(false)
 const isSubtask = computed(() => parentId.value !== '' && Number(parentId.value) > 0)
-const readOnly = computed(() => mode.value === 'view')
+const selectedProject = computed(() => {
+  if (projectId.value === '') return null
+  return projects.value.find((p) => p.id === Number(projectId.value)) ?? null
+})
+/** Viewers may open via edit entry points; treat their project role as read-only. */
+const readOnly = computed(() => {
+  if (mode.value === 'view') return true
+  if (mode.value === 'edit' && selectedProject.value?.role === 'viewer') return true
+  return false
+})
 const parentOptions = computed(() => rootTasks.value.filter((r) => r.id !== taskId.value))
 const parentPickerDisabled = computed(
   () =>
     readOnly.value ||
     (mode.value === 'edit' && (rootTasks.value.find((t) => t.id === taskId.value)?.child_count || 0) > 0),
 )
-const selectedProject = computed(() => {
-  if (projectId.value === '') return null
-  return projects.value.find((p) => p.id === Number(projectId.value)) ?? null
-})
 const isKanbanTask = computed(() => {
   if (taskWorkflow.value === 'kanban') return true
   return (selectedProject.value?.workflow_mode || 'classic') === 'kanban'
 })
 const sidebarTitle = computed(() => {
-  if (mode.value === 'view') return 'View Task'
+  if (readOnly.value) return 'View Task'
   if (mode.value === 'edit') return 'Edit Task'
   return 'Add Task'
 })
@@ -110,6 +116,7 @@ function resetForm() {
   priority.value = 0
   dueDate.value = ''
   selectedTagIds.value = []
+  taskTags.value = []
   newTags.value = ''
   completed.value = false
   descriptionError.value = ''
@@ -198,7 +205,8 @@ async function loadTask(id: number) {
   }
   priority.value = task.priority
   dueDate.value = task.due_date || ''
-  selectedTagIds.value = task.tags?.map((t) => t.id) ?? []
+  taskTags.value = task.tags ? [...task.tags] : []
+  selectedTagIds.value = taskTags.value.map((t) => t.id)
   newTags.value = ''
   completed.value = task.completed
   descriptionError.value = ''
@@ -792,34 +800,47 @@ async function removeTimeEntry(entryId: number) {
             <button type="button" class="btn btn-outline-secondary" @click="applyDuePreset('clear')">Clear</button>
           </div>
         </div>
-        <div v-if="allTags.length" class="form-group mt-2">
-          <label>Tags (max 5)</label>
-          <div v-for="tag in allTags" :key="tag.id" class="form-check">
-            <input
-              :id="`tag-${tag.id}`"
-              type="checkbox"
-              class="form-check-input"
-              :checked="selectedTagIds.includes(tag.id)"
-              :disabled="readOnly"
-              @change="toggleTag(tag.id, ($event.target as HTMLInputElement).checked)"
-            />
-            <label class="form-check-label" :for="`tag-${tag.id}`">
-              <span class="tag-chip" :style="{ backgroundColor: tag.color || '#6c757d' }">{{ tag.name }}</span>
-            </label>
+        <div v-if="readOnly" class="form-group mt-2">
+          <label>Tags</label>
+          <div v-if="taskTags.length" class="d-flex flex-wrap gap-1 mt-1">
+            <span
+              v-for="tag in taskTags"
+              :key="tag.id"
+              class="tag-chip"
+              :style="{ backgroundColor: tag.color || '#6c757d' }"
+            >{{ tag.name }}</span>
           </div>
+          <p v-else class="text-muted small mb-0 mt-1">No tags</p>
         </div>
-        <div v-if="!readOnly" class="form-group mt-2">
-          <label for="new_tags">Add tags (comma-separated)</label>
-          <input
-            id="new_tags"
-            v-model="newTags"
-            type="text"
-            class="form-control"
-            placeholder="e.g. work, urgent"
-            maxlength="200"
-          />
-          <small class="form-hint">New tag names are created on save (max 5 tags per task).</small>
-        </div>
+        <template v-else>
+          <div v-if="allTags.length" class="form-group mt-2">
+            <label>Tags (max 5)</label>
+            <div v-for="tag in allTags" :key="tag.id" class="form-check">
+              <input
+                :id="`tag-${tag.id}`"
+                type="checkbox"
+                class="form-check-input"
+                :checked="selectedTagIds.includes(tag.id)"
+                @change="toggleTag(tag.id, ($event.target as HTMLInputElement).checked)"
+              />
+              <label class="form-check-label" :for="`tag-${tag.id}`">
+                <span class="tag-chip" :style="{ backgroundColor: tag.color || '#6c757d' }">{{ tag.name }}</span>
+              </label>
+            </div>
+          </div>
+          <div class="form-group mt-2">
+            <label for="new_tags">Add tags (comma-separated)</label>
+            <input
+              id="new_tags"
+              v-model="newTags"
+              type="text"
+              class="form-control"
+              placeholder="e.g. work, urgent"
+              maxlength="200"
+            />
+            <small class="form-hint">New tag names are created on save (max 5 tags per task).</small>
+          </div>
+        </template>
 
         <div
           v-if="isKanbanTask && (mode === 'edit' || mode === 'view')"
