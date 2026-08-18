@@ -522,10 +522,8 @@ func FetchTaskByIDForUser(taskID, userID int, timezone string, page int) (Task, 
 	if err := attachTagsToTasks(taskList); err != nil {
 		return Task{}, err
 	}
-	if task.ParentID == 0 {
-		if err := attachChildrenToRoots(taskList, timezone); err != nil {
-			return Task{}, err
-		}
+	if err := attachChildrenToRoots(taskList, timezone); err != nil {
+		return Task{}, err
 	}
 	return taskList[0], nil
 }

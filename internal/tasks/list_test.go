@@ -1,6 +1,7 @@
 package tasks_test
 
 import (
+	"GoTodo/internal/storage"
 	"GoTodo/internal/tasks"
 	"context"
 	"fmt"
@@ -311,6 +312,53 @@ func TestSharedProjectVisibilityByRole(t *testing.T) {
 	}
 	if searchScopedTotal != 1 {
 		t.Fatalf("viewer project search should find shared task, got %d", searchScopedTotal)
+	}
+}
+
+func TestFetchTaskByIDAttachesChildrenAndParent(t *testing.T) {
+	pool, err := storage.OpenDatabase()
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	var parentID, childID int
+	err = pool.QueryRow(context.Background(),
+		`INSERT INTO tasks (title, description, user_id, completed, is_favorite, position, priority, project_id)
+		 VALUES ('Parent with kids', 'root', 1, false, false, 50, 0, 1)
+		 RETURNING id`).Scan(&parentID)
+	if err != nil {
+		t.Fatalf("insert parent: %v", err)
+	}
+	err = pool.QueryRow(context.Background(),
+		`INSERT INTO tasks (title, description, user_id, completed, is_favorite, position, priority, project_id, parent_id)
+		 VALUES ('Nested child', 'child', 1, false, false, 1, 0, 1, $1)
+		 RETURNING id`, parentID).Scan(&childID)
+	if err != nil {
+		t.Fatalf("insert child: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), "DELETE FROM tasks WHERE id = $1", parentID)
+	})
+
+	parent, err := tasks.FetchTaskByIDForUser(parentID, 1, "UTC", 1)
+	if err != nil {
+		t.Fatalf("fetch parent: %v", err)
+	}
+	if parent.ChildCount != 1 || len(parent.Children) != 1 {
+		t.Fatalf("expected parent to include 1 child, got count=%d children=%d", parent.ChildCount, len(parent.Children))
+	}
+	if parent.Children[0].ID != childID || parent.Children[0].Title != "Nested child" {
+		t.Fatalf("unexpected child on parent: %+v", parent.Children[0])
+	}
+
+	child, err := tasks.FetchTaskByIDForUser(childID, 1, "UTC", 1)
+	if err != nil {
+		t.Fatalf("fetch child: %v", err)
+	}
+	if child.ParentID != parentID {
+		t.Fatalf("expected child parent_id %d, got %d", parentID, child.ParentID)
+	}
+	if child.ChildCount != 0 || len(child.Children) != 0 {
+		t.Fatalf("expected no nested children on subtask, got count=%d children=%d", child.ChildCount, len(child.Children))
 	}
 }
 
