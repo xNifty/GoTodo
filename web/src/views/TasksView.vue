@@ -32,7 +32,7 @@ const emit = defineEmits<{
 }>()
 
 const route = useRoute()
-const { openAdd, openEdit, lastSavedTask } = useTaskSidebar()
+const { openAdd, openEdit, openView, lastSavedTask } = useTaskSidebar()
 const { density } = useViewDensity()
 const { sidebarCollapsed, toggleSidebar } = useSidebarState()
 const {
@@ -242,6 +242,20 @@ function canWriteTask(task: Task): boolean {
     if (p && p.role === 'viewer') return false
   }
   return true
+}
+
+/** Open edit for writers, view-only for project viewers. */
+function openTaskDetails(id: number) {
+  const found = findTaskInTree(id)
+  if (found && !canWriteTask(found.task)) {
+    openView(id)
+    return
+  }
+  if (!found && isViewerProjectView.value) {
+    openView(id)
+    return
+  }
+  openEdit(id)
 }
 
 const hasMore = computed(() => loadedPage.value < totalPages.value)
@@ -950,7 +964,7 @@ function focusSearchInput() {
 }
 
 function shortcutEditTask(id: number) {
-  openEdit(id)
+  openTaskDetails(id)
 }
 
 function shortcutDeleteTask(id: number) {
@@ -1138,7 +1152,7 @@ onUnmounted(() => {
             :density="density"
             :has-active-filters="hasActiveFilters"
             :can-add="!isViewerProjectView"
-            @open-task="openEdit"
+            @open-task="openTaskDetails"
             @changed="reloadInitial"
             @task-updated="applyTaskUpdate"
             @board-reorder="applyBoardReorder"
@@ -1330,7 +1344,7 @@ onUnmounted(() => {
                     @toggle-expand="toggleParentExpanded(task.id)"
                     @patch-task="handleInlineTaskPatch"
                     @add-subtask="openAddSubtask(task)"
-                    @edit="openEdit(task.id)"
+                    @edit="openTaskDetails(task.id)"
                     @remove="removeTask(task)"
                   />
                   <div
@@ -1351,7 +1365,7 @@ onUnmounted(() => {
                       @toggle-select="toggleSelect(child.id, $event)"
                       @toggle-complete="toggleCompleteChild(child)"
                       @patch-task="handleInlineTaskPatch"
-                      @edit="openEdit(child.id)"
+                      @edit="openTaskDetails(child.id)"
                       @remove="removeTask(child)"
                     />
                   </div>
@@ -1381,7 +1395,7 @@ onUnmounted(() => {
                   @toggle-expand="toggleParentExpanded(task.id)"
                   @patch-task="handleInlineTaskPatch"
                   @add-subtask="openAddSubtask(task)"
-                  @edit="openEdit(task.id)"
+                  @edit="openTaskDetails(task.id)"
                   @remove="removeTask(task)"
                 />
                 <div
@@ -1402,7 +1416,7 @@ onUnmounted(() => {
                     @toggle-select="toggleSelect(child.id, $event)"
                     @toggle-complete="toggleCompleteChild(child)"
                     @patch-task="handleInlineTaskPatch"
-                    @edit="openEdit(child.id)"
+                    @edit="openTaskDetails(child.id)"
                     @remove="removeTask(child)"
                   />
                 </div>

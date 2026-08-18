@@ -43,6 +43,7 @@ export function useTaskSidebar() {
     mode.value = 'view'
     taskId.value = id
     defaultDueDate.value = ''
+    defaultProjectId.value = null
     defaultParentId.value = null
     defaultParentTitle.value = ''
     open.value = true
