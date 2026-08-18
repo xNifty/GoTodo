@@ -676,6 +676,33 @@ func ListShareLinksForScope(scopeType string, scopeID int) ([]ShareLink, error) 
 	return out, nil
 }
 
+// GetLatestActiveShareLinkForScope returns the newest non-revoked, non-expired share link for a scope.
+func GetLatestActiveShareLinkForScope(scopeType string, scopeID int) (*ShareLink, error) {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return nil, err
+	}
+	defer CloseDatabase(pool)
+
+	var link ShareLink
+	err = pool.QueryRow(context.Background(), `
+		SELECT id, token, created_by, scope_type, scope_id, expires_at, revoked_at, created_at
+		FROM share_links
+		WHERE scope_type = $1 AND scope_id = $2 AND revoked_at IS NULL
+		  AND (expires_at IS NULL OR expires_at > NOW())
+		ORDER BY created_at DESC, id DESC
+		LIMIT 1`, scopeType, scopeID).Scan(
+		&link.ID, &link.Token, &link.CreatedBy, &link.ScopeType, &link.ScopeID,
+		&link.ExpiresAt, &link.RevokedAt, &link.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &link, nil
+}
+
 // GetShareLinkByID loads a share link by id.
 func GetShareLinkByID(id int) (*ShareLink, error) {
 	pool, err := OpenDatabase()
