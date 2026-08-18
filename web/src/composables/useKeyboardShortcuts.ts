@@ -32,27 +32,12 @@ function getBootstrap(): BootstrapNS | undefined {
   return (window as unknown as { bootstrap?: BootstrapNS }).bootstrap
 }
 
-function isInsideClosedSidebar(el: Element): boolean {
-  const sidebar = el.closest('#sidebar')
-  if (!sidebar) return false
-  return !sidebar.classList.contains('active')
-}
-
 function isTypingTarget(el: EventTarget | null): boolean {
   if (!el || !(el instanceof Element)) return false
-  // Focus can remain on inputs inside the closed (still-mounted) sidebar.
-  if (isInsideClosedSidebar(el)) return false
   const tag = el.tagName
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true
   if (el instanceof HTMLElement && el.isContentEditable) return true
   return !!el.closest("[contenteditable='true']")
-}
-
-/** Blur focus left inside the closed (still-mounted) task sidebar. */
-function blurClosedSidebarFocus() {
-  const active = document.activeElement
-  if (!(active instanceof HTMLElement)) return
-  if (isInsideClosedSidebar(active)) active.blur()
 }
 
 function isHelpKey(e: KeyboardEvent): boolean {
@@ -64,7 +49,6 @@ function isSearchKey(e: KeyboardEvent): boolean {
 }
 
 function openShortcutsModal() {
-  blurClosedSidebarFocus()
   const active = document.activeElement
   if (
     active instanceof HTMLElement &&
@@ -120,9 +104,6 @@ function moveFocus(delta: 1 | -1) {
 
 function onKeydown(e: KeyboardEvent) {
   if (e.ctrlKey || e.metaKey || e.altKey) return
-
-  // Release focus trapped in a closed sidebar before evaluating targets.
-  blurClosedSidebarFocus()
 
   const typing = isTypingTarget(document.activeElement)
 
