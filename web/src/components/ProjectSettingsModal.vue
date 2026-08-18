@@ -6,6 +6,7 @@ import { APIError } from '@/api/types'
 import { useToast } from '@/composables/useToast'
 import ProjectSharePanel from '@/components/ProjectSharePanel.vue'
 import ProjectWorkflowPanel from '@/components/ProjectWorkflowPanel.vue'
+import ProjectGitHubPanel from '@/components/ProjectGitHubPanel.vue'
 
 const props = defineProps<{
   open: boolean
@@ -124,6 +125,12 @@ function onPanelChanged() {
 
           <div class="mb-4">
             <ProjectWorkflowPanel :project="project" @changed="onPanelChanged" />
+          </div>
+
+          <hr class="my-3 opacity-25" />
+
+          <div class="mb-4">
+            <ProjectGitHubPanel :project="project" @changed="onPanelChanged" />
           </div>
 
           <hr class="my-3 opacity-25" />

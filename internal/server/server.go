@@ -88,6 +88,11 @@ func registerAPIV1Routes() {
 	handleBoth("/api/v1/me", utils.AuthMeChain(handlers.APIV1Me))
 	handleBoth("/api/v1/me/password", utils.AuthSessionChain(handlers.APIV1ChangePassword))
 	handleBoth("/api/v1/me/username", utils.AuthSessionChain(handlers.APIV1ClaimUsername))
+	handleBoth("/api/v1/me/github", utils.AuthSessionChain(handlers.APIV1MeGitHub))
+	handleBoth("/api/v1/me/github/pat", utils.AuthSessionChain(handlers.APIV1MeGitHubPAT))
+	handleBoth("/api/v1/me/github/oauth/start", utils.AuthSessionChain(handlers.APIV1MeGitHubOAuthStart))
+	handleBoth("/api/v1/auth/github/callback", handlers.APIV1GitHubOAuthCallback)
+	handleBoth("/api/v1/webhooks/github", handlers.APIV1GitHubWebhook)
 	handleBoth("/api/v1/api-keys", utils.AuthSessionChain(handlers.APIV1APIKeysRouter))
 	handleBoth("/api/v1/api-keys/", utils.AuthSessionChain(handlers.APIV1APIKeysRouter))
 

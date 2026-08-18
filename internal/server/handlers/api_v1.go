@@ -21,30 +21,31 @@ type apiTagJSON struct {
 }
 
 type apiTaskJSON struct {
-	ID                int           `json:"id"`
-	Title             string        `json:"title"`
-	Description       string        `json:"description"`
-	Completed         bool          `json:"completed"`
-	DueDate           string        `json:"due_date"`
-	ProjectID         *int          `json:"project_id,omitempty"`
-	Project           string        `json:"project,omitempty"`
-	Priority          int           `json:"priority"`
-	Favorite          bool          `json:"favorite"`
-	Position          int           `json:"position"`
-	ParentID          *int          `json:"parent_id"`
-	ChildCount        int           `json:"child_count"`
-	ChildrenCompleted int           `json:"children_completed"`
-	Children          []apiTaskJSON `json:"children,omitempty"`
-	Tags              []apiTagJSON  `json:"tags"`
-	CreatedAt         string        `json:"created_at"`
-	ModifiedAt        string        `json:"modified_at"`
-	StatusID          *int          `json:"status_id,omitempty"`
-	StatusName        string        `json:"status_name,omitempty"`
-	EstimatePoints    *int          `json:"estimate_points,omitempty"`
-	TimeSpentMinutes  int           `json:"time_spent_minutes,omitempty"`
-	ProjectWorkflow   string        `json:"project_workflow,omitempty"`
-	ClaimedBy         *int          `json:"claimed_by,omitempty"`
-	ClaimedByName     string        `json:"claimed_by_name,omitempty"`
+	ID                int                `json:"id"`
+	Title             string             `json:"title"`
+	Description       string             `json:"description"`
+	Completed         bool               `json:"completed"`
+	DueDate           string             `json:"due_date"`
+	ProjectID         *int               `json:"project_id,omitempty"`
+	Project           string             `json:"project,omitempty"`
+	Priority          int                `json:"priority"`
+	Favorite          bool               `json:"favorite"`
+	Position          int                `json:"position"`
+	ParentID          *int               `json:"parent_id"`
+	ChildCount        int                `json:"child_count"`
+	ChildrenCompleted int                `json:"children_completed"`
+	Children          []apiTaskJSON      `json:"children,omitempty"`
+	Tags              []apiTagJSON       `json:"tags"`
+	CreatedAt         string             `json:"created_at"`
+	ModifiedAt        string             `json:"modified_at"`
+	StatusID          *int               `json:"status_id,omitempty"`
+	StatusName        string             `json:"status_name,omitempty"`
+	EstimatePoints    *int               `json:"estimate_points,omitempty"`
+	TimeSpentMinutes  int                `json:"time_spent_minutes,omitempty"`
+	ProjectWorkflow   string             `json:"project_workflow,omitempty"`
+	ClaimedBy         *int               `json:"claimed_by,omitempty"`
+	ClaimedByName     string             `json:"claimed_by_name,omitempty"`
+	GitHub            *apiTaskGitHubJSON `json:"github,omitempty"`
 }
 
 type apiTaskListResponse struct {
@@ -228,6 +229,16 @@ func taskToAPIJSON(t tasks.Task) apiTaskJSON {
 		cid := t.ClaimedBy
 		out.ClaimedBy = &cid
 	}
+	if t.GitHubIssueNumber > 0 || t.GitHubIssueURL != "" {
+		out.GitHub = &apiTaskGitHubJSON{
+			IssueNumber:   t.GitHubIssueNumber,
+			IssueID:       t.GitHubIssueID,
+			IssueURL:      t.GitHubIssueURL,
+			IssueState:    t.GitHubIssueState,
+			IssueTitle:    t.GitHubIssueTitle,
+			LastSyncError: t.GitHubLastSyncError,
+		}
+	}
 	if len(t.Children) > 0 {
 		out.Children = make([]apiTaskJSON, 0, len(t.Children))
 		for _, c := range t.Children {
@@ -310,6 +321,13 @@ func APIV1TasksRouter(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			apiV1TaskClaim(w, r, id)
+			return
+		case "github-issue":
+			if len(parts) != 2 {
+				utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid task path.")
+				return
+			}
+			apiV1TaskGitHubIssue(w, r, id)
 			return
 		}
 		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid task path.")

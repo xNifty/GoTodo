@@ -29,6 +29,8 @@ func TestFormatProjectEventLabel(t *testing.T) {
 		{eventType: "renamed", metadata: map[string]interface{}{"name": "Roadmap"}, want: "Project renamed · Roadmap"},
 		{eventType: "renamed", want: "Project renamed"},
 		{eventType: "description_updated", want: "Description updated"},
+		{eventType: "github_repo_linked", metadata: map[string]interface{}{"full_name": "acme/widgets"}, want: "GitHub repo linked · acme/widgets"},
+		{eventType: "github_repo_unlinked", want: "GitHub repo unlinked"},
 		{eventType: "unknown_event", want: "unknown_event"},
 	}
 	for _, tt := range tests {

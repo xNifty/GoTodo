@@ -39,6 +39,11 @@ func TestOpenAPISpecIncludesSavedViews(t *testing.T) {
 		"/api/v1/auth/reset-password",
 		"/api/v1/calendar/sync",
 		"/api/v1/announcements/dismiss",
+		"/api/v1/me/github",
+		"/api/v1/me/github/pat",
+		"/api/v1/projects/{id}/github",
+		"/api/v1/tasks/{id}/github-issue",
+		"/api/v1/webhooks/github",
 	}
 	for _, value := range required {
 		if !strings.Contains(documentation, value) {
