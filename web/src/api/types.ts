@@ -34,6 +34,7 @@ export type ProjectStatus = {
   id: number
   project_id: number
   name: string
+  description?: string
   position: number
   is_done: boolean
   is_default: boolean

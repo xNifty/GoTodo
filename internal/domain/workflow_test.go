@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"GoTodo/internal/storage"
@@ -99,6 +100,10 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "workflow tables: %v\n", err)
 		os.Exit(1)
 	}
+	if err := storage.MigrateProjectStatusesAddDescription(); err != nil {
+		fmt.Fprintf(os.Stderr, "status description: %v\n", err)
+		os.Exit(1)
+	}
 	if err := storage.MigrateTasksAddWorkflowFields(); err != nil {
 		fmt.Fprintf(os.Stderr, "task workflow: %v\n", err)
 		os.Exit(1)
@@ -160,6 +165,16 @@ func TestKanbanEnableDisableAndStatusCap(t *testing.T) {
 	}
 	if len(statuses) != 3 {
 		t.Fatalf("want 3 default statuses, got %d", len(statuses))
+	}
+	wantDesc := map[string]string{
+		"To Do":       "Work that hasn't been started yet",
+		"In Progress": "Currently being worked on",
+		"Done":        "Finished and ready to close",
+	}
+	for _, s := range statuses {
+		if s.Description != wantDesc[s.Name] {
+			t.Errorf("%s description=%q want %q", s.Name, s.Description, wantDesc[s.Name])
+		}
 	}
 
 	pid := proj.ID
@@ -257,5 +272,74 @@ func TestKanbanEditorCannotManageStatuses(t *testing.T) {
 	_, err = CreateProjectStatusForUser(ctx, 2, proj.ID, CreateProjectStatusInput{Name: "Blocked"})
 	if !errors.Is(err, ErrForbidden) {
 		t.Fatalf("editor create status: err=%v want forbidden", err)
+	}
+}
+
+func TestProjectStatusDescription(t *testing.T) {
+	ctx := context.Background()
+	proj, err := CreateProject(ctx, 1, "Desc Board", "")
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	if _, err := SetProjectWorkflowMode(ctx, 1, proj.ID, storage.WorkflowKanban); err != nil {
+		t.Fatalf("enable kanban: %v", err)
+	}
+
+	created, err := CreateProjectStatusForUser(ctx, 1, proj.ID, CreateProjectStatusInput{
+		Name:        "Blocked",
+		Description: "  Waiting on someone else  ",
+	})
+	if err != nil {
+		t.Fatalf("create with description: %v", err)
+	}
+	if created.Description != "Waiting on someone else" {
+		t.Fatalf("create description=%q", created.Description)
+	}
+
+	tooLong := strings.Repeat("x", storage.MaxStatusDescriptionLen+1)
+	_, err = CreateProjectStatusForUser(ctx, 1, proj.ID, CreateProjectStatusInput{
+		Name:        "Too Long",
+		Description: tooLong,
+	})
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("create over-limit: err=%v want validation", err)
+	}
+
+	desc := "Needs a decision"
+	updated, err := UpdateProjectStatusForUser(ctx, 1, proj.ID, created.ID, UpdateProjectStatusInput{
+		Description: &desc,
+	})
+	if err != nil {
+		t.Fatalf("update description: %v", err)
+	}
+	if updated.Description != desc {
+		t.Fatalf("updated description=%q want %q", updated.Description, desc)
+	}
+
+	over := strings.Repeat("y", storage.MaxStatusDescriptionLen+1)
+	_, err = UpdateProjectStatusForUser(ctx, 1, proj.ID, created.ID, UpdateProjectStatusInput{
+		Description: &over,
+	})
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("update over-limit: err=%v want validation", err)
+	}
+
+	empty := ""
+	cleared, err := UpdateProjectStatusForUser(ctx, 1, proj.ID, created.ID, UpdateProjectStatusInput{
+		Description: &empty,
+	})
+	if err != nil {
+		t.Fatalf("clear description: %v", err)
+	}
+	if cleared.Description != "" {
+		t.Fatalf("cleared description=%q want empty", cleared.Description)
+	}
+
+	got, err := storage.GetProjectStatus(proj.ID, created.ID)
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	if got.Description != "" {
+		t.Fatalf("persisted description=%q want empty", got.Description)
 	}
 }

@@ -52,28 +52,37 @@
         :key="col.id"
         class="kanban-column flex-shrink-0"
         role="region"
-        :aria-label="`${col.name}, ${tasksForStatus(col.id).length} tasks`"
+        :aria-label="columnAriaLabel(col)"
       >
-        <div class="kanban-column-header d-flex align-items-center justify-content-between gap-2 mb-2 px-1">
-          <div class="d-flex align-items-center gap-1 min-w-0">
-            <strong class="kanban-column-title text-truncate">{{ col.name }}</strong>
-            <span
-              v-if="col.is_default"
-              class="ordryn-badge ordryn-badge-status text-nowrap"
-              title="Default status for new tasks"
-            >
-              default
-            </span>
-            <span
-              v-if="col.is_done"
-              class="ordryn-badge text-nowrap"
-              style="background: var(--badge-status-bg, rgba(25, 135, 84, 0.12)); color: var(--ordryn-accent, #198754);"
-              title="Done column"
-            >
-              done
-            </span>
+        <div class="kanban-column-header mb-2 px-1">
+          <div class="d-flex align-items-center justify-content-between gap-2">
+            <div class="d-flex align-items-center gap-1 min-w-0">
+              <strong class="kanban-column-title text-truncate">{{ col.name }}</strong>
+              <span
+                v-if="col.is_default"
+                class="ordryn-badge ordryn-badge-status text-nowrap"
+                title="Default status for new tasks"
+              >
+                default
+              </span>
+              <span
+                v-if="col.is_done"
+                class="ordryn-badge text-nowrap"
+                style="background: var(--badge-status-bg, rgba(25, 135, 84, 0.12)); color: var(--ordryn-accent, #198754);"
+                title="Done column"
+              >
+                done
+              </span>
+            </div>
+            <span class="kanban-column-count">{{ tasksForStatus(col.id).length }}</span>
           </div>
-          <span class="kanban-column-count">{{ tasksForStatus(col.id).length }}</span>
+          <p
+            v-if="col.description"
+            class="kanban-column-description mb-0"
+            :title="col.description"
+          >
+            {{ col.description }}
+          </p>
         </div>
 
         <div class="kanban-column-body-wrap">
@@ -325,6 +334,13 @@ function tasksForStatus(statusId: number): Task[] {
   })
 }
 
+function columnAriaLabel(col: ProjectStatus): string {
+  const count = tasksForStatus(col.id).length
+  const desc = (col.description || '').trim()
+  if (desc) return `${col.name}: ${desc}, ${count} tasks`
+  return `${col.name}, ${count} tasks`
+}
+
 async function loadStatuses() {
   loading.value = true
   try {
@@ -463,6 +479,19 @@ onBeforeUnmount(destroySortables)
   font-size: 0.85rem;
   color: var(--ordryn-text, inherit);
   letter-spacing: 0.01em;
+}
+
+.kanban-column-description {
+  font-size: 0.7rem;
+  color: var(--ordryn-muted, #6c757d);
+  line-height: 1.3;
+  margin-top: 0.2rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
 }
 
 .kanban-column-count {

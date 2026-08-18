@@ -15,25 +15,28 @@ import (
 )
 
 type apiProjectStatusJSON struct {
-	ID        int    `json:"id"`
-	ProjectID int    `json:"project_id"`
-	Name      string `json:"name"`
-	Position  int    `json:"position"`
-	IsDone    bool   `json:"is_done"`
-	IsDefault bool   `json:"is_default"`
-	CreatedAt string `json:"created_at"`
+	ID          int    `json:"id"`
+	ProjectID   int    `json:"project_id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Position    int    `json:"position"`
+	IsDone      bool   `json:"is_done"`
+	IsDefault   bool   `json:"is_default"`
+	CreatedAt   string `json:"created_at"`
 }
 
 type apiStatusCreateRequest struct {
-	Name      string `json:"name"`
-	IsDone    bool   `json:"is_done"`
-	IsDefault bool   `json:"is_default"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	IsDone      bool   `json:"is_done"`
+	IsDefault   bool   `json:"is_default"`
 }
 
 type apiStatusPatchRequest struct {
-	Name      *string `json:"name"`
-	IsDone    *bool   `json:"is_done"`
-	IsDefault *bool   `json:"is_default"`
+	Name        *string `json:"name"`
+	Description *string `json:"description"`
+	IsDone      *bool   `json:"is_done"`
+	IsDefault   *bool   `json:"is_default"`
 }
 
 type apiStatusReorderRequest struct {
@@ -62,13 +65,14 @@ type apiTimeEntryCreateRequest struct {
 
 func statusToAPIJSON(s storage.ProjectStatus) apiProjectStatusJSON {
 	return apiProjectStatusJSON{
-		ID:        s.ID,
-		ProjectID: s.ProjectID,
-		Name:      s.Name,
-		Position:  s.Position,
-		IsDone:    s.IsDone,
-		IsDefault: s.IsDefault,
-		CreatedAt: s.CreatedAt.UTC().Format(time.RFC3339),
+		ID:          s.ID,
+		ProjectID:   s.ProjectID,
+		Name:        s.Name,
+		Description: s.Description,
+		Position:    s.Position,
+		IsDone:      s.IsDone,
+		IsDefault:   s.IsDefault,
+		CreatedAt:   s.CreatedAt.UTC().Format(time.RFC3339),
 	}
 }
 
@@ -161,9 +165,10 @@ func handleProjectStatusesResource(w http.ResponseWriter, r *http.Request, proje
 				return
 			}
 			s, err := domain.CreateProjectStatusForUser(r.Context(), userID, projectID, domain.CreateProjectStatusInput{
-				Name:      req.Name,
-				IsDone:    req.IsDone,
-				IsDefault: req.IsDefault,
+				Name:        req.Name,
+				Description: req.Description,
+				IsDone:      req.IsDone,
+				IsDefault:   req.IsDefault,
 			})
 			if err != nil {
 				writeWorkflowDomainError(w, err)
@@ -211,9 +216,10 @@ func handleProjectStatusesResource(w http.ResponseWriter, r *http.Request, proje
 			return
 		}
 		s, err := domain.UpdateProjectStatusForUser(r.Context(), userID, projectID, statusID, domain.UpdateProjectStatusInput{
-			Name:      req.Name,
-			IsDone:    req.IsDone,
-			IsDefault: req.IsDefault,
+			Name:        req.Name,
+			Description: req.Description,
+			IsDone:      req.IsDone,
+			IsDefault:   req.IsDefault,
 		})
 		if err != nil {
 			writeWorkflowDomainError(w, err)
