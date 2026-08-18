@@ -65,9 +65,11 @@ const selectedProject = computed(() => {
   return projects.value.find((p) => p.id === Number(projectId.value)) ?? null
 })
 /** Viewers may open via edit entry points; treat their project role as read-only. */
-const readOnly = computed(
-  () => mode.value === 'view' || selectedProject.value?.role === 'viewer',
-)
+const readOnly = computed(() => {
+  if (mode.value === 'view') return true
+  if (mode.value === 'edit' && selectedProject.value?.role === 'viewer') return true
+  return false
+})
 const parentOptions = computed(() => rootTasks.value.filter((r) => r.id !== taskId.value))
 const parentPickerDisabled = computed(
   () =>
