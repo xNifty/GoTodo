@@ -343,3 +343,157 @@ func TestProjectStatusDescription(t *testing.T) {
 		t.Fatalf("persisted description=%q want empty", got.Description)
 	}
 }
+
+func eventsOfType(t *testing.T, taskID, userID int, eventType string) []storage.TaskEvent {
+	t.Helper()
+	events, err := storage.GetEventsForTask(taskID, userID, 50)
+	if err != nil {
+		t.Fatalf("list events: %v", err)
+	}
+	var out []storage.TaskEvent
+	for _, ev := range events {
+		if ev.EventType == eventType {
+			out = append(out, ev)
+		}
+	}
+	return out
+}
+
+func TestStatusChangedEventMetadataAndActor(t *testing.T) {
+	ctx := context.Background()
+	proj, err := CreateProject(ctx, 1, "Audit Board", "")
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	if _, err := SetProjectWorkflowMode(ctx, 1, proj.ID, storage.WorkflowKanban); err != nil {
+		t.Fatalf("enable kanban: %v", err)
+	}
+	statuses, err := ListProjectStatusesForUser(ctx, 1, proj.ID)
+	if err != nil {
+		t.Fatalf("list statuses: %v", err)
+	}
+	var todoID, progressID int
+	var todoName, progressName string
+	for _, s := range statuses {
+		switch s.Name {
+		case "To Do":
+			todoID, todoName = s.ID, s.Name
+		case "In Progress":
+			progressID, progressName = s.ID, s.Name
+		}
+	}
+	if todoID == 0 || progressID == 0 {
+		t.Fatalf("missing default statuses: %+v", statuses)
+	}
+
+	pid := proj.ID
+	taskID, err := CreateTask(ctx, 1, CreateTaskInput{
+		Title:     "Move me",
+		ProjectID: &pid,
+	})
+	if err != nil {
+		t.Fatalf("create task: %v", err)
+	}
+
+	sid := progressID
+	statusPtr := &sid
+	if _, err := UpdateTask(ctx, 1, taskID, UpdateTaskInput{StatusID: &statusPtr}); err != nil {
+		t.Fatalf("set status: %v", err)
+	}
+
+	changed := eventsOfType(t, taskID, 1, "status_changed")
+	if len(changed) != 1 {
+		t.Fatalf("status_changed count=%d want 1", len(changed))
+	}
+	ev := changed[0]
+	if ev.Metadata["to"] != progressName {
+		t.Errorf("to=%v want %q", ev.Metadata["to"], progressName)
+	}
+	if ev.Metadata["from"] != todoName {
+		t.Errorf("from=%v want %q", ev.Metadata["from"], todoName)
+	}
+	if ev.ActorEmail != "owner@example.com" && ev.ActorUserName == "" {
+		t.Errorf("missing actor: email=%q name=%q", ev.ActorEmail, ev.ActorUserName)
+	}
+	if len(eventsOfType(t, taskID, 1, "reordered")) != 0 {
+		t.Fatal("did not expect a reordered event from status change")
+	}
+
+	// Same status again should not log another status_changed.
+	if _, err := UpdateTask(ctx, 1, taskID, UpdateTaskInput{StatusID: &statusPtr}); err != nil {
+		t.Fatalf("set same status: %v", err)
+	}
+	if got := eventsOfType(t, taskID, 1, "status_changed"); len(got) != 1 {
+		t.Fatalf("after no-op status_changed count=%d want 1", len(got))
+	}
+}
+
+func TestReorderSkipsEventForKanbanColumn(t *testing.T) {
+	ctx := context.Background()
+	proj, err := CreateProject(ctx, 1, "Reorder Board", "")
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	if _, err := SetProjectWorkflowMode(ctx, 1, proj.ID, storage.WorkflowKanban); err != nil {
+		t.Fatalf("enable kanban: %v", err)
+	}
+	statuses, err := ListProjectStatusesForUser(ctx, 1, proj.ID)
+	if err != nil {
+		t.Fatalf("list statuses: %v", err)
+	}
+	var todoID int
+	for _, s := range statuses {
+		if s.Name == "To Do" {
+			todoID = s.ID
+			break
+		}
+	}
+	if todoID == 0 {
+		t.Fatal("missing To Do status")
+	}
+
+	pid := proj.ID
+	id1, err := CreateTask(ctx, 1, CreateTaskInput{Title: "A", ProjectID: &pid})
+	if err != nil {
+		t.Fatalf("create A: %v", err)
+	}
+	id2, err := CreateTask(ctx, 1, CreateTaskInput{Title: "B", ProjectID: &pid})
+	if err != nil {
+		t.Fatalf("create B: %v", err)
+	}
+
+	statusFilter := todoID
+	if err := ReorderTasks(ctx, 1, []int{id2, id1}, false, &pid, nil, &statusFilter); err != nil {
+		t.Fatalf("kanban reorder: %v", err)
+	}
+	if n := len(eventsOfType(t, id1, 1, "reordered")); n != 0 {
+		t.Fatalf("task A reordered events=%d want 0", n)
+	}
+	if n := len(eventsOfType(t, id2, 1, "reordered")); n != 0 {
+		t.Fatalf("task B reordered events=%d want 0", n)
+	}
+}
+
+func TestReorderLogsEventWithoutStatusFilter(t *testing.T) {
+	ctx := context.Background()
+	proj, err := CreateProject(ctx, 1, "List Reorder", "")
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	pid := proj.ID
+	id1, err := CreateTask(ctx, 1, CreateTaskInput{Title: "One", ProjectID: &pid})
+	if err != nil {
+		t.Fatalf("create One: %v", err)
+	}
+	id2, err := CreateTask(ctx, 1, CreateTaskInput{Title: "Two", ProjectID: &pid})
+	if err != nil {
+		t.Fatalf("create Two: %v", err)
+	}
+
+	if err := ReorderTasks(ctx, 1, []int{id2, id1}, false, &pid, nil, nil); err != nil {
+		t.Fatalf("list reorder: %v", err)
+	}
+	if n := len(eventsOfType(t, id2, 1, "reordered")); n != 1 {
+		t.Fatalf("reordered events on ids[0]=%d want 1", n)
+	}
+}

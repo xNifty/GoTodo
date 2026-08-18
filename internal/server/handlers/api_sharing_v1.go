@@ -333,15 +333,17 @@ func apiV1ProjectEvents(w http.ResponseWriter, r *http.Request, projectID int) {
 	for _, ev := range taskEvents {
 		tid := ev.TaskID
 		out = append(out, apiProjectEventJSON{
-			ID:          ev.ID,
-			ProjectID:   projectID,
-			ActorUserID: ev.UserID,
-			EventType:   ev.EventType,
-			Source:      "task",
-			TaskID:      &tid,
-			Label:       formatEventLabel(ev.EventType, ev.Metadata),
-			Metadata:    ev.Metadata,
-			CreatedAt:   formatRFC3339(ev.CreatedAt),
+			ID:            ev.ID,
+			ProjectID:     projectID,
+			ActorUserID:   ev.UserID,
+			ActorEmail:    ev.ActorEmail,
+			ActorUserName: ev.ActorUserName,
+			EventType:     ev.EventType,
+			Source:        "task",
+			TaskID:        &tid,
+			Label:         formatEventLabel(ev.EventType, ev.Metadata),
+			Metadata:      ev.Metadata,
+			CreatedAt:     formatRFC3339(ev.CreatedAt),
 		})
 	}
 	// Newest first (simple insertion merge by created_at string is fine enough; sort by time)

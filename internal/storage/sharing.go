@@ -68,14 +68,14 @@ type ProjectInvite struct {
 
 // ShareLink is a read-only public view token.
 type ShareLink struct {
-	ID         int
-	Token      string
-	CreatedBy  int
-	ScopeType  string
-	ScopeID    int
-	ExpiresAt  *time.Time
-	RevokedAt  *time.Time
-	CreatedAt  time.Time
+	ID        int
+	Token     string
+	CreatedBy int
+	ScopeType string
+	ScopeID   int
+	ExpiresAt *time.Time
+	RevokedAt *time.Time
+	CreatedAt time.Time
 }
 
 // ProjectEvent is an audit entry for project membership/share actions.
@@ -780,9 +780,11 @@ func GetProjectTaskEvents(projectID, limit int) ([]TaskEvent, error) {
 	defer CloseDatabase(pool)
 
 	rows, err := pool.Query(context.Background(), `
-		SELECT te.id, te.task_id, te.user_id, te.event_type, COALESCE(te.metadata, '{}'), te.created_at
+		SELECT te.id, te.task_id, te.user_id, te.event_type, COALESCE(te.metadata, '{}'), te.created_at,
+		       COALESCE(u.user_name, ''), COALESCE(u.email, '')
 		FROM task_events te
 		JOIN tasks t ON t.id = te.task_id
+		LEFT JOIN users u ON u.id = te.user_id
 		WHERE t.project_id = $1
 		ORDER BY te.created_at DESC
 		LIMIT $2`, projectID, limit)
@@ -791,20 +793,7 @@ func GetProjectTaskEvents(projectID, limit int) ([]TaskEvent, error) {
 	}
 	defer rows.Close()
 
-	var out []TaskEvent
-	for rows.Next() {
-		var ev TaskEvent
-		var metaRaw []byte
-		if err := rows.Scan(&ev.ID, &ev.TaskID, &ev.UserID, &ev.EventType, &metaRaw, &ev.CreatedAt); err != nil {
-			return nil, err
-		}
-		ev.Metadata = map[string]interface{}{}
-		if len(metaRaw) > 0 {
-			_ = json.Unmarshal(metaRaw, &ev.Metadata)
-		}
-		out = append(out, ev)
-	}
-	return out, nil
+	return scanTaskEvents(rows)
 }
 
 // TaskVisibleCondition returns a SQL fragment for tasks readable by userID,

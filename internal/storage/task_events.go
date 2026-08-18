@@ -9,12 +9,14 @@ import (
 
 // TaskEvent represents a single audit log entry for a task.
 type TaskEvent struct {
-	ID        int
-	TaskID    int
-	UserID    int
-	EventType string
-	Metadata  map[string]interface{}
-	CreatedAt time.Time
+	ID            int
+	TaskID        int
+	UserID        int
+	EventType     string
+	Metadata      map[string]interface{}
+	CreatedAt     time.Time
+	ActorUserName string
+	ActorEmail    string
 }
 
 // CreateTaskEventsTable creates the task_events audit table.
@@ -77,9 +79,11 @@ func GetEventsForTask(taskID, userID int, limit int) ([]TaskEvent, error) {
 	defer CloseDatabase(pool)
 
 	rows, err := pool.Query(context.Background(), `
-		SELECT te.id, te.task_id, te.user_id, te.event_type, COALESCE(te.metadata, '{}'), te.created_at
+		SELECT te.id, te.task_id, te.user_id, te.event_type, COALESCE(te.metadata, '{}'), te.created_at,
+		       COALESCE(u.user_name, ''), COALESCE(u.email, '')
 		FROM task_events te
 		JOIN tasks t ON t.id = te.task_id
+		LEFT JOIN users u ON u.id = te.user_id
 		WHERE te.task_id = $1 AND `+TaskVisibleCondition("t", "$2")+`
 		ORDER BY te.created_at DESC
 		LIMIT $3`, taskID, userID, limit)
@@ -88,11 +92,19 @@ func GetEventsForTask(taskID, userID int, limit int) ([]TaskEvent, error) {
 	}
 	defer rows.Close()
 
+	return scanTaskEvents(rows)
+}
+
+func scanTaskEvents(rows interface {
+	Next() bool
+	Scan(dest ...any) error
+	Err() error
+}) ([]TaskEvent, error) {
 	var out []TaskEvent
 	for rows.Next() {
 		var ev TaskEvent
 		var metaRaw []byte
-		if err := rows.Scan(&ev.ID, &ev.TaskID, &ev.UserID, &ev.EventType, &metaRaw, &ev.CreatedAt); err != nil {
+		if err := rows.Scan(&ev.ID, &ev.TaskID, &ev.UserID, &ev.EventType, &metaRaw, &ev.CreatedAt, &ev.ActorUserName, &ev.ActorEmail); err != nil {
 			return nil, err
 		}
 		ev.Metadata = map[string]interface{}{}
@@ -101,5 +113,5 @@ func GetEventsForTask(taskID, userID int, limit int) ([]TaskEvent, error) {
 		}
 		out = append(out, ev)
 	}
-	return out, nil
+	return out, rows.Err()
 }

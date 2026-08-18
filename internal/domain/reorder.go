@@ -169,6 +169,11 @@ func ReorderTasks(ctx context.Context, userID int, ids []int, isFav bool, projec
 		return err
 	}
 
-	_ = storage.LogTaskEvent(ids[0], userID, "reordered", map[string]interface{}{"count": len(ids)})
+	// Kanban column reorders follow a status change (or are same-column position
+	// updates). Do not log a per-task "reordered" row; that event is also written
+	// against ids[0], which is often not the card that moved.
+	if statusFilter == nil {
+		_ = storage.LogTaskEvent(ids[0], userID, "reordered", map[string]interface{}{"count": len(ids)})
+	}
 	return nil
 }

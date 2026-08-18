@@ -166,6 +166,9 @@ export type TaskEvent = {
   label: string
   metadata?: Record<string, unknown>
   created_at: string
+  actor_user_id?: number
+  actor_user_name?: string
+  actor_email?: string
 }
 
 export type TaskList = {
