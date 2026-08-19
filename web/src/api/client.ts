@@ -562,13 +562,13 @@ export const api = {
     return request<void>(`/api/v1/project-invites/${id}/decline`, { method: 'POST' })
   },
 
-  listShareLinks(scopeType: 'project' | 'tag', scopeId: number) {
+  listShareLinks(scopeType: 'project', scopeId: number) {
     return request<ShareLink[]>(
       `/api/v1/share-links?scope_type=${encodeURIComponent(scopeType)}&scope_id=${scopeId}`,
     )
   },
 
-  createShareLink(scopeType: 'project' | 'tag', scopeId: number, expiresAt?: string) {
+  createShareLink(scopeType: 'project', scopeId: number, expiresAt?: string) {
     return request<ShareLink>('/api/v1/share-links', {
       method: 'POST',
       body: JSON.stringify({

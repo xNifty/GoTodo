@@ -96,7 +96,7 @@ export type ShareLink = {
   id: number
   token: string
   url: string
-  scope_type: 'project' | 'tag'
+  scope_type: 'project'
   scope_id: number
   expires_at?: string | null
   created_at: string
