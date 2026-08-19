@@ -20,7 +20,6 @@ const (
 	RoleViewer = "viewer"
 
 	ShareScopeProject = "project"
-	ShareScopeTag     = "tag"
 )
 
 // ProjectWithAccess is a project plus the caller's role and owner info.
@@ -130,7 +129,7 @@ func CreateProjectSharingTables() error {
 			expires_at TIMESTAMPTZ,
 			revoked_at TIMESTAMPTZ,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-			CHECK (scope_type IN ('project', 'tag'))
+			CHECK (scope_type IN ('project'))
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_share_links_scope ON share_links(scope_type, scope_id)`,
 		`CREATE TABLE IF NOT EXISTS project_events (
@@ -165,6 +164,86 @@ func MigrateProjectOwnersToMembers() error {
 		FROM projects p
 		ON CONFLICT (project_id, user_id) DO NOTHING`)
 	return err
+}
+
+// MigrateShareLinksDropTagScope removes deprecated tag share links and
+// restricts share_links.scope_type to project.
+func MigrateShareLinksDropTagScope() error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return err
+	}
+	defer CloseDatabase(pool)
+
+	if _, err := pool.Exec(context.Background(), `DELETE FROM share_links WHERE scope_type = 'tag'`); err != nil {
+		return fmt.Errorf("failed to delete tag share links: %v", err)
+	}
+
+	rows, err := pool.Query(context.Background(), `
+		SELECT conname
+		FROM pg_constraint
+		WHERE conrelid = 'share_links'::regclass
+		  AND contype = 'c'
+		  AND pg_get_constraintdef(oid) ILIKE '%scope_type%'`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var names []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return err
+		}
+		names = append(names, name)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	rows.Close()
+
+	for _, name := range names {
+		if !pgIdentSafe(name) {
+			return fmt.Errorf("unexpected share_links constraint name %q", name)
+		}
+		if _, err := pool.Exec(context.Background(),
+			fmt.Sprintf(`ALTER TABLE share_links DROP CONSTRAINT IF EXISTS %s`, name)); err != nil {
+			return fmt.Errorf("failed to drop share_links check %s: %v", name, err)
+		}
+	}
+
+	var exists bool
+	err = pool.QueryRow(context.Background(),
+		`SELECT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'share_links_scope_type_check')`).Scan(&exists)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		_, err = pool.Exec(context.Background(),
+			`ALTER TABLE share_links ADD CONSTRAINT share_links_scope_type_check
+			 CHECK (scope_type IN ('project'))`)
+		if err != nil {
+			return fmt.Errorf("failed to add share_links scope check: %v", err)
+		}
+	}
+	return nil
+}
+
+func pgIdentSafe(name string) bool {
+	if name == "" {
+		return false
+	}
+	for i, r := range name {
+		if r == '_' || (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') {
+			continue
+		}
+		if i > 0 && r >= '0' && r <= '9' {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func newShareToken() (string, error) {
@@ -913,10 +992,11 @@ func ListTasksForShareLink(scopeType string, scopeID, createdBy int) ([]map[stri
 	}
 	defer CloseDatabase(pool)
 
-	var rows pgx.Rows
-	switch scopeType {
-	case ShareScopeProject:
-		rows, err = pool.Query(context.Background(), `
+	if scopeType != ShareScopeProject {
+		return nil, fmt.Errorf("invalid scope")
+	}
+	_ = createdBy
+	rows, err := pool.Query(context.Background(), `
 			SELECT t.id, t.title, t.completed, COALESCE(CAST(t.due_date AS TEXT), ''), COALESCE(t.priority,0),
 			       COALESCE(p.name, ''), COALESCE(t.description, ''), COALESCE(s.name, '')
 			FROM tasks t
@@ -924,37 +1004,6 @@ func ListTasksForShareLink(scopeType string, scopeID, createdBy int) ([]map[stri
 			LEFT JOIN project_statuses s ON s.id = t.status_id
 			WHERE t.project_id = $1
 			ORDER BY t.completed ASC, t.position ASC, t.id ASC`, scopeID)
-	case ShareScopeTag:
-		tag, tagErr := GetTag(scopeID)
-		if tagErr != nil {
-			return nil, tagErr
-		}
-		if tag.ProjectID != nil {
-			rows, err = pool.Query(context.Background(), `
-				SELECT t.id, t.title, t.completed, COALESCE(CAST(t.due_date AS TEXT), ''), COALESCE(t.priority,0),
-				       COALESCE(p.name, ''), COALESCE(t.description, ''), COALESCE(s.name, '')
-				FROM tasks t
-				LEFT JOIN projects p ON p.id = t.project_id
-				LEFT JOIN project_statuses s ON s.id = t.status_id
-				JOIN task_tags tt ON tt.task_id = t.id
-				JOIN tags tg ON tg.id = tt.tag_id
-				WHERE tg.id = $1 AND t.project_id = $2
-				ORDER BY t.completed ASC, t.position ASC, t.id ASC`, scopeID, *tag.ProjectID)
-		} else {
-			rows, err = pool.Query(context.Background(), `
-				SELECT t.id, t.title, t.completed, COALESCE(CAST(t.due_date AS TEXT), ''), COALESCE(t.priority,0),
-				       COALESCE(p.name, ''), COALESCE(t.description, ''), COALESCE(s.name, '')
-				FROM tasks t
-				LEFT JOIN projects p ON p.id = t.project_id
-				LEFT JOIN project_statuses s ON s.id = t.status_id
-				JOIN task_tags tt ON tt.task_id = t.id
-				JOIN tags tg ON tg.id = tt.tag_id
-				WHERE tg.id = $1 AND tg.project_id IS NULL AND t.project_id IS NULL AND t.user_id = $2
-				ORDER BY t.completed ASC, t.position ASC, t.id ASC`, scopeID, createdBy)
-		}
-	default:
-		return nil, fmt.Errorf("invalid scope")
-	}
 	if err != nil {
 		return nil, err
 	}
@@ -1017,13 +1066,4 @@ func GetUserEmailByID(userID int) (string, error) {
 	var email string
 	err = pool.QueryRow(context.Background(), `SELECT email FROM users WHERE id = $1`, userID).Scan(&email)
 	return email, err
-}
-
-// GetTagOwnedByUser verifies a tag can be shared by userID.
-func GetTagOwnedByUser(tagID, userID int) (bool, error) {
-	t, err := GetTag(tagID)
-	if err != nil {
-		return false, nil
-	}
-	return UserCanShareTag(userID, *t)
 }

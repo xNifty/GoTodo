@@ -1768,7 +1768,7 @@ paths:
     get:
       tags: [Projects]
       summary: List share links for a scope
-      description: Project members can list all share links for that project. Tag share links are listed only for tags you own.
+      description: Project members can list all share links for that project.
       security:
         - SessionCookie: []
         - BearerAuth: []
@@ -1778,7 +1778,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [project, tag]
+            enum: [project]
         - name: scope_id
           in: query
           required: true
@@ -2877,7 +2877,7 @@ components:
           type: string
         scope_type:
           type: string
-          enum: [project, tag]
+          enum: [project]
         scope_id:
           type: integer
         expires_at:
@@ -2894,7 +2894,7 @@ components:
       properties:
         scope_type:
           type: string
-          enum: [project, tag]
+          enum: [project]
         scope_id:
           type: integer
         expires_at:

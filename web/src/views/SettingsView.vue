@@ -5,7 +5,7 @@ import { useAuth } from '@/composables/useAuth'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { api } from '@/api/client'
-import type { APIKey, CalendarInfo, GitHubConnection, ShareLink, Tag } from '@/api/types'
+import type { APIKey, CalendarInfo, GitHubConnection, Tag } from '@/api/types'
 import { APIError } from '@/api/types'
 import TimezoneSelect from '@/components/TimezoneSelect.vue'
 import { useSite } from '@/composables/useSite'
@@ -28,7 +28,6 @@ const newPassword = ref('')
 const confirmPassword = ref('')
 
 const tags = ref<Tag[]>([])
-const tagLinks = ref<Record<number, ShareLink[]>>({})
 const tagName = ref('')
 const renameTagId = ref<number | null>(null)
 const renameTagValue = ref('')
@@ -59,24 +58,6 @@ watch(
   { immediate: true },
 )
 
-async function loadTagLinks(tagList: Tag[]) {
-  const entries = await Promise.all(
-    tagList.map(async (tag) => {
-      try {
-        const links = await api.listShareLinks('tag', tag.id)
-        return [tag.id, links] as const
-      } catch {
-        return [tag.id, [] as ShareLink[]] as const
-      }
-    }),
-  )
-  const next: Record<number, ShareLink[]> = {}
-  for (const [id, links] of entries) {
-    next[id] = links
-  }
-  tagLinks.value = next
-}
-
 async function loadExtras() {
   try {
     const [t, c, k, g] = await Promise.all([
@@ -89,7 +70,6 @@ async function loadExtras() {
     calendar.value = c
     keys.value = k
     github.value = g
-    await loadTagLinks(t)
   } catch (err) {
     push(err instanceof APIError ? err.message : 'Failed to load settings extras', 'error')
   }
@@ -180,7 +160,6 @@ async function createTag() {
     await api.createTag(tagName.value.trim())
     tagName.value = ''
     tags.value = await api.listTags({ project_id: 0 })
-    await loadTagLinks(tags.value)
     push('Tag created', 'success')
   } catch (err) {
     push(err instanceof APIError ? err.message : 'Create failed', 'error')
@@ -198,7 +177,6 @@ async function saveRenameTag() {
     await api.renameTag(renameTagId.value, renameTagValue.value.trim())
     renameTagId.value = null
     tags.value = await api.listTags({ project_id: 0 })
-    await loadTagLinks(tags.value)
     push('Tag renamed', 'success')
   } catch (err) {
     push(err instanceof APIError ? err.message : 'Rename failed', 'error')
@@ -216,47 +194,9 @@ async function removeTag(tag: Tag) {
   try {
     await api.deleteTag(tag.id)
     tags.value = await api.listTags({ project_id: 0 })
-    await loadTagLinks(tags.value)
     push('Tag deleted', 'info')
   } catch (err) {
     push(err instanceof APIError ? err.message : 'Delete failed', 'error')
-  }
-}
-
-async function shareTag(tag: Tag) {
-  try {
-    const link = await api.createShareLink('tag', tag.id)
-    await navigator.clipboard.writeText(link.url)
-    push('Share link created and copied', 'success')
-    await loadTagLinks(tags.value)
-  } catch (err) {
-    push(err instanceof APIError ? err.message : 'Failed to create share link', 'error')
-  }
-}
-
-async function copyTagLink(url: string) {
-  try {
-    await navigator.clipboard.writeText(url)
-    push('Copied', 'success')
-  } catch {
-    push(url, 'info')
-  }
-}
-
-async function revokeTagLink(tag: Tag, linkId: number) {
-  const ok = await askConfirm({
-    title: 'Make private?',
-    message: `Revoke the share link for “${tag.name}”? Anyone with that URL will lose access.`,
-    confirmLabel: 'Make private',
-    danger: true,
-  })
-  if (!ok) return
-  try {
-    await api.revokeShareLink(linkId)
-    push('Link revoked — tag is private again', 'info')
-    await loadTagLinks(tags.value)
-  } catch (err) {
-    push(err instanceof APIError ? err.message : 'Failed to revoke link', 'error')
   }
 }
 
@@ -515,7 +455,6 @@ onUnmounted(() => {
       <div class="card-body">
         <p class="text-muted small mb-3">
           These tags apply to inbox tasks (tasks not in a project). Project tags are managed in project settings.
-          Tags stay private by default; you can optionally create a read-only share link.
         </p>
         <form class="row g-2 mb-3" @submit.prevent="createTag">
           <div class="col-sm-8">
@@ -537,20 +476,6 @@ onUnmounted(() => {
                 <span class="flex-grow-1">{{ tag.name }}</span>
                 <button type="button" class="btn btn-sm btn-outline-secondary" @click="beginRenameTag(tag)">Rename</button>
                 <button type="button" class="btn btn-sm btn-outline-danger" @click="removeTag(tag)">Delete</button>
-              </template>
-            </div>
-            <div class="mt-2">
-              <template v-if="tagLinks[tag.id]?.length">
-                <div v-for="link in tagLinks[tag.id]" :key="link.id" class="d-flex flex-wrap align-items-center gap-1 mb-1">
-                  <span class="badge text-bg-success">Shared</span>
-                  <button class="btn btn-sm btn-outline-secondary" type="button" @click="copyTagLink(link.url)">Copy</button>
-                  <button class="btn btn-sm btn-outline-danger" type="button" @click="revokeTagLink(tag, link.id)">
-                    Make private
-                  </button>
-                </div>
-              </template>
-              <template v-else>
-                <button class="btn btn-sm btn-outline-primary" type="button" @click="shareTag(tag)">Create share link</button>
               </template>
             </div>
           </li>

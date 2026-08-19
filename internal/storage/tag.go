@@ -398,13 +398,6 @@ func mergeTagsMatching(pool *pgxpool.Pool, idSQL string, scopeID int, name strin
 		if _, err := pool.Exec(ctx, `DELETE FROM task_tags WHERE tag_id = $1`, dupe); err != nil {
 			return err
 		}
-		if tableExists(pool, "share_links") {
-			if _, err := pool.Exec(ctx, `
-				UPDATE share_links SET scope_id = $1
-				WHERE scope_type = 'tag' AND scope_id = $2`, canonical, dupe); err != nil {
-				return err
-			}
-		}
 		if tableExists(pool, "saved_views") {
 			if _, err := pool.Exec(ctx, `
 				UPDATE saved_views
@@ -484,18 +477,6 @@ func UserCanManageTag(userID int, tag Tag) (bool, error) {
 		return false, nil
 	}
 	return RoleCanWrite(proj.Role), nil
-}
-
-// UserCanShareTag reports whether the user can create a share link for the tag.
-func UserCanShareTag(userID int, tag Tag) (bool, error) {
-	if tag.ProjectID == nil {
-		return tag.UserID == userID, nil
-	}
-	proj, err := GetAccessibleProjectByID(*tag.ProjectID, userID)
-	if err != nil {
-		return false, nil
-	}
-	return RoleCanManage(proj.Role), nil
 }
 
 // UserCanManageTagNamespace reports whether the user can add/delete tags in a namespace.

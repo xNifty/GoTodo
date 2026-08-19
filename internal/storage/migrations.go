@@ -162,6 +162,10 @@ func RunMigrations() error {
 		fmt.Printf("migration: MigrateProjectOwnersToMembers failed: %v\n", err)
 		errCount++
 	}
+	if err := MigrateShareLinksDropTagScope(); err != nil {
+		fmt.Printf("migration: MigrateShareLinksDropTagScope failed: %v\n", err)
+		errCount++
+	}
 
 	if err := MigrateProjectsAddWorkflowMode(); err != nil {
 		fmt.Printf("migration: MigrateProjectsAddWorkflowMode failed: %v\n", err)
