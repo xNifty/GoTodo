@@ -184,6 +184,14 @@
                   >
                     <i class="bi bi-person me-1" />{{ claimerLabel(task) }}
                   </span>
+
+                  <span
+                    v-for="tag in task.tags || []"
+                    :key="tag.id"
+                    class="tag-chip"
+                    :style="{ backgroundColor: tag.color || '#6c757d' }"
+                    :title="tag.name"
+                  >{{ tag.name }}</span>
                 </div>
 
                 <div v-if="canDrag" class="kanban-claim-row mt-2">

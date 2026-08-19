@@ -220,7 +220,7 @@ func appendFilterSQL(where string, args []interface{}, filters ListFilters, time
 	where, args = appendDueDateCondition(where, args, filters.DueFilter, timezone, tablePrefix)
 	where, args = appendCompletedWeekCondition(where, args, filters.CompletedFilter, timezone, tablePrefix)
 	where += filters.priorityCondition(tablePrefix)
-	where, args = appendTagCondition(where, args, filters.TagFilter, tablePrefix)
+	where, args = appendTagCondition(where, args, filters, userID, tablePrefix)
 	if strings.ToLower(strings.TrimSpace(filters.WorkflowClaimScope)) == "mine" {
 		args = append(args, userID)
 		where += filters.workflowClaimCondition(tablePrefix, len(args))
@@ -238,16 +238,35 @@ func searchMatchClause(tablePrefix string) string {
 		WHERE tt.task_id = %s AND tg.name ILIKE $1))`, idCol)
 }
 
-func appendTagCondition(where string, args []interface{}, tagFilter *int, tablePrefix string) (string, []interface{}) {
-	if tagFilter == nil {
-		return where, args
-	}
-	args = append(args, *tagFilter)
-	idx := len(args)
+func appendTagCondition(where string, args []interface{}, filters ListFilters, userID int, tablePrefix string) (string, []interface{}) {
 	idCol := "id"
 	if tablePrefix != "" {
 		idCol = tablePrefix + ".id"
 	}
+	if name := strings.TrimSpace(filters.TagNameFilter); name != "" {
+		args = append(args, name, userID)
+		nameIdx := len(args) - 1
+		userIdx := len(args)
+		where += fmt.Sprintf(` AND %s IN (
+			SELECT tt.task_id FROM task_tags tt
+			JOIN tags tg ON tg.id = tt.tag_id
+			WHERE LOWER(tg.name) = LOWER($%d)
+			  AND (
+				(tg.project_id IS NULL AND tg.user_id = $%d)
+				OR EXISTS (
+					SELECT 1 FROM projects p
+					LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $%d
+					WHERE p.id = tg.project_id AND (p.user_id = $%d OR pm.user_id IS NOT NULL)
+				)
+			  )
+		)`, idCol, nameIdx, userIdx, userIdx, userIdx)
+		return where, args
+	}
+	if filters.TagFilter == nil {
+		return where, args
+	}
+	args = append(args, *filters.TagFilter)
+	idx := len(args)
 	where += fmt.Sprintf(" AND %s IN (SELECT task_id FROM task_tags WHERE tag_id = $%d)", idCol, idx)
 	return where, args
 }
@@ -268,7 +287,7 @@ func attachTagsToTasks(taskList []Task) error {
 		if tags, ok := tagMap[taskList[i].ID]; ok {
 			taskList[i].Tags = make([]Tag, len(tags))
 			for j, tg := range tags {
-				taskList[i].Tags[j] = Tag{ID: tg.ID, Name: tg.Name, Color: tg.Color}
+				taskList[i].Tags[j] = Tag{ID: tg.ID, Name: tg.Name, Color: tg.Color, ProjectID: tg.ProjectID}
 			}
 		}
 	}

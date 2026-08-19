@@ -12,16 +12,16 @@ import (
 
 // FilterContext holds active list filters for API task queries.
 type FilterContext struct {
-	Project             string
-	Status              string
-	Due                 string
-	Completed           string
-	Priority            string
-	Tag                 string
-	Sort                string
-	Search              string
-	Page                int
-	WorkflowClaimScope  string
+	Project            string
+	Status             string
+	Due                string
+	Completed          string
+	Priority           string
+	Tag                string
+	Sort               string
+	Search             string
+	Page               int
+	WorkflowClaimScope string
 }
 
 func firstNonEmpty(values ...string) string {
@@ -62,10 +62,10 @@ func normalizeTagFilter(tag string) string {
 	if tag == "" {
 		return ""
 	}
-	if id, err := strconv.Atoi(tag); err == nil && id > 0 {
-		return strconv.Itoa(id)
+	if len(tag) > 50 {
+		return ""
 	}
-	return ""
+	return tag
 }
 
 func normalizeCompletedFilter(completed string) string {
@@ -139,8 +139,16 @@ func (fc FilterContext) ToListFilters() tasks.ListFilters {
 		}
 	}
 	if fc.Tag != "" {
-		if tid, err := strconv.Atoi(fc.Tag); err == nil {
-			lf.TagFilter = &tid
+		if tid, err := strconv.Atoi(fc.Tag); err == nil && tid > 0 {
+			if lf.ProjectFilter != nil && *lf.ProjectFilter > 0 {
+				lf.TagFilter = &tid
+			} else if tag, err := storage.GetTag(tid); err == nil {
+				lf.TagNameFilter = tag.Name
+			} else {
+				lf.TagFilter = &tid
+			}
+		} else {
+			lf.TagNameFilter = fc.Tag
 		}
 	}
 	return lf

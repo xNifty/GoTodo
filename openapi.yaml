@@ -762,6 +762,9 @@ paths:
           in: query
           schema:
             type: string
+          description: >
+            Tag id when filtering a specific project, or a tag name (or id resolved to name)
+            when listing all tasks / inbox.
         - name: due
           in: query
           schema:
@@ -1851,9 +1854,18 @@ paths:
     get:
       tags: [Tags]
       summary: List tags
+      description: >
+        Omit project_id to list personal tags plus tags on accessible projects.
+        project_id=0 lists personal (inbox) tags. A positive project_id lists that project's tags.
       security:
         - SessionCookie: []
         - BearerAuth: []
+      parameters:
+        - name: project_id
+          in: query
+          schema:
+            type: integer
+          description: 0 for personal tags, or a project id
       responses:
         "200":
           description: Tags
@@ -1865,7 +1877,7 @@ paths:
                   $ref: "#/components/schemas/Tag"
     post:
       tags: [Tags]
-      summary: Create a tag (or return existing by name)
+      summary: Create a tag (or return existing by name in that namespace)
       security:
         - SessionCookie: []
         - BearerAuth: []
@@ -1874,7 +1886,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/NameBody"
+              $ref: "#/components/schemas/TagCreateBody"
       responses:
         "201":
           description: Created or existing
@@ -1884,6 +1896,8 @@ paths:
                 $ref: "#/components/schemas/Tag"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
 
   /api/v1/tags/{id}:
     parameters:
@@ -1909,6 +1923,8 @@ paths:
                 $ref: "#/components/schemas/Tag"
         "404":
           $ref: "#/components/responses/NotFound"
+        "403":
+          $ref: "#/components/responses/Forbidden"
     delete:
       tags: [Tags]
       summary: Delete a tag
@@ -1920,6 +1936,8 @@ paths:
           description: Deleted
         "404":
           $ref: "#/components/responses/NotFound"
+        "403":
+          $ref: "#/components/responses/Forbidden
 
   /api/v1/saved-views:
     get:
@@ -2648,6 +2666,22 @@ components:
           type: string
         color:
           type: string
+        project_id:
+          type: integer
+          nullable: true
+          description: Null for personal (inbox) tags
+
+    TagCreateBody:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 50
+        project_id:
+          type: integer
+          nullable: true
+          description: Omit, null, or 0 for a personal tag; a project id for a project tag
 
     Project:
       type: object

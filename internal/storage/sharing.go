@@ -925,16 +925,33 @@ func ListTasksForShareLink(scopeType string, scopeID, createdBy int) ([]map[stri
 			WHERE t.project_id = $1
 			ORDER BY t.completed ASC, t.position ASC, t.id ASC`, scopeID)
 	case ShareScopeTag:
-		rows, err = pool.Query(context.Background(), `
-			SELECT t.id, t.title, t.completed, COALESCE(CAST(t.due_date AS TEXT), ''), COALESCE(t.priority,0),
-			       COALESCE(p.name, ''), COALESCE(t.description, ''), COALESCE(s.name, '')
-			FROM tasks t
-			LEFT JOIN projects p ON p.id = t.project_id
-			LEFT JOIN project_statuses s ON s.id = t.status_id
-			JOIN task_tags tt ON tt.task_id = t.id
-			JOIN tags tg ON tg.id = tt.tag_id
-			WHERE tg.id = $1 AND tg.user_id = $2
-			ORDER BY t.completed ASC, t.position ASC, t.id ASC`, scopeID, createdBy)
+		tag, tagErr := GetTag(scopeID)
+		if tagErr != nil {
+			return nil, tagErr
+		}
+		if tag.ProjectID != nil {
+			rows, err = pool.Query(context.Background(), `
+				SELECT t.id, t.title, t.completed, COALESCE(CAST(t.due_date AS TEXT), ''), COALESCE(t.priority,0),
+				       COALESCE(p.name, ''), COALESCE(t.description, ''), COALESCE(s.name, '')
+				FROM tasks t
+				LEFT JOIN projects p ON p.id = t.project_id
+				LEFT JOIN project_statuses s ON s.id = t.status_id
+				JOIN task_tags tt ON tt.task_id = t.id
+				JOIN tags tg ON tg.id = tt.tag_id
+				WHERE tg.id = $1 AND t.project_id = $2
+				ORDER BY t.completed ASC, t.position ASC, t.id ASC`, scopeID, *tag.ProjectID)
+		} else {
+			rows, err = pool.Query(context.Background(), `
+				SELECT t.id, t.title, t.completed, COALESCE(CAST(t.due_date AS TEXT), ''), COALESCE(t.priority,0),
+				       COALESCE(p.name, ''), COALESCE(t.description, ''), COALESCE(s.name, '')
+				FROM tasks t
+				LEFT JOIN projects p ON p.id = t.project_id
+				LEFT JOIN project_statuses s ON s.id = t.status_id
+				JOIN task_tags tt ON tt.task_id = t.id
+				JOIN tags tg ON tg.id = tt.tag_id
+				WHERE tg.id = $1 AND tg.project_id IS NULL AND t.project_id IS NULL AND t.user_id = $2
+				ORDER BY t.completed ASC, t.position ASC, t.id ASC`, scopeID, createdBy)
+		}
 	default:
 		return nil, fmt.Errorf("invalid scope")
 	}
@@ -1002,22 +1019,11 @@ func GetUserEmailByID(userID int) (string, error) {
 	return email, err
 }
 
-// GetTagOwnedByUser verifies a tag belongs to userID.
+// GetTagOwnedByUser verifies a tag can be shared by userID.
 func GetTagOwnedByUser(tagID, userID int) (bool, error) {
-	pool, err := OpenDatabase()
+	t, err := GetTag(tagID)
 	if err != nil {
-		return false, err
+		return false, nil
 	}
-	defer CloseDatabase(pool)
-
-	var id int
-	err = pool.QueryRow(context.Background(),
-		`SELECT id FROM tags WHERE id = $1 AND user_id = $2`, tagID, userID).Scan(&id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, sql.ErrNoRows) {
-			return false, nil
-		}
-		return false, err
-	}
-	return true, nil
+	return UserCanShareTag(userID, *t)
 }

@@ -50,11 +50,11 @@ func TestReorderProjectsForUserValidation(t *testing.T) {
 
 func TestCreateTagValidation(t *testing.T) {
 	ctx := context.Background()
-	_, err := CreateTag(ctx, 1, "")
+	_, err := CreateTag(ctx, 1, "", nil)
 	if !errors.Is(err, ErrValidation) {
 		t.Fatalf("empty name: err=%v", err)
 	}
-	_, err = CreateTag(ctx, 1, strings.Repeat("t", MaxTagNameLength+1))
+	_, err = CreateTag(ctx, 1, strings.Repeat("t", MaxTagNameLength+1), nil)
 	if !errors.Is(err, ErrValidation) {
 		t.Fatalf("long name: err=%v", err)
 	}

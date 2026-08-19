@@ -259,7 +259,7 @@ Content-Type: application/json
   "favorite": false,
   "position": 5,
   "tags": [
-    { "id": 1, "name": "errands", "color": "#6c757d" }
+  { "id": 1, "name": "errands", "color": "#6c757d", "project_id": 3 }
   ],
   "created_at": "2026-07-01T14:30:00Z",
   "modified_at": "2026-07-10T09:00:00Z"
@@ -283,7 +283,7 @@ Content-Type: application/json
                             <tr><td><code>due</code></td><td><code>overdue</code>, <code>today</code>, <code>week</code>, <code>through_week</code>, <code>none</code></td><td>Due date quick filter</td></tr>
                             <tr><td><code>completed</code></td><td><code>week</code></td><td>Tasks completed in the last 7 days</td></tr>
                             <tr><td><code>priority</code></td><td><code>0</code>–<code>3</code></td><td>Priority level</td></tr>
-                            <tr><td><code>tag</code></td><td>tag ID</td><td>Filter by tag</td></tr>
+                            <tr><td><code>tag</code></td><td>tag ID or name</td><td>Filter by tag (name matches across accessible namespaces when not in a project view)</td></tr>
                             <tr><td><code>sort</code></td><td><code>priority</code></td><td>Sort by priority (descending)</td></tr>
                             <tr><td><code>search</code></td><td>text</td><td>Search title and description</td></tr>
                             <tr><td><code>page</code></td><td>integer ≥ 1</td><td>Page number (default 1)</td></tr>
@@ -423,7 +423,7 @@ Content-Type: application/json
                             <tr><td><code>due</code></td><td>Empty, <code>overdue</code>, <code>today</code>, <code>week</code>, <code>through_week</code>, or <code>none</code></td></tr>
                             <tr><td><code>completed</code></td><td>Empty, or <code>week</code> for tasks completed in the last 7 days</td></tr>
                             <tr><td><code>priority</code></td><td>Empty, or <code>0</code>–<code>3</code></td></tr>
-                            <tr><td><code>tag</code></td><td>Empty, or a positive tag ID</td></tr>
+                            <tr><td><code>tag</code></td><td>Empty, a positive tag ID (project views), or a tag name (all-tasks)</td></tr>
                             <tr><td><code>sort</code></td><td>Empty for default ordering, or <code>priority</code></td></tr>
                             <tr><td><code>search</code></td><td>Any string up to 500 characters</td></tr>
                         </tbody>
@@ -516,24 +516,35 @@ Content-Type: application/json
                     </p>
 
                     <h2 id="tags" class="h4 mt-4">Tags</h2>
+                    <p>
+                        Tags are either personal (inbox tasks) or scoped to a project.
+                        Project tags are shared with members; only the project owner or editors can create, rename, or delete them.
+                    </p>
 
                     <h3 class="h5 mt-3">List tags</h3>
                     <p><span class="badge bg-success">GET</span> <code>/api/v1/tags</code></p>
+                    <p>
+                        Optional query <code>project_id</code>: omit for all accessible tags,
+                        <code>0</code> for personal tags, or a project id for that project’s tags.
+                    </p>
                     <p>Returns a JSON array of tag objects:</p>
                     <pre class="api-docs-pre"><code>[
-  { "id": 1, "name": "urgent", "color": "#dc3545" },
-  { "id": 2, "name": "home", "color": "#198754" }
+  { "id": 1, "name": "urgent", "color": "#dc3545", "project_id": 3 },
+  { "id": 2, "name": "home", "color": "#198754", "project_id": null }
 ]</code></pre>
 
                     <h3 class="h5 mt-3">Create tag</h3>
                     <p><span class="badge bg-primary">POST</span> <code>/api/v1/tags</code></p>
                     <p>JSON body:</p>
                     <pre class="api-docs-pre"><code>{
-  "name": "errands"    // required, max 50 characters
+  "name": "errands",   // required, max 50 characters
+  "project_id": 3      // optional; omit/null/0 for a personal tag
 }</code></pre>
                     <p>
                         Returns <code>201 Created</code> with the tag object.
-                        Names are unique per user (case-insensitive); if a tag with the same name already exists, that tag is returned.
+                        Names are unique per namespace (personal per user, or per project), case-insensitive;
+                        if a tag with the same name already exists in that namespace, that tag is returned.
+                        Creating a project tag requires owner or editor access (<code>403</code> otherwise).
                     </p>
 
                     <h3 class="h5 mt-3">Rename tag</h3>
@@ -542,14 +553,15 @@ Content-Type: application/json
                     <pre class="api-docs-pre"><code>{
   "name": "renamed"
 }</code></pre>
-                    <p>Returns the updated tag object. Duplicate names return <code>400 invalid_request</code>.</p>
+                    <p>Returns the updated tag object. Duplicate names in the same namespace return <code>400 invalid_request</code>. Viewers receive <code>403</code>.</p>
 
                     <h3 class="h5 mt-3">Delete tag</h3>
                     <p><span class="badge bg-danger">DELETE</span> <code>/api/v1/tags/{id}</code></p>
-                    <p>Removes the tag and its associations on tasks. Returns <code>204 No Content</code> on success.</p>
+                    <p>Removes the tag and its associations on tasks. Returns <code>204 No Content</code> on success. Project tags may be deleted by the owner or editors.</p>
 
                     <p class="text-muted small mb-0">
-                        Pass <code>tag_ids</code> when creating or updating tasks to assign tags.
+                        Pass <code>tag_ids</code> when creating or updating tasks to assign tags from the task’s namespace
+                        (that project, or personal tags for inbox tasks).
                     </p>
                 </div>
             </div>

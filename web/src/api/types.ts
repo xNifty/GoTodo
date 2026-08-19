@@ -19,6 +19,7 @@ export type Tag = {
   id: number
   name: string
   color: string
+  project_id?: number | null
 }
 
 export type WorkflowMode = 'classic' | 'kanban'

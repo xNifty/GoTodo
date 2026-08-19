@@ -15,9 +15,10 @@ import (
 )
 
 type apiTagJSON struct {
-	ID    int    `json:"id"`
-	Name  string `json:"name"`
-	Color string `json:"color"`
+	ID        int    `json:"id"`
+	Name      string `json:"name"`
+	Color     string `json:"color"`
+	ProjectID *int   `json:"project_id"`
 }
 
 type apiTaskJSON struct {
@@ -129,7 +130,8 @@ type apiProjectJSON struct {
 }
 
 type apiTagCreateRequest struct {
-	Name string `json:"name"`
+	Name      string `json:"name"`
+	ProjectID *int   `json:"project_id"`
 }
 
 type apiTagPatchRequest struct {
@@ -178,7 +180,7 @@ type apiTaskEventJSON struct {
 }
 
 func tagToAPIJSON(t storage.Tag) apiTagJSON {
-	return apiTagJSON{ID: t.ID, Name: t.Name, Color: t.Color}
+	return apiTagJSON{ID: t.ID, Name: t.Name, Color: t.Color, ProjectID: t.ProjectID}
 }
 
 func apiUserFromRequest(r *http.Request) (int, bool) {
@@ -188,7 +190,7 @@ func apiUserFromRequest(r *http.Request) (int, bool) {
 func taskToAPIJSON(t tasks.Task) apiTaskJSON {
 	tags := make([]apiTagJSON, 0, len(t.Tags))
 	for _, tg := range t.Tags {
-		tags = append(tags, apiTagJSON{ID: tg.ID, Name: tg.Name, Color: tg.Color})
+		tags = append(tags, apiTagJSON{ID: tg.ID, Name: tg.Name, Color: tg.Color, ProjectID: tg.ProjectID})
 	}
 	out := apiTaskJSON{
 		ID:                t.ID,
@@ -1069,8 +1071,21 @@ func apiV1ListTags(w http.ResponseWriter, r *http.Request) {
 		utils.APIJSONError(w, http.StatusUnauthorized, "unauthorized", "Not authenticated.")
 		return
 	}
-	tags, err := storage.GetTagsForUser(userID)
+	var projectID *int
+	if raw := strings.TrimSpace(r.URL.Query().Get("project_id")); raw != "" {
+		pid, err := strconv.Atoi(raw)
+		if err != nil || pid < 0 {
+			utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid project_id.")
+			return
+		}
+		projectID = &pid
+	}
+	tags, err := domain.ListTags(r.Context(), userID, projectID)
 	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			utils.APIJSONError(w, http.StatusNotFound, "not_found", "Project not found.")
+			return
+		}
 		utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to list tags.")
 		return
 	}
@@ -1093,10 +1108,18 @@ func apiV1CreateTag(w http.ResponseWriter, r *http.Request) {
 		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid JSON body.")
 		return
 	}
-	tag, err := domain.CreateTag(r.Context(), userID, req.Name)
+	tag, err := domain.CreateTag(r.Context(), userID, req.Name, req.ProjectID)
 	if err != nil {
 		if errors.Is(err, domain.ErrValidation) {
 			utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", err.Error())
+			return
+		}
+		if errors.Is(err, domain.ErrForbidden) {
+			utils.APIJSONError(w, http.StatusForbidden, "forbidden", "Not authorized to manage tags.")
+			return
+		}
+		if errors.Is(err, domain.ErrNotFound) {
+			utils.APIJSONError(w, http.StatusNotFound, "not_found", "Project not found.")
 			return
 		}
 		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", err.Error())
@@ -1124,6 +1147,10 @@ func apiV1PatchTag(w http.ResponseWriter, r *http.Request, tagID int) {
 			utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", err.Error())
 			return
 		}
+		if errors.Is(err, domain.ErrForbidden) {
+			utils.APIJSONError(w, http.StatusForbidden, "forbidden", "Not authorized to manage tags.")
+			return
+		}
 		if errors.Is(err, domain.ErrNotFound) {
 			utils.APIJSONError(w, http.StatusNotFound, "not_found", "Tag not found.")
 			return
@@ -1144,6 +1171,10 @@ func apiV1DeleteTag(w http.ResponseWriter, r *http.Request, tagID int) {
 	if err := domain.DeleteTag(r.Context(), userID, tagID); err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			utils.APIJSONError(w, http.StatusNotFound, "not_found", "Tag not found.")
+			return
+		}
+		if errors.Is(err, domain.ErrForbidden) {
+			utils.APIJSONError(w, http.StatusForbidden, "forbidden", "Not authorized to manage tags.")
 			return
 		}
 		utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to delete tag.")

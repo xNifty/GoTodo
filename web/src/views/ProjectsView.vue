@@ -173,91 +173,6 @@
             <p v-else class="text-muted mb-0">No shared projects yet.</p>
           </div>
         </div>
-
-        <div class="card mt-4">
-          <div class="card-header">
-            <h3 class="mb-0 h5">Your Tags</h3>
-          </div>
-          <div class="card-body">
-            <p class="text-muted small mb-3">
-              Tags stay private by default. Optionally create a read-only share link for tasks with that tag,
-              then revoke it anytime to make them private again.
-            </p>
-            <div class="table-responsive">
-              <table class="table table-striped tags-table">
-                <thead>
-                  <tr>
-                    <th>Tag</th>
-                    <th style="width: 280px">Sharing</th>
-                    <th style="width: 80px">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="tag in tags" :key="tag.id">
-                    <td data-label="Tag">
-                      <template v-if="renameTagId === tag.id">
-                        <form class="d-inline-flex align-items-center gap-1 flex-wrap" @submit.prevent="saveRenameTag">
-                          <input
-                            v-model="renameTagValue"
-                            type="text"
-                            class="form-control form-control-sm"
-                            maxlength="50"
-                            required
-                          />
-                          <button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-check" /></button>
-                          <button class="btn btn-sm btn-secondary" type="button" @click="renameTagId = null">
-                            <i class="bi bi-x" />
-                          </button>
-                        </form>
-                      </template>
-                      <template v-else>
-                        {{ tag.name }}
-                        <button class="btn btn-sm btn-link p-0 ms-1" type="button" @click="beginRenameTag(tag)">
-                          <i class="bi bi-pencil" />
-                        </button>
-                      </template>
-                    </td>
-                    <td data-label="Sharing">
-                      <template v-if="tagLinks[tag.id]?.length">
-                        <div
-                          v-for="link in tagLinks[tag.id]"
-                          :key="link.id"
-                          class="d-flex flex-wrap align-items-center gap-1 mb-1"
-                        >
-                          <span class="badge text-bg-success">Shared</span>
-                          <button class="btn btn-sm btn-outline-secondary" type="button" @click="copyTagLink(link.url)">
-                            Copy
-                          </button>
-                          <button
-                            class="btn btn-sm btn-outline-danger"
-                            type="button"
-                            @click="revokeTagLink(tag, link.id)"
-                          >
-                            Make private
-                          </button>
-                        </div>
-                      </template>
-                      <template v-else>
-                        <span class="text-muted small me-2">Private</span>
-                        <button class="btn btn-sm btn-outline-primary" type="button" @click="shareTag(tag)">
-                          Create share link
-                        </button>
-                      </template>
-                    </td>
-                    <td data-label="Actions">
-                      <button class="btn btn-sm btn-danger" type="button" @click="removeTag(tag)">
-                        <i class="bi bi-trash" />
-                      </button>
-                    </td>
-                  </tr>
-                  <tr v-if="!tags.length">
-                    <td colspan="3" class="text-muted">No tags yet.</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
       </div>
 
       <div class="col-md-4">
@@ -321,7 +236,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Sortable from 'sortablejs'
 import { api } from '@/api/client'
-import type { Project, ProjectInvite, ShareLink, Tag } from '@/api/types'
+import type { Project, ProjectInvite } from '@/api/types'
 import { APIError } from '@/api/types'
 import { useToast } from '@/composables/useToast'
 import { useAuth } from '@/composables/useAuth'
@@ -332,12 +247,8 @@ import ProjectSettingsModal from '@/components/ProjectSettingsModal.vue'
 
 const projects = ref<Project[]>([])
 const pendingInvites = ref<ProjectInvite[]>([])
-const tags = ref<Tag[]>([])
-const tagLinks = ref<Record<number, ShareLink[]>>({})
 const name = ref('')
 const description = ref('')
-const renameTagId = ref<number | null>(null)
-const renameTagValue = ref('')
 const sharePanelId = ref<number | null>(null)
 const boardPanelId = ref<number | null>(null)
 const showEditModal = ref(false)
@@ -409,35 +320,14 @@ watch(ownedProjects, async () => {
   initSortable()
 })
 
-async function loadTagLinks(tagList: Tag[]) {
-  const entries = await Promise.all(
-    tagList.map(async (tag) => {
-      try {
-        const links = await api.listShareLinks('tag', tag.id)
-        return [tag.id, links] as const
-      } catch {
-        return [tag.id, [] as ShareLink[]] as const
-      }
-    }),
-  )
-  const next: Record<number, ShareLink[]> = {}
-  for (const [id, links] of entries) {
-    next[id] = links
-  }
-  tagLinks.value = next
-}
-
 async function load() {
   try {
-    const [p, t, invites] = await Promise.all([
+    const [p, invites] = await Promise.all([
       api.listProjects(),
-      api.listTags(),
       api.listMyProjectInvites(),
     ])
     projects.value = p
-    tags.value = t
     pendingInvites.value = invites
-    await loadTagLinks(t)
     if (editingProject.value) {
       const updated = p.find((x) => x.id === editingProject.value!.id)
       if (updated) editingProject.value = updated
@@ -540,77 +430,6 @@ async function declineInvite(inv: ProjectInvite) {
     await load()
   } catch (err) {
     toast.push(err instanceof APIError ? err.message : 'Decline failed', 'error')
-  }
-}
-
-function beginRenameTag(tag: Tag) {
-  renameTagId.value = tag.id
-  renameTagValue.value = tag.name
-}
-
-async function saveRenameTag() {
-  if (renameTagId.value == null || !renameTagValue.value.trim()) return
-  try {
-    await api.renameTag(renameTagId.value, renameTagValue.value.trim())
-    renameTagId.value = null
-    toast.push('Tag renamed', 'success')
-    await load()
-  } catch (err) {
-    toast.push(err instanceof APIError ? err.message : 'Rename failed', 'error')
-  }
-}
-
-async function removeTag(tag: Tag) {
-  const ok = await askConfirm({
-    title: 'Delete tag?',
-    message: 'Delete this tag? It will be removed from all tasks.',
-    confirmLabel: 'Delete',
-    danger: true,
-  })
-  if (!ok) return
-  try {
-    await api.deleteTag(tag.id)
-    toast.push('Tag deleted', 'info')
-    await load()
-  } catch (err) {
-    toast.push(err instanceof APIError ? err.message : 'Delete failed', 'error')
-  }
-}
-
-async function shareTag(tag: Tag) {
-  try {
-    const link = await api.createShareLink('tag', tag.id)
-    await navigator.clipboard.writeText(link.url)
-    toast.push('Share link created and copied', 'success')
-    await loadTagLinks(tags.value)
-  } catch (err) {
-    toast.push(err instanceof APIError ? err.message : 'Failed to create share link', 'error')
-  }
-}
-
-async function copyTagLink(url: string) {
-  try {
-    await navigator.clipboard.writeText(url)
-    toast.push('Copied', 'success')
-  } catch {
-    toast.push(url, 'info')
-  }
-}
-
-async function revokeTagLink(tag: Tag, linkId: number) {
-  const ok = await askConfirm({
-    title: 'Make private?',
-    message: `Revoke the share link for “${tag.name}”? Anyone with that URL will lose access.`,
-    confirmLabel: 'Make private',
-    danger: true,
-  })
-  if (!ok) return
-  try {
-    await api.revokeShareLink(linkId)
-    toast.push('Link revoked — tag is private again', 'info')
-    await loadTagLinks(tags.value)
-  } catch (err) {
-    toast.push(err instanceof APIError ? err.message : 'Failed to revoke link', 'error')
   }
 }
 
