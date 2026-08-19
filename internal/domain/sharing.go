@@ -172,97 +172,47 @@ func DeclineProjectInvite(ctx context.Context, userEmail string, inviteID int) e
 }
 
 // ListShareLinksForUser lists share links the caller is allowed to see.
-// Project members see all links for that project; tag links remain creator-only.
+// Project members see all links for that project.
 func ListShareLinksForUser(ctx context.Context, userID int, scopeType string, scopeID int) ([]storage.ShareLink, error) {
 	_ = ctx
 	scopeType = strings.TrimSpace(strings.ToLower(scopeType))
-	switch scopeType {
-	case storage.ShareScopeProject:
-		if _, err := storage.GetAccessibleProjectByID(scopeID, userID); err != nil {
-			return nil, ErrNotFound
-		}
-		links, err := storage.ListShareLinksForScope(scopeType, scopeID)
-		if err != nil {
-			return nil, err
-		}
-		if links == nil {
-			links = []storage.ShareLink{}
-		}
-		return links, nil
-	case storage.ShareScopeTag:
-		tag, err := storage.GetTag(scopeID)
-		if err != nil {
-			return nil, ErrNotFound
-		}
-		if tag.ProjectID != nil {
-			if _, err := storage.GetAccessibleProjectByID(*tag.ProjectID, userID); err != nil {
-				return nil, ErrNotFound
-			}
-			links, err := storage.ListShareLinksForScope(scopeType, scopeID)
-			if err != nil {
-				return nil, err
-			}
-			if links == nil {
-				links = []storage.ShareLink{}
-			}
-			return links, nil
-		}
-		if tag.UserID != userID {
-			return nil, ErrNotFound
-		}
-		links, err := storage.ListShareLinks(userID, scopeType, scopeID)
-		if err != nil {
-			return nil, err
-		}
-		if links == nil {
-			links = []storage.ShareLink{}
-		}
-		return links, nil
-	default:
-		return nil, fmt.Errorf("%w: scope_type must be project or tag", ErrValidation)
+	if scopeType != storage.ShareScopeProject {
+		return nil, fmt.Errorf("%w: scope_type must be project", ErrValidation)
 	}
+	if _, err := storage.GetAccessibleProjectByID(scopeID, userID); err != nil {
+		return nil, ErrNotFound
+	}
+	links, err := storage.ListShareLinksForScope(scopeType, scopeID)
+	if err != nil {
+		return nil, err
+	}
+	if links == nil {
+		links = []storage.ShareLink{}
+	}
+	return links, nil
 }
 
-// CreateShareLinkForScope creates a read-only share link for a project or tag.
+// CreateShareLinkForScope creates a read-only share link for a project.
 func CreateShareLinkForScope(ctx context.Context, userID int, scopeType string, scopeID int, expiresAt *time.Time) (*storage.ShareLink, error) {
 	_ = ctx
 	scopeType = strings.TrimSpace(strings.ToLower(scopeType))
-	switch scopeType {
-	case storage.ShareScopeProject:
-		proj, err := storage.GetAccessibleProjectByID(scopeID, userID)
-		if err != nil {
-			return nil, ErrNotFound
-		}
-		if !storage.RoleCanManage(proj.Role) {
-			return nil, ErrForbidden
-		}
-	case storage.ShareScopeTag:
-		tag, err := storage.GetTag(scopeID)
-		if err != nil {
-			return nil, ErrNotFound
-		}
-		ok, err := storage.UserCanShareTag(userID, *tag)
-		if err != nil {
-			return nil, err
-		}
-		if !ok {
-			if access, aerr := storage.UserCanAccessTag(userID, *tag); aerr == nil && access {
-				return nil, ErrForbidden
-			}
-			return nil, ErrNotFound
-		}
-	default:
-		return nil, fmt.Errorf("%w: scope_type must be project or tag", ErrValidation)
+	if scopeType != storage.ShareScopeProject {
+		return nil, fmt.Errorf("%w: scope_type must be project", ErrValidation)
+	}
+	proj, err := storage.GetAccessibleProjectByID(scopeID, userID)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+	if !storage.RoleCanManage(proj.Role) {
+		return nil, ErrForbidden
 	}
 	link, err := storage.CreateShareLink(userID, scopeType, scopeID, expiresAt)
 	if err != nil {
 		return nil, err
 	}
-	if scopeType == storage.ShareScopeProject {
-		_ = storage.LogProjectEvent(scopeID, userID, "link_created", map[string]interface{}{
-			"share_link_id": link.ID,
-		})
-	}
+	_ = storage.LogProjectEvent(scopeID, userID, "link_created", map[string]interface{}{
+		"share_link_id": link.ID,
+	})
 	return link, nil
 }
 

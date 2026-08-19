@@ -189,31 +189,14 @@ func TestListTagsQueryScopes(t *testing.T) {
 	}
 }
 
-func TestProjectTagShareLinkOwnerOnly(t *testing.T) {
+func TestTagShareLinksRejected(t *testing.T) {
 	ctx := context.Background()
-	proj, err := CreateProject(ctx, 1, "Tag Share Proj", "")
-	if err != nil {
-		t.Fatalf("create: %v", err)
+	_, err := CreateShareLinkForScope(ctx, 1, "tag", 1, nil)
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("create tag share: err=%v want validation", err)
 	}
-	if err := storage.UpsertProjectMember(proj.ID, 2, storage.RoleEditor); err != nil {
-		t.Fatalf("add editor: %v", err)
-	}
-	pid := proj.ID
-	tag, err := CreateTag(ctx, 1, "share-me", &pid)
-	if err != nil {
-		t.Fatalf("tag: %v", err)
-	}
-
-	_, err = CreateShareLinkForScope(ctx, 2, storage.ShareScopeTag, tag.ID, nil)
-	if !errors.Is(err, ErrForbidden) {
-		t.Fatalf("editor share: err=%v want forbidden", err)
-	}
-
-	link, err := CreateShareLinkForScope(ctx, 1, storage.ShareScopeTag, tag.ID, nil)
-	if err != nil {
-		t.Fatalf("owner share: %v", err)
-	}
-	if link == nil || link.ScopeID != tag.ID {
-		t.Fatalf("unexpected link %+v", link)
+	_, err = ListShareLinksForUser(ctx, 1, "tag", 1)
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("list tag share: err=%v want validation", err)
 	}
 }

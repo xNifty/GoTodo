@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { api } from '@/api/client'
-import type { Project, ShareLink, Tag } from '@/api/types'
+import type { Project, Tag } from '@/api/types'
 import { APIError } from '@/api/types'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
@@ -17,42 +17,20 @@ const emit = defineEmits<{
 const toast = useToast()
 const { askConfirm } = useConfirm()
 const tags = ref<Tag[]>([])
-const tagLinks = ref<Record<number, ShareLink[]>>({})
 const tagName = ref('')
 const renameTagId = ref<number | null>(null)
 const renameTagValue = ref('')
 const loading = ref(false)
 
-const isOwner = computed(() => (props.project.role || 'owner') === 'owner')
 const canManage = computed(() => {
   const role = props.project.role || 'owner'
   return role === 'owner' || role === 'editor'
 })
 
-async function loadTagLinks(tagList: Tag[]) {
-  const entries = await Promise.all(
-    tagList.map(async (tag) => {
-      try {
-        const links = await api.listShareLinks('tag', tag.id)
-        return [tag.id, links] as const
-      } catch {
-        return [tag.id, [] as ShareLink[]] as const
-      }
-    }),
-  )
-  const next: Record<number, ShareLink[]> = {}
-  for (const [id, links] of entries) {
-    next[id] = links
-  }
-  tagLinks.value = next
-}
-
 async function load() {
   loading.value = true
   try {
-    const list = await api.listTags({ project_id: props.project.id })
-    tags.value = list
-    await loadTagLinks(list)
+    tags.value = await api.listTags({ project_id: props.project.id })
   } catch (err) {
     toast.push(err instanceof APIError ? err.message : 'Failed to load tags', 'error')
   } finally {
@@ -116,45 +94,6 @@ async function removeTag(tag: Tag) {
     toast.push(err instanceof APIError ? err.message : 'Delete failed', 'error')
   }
 }
-
-async function shareTag(tag: Tag) {
-  try {
-    const link = await api.createShareLink('tag', tag.id)
-    await navigator.clipboard.writeText(link.url)
-    toast.push('Share link created and copied', 'success')
-    await loadTagLinks(tags.value)
-    emit('changed')
-  } catch (err) {
-    toast.push(err instanceof APIError ? err.message : 'Failed to create share link', 'error')
-  }
-}
-
-async function copyTagLink(url: string) {
-  try {
-    await navigator.clipboard.writeText(url)
-    toast.push('Copied', 'success')
-  } catch {
-    toast.push(url, 'info')
-  }
-}
-
-async function revokeTagLink(tag: Tag, linkId: number) {
-  const ok = await askConfirm({
-    title: 'Make private?',
-    message: `Revoke the share link for “${tag.name}”? Anyone with that URL will lose access.`,
-    confirmLabel: 'Make private',
-    danger: true,
-  })
-  if (!ok) return
-  try {
-    await api.revokeShareLink(linkId)
-    toast.push('Link revoked — tag is private again', 'info')
-    await loadTagLinks(tags.value)
-    emit('changed')
-  } catch (err) {
-    toast.push(err instanceof APIError ? err.message : 'Failed to revoke link', 'error')
-  }
-}
 </script>
 
 <template>
@@ -189,25 +128,6 @@ async function revokeTagLink(tag: Tag, linkId: number) {
             <button v-if="canManage" type="button" class="btn btn-sm btn-outline-danger" @click="removeTag(tag)">
               Delete
             </button>
-          </template>
-        </div>
-        <div class="mt-2 small">
-          <template v-if="tagLinks[tag.id]?.length">
-            <div v-for="link in tagLinks[tag.id]" :key="link.id" class="d-flex flex-wrap align-items-center gap-1 mb-1">
-              <span class="badge text-bg-success">Shared</span>
-              <button class="btn btn-sm btn-outline-secondary" type="button" @click="copyTagLink(link.url)">Copy</button>
-              <button
-                v-if="isOwner"
-                class="btn btn-sm btn-outline-danger"
-                type="button"
-                @click="revokeTagLink(tag, link.id)"
-              >
-                Make private
-              </button>
-            </div>
-          </template>
-          <template v-else-if="isOwner">
-            <button class="btn btn-sm btn-outline-primary" type="button" @click="shareTag(tag)">Create share link</button>
           </template>
         </div>
       </li>
