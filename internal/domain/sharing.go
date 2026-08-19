@@ -190,11 +190,24 @@ func ListShareLinksForUser(ctx context.Context, userID int, scopeType string, sc
 		}
 		return links, nil
 	case storage.ShareScopeTag:
-		ok, err := storage.GetTagOwnedByUser(scopeID, userID)
+		tag, err := storage.GetTag(scopeID)
 		if err != nil {
-			return nil, err
+			return nil, ErrNotFound
 		}
-		if !ok {
+		if tag.ProjectID != nil {
+			if _, err := storage.GetAccessibleProjectByID(*tag.ProjectID, userID); err != nil {
+				return nil, ErrNotFound
+			}
+			links, err := storage.ListShareLinksForScope(scopeType, scopeID)
+			if err != nil {
+				return nil, err
+			}
+			if links == nil {
+				links = []storage.ShareLink{}
+			}
+			return links, nil
+		}
+		if tag.UserID != userID {
 			return nil, ErrNotFound
 		}
 		links, err := storage.ListShareLinks(userID, scopeType, scopeID)
@@ -224,11 +237,18 @@ func CreateShareLinkForScope(ctx context.Context, userID int, scopeType string, 
 			return nil, ErrForbidden
 		}
 	case storage.ShareScopeTag:
-		ok, err := storage.GetTagOwnedByUser(scopeID, userID)
+		tag, err := storage.GetTag(scopeID)
+		if err != nil {
+			return nil, ErrNotFound
+		}
+		ok, err := storage.UserCanShareTag(userID, *tag)
 		if err != nil {
 			return nil, err
 		}
 		if !ok {
+			if access, aerr := storage.UserCanAccessTag(userID, *tag); aerr == nil && access {
+				return nil, ErrForbidden
+			}
 			return nil, ErrNotFound
 		}
 	default:

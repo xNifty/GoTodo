@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import type { Tag } from '@/api/types'
 import type { ViewDensity } from '@/composables/useViewDensity'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     status: string
     tag: string
@@ -15,10 +15,12 @@ withDefaults(
     tags: Tag[]
     showViewMode?: boolean
     viewMode?: 'list' | 'board'
+    tagByName?: boolean
   }>(),
   {
     showViewMode: false,
     viewMode: 'list',
+    tagByName: false,
   },
 )
 
@@ -36,6 +38,18 @@ const emit = defineEmits<{
 
 // Fold/unfold state for the filter toolbar
 const showFilterPills = ref(true)
+
+function tagFilterValue(t: Tag) {
+  return props.tagByName ? t.name : String(t.id)
+}
+
+function selectedTagLabel() {
+  if (!props.tag) return 'ALL'
+  const match = props.tags.find((t) =>
+    props.tagByName ? t.name.toLowerCase() === props.tag.toLowerCase() : String(t.id) === props.tag,
+  )
+  return match?.name || 'Selected'
+}
 
 function getDueDateLabel(preset: string) {
   if (preset === 'today') return 'TODAY'
@@ -166,12 +180,12 @@ function getDueDateLabel(preset: string) {
           type="button"
           data-bs-toggle="dropdown"
         >
-          TAGS: <span class="fw-bold">{{ tag ? tags.find(t => String(t.id) === tag)?.name || 'Selected' : 'ALL' }}</span>
+          TAGS: <span class="fw-bold">{{ selectedTagLabel() }}</span>
         </button>
         <ul class="dropdown-menu shadow-sm border-0">
           <li><button class="dropdown-item small" @click="emit('update:tag', '')">All Tags</button></li>
           <li v-for="t in tags" :key="t.id">
-            <button class="dropdown-item small" @click="emit('update:tag', String(t.id))">
+            <button class="dropdown-item small" @click="emit('update:tag', tagFilterValue(t))">
               <span class="badge rounded-pill me-1" :style="{ backgroundColor: t.color || '#6c757d' }">&nbsp;</span>
               {{ t.name }}
             </button>

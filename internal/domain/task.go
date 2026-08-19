@@ -424,6 +424,19 @@ func UpdateTask(ctx context.Context, userID, taskID int, in UpdateTaskInput) (*U
 				}
 			}
 		}
+		var destProject *int
+		if newProjectID.Valid {
+			pid := int(newProjectID.Int64)
+			destProject = &pid
+		}
+		for _, id := range allIDs {
+			if in.TagIDs != nil && id == taskID {
+				continue
+			}
+			if err := storage.RemapTaskTagsForProjectChange(id, userID, destProject); err != nil {
+				return nil, fmt.Errorf("%w: %s", ErrValidation, err.Error())
+			}
+		}
 	}
 
 	oldStatusID := 0

@@ -4,11 +4,12 @@ import (
 	"fmt"
 )
 
-// Tag is a user-owned label attached to tasks.
+// Tag is a label attached to tasks.
 type Tag struct {
-	ID    int
-	Name  string
-	Color string
+	ID        int
+	Name      string
+	Color     string
+	ProjectID *int
 }
 
 type Task struct {
