@@ -4,14 +4,23 @@ import (
 	"GoTodo/internal/storage"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
-func resolveTaskTagIDsFromRequest(r *http.Request, userID int) ([]int, error) {
-	return storage.ResolveTaskTagIDs(userID, r.Form["tag_ids"], r.FormValue("new_tags"))
+func resolveTaskTagIDsFromRequest(r *http.Request, userID int, projectID *int) ([]int, error) {
+	return storage.ResolveTaskTagIDs(userID, projectID, r.Form["tag_ids"], r.FormValue("new_tags"))
 }
 
 func assignTaskTagsFromRequest(r *http.Request, taskID, userID int) error {
-	tagIDs, err := resolveTaskTagIDsFromRequest(r, userID)
+	pid, err := storage.GetTaskProjectID(taskID)
+	if err != nil {
+		return err
+	}
+	var ns *int
+	if pid > 0 {
+		ns = &pid
+	}
+	tagIDs, err := resolveTaskTagIDsFromRequest(r, userID, ns)
 	if err != nil {
 		return err
 	}
@@ -54,7 +63,7 @@ func tagsListForFilter(userID int, tagFilter string) []map[string]interface{} {
 			"ID":       tg.ID,
 			"Name":     tg.Name,
 			"Color":    tg.Color,
-			"Selected": tagFilter == strconv.Itoa(tg.ID),
+			"Selected": tagFilter == strconv.Itoa(tg.ID) || strings.EqualFold(tagFilter, tg.Name),
 		})
 	}
 	return out

@@ -79,10 +79,10 @@ func TestMain(m *testing.M) {
 		CREATE TABLE tags (
 			id SERIAL PRIMARY KEY,
 			user_id INTEGER NOT NULL,
+			project_id INTEGER,
 			name TEXT NOT NULL,
 			color VARCHAR(7) DEFAULT '#6c757d',
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			UNIQUE(user_id, name)
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		);
 		CREATE TABLE tasks (
 			id SERIAL PRIMARY KEY,
@@ -235,6 +235,14 @@ func TestSearchTasksForUserWithFilters(t *testing.T) {
 	}
 	if len(tasksList) != 1 || tasksList[0].Title != "Tagged task" {
 		t.Fatalf("expected tagged task on page, got %v", tasksList)
+	}
+
+	_, nameTotal, err := tasks.ReturnPaginationForUserWithFilters(1, 10, &userID, timezone, tasks.ListFilters{TagNameFilter: "WORK"})
+	if err != nil {
+		t.Fatalf("tag name filter list: %v", err)
+	}
+	if nameTotal != 1 {
+		t.Fatalf("expected 1 task matching tag name, got total %d", nameTotal)
 	}
 
 	_, tagSearchTotal, err := tasks.SearchTasksForUserWithFilters(1, 10, "work", &userID, timezone, tasks.ListFilters{})

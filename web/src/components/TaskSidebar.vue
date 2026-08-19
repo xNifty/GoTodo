@@ -78,6 +78,12 @@ const readOnly = computed(() => {
   if (mode.value === 'edit' && selectedProject.value?.role === 'viewer') return true
   return false
 })
+const canManageTags = computed(() => {
+  if (readOnly.value) return false
+  const role = selectedProject.value?.role
+  if (!role) return true
+  return role === 'owner' || role === 'editor'
+})
 const parentOptions = computed(() =>
   rootTasks.value.filter((r) => r.id !== taskId.value && taskInSelectedProject(r)),
 )
@@ -182,9 +188,17 @@ function resetForm() {
 }
 
 async function loadMeta() {
-  const [projs, tags] = await Promise.all([api.listProjects(), api.listTags()])
-  projects.value = projs
-  allTags.value = tags
+  projects.value = await api.listProjects()
+  await loadTagsForProject(projectId.value)
+}
+
+async function loadTagsForProject(pid: number | '') {
+  const project_id = pid === '' || pid == null ? 0 : Number(pid)
+  try {
+    allTags.value = await api.listTags({ project_id })
+  } catch {
+    allTags.value = []
+  }
 }
 
 async function loadParentCandidates(pid: number | '', keepParentId: number | null = null) {
@@ -306,6 +320,7 @@ async function loadTask(id: number) {
   githubIssue.value = task.github ?? null
   githubIssueRef.value = ''
   await loadStatusesForProject(projectId.value)
+  await loadTagsForProject(projectId.value)
   await refreshProjectGitHub(projectId.value)
   if (taskWorkflow.value === 'kanban' || isKanbanTask.value) {
     await loadTimeEntries(id)
@@ -326,7 +341,7 @@ async function resolveTagIds(): Promise<number[]> {
       ids.add(existing.id)
       continue
     }
-    const created = await api.createTag(name)
+    const created = await api.createTag(name, projectId.value === '' ? null : Number(projectId.value))
     allTags.value = [...allTags.value, created]
     ids.add(created.id)
   }
@@ -459,12 +474,19 @@ async function loadEvents() {
 watch(description, validateDescription)
 
 async function onProjectChange() {
+  const names = new Set(
+    [...taskTags.value, ...allTags.value]
+      .filter((t) => selectedTagIds.value.includes(t.id))
+      .map((t) => t.name.toLowerCase()),
+  )
   taskWorkflow.value = ''
   if (statusId.value !== '' && !statuses.value.some((s) => s.id === statusId.value)) {
     statusId.value = ''
   }
   await loadStatusesForProject(projectId.value)
   await refreshProjectGitHub(projectId.value)
+  await loadTagsForProject(projectId.value)
+  selectedTagIds.value = allTags.value.filter((t) => names.has(t.name.toLowerCase())).map((t) => t.id)
   const previousParent = isSubtask.value ? Number(parentId.value) : null
   await loadParentCandidates(projectId.value)
   if (previousParent && !parentOptions.value.some((t) => t.id === previousParent)) {
@@ -517,6 +539,7 @@ watch(
           await loadParentCandidates(projectId.value)
         }
         await loadStatusesForProject(projectId.value)
+        await loadTagsForProject(projectId.value)
         await refreshProjectGitHub(projectId.value)
       }
     } catch (err) {
@@ -966,7 +989,7 @@ async function removeTimeEntry(entryId: number) {
               </label>
             </div>
           </div>
-          <div class="form-group mt-2">
+          <div class="form-group mt-2" v-if="canManageTags">
             <label for="new_tags">Add tags (comma-separated)</label>
             <input
               id="new_tags"

@@ -111,10 +111,10 @@ func apiV1ImportPreview(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"preview":       out,
-		"would_import":  wouldImport,
-		"would_skip":    wouldSkip,
-		"total_rows":    len(rows),
+		"preview":      out,
+		"would_import": wouldImport,
+		"would_skip":   wouldSkip,
+		"total_rows":   len(rows),
 	})
 }
 
@@ -529,12 +529,12 @@ func importTasksFromCSV(userID int, cols importColumnMap, rows [][]string) (impo
 
 		tagCSV := cellValue(row, cols.tags)
 		if tagCSV != "" {
-			tagIDs, tagErr := resolveImportTagIDs(userID, tagCSV)
+			tagIDs, tagErr := resolveImportTagIDs(userID, projectID, tagCSV)
 			if tagErr != nil {
 				return imported, skipped, tagErr
 			}
 			if len(tagIDs) > 0 {
-				if err := setTaskTagsInTx(ctx, tx, taskID, userID, tagIDs); err != nil {
+				if err := setTaskTagsInTx(ctx, tx, taskID, userID, projectID, tagIDs); err != nil {
 					return imported, skipped, err
 				}
 			}
@@ -549,7 +549,7 @@ func importTasksFromCSV(userID int, cols importColumnMap, rows [][]string) (impo
 	return imported, skipped, nil
 }
 
-func resolveImportTagIDs(userID int, tagsCSV string) ([]int, error) {
+func resolveImportTagIDs(userID int, projectID *int, tagsCSV string) ([]int, error) {
 	parts := strings.Split(tagsCSV, ";")
 	if len(parts) == 1 {
 		parts = strings.Split(tagsCSV, ",")
@@ -561,7 +561,7 @@ func resolveImportTagIDs(userID int, tagsCSV string) ([]int, error) {
 		if name == "" {
 			continue
 		}
-		t, err := storage.GetOrCreateTagByName(userID, name)
+		t, err := storage.GetOrCreateTagByName(userID, projectID, name)
 		if err != nil {
 			return nil, err
 		}
@@ -576,13 +576,20 @@ func resolveImportTagIDs(userID int, tagsCSV string) ([]int, error) {
 	return ids, nil
 }
 
-func setTaskTagsInTx(ctx context.Context, tx pgx.Tx, taskID, userID int, tagIDs []int) error {
+func setTaskTagsInTx(ctx context.Context, tx pgx.Tx, taskID, userID int, projectID *int, tagIDs []int) error {
 	if _, err := tx.Exec(ctx, "DELETE FROM task_tags WHERE task_id = $1", taskID); err != nil {
 		return err
 	}
 	for _, tagID := range tagIDs {
-		var exists bool
-		if err := tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM tags WHERE id = $1 AND user_id = $2)", tagID, userID).Scan(&exists); err != nil || !exists {
+		tag, err := storage.GetTag(tagID)
+		if err != nil {
+			return fmt.Errorf("invalid tag")
+		}
+		if projectID == nil {
+			if tag.ProjectID != nil || tag.UserID != userID {
+				return fmt.Errorf("invalid tag")
+			}
+		} else if tag.ProjectID == nil || *tag.ProjectID != *projectID {
 			return fmt.Errorf("invalid tag")
 		}
 		if _, err := tx.Exec(ctx, "INSERT INTO task_tags (task_id, tag_id) VALUES ($1, $2)", taskID, tagID); err != nil {

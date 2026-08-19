@@ -124,6 +124,10 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "tags: %v\n", err)
 		os.Exit(1)
 	}
+	if err := storage.MigrateTagsAddProjectID(); err != nil {
+		fmt.Fprintf(os.Stderr, "tags migrate: %v\n", err)
+		os.Exit(1)
+	}
 	if err := storage.CreateGitHubTables(); err != nil {
 		fmt.Fprintf(os.Stderr, "github: %v\n", err)
 		os.Exit(1)
