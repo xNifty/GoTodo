@@ -46,6 +46,7 @@ const addingTime = ref(false)
 const taskWorkflow = ref('')
 
 const titleInput = ref<HTMLInputElement | null>(null)
+const descriptionInput = ref<HTMLTextAreaElement | null>(null)
 const title = ref('')
 const description = ref('')
 const projectId = ref<number | ''>('')
@@ -138,6 +139,15 @@ function stubParentTask(id: number, titleText: string, pid: number | ''): Task {
     created_at: '',
     modified_at: '',
   }
+}
+
+const DESCRIPTION_MIN_HEIGHT = 80
+
+function autosizeDescription() {
+  const el = descriptionInput.value
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = `${Math.max(el.scrollHeight, DESCRIPTION_MIN_HEIGHT)}px`
 }
 
 function resetForm() {
@@ -373,6 +383,7 @@ async function save(keepOpen = false) {
         newTags.value = ''
         descriptionError.value = ''
         await nextTick()
+        autosizeDescription()
         titleInput.value?.focus()
       } else {
         resetForm()
@@ -517,8 +528,9 @@ watch(
       if (seq === loadSeq) loading.value = false
     }
     if (seq !== loadSeq || !open.value) return
+    await nextTick()
+    autosizeDescription()
     if (m === 'add') {
-      await nextTick()
       titleInput.value?.focus()
     }
   },
@@ -713,12 +725,14 @@ async function removeTimeEntry(entryId: number) {
           <label for="description">Description:</label>
           <textarea
             id="description"
+            ref="descriptionInput"
             v-model="description"
-            class="form-control"
+            class="form-control task-description-input"
             maxlength="1000"
             rows="4"
             :readonly="readOnly"
             :disabled="readOnly"
+            @input="autosizeDescription"
           />
           <div v-if="!readOnly" class="d-flex justify-content-between align-items-center mt-1">
             <small class="form-hint">Max 1000 Characters</small>
@@ -1070,3 +1084,12 @@ async function removeTimeEntry(entryId: number) {
     </div>
   </div>
 </template>
+
+<style scoped>
+textarea.task-description-input {
+  height: auto;
+  min-height: 80px;
+  resize: vertical;
+  overflow-y: hidden;
+}
+</style>
