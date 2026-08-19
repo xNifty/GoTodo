@@ -16,34 +16,6 @@
     </div>
 
     <div
-      v-else-if="!boardTaskCount"
-      class="text-center py-5 rounded-3 border shadow-xs"
-      style="background: var(--ordryn-card-bg); color: var(--ordryn-text); border-color: var(--ordryn-card-border) !important;"
-    >
-      <template v-if="hasActiveFilters">
-        <i class="bi bi-funnel display-4 text-muted opacity-50" />
-        <h4 class="mt-3 fw-bold">No matching tasks</h4>
-        <p class="text-muted mb-2">No tasks on the board match your active filters.</p>
-        <button type="button" class="btn btn-sm btn-outline-primary rounded-pill" @click="emit('clear-filters')">
-          <i class="bi bi-x-circle me-1" />Clear filters
-        </button>
-      </template>
-      <template v-else>
-        <i class="bi bi-kanban display-4 text-muted opacity-50" />
-        <h4 class="mt-3 fw-bold">Board is empty</h4>
-        <p class="text-muted">Add a task to get your board moving.</p>
-        <button
-          v-if="canAdd"
-          type="button"
-          class="btn btn-success rounded-pill px-4"
-          @click="emit('add-task')"
-        >
-          <i class="bi bi-plus-lg me-1" /> Add Task
-        </button>
-      </template>
-    </div>
-
-    <div
       v-else
       class="kanban-columns d-flex gap-3 overflow-auto pb-2"
     >
@@ -242,13 +214,9 @@ const props = withDefaults(
     tasks: Task[]
     role?: 'owner' | 'editor' | 'viewer'
     density?: ViewDensity
-    hasActiveFilters?: boolean
-    canAdd?: boolean
   }>(),
   {
     density: 'comfortable',
-    hasActiveFilters: false,
-    canAdd: true,
   },
 )
 
@@ -257,8 +225,6 @@ const emit = defineEmits<{
   changed: []
   'task-updated': [task: Task]
   'board-reorder': [payload: { statusId: number; taskIds: number[] }]
-  'add-task': []
-  'clear-filters': []
 }>()
 
 const toast = useToast()
@@ -302,8 +268,6 @@ const boardTasks = computed(() => {
   }
   return out
 })
-
-const boardTaskCount = computed(() => boardTasks.value.length)
 
 function parentTitleFor(task: Task): string {
   if (!task.parent_id) return ''
