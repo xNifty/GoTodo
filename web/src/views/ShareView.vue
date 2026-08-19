@@ -62,6 +62,11 @@ onMounted(async () => {
   }
   try {
     view.value = await api.viewShareLink(token)
+    const raw = Array.isArray(route.query.task) ? route.query.task[0] : route.query.task
+    const taskID = Number(raw)
+    if (Number.isFinite(taskID) && taskID > 0) {
+      selectedTask.value = (view.value?.tasks || []).find((t) => t.id === taskID) ?? null
+    }
   } catch {
     notFound.value = true
   } finally {
