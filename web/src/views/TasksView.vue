@@ -1206,14 +1206,10 @@ onUnmounted(() => {
             :tasks="tasks"
             :role="activeProjectObj.role"
             :density="density"
-            :has-active-filters="hasActiveFilters"
-            :can-add="!isViewerProjectView"
             @open-task="openTaskDetails"
             @changed="reloadInitial"
             @task-updated="applyTaskUpdate"
             @board-reorder="applyBoardReorder"
-            @add-task="openAdd(undefined, filters.project)"
-            @clear-filters="clearFilters"
           />
           <div v-if="loadingMore" class="text-center py-2 text-muted small">
             <span class="spinner-border spinner-border-sm me-2" />Loading more tasks…
