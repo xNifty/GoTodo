@@ -22,6 +22,7 @@ import { useViewDensity } from '@/composables/useViewDensity'
 import { useSidebarState } from '@/composables/useSidebarState'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { projectOptionLabel } from '@/utils/projectLabel'
+import { uniqueTagsByName } from '@/utils/tags'
 
 defineProps<{
   mobileSidebarOpen?: boolean
@@ -129,6 +130,9 @@ const activeProjectObj = computed(() => {
 const isViewerProjectView = computed(
   () => activeProjectObj.value?.role === 'viewer',
 )
+
+const tagFilterByName = computed(() => !filters.project)
+const displayTags = computed(() => (tagFilterByName.value ? uniqueTagsByName(tags.value) : tags.value))
 
 const VIEW_MODE_KEY = 'gotodo.viewMode'
 type TaskViewMode = 'list' | 'board'
@@ -297,8 +301,11 @@ function taskMatchesCurrentFilters(task: Task): boolean {
   }
   if (filters.priority && String(task.priority) !== filters.priority) return false
   if (filters.tag) {
-    const tagId = parseInt(filters.tag, 10)
-    if (!task.tags?.some((t) => t.id === tagId)) return false
+    const q = filters.tag.toLowerCase()
+    const byId = String(parseInt(filters.tag, 10)) === filters.tag
+    if (!task.tags?.some((t) => (byId && String(t.id) === filters.tag) || t.name.toLowerCase() === q)) {
+      return false
+    }
   }
   if (filters.search) {
     const q = filters.search.toLowerCase()
@@ -503,16 +510,47 @@ const { refresh: refreshSortable } = useTaskSortable(
 
 async function loadMeta() {
   try {
-    const [projs, tagList, views] = await Promise.all([
+    const [projs, views] = await Promise.all([
       api.listProjects(),
-      api.listTags(),
       api.listSavedViews(),
     ])
     projects.value = projs
-    tags.value = tagList
     savedViews.value = views
+    await loadTags()
   } catch {
     /* non-fatal */
+  }
+}
+
+async function loadTags() {
+  try {
+    if (filters.project === '0') {
+      tags.value = await api.listTags({ project_id: 0 })
+    } else if (filters.project) {
+      const pid = parseInt(filters.project, 10)
+      tags.value = Number.isNaN(pid) ? await api.listTags() : await api.listTags({ project_id: pid })
+    } else {
+      tags.value = await api.listTags()
+    }
+    if (filters.tag) {
+      if (tagFilterByName.value) {
+        const byId = tags.value.find((t) => String(t.id) === filters.tag)
+        if (byId) {
+          setFilter('tag', byId.name)
+        } else if (!displayTags.value.some((t) => t.name.toLowerCase() === filters.tag.toLowerCase())) {
+          setFilter('tag', '')
+        }
+      } else {
+        const byName = tags.value.find((t) => t.name.toLowerCase() === filters.tag.toLowerCase())
+        if (byName) {
+          setFilter('tag', String(byName.id))
+        } else if (!tags.value.some((t) => String(t.id) === filters.tag)) {
+          setFilter('tag', '')
+        }
+      }
+    }
+  } catch {
+    tags.value = []
   }
 }
 
@@ -588,6 +626,13 @@ async function loadMore() {
     loadingMore.value = false
   }
 }
+
+watch(
+  () => filters.project,
+  () => {
+    void loadTags()
+  },
+)
 
 watch(lastSavedTask, async (task) => {
   if (!task) return
@@ -1135,7 +1180,8 @@ onUnmounted(() => {
           :sort="filters.sort"
           :search="search"
           :density="density"
-          :tags="tags"
+          :tags="displayTags"
+          :tag-by-name="tagFilterByName"
           :show-view-mode="isKanbanProjectView"
           :view-mode="viewMode"
           @update:status="setFilterAndReload('status', $event)"
@@ -1160,14 +1206,10 @@ onUnmounted(() => {
             :tasks="tasks"
             :role="activeProjectObj.role"
             :density="density"
-            :has-active-filters="hasActiveFilters"
-            :can-add="!isViewerProjectView"
             @open-task="openTaskDetails"
             @changed="reloadInitial"
             @task-updated="applyTaskUpdate"
             @board-reorder="applyBoardReorder"
-            @add-task="openAdd(undefined, filters.project)"
-            @clear-filters="clearFilters"
           />
           <div v-if="loadingMore" class="text-center py-2 text-muted small">
             <span class="spinner-border spinner-border-sm me-2" />Loading more tasks…
@@ -1216,7 +1258,7 @@ onUnmounted(() => {
                   <label class="form-label text-muted small fw-bold text-uppercase mb-1" style="font-size: 0.7rem;">Select tag...</label>
                   <select v-model="bulkTag" class="form-select form-select-sm mb-2">
                     <option value="">Select tag...</option>
-                    <option v-for="t in tags" :key="t.id" :value="String(t.id)">{{ t.name }}</option>
+                    <option v-for="t in displayTags" :key="t.id" :value="String(t.id)">{{ t.name }}</option>
                   </select>
                   <div class="d-flex gap-2">
                     <button

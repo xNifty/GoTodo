@@ -18,7 +18,7 @@ func TestValidateSavedViewFilterRejectsInvalidValues(t *testing.T) {
 		{name: "due", filter: storage.SavedViewFilter{Due: "tomorrow"}},
 		{name: "completed", filter: storage.SavedViewFilter{Completed: "month"}},
 		{name: "priority", filter: storage.SavedViewFilter{Priority: "4"}},
-		{name: "tag", filter: storage.SavedViewFilter{Tag: "zero"}},
+		{name: "tag", filter: storage.SavedViewFilter{Tag: strings.Repeat("t", 51)}},
 		{name: "sort", filter: storage.SavedViewFilter{Sort: "name"}},
 	}
 	for _, testCase := range cases {

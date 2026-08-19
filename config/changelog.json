@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.1.0",
+    "date": "2026-08-19",
+    "title": "Per-project tags",
+    "notes": [
+      "Tags are scoped per project and shared with members; inbox tasks keep personal tags",
+      "Only project owners and editors can add, rename, or delete project tags",
+      "Task list filters show that project's tags, or unique tag names when viewing all tasks",
+      "Moving a task between projects keeps tags whose names exist in the destination and drops the rest"
+    ]
+  },
+  {
     "version": "1.0.0",
     "date": "2026-07-18",
     "title": "Stable SPA release — Vue UI, JSON API, HTMX removed",

@@ -587,14 +587,19 @@ export const api = {
     return request<ShareLinkView>(`/api/v1/share-links/view/${encodeURIComponent(token)}`)
   },
 
-  listTags() {
-    return request<Tag[]>('/api/v1/tags')
+  listTags(opts?: { project_id?: number }) {
+    const q = new URLSearchParams()
+    if (opts && opts.project_id !== undefined) {
+      q.set('project_id', String(opts.project_id))
+    }
+    const qs = q.toString()
+    return request<Tag[]>(`/api/v1/tags${qs ? `?${qs}` : ''}`)
   },
 
-  createTag(name: string) {
+  createTag(name: string, projectId?: number | null) {
     return request<Tag>('/api/v1/tags', {
       method: 'POST',
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, project_id: projectId ?? null }),
     })
   },
 

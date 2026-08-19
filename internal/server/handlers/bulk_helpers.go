@@ -249,14 +249,37 @@ func bulkMoveProject(ctx context.Context, db *pgxpool.Pool, ids []int, userID in
 }
 
 func bulkAddTag(ctx context.Context, db *pgxpool.Pool, ids []int, userID, tagID int) error {
-	var tagExists bool
-	if err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM tags WHERE id = $1 AND user_id = $2)", tagID, userID).Scan(&tagExists); err != nil || !tagExists {
+	src, err := storage.GetTag(tagID)
+	if err != nil {
+		return fmt.Errorf("invalid tag")
+	}
+	ok, err := storage.UserCanAccessTag(userID, *src)
+	if err != nil || !ok {
 		return fmt.Errorf("invalid tag")
 	}
 	for _, taskID := range ids {
 		existing, err := storage.GetTagsForTask(taskID)
 		if err != nil {
 			return err
+		}
+		taskProjectID, err := storage.GetTaskProjectID(taskID)
+		if err != nil {
+			return err
+		}
+		var ns *int
+		if taskProjectID > 0 {
+			ns = &taskProjectID
+		}
+		dest, err := storage.FindTagByName(userID, ns, src.Name)
+		if err != nil {
+			canManage, manErr := storage.UserCanManageTagNamespace(userID, ns)
+			if manErr != nil || !canManage {
+				continue
+			}
+			dest, err = storage.GetOrCreateTagByName(userID, ns, src.Name)
+			if err != nil {
+				return err
+			}
 		}
 		tagIDs := make([]int, 0, len(existing)+1)
 		seen := make(map[int]bool)
@@ -266,8 +289,8 @@ func bulkAddTag(ctx context.Context, db *pgxpool.Pool, ids []int, userID, tagID 
 				tagIDs = append(tagIDs, t.ID)
 			}
 		}
-		if !seen[tagID] {
-			tagIDs = append(tagIDs, tagID)
+		if !seen[dest.ID] {
+			tagIDs = append(tagIDs, dest.ID)
 		}
 		if len(tagIDs) > storage.MaxTagsPerTask {
 			continue
@@ -275,35 +298,29 @@ func bulkAddTag(ctx context.Context, db *pgxpool.Pool, ids []int, userID, tagID 
 		if err := storage.SetTaskTags(taskID, userID, tagIDs); err != nil {
 			return err
 		}
-		var tagName string
-		if t, err := storage.GetTagsForUser(userID); err == nil {
-			for _, tg := range t {
-				if tg.ID == tagID {
-					tagName = tg.Name
-					break
-				}
-			}
-		}
-		logTaskEvent(taskID, userID, "tag_added", map[string]interface{}{"tag": tagName, "tag_id": tagID})
+		logTaskEvent(taskID, userID, "tag_added", map[string]interface{}{"tag": dest.Name, "tag_id": dest.ID})
 	}
 	return nil
 }
 
 func bulkRemoveTag(ctx context.Context, db *pgxpool.Pool, ids []int, userID, tagID int) error {
-	var tagName string
-	if tags, err := storage.GetTagsForUser(userID); err == nil {
-		for _, tg := range tags {
-			if tg.ID == tagID {
-				tagName = tg.Name
-				break
-			}
-		}
+	src, err := storage.GetTag(tagID)
+	if err != nil {
+		return fmt.Errorf("invalid tag")
+	}
+	ok, err := storage.UserCanAccessTag(userID, *src)
+	if err != nil || !ok {
+		return fmt.Errorf("invalid tag")
 	}
 	for _, taskID := range ids {
-		if _, err := db.Exec(ctx, "DELETE FROM task_tags WHERE task_id = $1 AND tag_id = $2", taskID, tagID); err != nil {
+		if _, err := db.Exec(ctx, `
+			DELETE FROM task_tags tt
+			USING tags tg
+			WHERE tt.task_id = $1 AND tt.tag_id = tg.id AND LOWER(tg.name) = LOWER($2)`,
+			taskID, src.Name); err != nil {
 			return err
 		}
-		logTaskEvent(taskID, userID, "tag_removed", map[string]interface{}{"tag": tagName, "tag_id": tagID})
+		logTaskEvent(taskID, userID, "tag_removed", map[string]interface{}{"tag": src.Name, "tag_id": tagID})
 	}
 	return nil
 }

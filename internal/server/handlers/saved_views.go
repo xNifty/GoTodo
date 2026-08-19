@@ -254,7 +254,7 @@ func validateSavedViewFilter(filter *storage.SavedViewFilter) (storage.SavedView
 	rawTag := strings.TrimSpace(filter.Tag)
 	normalized.Tag = normalizeTagFilter(rawTag)
 	if rawTag != "" && normalized.Tag == "" {
-		return storage.SavedViewFilter{}, errors.New("filter.tag must be a positive id.")
+		return storage.SavedViewFilter{}, errors.New("filter.tag must be a positive id or a tag name (max 50 characters).")
 	}
 
 	rawSort := strings.TrimSpace(filter.Sort)

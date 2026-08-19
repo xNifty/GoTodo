@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch, computed } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { api } from '@/api/client'
 import type { Project, SavedView, Tag } from '@/api/types'
@@ -8,6 +8,7 @@ import { useTaskListFilters } from '@/composables/useTaskListFilters'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { projectOptionLabel } from '@/utils/projectLabel'
+import { uniqueTagsByName } from '@/utils/tags'
 
 const views = ref<SavedView[]>([])
 const projects = ref<Project[]>([])
@@ -27,23 +28,47 @@ const { askConfirm } = useConfirm()
 const router = useRouter()
 const { applySavedView } = useTaskListFilters()
 
+const tagOptions = computed(() => {
+  if (!project.value) return uniqueTagsByName(tags.value)
+  return tags.value
+})
+
+async function loadTags() {
+  try {
+    if (project.value === '0') {
+      tags.value = await api.listTags({ project_id: 0 })
+    } else if (project.value) {
+      const pid = parseInt(project.value, 10)
+      tags.value = Number.isNaN(pid) ? await api.listTags() : await api.listTags({ project_id: pid })
+    } else {
+      tags.value = await api.listTags()
+    }
+  } catch {
+    tags.value = []
+  }
+}
+
 async function load() {
   loading.value = true
   try {
-    const [viewList, projs, tagList] = await Promise.all([
+    const [viewList, projs] = await Promise.all([
       api.listSavedViews(),
       api.listProjects(),
-      api.listTags(),
     ])
     views.value = viewList
     projects.value = projs
-    tags.value = tagList
+    await loadTags()
   } catch (err) {
     toast.push(err instanceof APIError ? err.message : 'Failed to load saved views', 'error')
   } finally {
     loading.value = false
   }
 }
+
+watch(project, () => {
+  tag.value = ''
+  void loadTags()
+})
 
 async function create() {
   if (!name.value.trim()) return
@@ -125,9 +150,10 @@ function projectLabel(value?: string) {
 
 function tagLabel(value?: string) {
   if (!value) return ''
-  const tid = parseInt(value, 10)
-  const match = tags.value.find((t) => t.id === tid)
-  return match?.name || `Tag #${value}`
+  const match = tags.value.find(
+    (t) => String(t.id) === value || t.name.toLowerCase() === value.toLowerCase(),
+  )
+  return match?.name || value
 }
 
 function filterBadges(view: SavedView) {
@@ -226,11 +252,15 @@ onMounted(load)
                 <option v-for="p in projects" :key="p.id" :value="String(p.id)">{{ projectOptionLabel(p) }}</option>
               </select>
             </div>
-            <div v-if="tags.length" class="col-sm-6 col-md-4">
+            <div v-if="tagOptions.length" class="col-sm-6 col-md-4">
               <label class="form-label" for="view-tag">Tag</label>
               <select id="view-tag" v-model="tag" class="form-select">
                 <option value="">All tags</option>
-                <option v-for="t in tags" :key="t.id" :value="String(t.id)">{{ t.name }}</option>
+                <option
+                  v-for="t in tagOptions"
+                  :key="t.id"
+                  :value="project ? String(t.id) : t.name"
+                >{{ t.name }}</option>
               </select>
             </div>
             <div class="col-sm-6 col-md-4">
