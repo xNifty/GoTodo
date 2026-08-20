@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"GoTodo/internal/live"
 	"GoTodo/internal/storage"
 
 	"github.com/jackc/pgx/v5"
@@ -135,6 +136,7 @@ func CreateTask(ctx context.Context, userID int, in CreateTaskInput) (int, error
 		if pid, ok := projectArg.(int); ok && pid > 0 {
 			NotifyProjectMembersTaskCreated(newID, userID, pid, title)
 		}
+		live.AfterTaskChange(userID, newID, live.TypeTaskCreated)
 		return newID, nil
 	}
 
@@ -187,6 +189,7 @@ func CreateTask(ctx context.Context, userID int, in CreateTaskInput) (int, error
 	if pid, ok := projectArg.(int); ok && pid > 0 {
 		NotifyProjectMembersTaskCreated(newID, userID, pid, title)
 	}
+	live.AfterTaskChange(userID, newID, live.TypeTaskCreated)
 	return newID, nil
 }
 
@@ -540,6 +543,11 @@ func UpdateTask(ctx context.Context, userID, taskID int, in UpdateTaskInput) (*U
 	result.NewProjectID = effectiveProjectID
 	result.PriorityChanged = result.OldPriority != result.NewPriority
 	result.ProjectChanged = projectChanged
+	if projectChanged {
+		live.AfterTaskChange(userID, taskID, live.TypeTaskUpdated, result.OldProjectID)
+	} else {
+		live.AfterTaskChange(userID, taskID, live.TypeTaskUpdated)
+	}
 	return result, nil
 }
 
@@ -577,6 +585,7 @@ func DeleteTask(ctx context.Context, userID, taskID int) error {
 	}
 
 	_ = storage.LogTaskEvent(taskID, userID, "deleted", nil)
+	live.AfterTaskChange(userID, taskID, live.TypeTaskDeleted)
 	tag, err := pool.Exec(ctx, `DELETE FROM tasks WHERE id = $1`, taskID)
 	if err != nil {
 		return err
@@ -618,6 +627,7 @@ func SetTaskCompleted(ctx context.Context, userID, taskID int, completed bool) e
 				_ = storage.LogTaskEvent(taskID, userID, "reopened", nil)
 			}
 			go SyncGitHubIssueFromOrdrynState(context.Background(), userID, taskID, completed)
+			live.AfterTaskChange(userID, taskID, live.TypeTaskUpdated)
 			return nil
 		}
 	}
@@ -637,6 +647,7 @@ func SetTaskCompleted(ctx context.Context, userID, taskID int, completed bool) e
 		_ = storage.LogTaskEvent(taskID, userID, "reopened", nil)
 	}
 	go SyncGitHubIssueFromOrdrynState(context.Background(), userID, taskID, completed)
+	live.AfterTaskChange(userID, taskID, live.TypeTaskUpdated)
 	return nil
 }
 
@@ -706,6 +717,7 @@ func SetTaskFavorite(ctx context.Context, userID, taskID int, favorite bool) err
 	if tag.RowsAffected() == 0 {
 		return ErrNotFound
 	}
+	live.AfterTaskChange(userID, taskID, live.TypeTaskUpdated)
 	return nil
 }
 
@@ -803,11 +815,20 @@ func ReparentChildren(ctx context.Context, userID, fromParent int, toParent *int
 			`UPDATE tasks SET parent_id = $1, project_id = $2, is_favorite = false,
 			 date_modified = NOW() AT TIME ZONE 'UTC' WHERE parent_id = $3`,
 			*toParent, parentProj, fromParent)
-		return err
+		if err != nil {
+			return err
+		}
+		live.AfterTaskChange(userID, fromParent, live.TypeTaskUpdated)
+		live.AfterTaskChange(userID, *toParent, live.TypeTaskUpdated)
+		return nil
 	}
 
 	_, err = pool.Exec(ctx,
 		`UPDATE tasks SET parent_id = NULL, date_modified = NOW() AT TIME ZONE 'UTC' WHERE parent_id = $1`,
 		fromParent)
-	return err
+	if err != nil {
+		return err
+	}
+	live.AfterTaskChange(userID, fromParent, live.TypeTaskUpdated)
+	return nil
 }

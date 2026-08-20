@@ -31,6 +31,7 @@ onUnmounted(() => {
             <li class="list-inline-item"><a href="#tasks">Tasks</a></li>
             <li class="list-inline-item"><a href="#projects-views">Projects &amp; views</a></li>
             <li class="list-inline-item"><a href="#calendar-dashboard">Calendar &amp; dashboard</a></li>
+            <li class="list-inline-item"><a href="#collaboration">Collaboration</a></li>
             <li class="list-inline-item"><a href="#shortcuts">Shortcuts</a></li>
             <li class="list-inline-item"><a href="#settings-api">Settings &amp; API</a></li>
           </ul>
@@ -81,6 +82,23 @@ onUnmounted(() => {
           <RouterLink to="/dashboard">Dashboard</RouterLink>
           summarizes progress, overdue items, and other quick stats.
         </p>
+
+        <h2 id="collaboration" class="h4 mt-4">Live collaboration</h2>
+        <p>
+          Shared projects stay in sync while you keep the page open. When someone else (or another of
+          your tabs) creates, edits, moves, or deletes a task, the list, board, calendar, and
+          dashboard refresh on their own. You do not need to reload the browser.
+        </p>
+        <ul>
+          <li>
+            If you are mid-edit in the task sidebar, Ordryn will not overwrite your draft. You will
+            see a notice so you can save or discard first.
+          </li>
+          <li>
+            Public share-link pages stay a snapshot until you refresh; live updates require a signed-in
+            session.
+          </li>
+        </ul>
 
         <h2 id="shortcuts" class="h4 mt-4">Keyboard shortcuts</h2>
         <p>

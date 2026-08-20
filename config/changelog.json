@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.2.0",
+    "date": "2026-08-19",
+    "title": "Live task updates",
+    "notes": [
+      "Task lists, kanban boards, calendar, and dashboard refresh immediately when another tab or collaborator changes a task",
+      "Uses Server-Sent Events plus Redis so multiple app instances stay in sync",
+      "An in-progress edit in the task sidebar is not overwritten; you get a notice instead"
+    ]
+  },
+  {
     "version": "1.1.0",
     "date": "2026-08-19",
     "title": "Per-project tags",

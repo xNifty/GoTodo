@@ -27,12 +27,13 @@ GoTodo (Ordryn) is a self-hosted task manager built with Go, PostgreSQL, Redis, 
 - Admin panel: site settings, user management, global announcements
 - Dark and light themes
 - Vue 3 SPA at the site root (or `BASE_PATH`, e.g. `/gotodo/`) over `/api/v1` (session cookie auth)
+- Live updates over Server-Sent Events so shared projects and other tabs stay in sync without a refresh
 
 ## Requirements
 
 - Go 1.24+
 - PostgreSQL
-- Redis (required for `/api/v1` auth, rate limits, and device SSO)
+- Redis (required for `/api/v1` auth, rate limits, device SSO, and live updates)
 - Node.js + npm (to build or develop the Vue SPA)
 
 ## Quick start

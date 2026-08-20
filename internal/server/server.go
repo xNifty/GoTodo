@@ -1,6 +1,7 @@
 package server
 
 import (
+	"GoTodo/internal/live"
 	"GoTodo/internal/server/digest"
 	"GoTodo/internal/server/handlers"
 	"GoTodo/internal/server/utils"
@@ -49,6 +50,7 @@ func StartServer() error {
 	if err := utils.InitRedis(); err != nil {
 		return fmt.Errorf("redis: %w", err)
 	}
+	live.Init(utils.RedisClient)
 
 	if err := storage.RunMigrations(); err != nil {
 		fmt.Printf("Warning: migrations completed with errors: %v\n", err)
@@ -121,6 +123,7 @@ func registerAPIV1Routes() {
 	handleBoth("/api/v1/saved-views", v1(handlers.APIV1SavedViewsRouter))
 	handleBoth("/api/v1/saved-views/", v1(handlers.APIV1SavedViewsRouter))
 	handleBoth("/api/v1/dashboard", v1(handlers.APIV1Dashboard))
+	handleBoth("/api/v1/events", v1(handlers.APIV1Events))
 	handleBoth("/api/v1/calendar", v1(handlers.APIV1CalendarRouter))
 	handleBoth("/api/v1/calendar/", v1(handlers.APIV1CalendarRouter))
 	handleBoth("/api/v1/export", v1(handlers.APIV1Export))

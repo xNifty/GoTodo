@@ -12,6 +12,7 @@ import (
 
 	"GoTodo/internal/crypto/secret"
 	githubclient "GoTodo/internal/githubclient"
+	"GoTodo/internal/live"
 	"GoTodo/internal/storage"
 )
 
@@ -214,6 +215,7 @@ func LinkProjectGitHubRepo(ctx context.Context, userID, projectID int, repoRef s
 		"full_name": saved.GitHubOwner + "/" + saved.GitHubRepo,
 		"repo_id":   saved.GitHubRepoID,
 	})
+	live.AfterProjectChange(userID, projectID, live.TypeProjectUpdated)
 	return projectGitHubPublic(saved, true), nil
 }
 
@@ -231,6 +233,7 @@ func UnlinkProjectGitHubRepo(ctx context.Context, userID, projectID int) error {
 		return err
 	}
 	_ = storage.LogProjectEvent(projectID, userID, "github_repo_unlinked", nil)
+	live.AfterProjectChange(userID, projectID, live.TypeProjectUpdated)
 	return nil
 }
 
@@ -332,6 +335,7 @@ func CreateGitHubIssueForTask(ctx context.Context, userID, taskID int, title, bo
 		"issue_number": issue.Number,
 		"issue_url":    issue.HTMLURL,
 	})
+	live.AfterTaskChange(userID, taskID, live.TypeTaskUpdated)
 	return taskGitHubPublic(saved), nil
 }
 
@@ -388,6 +392,7 @@ func LinkExistingGitHubIssue(ctx context.Context, userID, taskID int, issueRef s
 		"issue_number": issue.Number,
 		"issue_url":    issue.HTMLURL,
 	})
+	live.AfterTaskChange(userID, taskID, live.TypeTaskUpdated)
 	return taskGitHubPublic(saved), nil
 }
 
@@ -411,6 +416,7 @@ func UnlinkGitHubIssue(ctx context.Context, userID, taskID int) error {
 	_ = storage.LogTaskEvent(taskID, userID, "github_issue_unlinked", map[string]interface{}{
 		"issue_number": existing.IssueNumber,
 	})
+	live.AfterTaskChange(userID, taskID, live.TypeTaskUpdated)
 	return nil
 }
 
@@ -499,6 +505,7 @@ func ApplyGitHubIssueWebhookState(ctx context.Context, owner, repoName string, i
 		"issue_state":  state,
 		"source":       "github",
 	})
+	live.AfterTaskChange(0, issue.TaskID, live.TypeTaskUpdated)
 	return nil
 }
 

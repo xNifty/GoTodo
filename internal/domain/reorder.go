@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 
+	"GoTodo/internal/live"
 	"GoTodo/internal/storage"
 )
 
@@ -175,5 +176,6 @@ func ReorderTasks(ctx context.Context, userID int, ids []int, isFav bool, projec
 	if statusFilter == nil {
 		_ = storage.LogTaskEvent(ids[0], userID, "reordered", map[string]interface{}{"count": len(ids)})
 	}
+	live.AfterTasksChange(userID, live.TypeTaskReordered, ids)
 	return nil
 }

@@ -3,7 +3,8 @@ info:
   title: Ordryn / GoTodo API
   description: |
     JSON API for Ordryn (GoTodo). Self-host with `GOTODO_MODE=full` (UI + API) or
-    `GOTODO_MODE=api` (API only). Redis is required for `/api/v1` authentication and rate limiting.
+    `GOTODO_MODE=api` (API only). Redis is required for `/api/v1` authentication,
+    rate limiting, and live SSE fan-out.
 
     Auth: session cookie (SPA login/register) or `Authorization: Bearer <api_key>`.
   version: 1.0.0
@@ -26,6 +27,7 @@ tags:
   - name: Saved Views
   - name: Device Auth
   - name: GitHub
+  - name: Live
 
 paths:
   /api/v1/health:
@@ -53,6 +55,42 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SiteInfo"
+
+  /api/v1/events:
+    get:
+      tags: [Live]
+      summary: Live task and project updates (Server-Sent Events)
+      description: |
+        Long-lived `text/event-stream` for the authenticated user. The SPA uses a
+        session cookie (`EventSource` cannot send `Authorization` headers).
+
+        Named events:
+        - `ready` — stream is open
+        - `ping` — keepalive about every 25s
+        - `task-update` — JSON invalidation payload (`type`, optional `task_id` /
+          `project_id`, `actor_id`, `timestamp`). Clients should refetch the
+          current view; the payload does not include task bodies.
+
+        Types include `task.created`, `task.updated`, `task.deleted`,
+        `task.reordered`, and `project.updated`.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Event stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                example: |
+                  event: ready
+                  data: {}
+
+                  event: task-update
+                  data: {"type":"task.updated","task_id":42,"project_id":7,"actor_id":3}
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
   /api/v1/auth/register:
     post:
@@ -3320,6 +3358,29 @@ components:
           type: string
         actor_email:
           type: string
+
+    LiveEvent:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - task.created
+            - task.updated
+            - task.deleted
+            - task.reordered
+            - project.updated
+        task_id:
+          type: integer
+        project_id:
+          type: integer
+        actor_id:
+          type: integer
+        origin:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
 
     SavedViewFilter:
       type: object

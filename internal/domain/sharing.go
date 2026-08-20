@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"GoTodo/internal/live"
 	"GoTodo/internal/storage"
 
 	"github.com/jackc/pgx/v5"
@@ -106,6 +107,7 @@ func UpdateProjectMemberRole(ctx context.Context, actorUserID, projectID, member
 	_ = storage.LogProjectEvent(projectID, actorUserID, "role_changed", map[string]interface{}{
 		"user_id": memberUserID, "role": role,
 	})
+	live.AfterProjectChange(actorUserID, projectID, live.TypeProjectUpdated)
 	return nil
 }
 
@@ -140,6 +142,7 @@ func RemoveProjectMember(ctx context.Context, actorUserID, projectID, memberUser
 	_ = storage.LogProjectEvent(projectID, actorUserID, event, map[string]interface{}{
 		"user_id": memberUserID,
 	})
+	live.AfterProjectChange(actorUserID, projectID, live.TypeProjectUpdated, memberUserID)
 	return nil
 }
 
@@ -159,6 +162,7 @@ func AcceptProjectInvite(ctx context.Context, userID int, userEmail string, invi
 	_ = storage.LogProjectEvent(inv.ProjectID, userID, "accepted", map[string]interface{}{
 		"invite_id": inviteID, "role": inv.Role,
 	})
+	live.AfterProjectChange(userID, inv.ProjectID, live.TypeProjectUpdated)
 	return nil
 }
 
