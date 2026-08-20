@@ -147,6 +147,45 @@ func TestMoveTaskRemapsTagsByName(t *testing.T) {
 	}
 }
 
+func TestSameTagNameAllowedAcrossProjectsAndInbox(t *testing.T) {
+	ctx := context.Background()
+	a, err := CreateProject(ctx, 1, "Tag Dup A", "")
+	if err != nil {
+		t.Fatalf("project a: %v", err)
+	}
+	b, err := CreateProject(ctx, 1, "Tag Dup B", "")
+	if err != nil {
+		t.Fatalf("project b: %v", err)
+	}
+	aID, bID := a.ID, b.ID
+
+	aTag, err := CreateTag(ctx, 1, "shared-across", &aID)
+	if err != nil {
+		t.Fatalf("project a tag: %v", err)
+	}
+	bTag, err := CreateTag(ctx, 1, "shared-across", &bID)
+	if err != nil {
+		t.Fatalf("project b tag: %v", err)
+	}
+	inbox, err := CreateTag(ctx, 1, "shared-across", nil)
+	if err != nil {
+		t.Fatalf("inbox tag: %v", err)
+	}
+
+	if aTag.ID == bTag.ID || aTag.ID == inbox.ID || bTag.ID == inbox.ID {
+		t.Fatalf("expected distinct tags, got a=%d b=%d inbox=%d", aTag.ID, bTag.ID, inbox.ID)
+	}
+	if aTag.ProjectID == nil || *aTag.ProjectID != aID {
+		t.Fatalf("project a tag scope: %+v", aTag)
+	}
+	if bTag.ProjectID == nil || *bTag.ProjectID != bID {
+		t.Fatalf("project b tag scope: %+v", bTag)
+	}
+	if inbox.ProjectID != nil {
+		t.Fatalf("inbox tag should be personal, got %+v", inbox)
+	}
+}
+
 func TestListTagsQueryScopes(t *testing.T) {
 	ctx := context.Background()
 	proj, err := CreateProject(ctx, 1, "Tag List Proj", "")
