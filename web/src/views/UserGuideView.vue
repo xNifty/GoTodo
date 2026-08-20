@@ -103,6 +103,16 @@ onUnmounted(() => {
             Public share-link pages stay a snapshot until you refresh; live updates require a signed-in
             session.
           </li>
+          <li>
+            Owners, editors, and viewers can discuss a project task in the sidebar. Deleting a comment
+            leaves a tombstone (“Message deleted by user” or “Message deleted by project owner”). New
+            comments show up live for anyone with the task open, and in the notification bell.
+          </li>
+          <li>
+            Paste <code>#123</code> in a comment to link another task you can access (including tasks
+            only you can see). Click <strong>Insert link</strong>, and it renders as
+            <em>Task #123 - Title</em> for anyone who can open that task.
+          </li>
         </ul>
 
         <h2 id="shortcuts" class="h4 mt-4">Keyboard shortcuts</h2>

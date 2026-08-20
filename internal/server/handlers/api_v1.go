@@ -331,6 +331,9 @@ func APIV1TasksRouter(w http.ResponseWriter, r *http.Request) {
 			}
 			apiV1TaskGitHubIssue(w, r, id)
 			return
+		case "comments":
+			handleTaskComments(w, r, id, parts[2:])
+			return
 		}
 		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid task path.")
 		return

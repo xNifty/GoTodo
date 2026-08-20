@@ -140,7 +140,8 @@ watch(lastSavedTask, () => {
   })
 })
 
-useLiveUpdates(() => {
+useLiveUpdates((event) => {
+  if (event.type === 'task.commented') return
   void refreshDashboard().catch(() => {
     /* keep current view if refresh fails */
   })

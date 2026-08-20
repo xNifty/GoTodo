@@ -1576,6 +1576,80 @@ paths:
               schema:
                 $ref: "#/components/schemas/TaskTimeEntry"
 
+  /api/v1/tasks/{id}/comments:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      tags: [Tasks]
+      summary: List discussion comments for a project task
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Comments oldest-first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TaskComment"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      tags: [Tasks]
+      summary: Add a discussion comment (any project member, including viewers)
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body:
+                  type: string
+                  minLength: 1
+                  maxLength: 2000
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskComment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/tasks/{id}/comments/{commentId}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+      - name: commentId
+        in: path
+        required: true
+        schema:
+          type: integer
+    delete:
+      tags: [Tasks]
+      summary: Soft-delete a comment (author or project owner)
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
   /api/v1/tasks/{id}/time-entries/{entryId}:
     parameters:
       - $ref: "#/components/parameters/ID"
@@ -2507,6 +2581,12 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
+    Conflict:
+      description: Resource is in a conflicting state
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
     NotFound:
       description: Resource not found
       content:
@@ -2810,6 +2890,44 @@ components:
           type: string
         user_name:
           type: string
+
+    TaskComment:
+      type: object
+      properties:
+        id:
+          type: integer
+        task_id:
+          type: integer
+        user_id:
+          type: integer
+        user_name:
+          type: string
+        body:
+          type: string
+          description: Empty when the comment has been deleted
+        created_at:
+          type: string
+          format: date-time
+        deleted:
+          type: boolean
+        deleted_at:
+          type: string
+          format: date-time
+        deleted_by_user_id:
+          type: integer
+        deleted_by_kind:
+          type: string
+          enum: [user, owner]
+        links:
+          type: array
+          description: Tasks referenced in the body that the current user can access
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              title:
+                type: string
 
     ProjectMember:
       type: object

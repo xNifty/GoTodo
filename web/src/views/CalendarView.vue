@@ -124,7 +124,8 @@ watch(lastSavedTask, () => {
   if (month.value) void loadMonth(month.value)
 })
 
-useLiveUpdates(() => {
+useLiveUpdates((event) => {
+  if (event.type === 'task.commented') return
   if (month.value) void loadMonth(month.value)
 })
 </script>

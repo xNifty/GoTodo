@@ -1108,6 +1108,7 @@ onMounted(async () => {
 })
 
 useLiveUpdates((event) => {
+  if (event.type === 'task.commented') return
   if (event.type === 'project.updated') {
     void loadMeta()
     kanbanColumnsRev.value++
