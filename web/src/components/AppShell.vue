@@ -93,6 +93,7 @@ watch(
 
 useLiveUpdates((event) => {
   if (!isAuthenticated.value) return
+  if (event.type === 'task.commented') return
   void loadOverdue()
   if (event.type === 'project.updated') {
     void loadPendingInvites()

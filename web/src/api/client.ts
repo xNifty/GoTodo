@@ -30,6 +30,7 @@ import type {
   TaskEvent,
   TaskList,
   TaskTimeEntry,
+  TaskComment,
   User,
   UserSearchHit,
   WorkflowMode,
@@ -475,6 +476,23 @@ export const api = {
 
   deleteTimeEntry(taskId: number, entryId: number) {
     return request<void>(`/api/v1/tasks/${taskId}/time-entries/${entryId}`, {
+      method: 'DELETE',
+    })
+  },
+
+  listTaskComments(taskId: number) {
+    return request<TaskComment[]>(`/api/v1/tasks/${taskId}/comments`)
+  },
+
+  addTaskComment(taskId: number, body: string) {
+    return request<TaskComment>(`/api/v1/tasks/${taskId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ body }),
+    })
+  },
+
+  deleteTaskComment(taskId: number, commentId: number) {
+    return request<void>(`/api/v1/tasks/${taskId}/comments/${commentId}`, {
       method: 'DELETE',
     })
   },

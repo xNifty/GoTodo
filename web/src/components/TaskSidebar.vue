@@ -4,6 +4,7 @@ import { api } from '@/api/client'
 import type { Project, ProjectStatus, Tag, Task, TaskEvent, TaskGitHubIssue, TaskTimeEntry } from '@/api/types'
 import { APIError } from '@/api/types'
 import ParentTaskCombobox from '@/components/ParentTaskCombobox.vue'
+import TaskDiscussion from '@/components/TaskDiscussion.vue'
 import { useAuth } from '@/composables/useAuth'
 import { useTaskSidebar } from '@/composables/useTaskSidebar'
 import { useToast } from '@/composables/useToast'
@@ -111,6 +112,11 @@ const sidebarTitle = computed(() => {
 const submitText = computed(() => (mode.value === 'edit' ? 'Save Task' : 'Add Task'))
 const charCount = computed(() => description.value.length)
 const timeSpentLabel = computed(() => formatMinutes(timeSpentMinutes.value))
+const showDiscussion = computed(
+  () => (mode.value === 'edit' || mode.value === 'view') && !!currentTask.value?.project_id,
+)
+const discussionIsOwner = computed(() => selectedProject.value?.role === 'owner')
+const discussionRef = ref<{ reload: () => Promise<void> } | null>(null)
 const claimerLabel = computed(() => {
   if (!claimedBy.value) return 'Unclaimed'
   if (user.value?.id && claimedBy.value === user.value.id) return 'You'
@@ -362,6 +368,12 @@ function isFormDirty(): boolean {
 
 useLiveUpdates(async (event: LiveEvent) => {
   if (!open.value || !taskId.value) return
+  if (event.type === 'task.commented') {
+    if (!event.task_id || event.task_id === taskId.value) {
+      await discussionRef.value?.reload()
+    }
+    return
+  }
   if (event.type === 'project.updated') {
     if (currentTask.value?.project_id && event.project_id === currentTask.value.project_id) {
       await loadMeta()
@@ -1126,6 +1138,14 @@ async function removeTimeEntry(entryId: number) {
           </ul>
           <p v-else class="small text-muted mb-0">No time entries yet.</p>
         </div>
+
+        <TaskDiscussion
+          v-if="showDiscussion && taskId"
+          ref="discussionRef"
+          :task-id="taskId"
+          :current-user-id="user?.id ?? null"
+          :is-owner="discussionIsOwner"
+        />
 
         <!-- Form Submit Action Buttons -->
         <div v-if="!readOnly" class="d-flex gap-2 mt-3">
