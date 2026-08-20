@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"GoTodo/internal/live"
 	"GoTodo/internal/storage"
 )
 
@@ -44,6 +45,7 @@ func ClaimTaskForUser(ctx context.Context, userID, taskID int) error {
 		meta["previous_claimed_by"] = prev
 	}
 	_ = storage.LogTaskEvent(taskID, userID, "claimed", meta)
+	live.AfterTaskChange(userID, taskID, live.TypeTaskUpdated)
 	return nil
 }
 
@@ -83,5 +85,6 @@ func UnclaimTaskForUser(ctx context.Context, userID, taskID int) error {
 		meta["previous_claimed_by"] = prev
 	}
 	_ = storage.LogTaskEvent(taskID, userID, "unclaimed", meta)
+	live.AfterTaskChange(userID, taskID, live.TypeTaskUpdated)
 	return nil
 }

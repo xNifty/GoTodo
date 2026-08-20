@@ -147,6 +147,45 @@ func TestMoveTaskRemapsTagsByName(t *testing.T) {
 	}
 }
 
+func TestSameTagNameAllowedAcrossProjectsAndInbox(t *testing.T) {
+	ctx := context.Background()
+	a, err := CreateProject(ctx, 1, "Tag Dup A", "")
+	if err != nil {
+		t.Fatalf("project a: %v", err)
+	}
+	b, err := CreateProject(ctx, 1, "Tag Dup B", "")
+	if err != nil {
+		t.Fatalf("project b: %v", err)
+	}
+	aID, bID := a.ID, b.ID
+
+	aTag, err := CreateTag(ctx, 1, "shared-across", &aID)
+	if err != nil {
+		t.Fatalf("project a tag: %v", err)
+	}
+	bTag, err := CreateTag(ctx, 1, "shared-across", &bID)
+	if err != nil {
+		t.Fatalf("project b tag: %v", err)
+	}
+	inbox, err := CreateTag(ctx, 1, "shared-across", nil)
+	if err != nil {
+		t.Fatalf("inbox tag: %v", err)
+	}
+
+	if aTag.ID == bTag.ID || aTag.ID == inbox.ID || bTag.ID == inbox.ID {
+		t.Fatalf("expected distinct tags, got a=%d b=%d inbox=%d", aTag.ID, bTag.ID, inbox.ID)
+	}
+	if aTag.ProjectID == nil || *aTag.ProjectID != aID {
+		t.Fatalf("project a tag scope: %+v", aTag)
+	}
+	if bTag.ProjectID == nil || *bTag.ProjectID != bID {
+		t.Fatalf("project b tag scope: %+v", bTag)
+	}
+	if inbox.ProjectID != nil {
+		t.Fatalf("inbox tag should be personal, got %+v", inbox)
+	}
+}
+
 func TestListTagsQueryScopes(t *testing.T) {
 	ctx := context.Background()
 	proj, err := CreateProject(ctx, 1, "Tag List Proj", "")
@@ -186,6 +225,37 @@ func TestListTagsQueryScopes(t *testing.T) {
 	}
 	if len(all) < 2 {
 		t.Fatalf("all list should include personal and project tags, got %d", len(all))
+	}
+}
+
+func TestMigrateTagsSplitsLegacySharedTag(t *testing.T) {
+	personal, err := storage.FindTagByName(1, nil, "legacy-migrate-clone")
+	if err != nil {
+		t.Fatalf("personal tag after migrate: %v", err)
+	}
+	projID := 9001
+	project, err := storage.FindTagByName(1, &projID, "legacy-migrate-clone")
+	if err != nil {
+		t.Fatalf("project tag after migrate: %v", err)
+	}
+	if personal.ID == project.ID {
+		t.Fatal("legacy shared tag should be cloned into the project namespace")
+	}
+
+	inboxTags, err := storage.GetTagsForTask(9001)
+	if err != nil {
+		t.Fatalf("inbox tags: %v", err)
+	}
+	if len(inboxTags) != 1 || inboxTags[0].ID != personal.ID {
+		t.Fatalf("inbox task should keep personal tag, got %+v", inboxTags)
+	}
+
+	projTags, err := storage.GetTagsForTask(9002)
+	if err != nil {
+		t.Fatalf("project tags: %v", err)
+	}
+	if len(projTags) != 1 || projTags[0].ID != project.ID {
+		t.Fatalf("project task should use cloned tag, got %+v", projTags)
 	}
 }
 

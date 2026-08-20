@@ -9,6 +9,7 @@ import { useTaskSidebar } from '@/composables/useTaskSidebar'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { projectOptionLabel } from '@/utils/projectLabel'
+import { useLiveUpdates, type LiveEvent } from '@/composables/useLiveUpdates'
 
 const {
   open,
@@ -328,6 +329,66 @@ async function loadTask(id: number) {
     timeEntries.value = []
   }
 }
+
+function sameIdSet(a: number[], b: number[]) {
+  if (a.length !== b.length) return false
+  const seen = new Set(a)
+  return b.every((id) => seen.has(id))
+}
+
+function isFormDirty(): boolean {
+  if (mode.value !== 'edit' || !currentTask.value) return false
+  const t = currentTask.value
+  const project = t.project_id ?? ''
+  const parent = t.parent_id ?? ''
+  const due = t.due_date || ''
+  const status = t.status_id ?? ''
+  const estimate = t.estimate_points ?? ''
+  const tagIds = (t.tags || []).map((x) => x.id)
+  return (
+    title.value !== t.title ||
+    (description.value || '') !== (t.description || '') ||
+    projectId.value !== project ||
+    parentId.value !== parent ||
+    priority.value !== t.priority ||
+    dueDate.value !== due ||
+    completed.value !== t.completed ||
+    statusId.value !== status ||
+    estimatePoints.value !== estimate ||
+    newTags.value.trim() !== '' ||
+    !sameIdSet(selectedTagIds.value, tagIds)
+  )
+}
+
+useLiveUpdates(async (event: LiveEvent) => {
+  if (!open.value || !taskId.value) return
+  if (event.type === 'project.updated') {
+    if (currentTask.value?.project_id && event.project_id === currentTask.value.project_id) {
+      await loadMeta()
+      await loadTagsForProject(projectId.value)
+      await loadStatusesForProject(projectId.value)
+    }
+    return
+  }
+  if (event.task_id && event.task_id !== taskId.value) return
+  if (event.type === 'task.deleted') {
+    toast.push('This task was deleted in another session', 'info')
+    close()
+    return
+  }
+  if (mode.value === 'add') return
+  if (isFormDirty()) {
+    toast.push('This task was updated in another session. Save or discard to avoid overwriting.', 'info')
+    return
+  }
+  try {
+    await loadTask(taskId.value)
+    if (eventsLoaded.value) await loadEvents()
+  } catch {
+    toast.push('This task is no longer available', 'info')
+    close()
+  }
+})
 
 async function resolveTagIds(): Promise<number[]> {
   const ids = new Set(selectedTagIds.value)

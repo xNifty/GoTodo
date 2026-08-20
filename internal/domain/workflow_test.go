@@ -124,8 +124,43 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "tags: %v\n", err)
 		os.Exit(1)
 	}
+
+	// Reproduce production DBs that still have UNIQUE(user_id, name) while a
+	// personal tag is used on both inbox and project tasks. The migration must
+	// drop that constraint before cloning.
+	_, err = pool.Exec(context.Background(), `
+		INSERT INTO users (id, email, password, role_id) VALUES
+			(1, 'owner@example.com', 'x', 1)
+		ON CONFLICT DO NOTHING;
+		ALTER TABLE tags DROP CONSTRAINT IF EXISTS tags_user_id_name_key;
+		ALTER TABLE tags ADD CONSTRAINT tags_user_id_name_key UNIQUE (user_id, name);
+		INSERT INTO projects (id, user_id, name) VALUES (9001, 1, 'Legacy Tag Migrate Fixture')
+		ON CONFLICT DO NOTHING;
+		INSERT INTO project_members (project_id, user_id, role) VALUES (9001, 1, 'owner')
+		ON CONFLICT DO NOTHING;
+		INSERT INTO tags (id, user_id, name, color) VALUES (9001, 1, 'legacy-migrate-clone', '#0d6efd')
+		ON CONFLICT DO NOTHING;
+		INSERT INTO tasks (id, title, user_id, project_id) VALUES
+			(9001, 'legacy inbox', 1, NULL),
+			(9002, 'legacy project', 1, 9001)
+		ON CONFLICT DO NOTHING;
+		INSERT INTO task_tags (task_id, tag_id) VALUES (9001, 9001), (9002, 9001)
+		ON CONFLICT DO NOTHING;
+		SELECT setval(pg_get_serial_sequence('projects','id'), GREATEST((SELECT MAX(id) FROM projects), 1));
+		SELECT setval(pg_get_serial_sequence('tasks','id'), GREATEST((SELECT MAX(id) FROM tasks), 1));
+		SELECT setval(pg_get_serial_sequence('tags','id'), GREATEST((SELECT MAX(id) FROM tags), 1));
+	`)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "legacy tag fixture: %v\n", err)
+		os.Exit(1)
+	}
+
 	if err := storage.MigrateTagsAddProjectID(); err != nil {
 		fmt.Fprintf(os.Stderr, "tags migrate: %v\n", err)
+		os.Exit(1)
+	}
+	if err := storage.MigrateTagsAddProjectID(); err != nil {
+		fmt.Fprintf(os.Stderr, "tags migrate retry: %v\n", err)
 		os.Exit(1)
 	}
 	if err := storage.CreateGitHubTables(); err != nil {

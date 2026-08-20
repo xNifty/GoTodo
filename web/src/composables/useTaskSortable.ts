@@ -1,5 +1,6 @@
 import { nextTick, onBeforeUnmount, type Ref, watch } from 'vue'
 import Sortable from 'sortablejs'
+import { pauseLiveReload, resumeLiveReload } from '@/composables/useLiveUpdates'
 
 type ReorderHandler = (
   taskIds: number[],
@@ -17,8 +18,21 @@ export function useTaskSortable(
   let favSortable: Sortable | null = null
   let regSortable: Sortable | null = null
   const childSortables: Sortable[] = []
+  let dragPaused = 0
+
+  function beginDrag() {
+    if (dragPaused === 0) pauseLiveReload()
+    dragPaused += 1
+  }
+
+  function endDrag() {
+    if (dragPaused === 0) return
+    dragPaused -= 1
+    if (dragPaused === 0) resumeLiveReload()
+  }
 
   function destroy() {
+    while (dragPaused > 0) endDrag()
     favSortable?.destroy()
     regSortable?.destroy()
     favSortable = null
@@ -37,7 +51,11 @@ export function useTaskSortable(
       delay: coarse ? 200 : 0,
       delayOnTouchOnly: true,
       touchStartThreshold: coarse ? 5 : 1,
+      onStart() {
+        beginDrag()
+      },
       onEnd(evt) {
+        endDrag()
         const container = evt.to as HTMLElement
         const ids = Array.from(container.querySelectorAll(':scope > .task-tree-root'))
           .map((el) => parseInt((el as HTMLElement).dataset.taskId || '', 10))
@@ -56,7 +74,11 @@ export function useTaskSortable(
       delay: coarse ? 200 : 0,
       delayOnTouchOnly: true,
       touchStartThreshold: coarse ? 5 : 1,
+      onStart() {
+        beginDrag()
+      },
       onEnd(evt) {
+        endDrag()
         const container = evt.to as HTMLElement
         const ids = Array.from(container.querySelectorAll(':scope > .ordryn-task-card'))
           .map((el) => {

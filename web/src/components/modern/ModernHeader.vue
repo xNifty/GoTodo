@@ -7,6 +7,7 @@ import { useAuth } from '@/composables/useAuth'
 import { useSite } from '@/composables/useSite'
 import { useTheme } from '@/composables/useTheme'
 import { useToast } from '@/composables/useToast'
+import { useLiveUpdates } from '@/composables/useLiveUpdates'
 
 const emit = defineEmits<{
   'toggle-mobile-sidebar': []
@@ -111,6 +112,14 @@ watch(isAuthenticated, (ok) => {
     stopPolling()
     notifications.value = []
     unreadCount.value = 0
+  }
+})
+
+useLiveUpdates((event) => {
+  if (!isAuthenticated.value) return
+  void refreshUnreadCount()
+  if (event.type === 'task.created' || event.type === 'project.updated') {
+    void loadNotifications()
   }
 })
 

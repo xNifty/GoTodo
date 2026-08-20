@@ -9,6 +9,7 @@ import AppFooter from '@/components/AppFooter.vue'
 import { useToast } from '@/composables/useToast'
 import { useSidebarState } from '@/composables/useSidebarState'
 import { useTaskSidebar } from '@/composables/useTaskSidebar'
+import { useLiveUpdates } from '@/composables/useLiveUpdates'
 
 defineProps<{
   mobileSidebarOpen?: boolean
@@ -134,6 +135,12 @@ onMounted(async () => {
 })
 
 watch(lastSavedTask, () => {
+  void refreshDashboard().catch(() => {
+    /* keep current view if refresh fails */
+  })
+})
+
+useLiveUpdates(() => {
   void refreshDashboard().catch(() => {
     /* keep current view if refresh fails */
   })

@@ -54,6 +54,7 @@ var requiredOpenAPIPaths = []string{
 	"/api/v1/saved-views",
 	"/api/v1/saved-views/{id}",
 	"/api/v1/dashboard",
+	"/api/v1/events",
 	"/api/v1/calendar",
 	"/api/v1/calendar/month",
 	"/api/v1/calendar/regenerate",

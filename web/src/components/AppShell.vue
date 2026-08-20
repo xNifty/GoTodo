@@ -4,6 +4,7 @@ import { RouterView, useRoute } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useSite } from '@/composables/useSite'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
+import { startLiveUpdates, stopLiveUpdates, useLiveUpdates } from '@/composables/useLiveUpdates'
 import { api } from '@/api/client'
 import ModernHeader from '@/components/modern/ModernHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
@@ -80,13 +81,23 @@ watch(
     if (authed) {
       void loadOverdue()
       void loadPendingInvites()
+      startLiveUpdates()
     } else {
       overdueCount.value = 0
       pendingInviteCount.value = 0
+      stopLiveUpdates()
     }
   },
   { immediate: true },
 )
+
+useLiveUpdates((event) => {
+  if (!isAuthenticated.value) return
+  void loadOverdue()
+  if (event.type === 'project.updated') {
+    void loadPendingInvites()
+  }
+})
 
 watch(
   () => route.name,
@@ -104,6 +115,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   destroyKeyboardShortcuts()
+  stopLiveUpdates()
 })
 </script>
 
