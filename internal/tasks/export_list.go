@@ -10,7 +10,7 @@ import (
 const ExportMaxTasks = 10000
 
 // FetchAllTasksForUserWithFilters returns all tasks matching filters (up to ExportMaxTasks).
-// Includes favorites. When search is non-empty, matches title, description, and tag names.
+// Includes favorites. When search is non-empty, matches title, description, tag names, and numeric IDs.
 func FetchAllTasksForUserWithFilters(userID *int, timezone string, filters ListFilters, search string) ([]Task, error) {
 	if userID == nil {
 		return []Task{}, nil
@@ -39,7 +39,12 @@ func FetchAllTasksForUserWithFilters(userID *int, timezone string, filters ListF
 	if search != "" {
 		searchPattern := "%" + search + "%"
 		args := []interface{}{searchPattern, timezone, *userID}
-		where := "WHERE (t.title ILIKE $1 OR t.description ILIKE $1 OR EXISTS (SELECT 1 FROM task_tags tt JOIN tags tg ON tt.tag_id = tg.id WHERE tt.task_id = t.id AND tg.name ILIKE $1)) AND t.user_id = $3"
+		match := `(t.title ILIKE $1 OR t.description ILIKE $1 OR EXISTS (SELECT 1 FROM task_tags tt JOIN tags tg ON tt.tag_id = tg.id WHERE tt.task_id = t.id AND tg.name ILIKE $1))`
+		if searchID, ok := parseSearchTaskID(search); ok {
+			args = append(args, searchID)
+			match = fmt.Sprintf("(%s OR t.id = $%d)", match, len(args))
+		}
+		where := "WHERE " + match + " AND t.user_id = $3"
 		where, args = appendFilterSQL(where, args, filters, timezone, "t", *userID)
 		query := taskSelect + where + filters.orderByClause("t") + fmt.Sprintf(" LIMIT %d", ExportMaxTasks)
 		r, err := pool.Query(context.Background(), query, args...)

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { api } from '@/api/client'
 import type { Project, SavedView, Tag, Task } from '@/api/types'
 import { APIError } from '@/api/types'
@@ -34,6 +34,7 @@ const emit = defineEmits<{
 }>()
 
 const route = useRoute()
+const router = useRouter()
 const { openAdd, openEdit, openView, lastSavedTask } = useTaskSidebar()
 const { density } = useViewDensity()
 const { sidebarCollapsed, toggleSidebar } = useSidebarState()
@@ -583,6 +584,16 @@ function syncFiltersFromRoute() {
   }
 }
 
+async function consumeTaskQuery() {
+  const raw = Array.isArray(route.query.task) ? route.query.task[0] : route.query.task
+  const id = Number(raw)
+  if (!Number.isFinite(id) || id <= 0) return
+  const nextQuery = { ...route.query }
+  delete nextQuery.task
+  await router.replace({ query: nextQuery })
+  openTaskDetails(id)
+}
+
 async function reloadInitial() {
   const generation = ++reloadGeneration
   const projectKey = filters.project || ''
@@ -670,9 +681,18 @@ watch(lastSavedTask, async (task) => {
 
 watch(
   () => route.query,
-  () => {
-    syncFiltersFromRoute()
-    void reloadInitial()
+  (next, prev) => {
+    const nextRest = { ...next }
+    const prevRest = { ...(prev || {}) }
+    delete nextRest.task
+    delete prevRest.task
+    if (JSON.stringify(nextRest) !== JSON.stringify(prevRest)) {
+      syncFiltersFromRoute()
+      void reloadInitial()
+    }
+    if (next.task) {
+      void consumeTaskQuery()
+    }
   },
 )
 
@@ -1084,6 +1104,7 @@ onMounted(async () => {
   await loadMeta()
   syncFiltersFromRoute()
   await reloadInitial()
+  await consumeTaskQuery()
 })
 
 useLiveUpdates((event) => {

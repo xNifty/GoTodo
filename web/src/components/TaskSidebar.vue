@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { api } from '@/api/client'
 import type { Project, ProjectStatus, Tag, Task, TaskEvent, TaskGitHubIssue, TaskTimeEntry } from '@/api/types'
 import { APIError } from '@/api/types'
@@ -27,6 +28,20 @@ const {
 const toast = useToast()
 const { askConfirm } = useConfirm()
 const { user } = useAuth()
+const router = useRouter()
+const showTaskNumber = computed(() => (mode.value === 'edit' || mode.value === 'view') && !!taskId.value)
+
+async function copyPermalink() {
+  if (!taskId.value) return
+  const href = router.resolve({ name: 'task', params: { id: String(taskId.value) } }).href
+  const url = new URL(href, window.location.origin).href
+  try {
+    await navigator.clipboard.writeText(url)
+    toast.push('Copied', 'success')
+  } catch {
+    toast.push(url, 'info')
+  }
+}
 
 const loading = ref(false)
 const saving = ref(false)
@@ -777,7 +792,20 @@ async function removeTimeEntry(entryId: number) {
         style="background: var(--ordryn-card-bg); color: var(--ordryn-text);"
       >
         <div class="modal-header border-0 pb-0">
-          <h5 class="modal-title fw-bold">{{ sidebarTitle }}</h5>
+          <h5 class="modal-title fw-bold d-flex align-items-center gap-2 flex-wrap">
+            {{ sidebarTitle }}
+            <span v-if="showTaskNumber" class="text-muted fw-normal">#{{ taskId }}</span>
+            <button
+              v-if="showTaskNumber"
+              type="button"
+              class="btn btn-sm btn-outline-secondary"
+              title="Copy link"
+              aria-label="Copy task link"
+              @click="copyPermalink"
+            >
+              <i class="bi bi-link-45deg" /> Copy link
+            </button>
+          </h5>
           <button type="button" class="btn-close" id="closeSidebar" aria-label="Close" @click="close" />
         </div>
         <div class="modal-body py-3">

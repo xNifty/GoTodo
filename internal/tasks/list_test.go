@@ -252,6 +252,22 @@ func TestSearchTasksForUserWithFilters(t *testing.T) {
 	if tagSearchTotal != 1 {
 		t.Fatalf("expected 1 task matching tag name search, got %d", tagSearchTotal)
 	}
+
+	idResults, idTotal, err := tasks.SearchTasksForUserWithFilters(1, 10, "4", &userID, timezone, tasks.ListFilters{})
+	if err != nil {
+		t.Fatalf("numeric id search: %v", err)
+	}
+	if idTotal != 1 || len(idResults) != 1 || idResults[0].Title != "Tagged task" {
+		t.Fatalf("expected Tagged task for id 4, got total %d tasks %v", idTotal, idResults)
+	}
+
+	hashResults, hashTotal, err := tasks.SearchTasksForUserWithFilters(1, 10, "#4", &userID, timezone, tasks.ListFilters{})
+	if err != nil {
+		t.Fatalf("hash id search: %v", err)
+	}
+	if hashTotal != 1 || len(hashResults) != 1 || hashResults[0].ID != 4 {
+		t.Fatalf("expected task 4 for #4, got total %d tasks %v", hashTotal, hashResults)
+	}
 }
 
 func TestSharedProjectVisibilityByRole(t *testing.T) {

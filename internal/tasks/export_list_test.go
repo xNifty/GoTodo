@@ -20,4 +20,12 @@ func TestFetchAllTasksForUserWithFilters(t *testing.T) {
 	if len(list[0].Tags) != 1 || list[0].Tags[0].Name != "work" {
 		t.Fatalf("expected work tag attached, got %v", list[0].Tags)
 	}
+
+	byID, err := tasks.FetchAllTasksForUserWithFilters(&userID, timezone, tasks.ListFilters{}, "#4")
+	if err != nil {
+		t.Fatalf("export search by id: %v", err)
+	}
+	if len(byID) != 1 || byID[0].Title != "Tagged task" {
+		t.Fatalf("expected Tagged task for #4 export search, got %v", byID)
+	}
 }
