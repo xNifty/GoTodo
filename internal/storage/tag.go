@@ -148,7 +148,66 @@ func dropLegacyTagsUserNameUnique(pool *pgxpool.Pool) error {
 	if _, err := pool.Exec(ctx, `DROP INDEX IF EXISTS tags_user_id_name_key`); err != nil {
 		return fmt.Errorf("failed to drop tags_user_id_name_key index: %v", err)
 	}
+
+	// Catch leftover UNIQUE(user_id, name) objects that were renamed or created
+	// as an index instead of a table constraint.
+	constraintNames, err := listTagNames(ctx, pool, `
+		SELECT conname
+		FROM pg_constraint
+		WHERE conrelid = 'tags'::regclass
+		  AND contype = 'u'
+		  AND pg_get_constraintdef(oid) ~* 'UNIQUE\s*\(\s*user_id\s*,\s*name\s*\)'
+		  AND pg_get_constraintdef(oid) !~* 'project_id'`)
+	if err != nil {
+		return fmt.Errorf("failed to list leftover tag unique constraints: %v", err)
+	}
+	for _, name := range constraintNames {
+		if !pgIdentSafe(name) {
+			return fmt.Errorf("unexpected tags unique constraint name %q", name)
+		}
+		if _, err := pool.Exec(ctx, fmt.Sprintf(`ALTER TABLE tags DROP CONSTRAINT IF EXISTS %s`, name)); err != nil {
+			return fmt.Errorf("failed to drop leftover tag unique constraint %s: %v", name, err)
+		}
+	}
+
+	indexNames, err := listTagNames(ctx, pool, `
+		SELECT indexname
+		FROM pg_indexes
+		WHERE tablename = 'tags'
+		  AND indexdef ILIKE '%UNIQUE%'
+		  AND indexdef ~* '\(\s*user_id\s*,\s*name\s*\)'
+		  AND indexdef !~* 'project_id'
+		  AND indexname NOT IN ('tags_pkey', 'idx_tags_personal_lower_name', 'idx_tags_project_lower_name')`)
+	if err != nil {
+		return fmt.Errorf("failed to list leftover tag unique indexes: %v", err)
+	}
+	for _, name := range indexNames {
+		if !pgIdentSafe(name) {
+			return fmt.Errorf("unexpected tags unique index name %q", name)
+		}
+		if _, err := pool.Exec(ctx, fmt.Sprintf(`DROP INDEX IF EXISTS %s`, name)); err != nil {
+			return fmt.Errorf("failed to drop leftover tag unique index %s: %v", name, err)
+		}
+	}
 	return nil
+}
+
+func listTagNames(ctx context.Context, pool *pgxpool.Pool, query string) ([]string, error) {
+	rows, err := pool.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var names []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		names = append(names, name)
+	}
+	return names, rows.Err()
 }
 
 func migrateSplitLegacyTags(pool *pgxpool.Pool) error {
