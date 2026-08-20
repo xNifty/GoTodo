@@ -52,7 +52,10 @@ onUnmounted(() => {
         style="background: var(--ordryn-card-bg); color: var(--ordryn-text);"
       >
         <div class="modal-header border-0 pb-0">
-          <h5 id="shareTaskModalTitle" class="modal-title fw-bold">View Task</h5>
+          <h5 id="shareTaskModalTitle" class="modal-title fw-bold d-flex align-items-center gap-2 flex-wrap">
+            View Task
+            <span class="text-muted fw-normal">#{{ task.id }}</span>
+          </h5>
           <button type="button" class="btn-close" aria-label="Close" @click="emit('close')" />
         </div>
         <div class="modal-body py-3">

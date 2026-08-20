@@ -54,6 +54,11 @@ onUnmounted(() => {
           <li>Use the checkmark to mark a task complete, or press <kbd>x</kbd> on the focused task.</li>
           <li>Star important tasks so they stay pinned at the top of the list.</li>
           <li>Nest work under a parent with <strong>Add subtask</strong>; expand or collapse children as needed.</li>
+          <li>
+            Each task has a stable number (for example <code>#42</code>) shown in the task panel.
+            Use <strong>Copy link</strong> to share a URL such as <code>/tasks/42</code>, or search
+            for <code>42</code> / <code>#42</code> to find it.
+          </li>
           <li>Deleting a task may offer undo for a short time when the server returns an undo token.</li>
         </ul>
 
