@@ -189,6 +189,37 @@ func TestListTagsQueryScopes(t *testing.T) {
 	}
 }
 
+func TestMigrateTagsSplitsLegacySharedTag(t *testing.T) {
+	personal, err := storage.FindTagByName(1, nil, "legacy-migrate-clone")
+	if err != nil {
+		t.Fatalf("personal tag after migrate: %v", err)
+	}
+	projID := 9001
+	project, err := storage.FindTagByName(1, &projID, "legacy-migrate-clone")
+	if err != nil {
+		t.Fatalf("project tag after migrate: %v", err)
+	}
+	if personal.ID == project.ID {
+		t.Fatal("legacy shared tag should be cloned into the project namespace")
+	}
+
+	inboxTags, err := storage.GetTagsForTask(9001)
+	if err != nil {
+		t.Fatalf("inbox tags: %v", err)
+	}
+	if len(inboxTags) != 1 || inboxTags[0].ID != personal.ID {
+		t.Fatalf("inbox task should keep personal tag, got %+v", inboxTags)
+	}
+
+	projTags, err := storage.GetTagsForTask(9002)
+	if err != nil {
+		t.Fatalf("project tags: %v", err)
+	}
+	if len(projTags) != 1 || projTags[0].ID != project.ID {
+		t.Fatalf("project task should use cloned tag, got %+v", projTags)
+	}
+}
+
 func TestTagShareLinksRejected(t *testing.T) {
 	ctx := context.Background()
 	_, err := CreateShareLinkForScope(ctx, 1, "tag", 1, nil)

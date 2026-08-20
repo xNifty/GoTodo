@@ -99,16 +99,18 @@ func MigrateTagsAddProjectID() error {
 		return fmt.Errorf("failed to add tags.project_id: %v", err)
 	}
 
+	// Cloning a personal tag onto a project inserts another row with the same
+	// (user_id, name). The legacy UNIQUE(user_id, name) constraint must be
+	// gone before that split, or PostgreSQL raises tags_user_id_name_key.
+	if err := dropLegacyTagsUserNameUnique(pool); err != nil {
+		return err
+	}
+
 	if err := migrateSplitLegacyTags(pool); err != nil {
 		return err
 	}
 	if err := migrateMergeDuplicateTagNames(pool); err != nil {
 		return err
-	}
-
-	if _, err := pool.Exec(context.Background(),
-		`ALTER TABLE tags DROP CONSTRAINT IF EXISTS tags_user_id_name_key`); err != nil {
-		return fmt.Errorf("failed to drop tags_user_id_name_key: %v", err)
 	}
 
 	if _, err := pool.Exec(context.Background(),
@@ -133,6 +135,18 @@ func MigrateTagsAddProjectID() error {
 			 FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE`); err != nil {
 			return fmt.Errorf("failed to add tags.project_id FK: %v", err)
 		}
+	}
+	return nil
+}
+
+func dropLegacyTagsUserNameUnique(pool *pgxpool.Pool) error {
+	ctx := context.Background()
+	if _, err := pool.Exec(ctx, `ALTER TABLE tags DROP CONSTRAINT IF EXISTS tags_user_id_name_key`); err != nil {
+		return fmt.Errorf("failed to drop tags_user_id_name_key: %v", err)
+	}
+	// Some installs created this as a unique index rather than a table constraint.
+	if _, err := pool.Exec(ctx, `DROP INDEX IF EXISTS tags_user_id_name_key`); err != nil {
+		return fmt.Errorf("failed to drop tags_user_id_name_key index: %v", err)
 	}
 	return nil
 }

@@ -238,6 +238,7 @@ import { api } from '@/api/client'
 import type { Project, ProjectStatus } from '@/api/types'
 import { APIError } from '@/api/types'
 import { useToast } from '@/composables/useToast'
+import { useLiveUpdates } from '@/composables/useLiveUpdates'
 
 const props = defineProps<{ project: Project }>()
 const emit = defineEmits<{ changed: [] }>()
@@ -473,6 +474,13 @@ watch(
 )
 
 onMounted(loadStatuses)
+
+useLiveUpdates((event) => {
+  if (event.type !== 'project.updated') return
+  if (event.project_id && event.project_id !== props.project.id) return
+  if (renameId.value != null || deleteTarget.value) return
+  void loadStatuses()
+})
 
 onBeforeUnmount(() => {
   destroySortable()
