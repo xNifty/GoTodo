@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"GoTodo/internal/live"
 	"GoTodo/internal/storage"
 )
 
@@ -46,6 +47,7 @@ func SetProjectWorkflowMode(ctx context.Context, userID, projectID int, mode str
 		"mode": mode,
 	})
 
+	live.AfterProjectChange(userID, projectID, live.TypeProjectUpdated)
 	return storage.GetAccessibleProjectByID(projectID, userID)
 }
 
@@ -160,6 +162,7 @@ func CreateProjectStatusForUser(ctx context.Context, userID, projectID int, in C
 	_ = storage.LogProjectEvent(projectID, userID, "status_added", map[string]interface{}{
 		"status_id": s.ID, "name": s.Name,
 	})
+	live.AfterProjectChange(userID, projectID, live.TypeProjectUpdated)
 	return s, nil
 }
 
@@ -235,6 +238,7 @@ func UpdateProjectStatusForUser(ctx context.Context, userID, projectID, statusID
 	_ = storage.LogProjectEvent(projectID, userID, "status_updated", map[string]interface{}{
 		"status_id": s.ID, "name": s.Name,
 	})
+	live.AfterProjectChange(userID, projectID, live.TypeProjectUpdated)
 	return s, nil
 }
 
@@ -310,6 +314,7 @@ func DeleteProjectStatusForUser(ctx context.Context, userID, projectID, statusID
 	_ = storage.LogProjectEvent(projectID, userID, "status_deleted", map[string]interface{}{
 		"name": cur.Name,
 	})
+	live.AfterProjectChange(userID, projectID, live.TypeProjectUpdated)
 	return nil
 }
 
@@ -325,6 +330,7 @@ func ReorderProjectStatusesForUser(ctx context.Context, userID, projectID int, o
 	if err := storage.ReorderProjectStatuses(projectID, orderedIDs); err != nil {
 		return fmt.Errorf("%w: %s", ErrValidation, err.Error())
 	}
+	live.AfterProjectChange(userID, projectID, live.TypeProjectUpdated)
 	return nil
 }
 
@@ -444,7 +450,12 @@ func AddTimeEntryForUser(ctx context.Context, userID, taskID, minutes int, note 
 	if len(note) > storage.MaxTimeEntryNote {
 		return nil, fmt.Errorf("%w: note must be %d characters or less", ErrValidation, storage.MaxTimeEntryNote)
 	}
-	return storage.CreateTaskTimeEntry(taskID, userID, minutes, note)
+	entry, err := storage.CreateTaskTimeEntry(taskID, userID, minutes, note)
+	if err != nil {
+		return nil, err
+	}
+	live.AfterTaskChange(userID, taskID, live.TypeTaskUpdated)
+	return entry, nil
 }
 
 // DeleteTimeEntryForUser deletes a time entry (author or project owner).
@@ -472,5 +483,9 @@ func DeleteTimeEntryForUser(ctx context.Context, userID, taskID, entryID int) er
 	if !storage.RoleCanWrite(writeRole) && !isOwner {
 		return ErrForbidden
 	}
-	return storage.DeleteTaskTimeEntry(entryID)
+	if err := storage.DeleteTaskTimeEntry(entryID); err != nil {
+		return err
+	}
+	live.AfterTaskChange(userID, taskID, live.TypeTaskUpdated)
+	return nil
 }

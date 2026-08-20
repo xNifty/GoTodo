@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"GoTodo/internal/live"
 	"GoTodo/internal/server/utils"
 	"GoTodo/internal/sessionstore"
 	"GoTodo/internal/storage"
@@ -195,6 +196,7 @@ func restoreDeletedTasks(ctx context.Context, db *pgxpool.Pool, userID int, task
 		return false
 	})
 
+	restoredIDs := make([]int, 0, len(tasks))
 	for _, snap := range tasks {
 		position := snap.Position
 		if snap.ParentID == nil && !snap.IsFavorite {
@@ -212,9 +214,11 @@ func restoreDeletedTasks(ctx context.Context, db *pgxpool.Pool, userID int, task
 			}
 		}
 		logTaskEvent(newID, userID, "created", map[string]interface{}{"restored": true, "original_id": snap.ID})
+		restoredIDs = append(restoredIDs, newID)
 	}
 
 	_, _ = db.Exec(ctx, `SELECT setval(pg_get_serial_sequence('tasks', 'id'), GREATEST((SELECT COALESCE(MAX(id), 1) FROM tasks), 1))`)
+	live.AfterTasksChange(userID, live.TypeTaskCreated, restoredIDs)
 	return nil
 }
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"GoTodo/internal/live"
 	"GoTodo/internal/storage"
 )
 
@@ -89,6 +90,8 @@ func UpdateProject(ctx context.Context, userID, projectID int, name, description
 		if _, err := SetProjectWorkflowMode(ctx, userID, projectID, *workflowMode); err != nil {
 			return nil, err
 		}
+	} else if namePtr != nil || trimmedDescription != nil {
+		live.AfterProjectChange(userID, projectID, live.TypeProjectUpdated)
 	}
 
 	return storage.GetProjectByID(projectID, proj.OwnerUserID)
@@ -116,6 +119,7 @@ func DeleteProject(ctx context.Context, userID, projectID int) error {
 	if !storage.RoleCanManage(proj.Role) {
 		return ErrForbidden
 	}
+	live.AfterProjectChange(userID, projectID, live.TypeProjectUpdated)
 	return storage.DeleteProject(projectID, proj.OwnerUserID)
 }
 

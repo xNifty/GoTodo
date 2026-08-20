@@ -206,6 +206,7 @@ import type { ProjectStatus, Task } from '@/api/types'
 import { APIError } from '@/api/types'
 import { useAuth } from '@/composables/useAuth'
 import { useToast } from '@/composables/useToast'
+import { pauseLiveReload, resumeLiveReload } from '@/composables/useLiveUpdates'
 import type { ViewDensity } from '@/composables/useViewDensity'
 
 const props = withDefaults(
@@ -234,6 +235,20 @@ const loading = ref(true)
 const claimingId = ref<number | null>(null)
 const columnEls = new Map<number, HTMLElement>()
 const sortables: Sortable[] = []
+let dragPaused = false
+
+function beginBoardDrag() {
+  if (!dragPaused) {
+    pauseLiveReload()
+    dragPaused = true
+  }
+}
+
+function endBoardDrag() {
+  if (!dragPaused) return
+  resumeLiveReload()
+  dragPaused = false
+}
 
 const canDrag = computed(() => props.role !== 'viewer')
 
@@ -388,6 +403,7 @@ async function loadStatuses() {
 }
 
 function destroySortables() {
+  endBoardDrag()
   while (sortables.length) {
     sortables.pop()?.destroy()
   }
@@ -454,8 +470,13 @@ function initSortables() {
         ghostClass: 'kanban-sortable-ghost',
         chosenClass: 'kanban-sortable-chosen',
         dragClass: 'kanban-sortable-drag',
+        onStart() {
+          beginBoardDrag()
+        },
         onEnd(evt) {
-          void onCardDrop(evt)
+          void onCardDrop(evt).finally(() => {
+            endBoardDrag()
+          })
         },
       }),
     )

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"GoTodo/internal/domain"
+	"GoTodo/internal/live"
 	"GoTodo/internal/server/utils"
 	"GoTodo/internal/storage"
 
@@ -72,6 +73,7 @@ func deleteTasksForUser(ctx context.Context, db *pgxpool.Pool, r *http.Request, 
 func deleteTaskRows(ctx context.Context, db *pgxpool.Pool, ids []int, userID int) error {
 	for _, id := range ids {
 		logTaskEvent(id, userID, "deleted", nil)
+		live.AfterTaskChange(userID, id, live.TypeTaskDeleted)
 		tag, err := db.Exec(ctx, "DELETE FROM tasks WHERE id = $1", id)
 		if err != nil {
 			return err
@@ -181,6 +183,7 @@ func bulkSetPriority(ctx context.Context, db *pgxpool.Pool, ids []int, userID in
 		}
 		logTaskEvent(id, userID, "priority_changed", map[string]interface{}{"to": priorityLabel(priority)})
 	}
+	live.AfterTasksChange(userID, live.TypeTaskUpdated, ids)
 	return nil
 }
 
@@ -211,6 +214,7 @@ func bulkSetDueDate(ctx context.Context, db *pgxpool.Pool, ids []int, userID int
 		}
 		logTaskEvent(id, userID, "edited", map[string]interface{}{"fields": []string{"due_date"}})
 	}
+	live.AfterTasksChange(userID, live.TypeTaskUpdated, ids)
 	return nil
 }
 
@@ -300,6 +304,7 @@ func bulkAddTag(ctx context.Context, db *pgxpool.Pool, ids []int, userID, tagID 
 		}
 		logTaskEvent(taskID, userID, "tag_added", map[string]interface{}{"tag": dest.Name, "tag_id": dest.ID})
 	}
+	live.AfterTasksChange(userID, live.TypeTaskUpdated, ids)
 	return nil
 }
 
@@ -322,5 +327,6 @@ func bulkRemoveTag(ctx context.Context, db *pgxpool.Pool, ids []int, userID, tag
 		}
 		logTaskEvent(taskID, userID, "tag_removed", map[string]interface{}{"tag": src.Name, "tag_id": tagID})
 	}
+	live.AfterTasksChange(userID, live.TypeTaskUpdated, ids)
 	return nil
 }

@@ -8,6 +8,7 @@ import ModernSidebar from '@/components/modern/ModernSidebar.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import { useAuth } from '@/composables/useAuth'
 import { useTaskSidebar } from '@/composables/useTaskSidebar'
+import { useLiveUpdates } from '@/composables/useLiveUpdates'
 import { useToast } from '@/composables/useToast'
 import { useSidebarState } from '@/composables/useSidebarState'
 
@@ -120,6 +121,10 @@ onMounted(() => {
 })
 
 watch(lastSavedTask, () => {
+  if (month.value) void loadMonth(month.value)
+})
+
+useLiveUpdates(() => {
   if (month.value) void loadMonth(month.value)
 })
 </script>

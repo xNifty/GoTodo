@@ -21,6 +21,7 @@ import { useConfirm } from '@/composables/useConfirm'
 import { useViewDensity } from '@/composables/useViewDensity'
 import { useSidebarState } from '@/composables/useSidebarState'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
+import { useLiveUpdates } from '@/composables/useLiveUpdates'
 import { projectOptionLabel } from '@/utils/projectLabel'
 import { uniqueTagsByName } from '@/utils/tags'
 
@@ -1063,6 +1064,13 @@ onMounted(async () => {
   await loadMeta()
   syncFiltersFromRoute()
   await reloadInitial()
+})
+
+useLiveUpdates((event) => {
+  if (event.type === 'project.updated') {
+    void loadMeta()
+  }
+  void reloadInitial()
 })
 
 onUnmounted(() => {
