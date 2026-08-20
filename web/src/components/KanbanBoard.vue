@@ -206,7 +206,7 @@ import type { ProjectStatus, Task } from '@/api/types'
 import { APIError } from '@/api/types'
 import { useAuth } from '@/composables/useAuth'
 import { useToast } from '@/composables/useToast'
-import { pauseLiveReload, resumeLiveReload } from '@/composables/useLiveUpdates'
+import { pauseLiveReload, resumeLiveReload, useLiveUpdates } from '@/composables/useLiveUpdates'
 import type { ViewDensity } from '@/composables/useViewDensity'
 
 const props = withDefaults(
@@ -215,9 +215,12 @@ const props = withDefaults(
     tasks: Task[]
     role?: 'owner' | 'editor' | 'viewer'
     density?: ViewDensity
+    /** Bump to reload column definitions (rename/add/delete status). */
+    columnsRev?: number
   }>(),
   {
     density: 'comfortable',
+    columnsRev: 0,
   },
 )
 
@@ -388,15 +391,17 @@ function columnAriaLabel(col: ProjectStatus): string {
   return `${col.name}, ${count} tasks`
 }
 
-async function loadStatuses() {
-  loading.value = true
+async function loadStatuses(quiet = false) {
+  if (!quiet) loading.value = true
   try {
     statuses.value = await api.listProjectStatuses(props.projectId)
   } catch (err) {
-    toast.push(err instanceof APIError ? err.message : 'Failed to load board columns', 'error')
-    statuses.value = []
+    if (!quiet) {
+      toast.push(err instanceof APIError ? err.message : 'Failed to load board columns', 'error')
+      statuses.value = []
+    }
   } finally {
-    loading.value = false
+    if (!quiet) loading.value = false
     await nextTick()
     initSortables()
   }
@@ -489,6 +494,19 @@ watch(
     void loadStatuses()
   },
 )
+
+watch(
+  () => props.columnsRev,
+  (rev, prev) => {
+    if (rev && rev !== prev) void loadStatuses(true)
+  },
+)
+
+useLiveUpdates((event) => {
+  if (event.type !== 'project.updated') return
+  if (event.project_id && event.project_id !== props.projectId) return
+  void loadStatuses(true)
+})
 
 watch(
   () => [props.tasks, canDrag.value] as const,

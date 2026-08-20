@@ -61,6 +61,10 @@ const incompleteCount = ref(0)
 const search = ref('')
 const loading = ref(true)
 const loadingMore = ref(false)
+/** Project filter key last applied to `tasks` ('' = all projects). */
+const loadedProjectKey = ref<string | null>(null)
+/** Monotonic counter so out-of-order reloadInitial responses are ignored. */
+let reloadGeneration = 0
 
 // Save View Modal state
 const showSaveViewModal = ref(false)
@@ -94,6 +98,7 @@ const {
   applySavedView: applySavedViewFilters,
 } = useTaskListFilters()
 const undoToken = ref<string | null>(null)
+const kanbanColumnsRev = ref(0)
 const selected = ref<number[]>([])
 const favoriteListEl = ref<HTMLElement | null>(null)
 const taskListEl = ref<HTMLElement | null>(null)
@@ -579,12 +584,23 @@ function syncFiltersFromRoute() {
 }
 
 async function reloadInitial() {
+  const generation = ++reloadGeneration
+  const projectKey = filters.project || ''
   loading.value = true
   loadedPage.value = 0
   selected.value = []
+  // Drop stale cards immediately when switching projects so the previous
+  // project's tasks never flash under the new project context.
+  if (loadedProjectKey.value !== null && loadedProjectKey.value !== projectKey) {
+    tasks.value = []
+    total.value = 0
+    completedCount.value = 0
+    incompleteCount.value = 0
+  }
   try {
     const perPage = user.value?.items_per_page || 50
     const list = await api.listTasks(listApiParams(1, perPage))
+    if (generation !== reloadGeneration) return
     tasks.value = list.tasks
     loadedPage.value = 1
     total.value = list.total
@@ -592,9 +608,12 @@ async function reloadInitial() {
     completedCount.value = list.completed_count
     incompleteCount.value = list.incomplete_count
     search.value = filters.search
+    loadedProjectKey.value = projectKey
   } catch (err) {
+    if (generation !== reloadGeneration) return
     toast.push(err instanceof APIError ? err.message : 'Failed to load tasks', 'error')
   } finally {
+    if (generation !== reloadGeneration) return
     loading.value = false
     await nextTick()
     refreshSortable()
@@ -946,6 +965,7 @@ async function onProjectSettingsSaved() {
 async function onProjectSettingsChanged() {
   await loadMeta()
   await reloadInitial()
+  kanbanColumnsRev.value++
   if (editingProject.value) {
     const updated = projects.value.find((p) => p.id === editingProject.value!.id)
     if (updated) editingProject.value = updated
@@ -1069,6 +1089,7 @@ onMounted(async () => {
 useLiveUpdates((event) => {
   if (event.type === 'project.updated') {
     void loadMeta()
+    kanbanColumnsRev.value++
   }
   void reloadInitial()
 })
@@ -1210,10 +1231,12 @@ onUnmounted(() => {
           </div>
           <KanbanBoard
             v-else-if="activeProjectObj"
+            :key="activeProjectObj.id"
             :project-id="activeProjectObj.id"
             :tasks="tasks"
             :role="activeProjectObj.role"
             :density="density"
+            :columns-rev="kanbanColumnsRev"
             @open-task="openTaskDetails"
             @changed="reloadInitial"
             @task-updated="applyTaskUpdate"
