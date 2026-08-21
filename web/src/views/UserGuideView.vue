@@ -55,6 +55,11 @@ onUnmounted(() => {
           <li>Use the checkmark to mark a task complete, or press <kbd>x</kbd> on the focused task.</li>
           <li>Star important tasks so they stay pinned at the top of the list.</li>
           <li>Nest work under a parent with <strong>Add subtask</strong>; expand or collapse children as needed.</li>
+          <li>
+            Each task has a stable number (for example <code>#42</code>) shown in the task panel.
+            Use <strong>Copy link</strong> to share a URL such as <code>/tasks/42</code>, or search
+            for <code>42</code> / <code>#42</code> to find it.
+          </li>
           <li>Deleting a task may offer undo for a short time when the server returns an undo token.</li>
         </ul>
 
@@ -97,6 +102,16 @@ onUnmounted(() => {
           <li>
             Public share-link pages stay a snapshot until you refresh; live updates require a signed-in
             session.
+          </li>
+          <li>
+            Owners, editors, and viewers can discuss a project task in the sidebar. Deleting a comment
+            leaves a tombstone (“Message deleted by user” or “Message deleted by project owner”). New
+            comments show up live for anyone with the task open, and in the notification bell.
+          </li>
+          <li>
+            Paste <code>#123</code> in a comment to link another task you can access (including tasks
+            only you can see). Click <strong>Insert link</strong>, and it renders as
+            <em>Task #123 - Title</em> for anyone who can open that task.
           </li>
         </ul>
 

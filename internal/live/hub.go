@@ -27,6 +27,7 @@ const (
 	TypeTaskUpdated    = "task.updated"
 	TypeTaskDeleted    = "task.deleted"
 	TypeTaskReordered  = "task.reordered"
+	TypeTaskCommented  = "task.commented"
 	TypeProjectUpdated = "project.updated"
 )
 

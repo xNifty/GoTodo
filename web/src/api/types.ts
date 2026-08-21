@@ -57,6 +57,25 @@ export type TaskTimeEntry = {
   user_name?: string
 }
 
+export type TaskCommentLink = {
+  id: number
+  title: string
+}
+
+export type TaskComment = {
+  id: number
+  task_id: number
+  user_id: number
+  user_name?: string
+  body: string
+  created_at: string
+  deleted: boolean
+  deleted_at?: string | null
+  deleted_by_user_id?: number
+  deleted_by_kind?: 'user' | 'owner' | string
+  links?: TaskCommentLink[]
+}
+
 export type ProjectMember = {
   user_id: number
   email: string

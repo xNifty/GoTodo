@@ -62,6 +62,58 @@ func NotifyProjectMembersTaskCreated(taskID, actorUserID, projectID int, taskTit
 	}
 }
 
+// NotifyProjectMembersTaskCommented fans out in-app notifications for a new discussion post.
+// Best-effort: failures are logged and do not fail the comment write.
+func NotifyProjectMembersTaskCommented(taskID, actorUserID, projectID int, commentBody string) {
+	if projectID <= 0 || taskID <= 0 {
+		return
+	}
+
+	members, err := storage.ListProjectMembers(projectID)
+	if err != nil {
+		log.Printf("notify task_commented: list members project=%d: %v", projectID, err)
+		return
+	}
+
+	proj, err := storage.GetAccessibleProjectByID(projectID, actorUserID)
+	projectName := ""
+	if err == nil && proj != nil {
+		projectName = proj.Name
+	}
+
+	taskTitle := ""
+	if td, err := storage.GetTaskTitleDescription(taskID); err == nil && td != nil {
+		taskTitle = td.Title
+	}
+
+	title := "New comment on a task"
+	if taskTitle != "" {
+		title = fmt.Sprintf("New comment on %s", taskTitle)
+	} else if projectName != "" {
+		title = fmt.Sprintf("New comment in %s", projectName)
+	}
+	body := commentPreview(commentBody)
+
+	items := make([]storage.UserNotification, 0, len(members))
+	for _, m := range members {
+		if m.UserID == actorUserID {
+			continue
+		}
+		items = append(items, storage.UserNotification{
+			UserID:      m.UserID,
+			ActorUserID: actorUserID,
+			Type:        storage.NotificationTaskCommented,
+			ProjectID:   projectID,
+			TaskID:      taskID,
+			Title:       title,
+			Body:        body,
+		})
+	}
+	if err := storage.CreateUserNotificationsBulk(items); err != nil {
+		log.Printf("notify task_commented: insert task=%d: %v", taskID, err)
+	}
+}
+
 // ListNotificationsForUser returns paginated notifications.
 func ListNotificationsForUser(ctx context.Context, userID, page, perPage int) ([]storage.UserNotification, int, error) {
 	_ = ctx
