@@ -83,6 +83,10 @@ async function markAllRead() {
 
 async function openNotification(n: Notification) {
   await markOneRead(n)
+  if (n.type === 'join_request') {
+    await router.push({ name: 'admin-requests' })
+    return
+  }
   if (n.task_id) {
     await router.push({ name: 'task', params: { id: String(n.task_id) } })
     return
@@ -120,7 +124,12 @@ watch(isAuthenticated, (ok) => {
 useLiveUpdates((event) => {
   if (!isAuthenticated.value) return
   void refreshUnreadCount()
-  if (event.type === 'task.created' || event.type === 'task.commented' || event.type === 'project.updated') {
+  if (
+    event.type === 'task.created' ||
+    event.type === 'task.commented' ||
+    event.type === 'project.updated' ||
+    event.type === 'join.request'
+  ) {
     void loadNotifications()
   }
 })

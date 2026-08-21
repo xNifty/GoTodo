@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"GoTodo/internal/domain"
 	"GoTodo/internal/server/utils"
 	"GoTodo/internal/storage"
 )
@@ -115,6 +116,7 @@ func APIV1JoinRequestsCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func notifyAdminsOfJoinRequest(r *http.Request, siteName, email, message string) {
+	domain.NotifyAdminsOfJoinRequest(email, message)
 	if strings.TrimSpace(siteName) == "" {
 		siteName = "GoTodo"
 	}
@@ -122,7 +124,7 @@ func notifyAdminsOfJoinRequest(r *http.Request, siteName, email, message string)
 	if err != nil || len(admins) == 0 {
 		return
 	}
-	adminURL := utils.AbsoluteURLForRequest(r, "/admin")
+	adminURL := utils.AbsoluteURLForRequest(r, "/admin/requests")
 	body := fmt.Sprintf("%s requested to join %s.\n\n", email, siteName)
 	if message != "" {
 		body += "Message:\n" + message + "\n\n"

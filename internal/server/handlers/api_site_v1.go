@@ -12,6 +12,10 @@ import (
 type apiSiteResponse struct {
 	SiteName                 string `json:"site_name"`
 	ShowChangelog            bool   `json:"show_changelog"`
+	EnableRegistration       bool   `json:"enable_registration"`
+	InviteOnly               bool   `json:"invite_only"`
+	EnableJoinRequests       bool   `json:"enable_join_requests"`
+	MetaDescription          string `json:"meta_description"`
 	EnableGlobalAnnouncement bool   `json:"enable_global_announcement"`
 	GlobalAnnouncementText   string `json:"global_announcement_text"`
 	AnnouncementDismissed    bool   `json:"announcement_dismissed"`
@@ -26,7 +30,7 @@ func APIV1Site(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	settings, err := storage.GetSiteSettings()
-	if err != nil {
+	if err != nil || settings == nil {
 		utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to load site settings.")
 		return
 	}
@@ -40,6 +44,10 @@ func APIV1Site(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(apiSiteResponse{
 		SiteName:                 settings.SiteName,
 		ShowChangelog:            settings.ShowChangelog,
+		EnableRegistration:       settings.EnableRegistration,
+		InviteOnly:               settings.InviteOnly,
+		EnableJoinRequests:       settings.EnableJoinRequests,
+		MetaDescription:          settings.MetaDescription,
 		EnableGlobalAnnouncement: settings.EnableGlobalAnnouncement,
 		GlobalAnnouncementText:   settings.GlobalAnnouncementText,
 		AnnouncementDismissed:    dismissed,

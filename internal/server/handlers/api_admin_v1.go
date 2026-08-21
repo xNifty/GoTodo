@@ -22,6 +22,7 @@ type adminSettingsJSON struct {
 	SiteVersion              string `json:"site_version"`
 	EnableRegistration       bool   `json:"enable_registration"`
 	InviteOnly               bool   `json:"invite_only"`
+	EnableJoinRequests       bool   `json:"enable_join_requests"`
 	MetaDescription          string `json:"meta_description"`
 	EnableGlobalAnnouncement bool   `json:"enable_global_announcement"`
 	GlobalAnnouncementText   string `json:"global_announcement_text"`
@@ -49,6 +50,7 @@ type adminSettingsPatch struct {
 	ShowChangelog            *bool   `json:"show_changelog"`
 	EnableRegistration       *bool   `json:"enable_registration"`
 	InviteOnly               *bool   `json:"invite_only"`
+	EnableJoinRequests       *bool   `json:"enable_join_requests"`
 	MetaDescription          *string `json:"meta_description"`
 	EnableGlobalAnnouncement *bool   `json:"enable_global_announcement"`
 	GlobalAnnouncementText   *string `json:"global_announcement_text"`
@@ -116,6 +118,9 @@ func apiV1PatchAdminSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.InviteOnly != nil {
 		next.InviteOnly = *req.InviteOnly
+	}
+	if req.EnableJoinRequests != nil {
+		next.EnableJoinRequests = *req.EnableJoinRequests
 	}
 	if req.MetaDescription != nil {
 		next.MetaDescription = strings.TrimSpace(*req.MetaDescription)
@@ -289,6 +294,7 @@ func writeAdminSettings(w http.ResponseWriter, s *storage.SiteSettings) {
 		SiteVersion:                version.Version, // baked into binary; not from DB
 		EnableRegistration:         s.EnableRegistration,
 		InviteOnly:                 s.InviteOnly,
+		EnableJoinRequests:         s.EnableJoinRequests,
 		MetaDescription:            s.MetaDescription,
 		EnableGlobalAnnouncement:   s.EnableGlobalAnnouncement,
 		GlobalAnnouncementText:     s.GlobalAnnouncementText,

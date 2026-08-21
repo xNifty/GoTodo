@@ -72,7 +72,7 @@ paths:
           current view; the payload does not include task bodies.
 
         Types include `task.created`, `task.updated`, `task.deleted`,
-        `task.reordered`, and `project.updated`.
+        `task.reordered`, `project.updated`, and `join.request`.
       security:
         - SessionCookie: []
         - BearerAuth: []
@@ -110,6 +110,44 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/APIError"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/v1/join-requests:
+    post:
+      tags: [Auth]
+      summary: Submit a request to join the site
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                message:
+                  type: string
+                  maxLength: 500
+      responses:
+        "200":
+          description: Acknowledgement (same message even if already pending)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  message:
+                    type: string
         "400":
           $ref: "#/components/responses/BadRequest"
         "403":
@@ -2540,6 +2578,78 @@ paths:
         "409":
           $ref: "#/components/responses/APIError"
 
+  /api/v1/admin/join-requests:
+    get:
+      tags: [Admin]
+      summary: List join requests
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Join requests (pending first)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/JoinRequest"
+
+  /api/v1/admin/join-requests/{id}/approve:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      tags: [Admin]
+      summary: Approve a pending join request
+      description: Creates or reuses a site invite and emails the requester.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Approved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  request:
+                    $ref: "#/components/schemas/JoinRequest"
+                  invite:
+                    $ref: "#/components/schemas/Invite"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/APIError"
+
+  /api/v1/admin/join-requests/{id}/deny:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      tags: [Admin]
+      summary: Deny a pending join request
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Denied
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  request:
+                    $ref: "#/components/schemas/JoinRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/APIError"
+
 components:
   securitySchemes:
     BearerAuth:
@@ -2648,6 +2758,16 @@ components:
         global_announcement_text:
           type: string
         announcement_dismissed:
+          type: boolean
+        enable_registration:
+          type: boolean
+        invite_only:
+          type: boolean
+        enable_join_requests:
+          type: boolean
+        meta_description:
+          type: string
+        github_oauth_configured:
           type: boolean
 
     User:
@@ -3725,6 +3845,31 @@ components:
         used:
           type: boolean
 
+    JoinRequest:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        message:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, denied]
+        created_at:
+          type: string
+          format: date-time
+        invite_id:
+          type: integer
+        reviewed_at:
+          type: string
+          format: date-time
+        reviewed_by:
+          type: integer
+        invite_token:
+          type: string
+
     AdminSettings:
       type: object
       properties:
@@ -3739,6 +3884,8 @@ components:
         enable_registration:
           type: boolean
         invite_only:
+          type: boolean
+        enable_join_requests:
           type: boolean
         meta_description:
           type: string
@@ -3782,6 +3929,8 @@ components:
         enable_registration:
           type: boolean
         invite_only:
+          type: boolean
+        enable_join_requests:
           type: boolean
         meta_description:
           type: string

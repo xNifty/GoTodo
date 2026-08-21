@@ -27,6 +27,7 @@ type SiteSettings struct {
 	SiteVersion              string
 	EnableRegistration       bool
 	InviteOnly               bool
+	EnableJoinRequests       bool
 	MetaDescription          string
 	EnableGlobalAnnouncement bool
 	GlobalAnnouncementText   string
@@ -93,6 +94,7 @@ func GetSiteSettings() (*SiteSettings, error) {
 			COALESCE(site_version, ''),
 			enable_registration,
 			invite_only,
+			COALESCE(enable_join_requests, FALSE),
 			COALESCE(meta_description, ''),
 			COALESCE(enable_global_announcement, FALSE),
 			COALESCE(global_announcement_text, ''),
@@ -112,7 +114,7 @@ func GetSiteSettings() (*SiteSettings, error) {
 		FROM site_settings WHERE id = 1`)
 	if err := row.Scan(
 		&s.SiteName, &s.DefaultTimezone, &s.ShowChangelog, &s.SiteVersion,
-		&s.EnableRegistration, &s.InviteOnly, &s.MetaDescription,
+		&s.EnableRegistration, &s.InviteOnly, &s.EnableJoinRequests, &s.MetaDescription,
 		&s.EnableGlobalAnnouncement, &s.GlobalAnnouncementText, &s.EnableAPI,
 		&s.EmailProvider, &s.EmailFromAddress, &s.EmailFromName,
 		&s.EmailMailgunDomain, &s.EmailMailgunAPIKeyEnc,
@@ -140,7 +142,7 @@ func UpsertSiteSettings(s SiteSettings) error {
 	_, err = pool.Exec(context.Background(), `
         INSERT INTO site_settings (
 			id, site_name, default_timezone, show_changelog, site_version,
-			enable_registration, invite_only, meta_description,
+			enable_registration, invite_only, enable_join_requests, meta_description,
 			enable_global_announcement, global_announcement_text, enable_api,
 			email_provider, email_from_address, email_from_name,
 			email_mailgun_domain, email_mailgun_api_key_enc,
@@ -148,7 +150,7 @@ func UpsertSiteSettings(s SiteSettings) error {
 			email_smtp_password_enc, email_smtp_tls,
 			github_oauth_client_id, github_oauth_client_secret_enc
 		)
-        VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+        VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
         ON CONFLICT (id) DO UPDATE SET
             site_name = EXCLUDED.site_name,
             default_timezone = EXCLUDED.default_timezone,
@@ -156,6 +158,7 @@ func UpsertSiteSettings(s SiteSettings) error {
             site_version = EXCLUDED.site_version,
             enable_registration = EXCLUDED.enable_registration,
             invite_only = EXCLUDED.invite_only,
+            enable_join_requests = EXCLUDED.enable_join_requests,
             meta_description = EXCLUDED.meta_description,
             enable_global_announcement = EXCLUDED.enable_global_announcement,
             global_announcement_text = EXCLUDED.global_announcement_text,
@@ -173,7 +176,7 @@ func UpsertSiteSettings(s SiteSettings) error {
 			github_oauth_client_id = EXCLUDED.github_oauth_client_id,
 			github_oauth_client_secret_enc = EXCLUDED.github_oauth_client_secret_enc
     `, s.SiteName, s.DefaultTimezone, s.ShowChangelog, s.SiteVersion,
-		s.EnableRegistration, s.InviteOnly, s.MetaDescription,
+		s.EnableRegistration, s.InviteOnly, s.EnableJoinRequests, s.MetaDescription,
 		s.EnableGlobalAnnouncement, s.GlobalAnnouncementText, s.EnableAPI,
 		s.EmailProvider, s.EmailFromAddress, s.EmailFromName,
 		s.EmailMailgunDomain, s.EmailMailgunAPIKeyEnc,
@@ -272,6 +275,20 @@ func MigrateSiteSettingsAddEmailSettings() error {
 		if _, err := pool.Exec(context.Background(), q); err != nil {
 			return fmt.Errorf("failed to migrate site_settings email columns: %v", err)
 		}
+	}
+	return nil
+}
+
+// MigrateSiteSettingsAddJoinRequests adds enable_join_requests if missing.
+func MigrateSiteSettingsAddJoinRequests() error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return err
+	}
+	defer CloseDatabase(pool)
+
+	if _, err := pool.Exec(context.Background(), "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS enable_join_requests BOOLEAN DEFAULT FALSE"); err != nil {
+		return fmt.Errorf("failed to add enable_join_requests column to site_settings: %v", err)
 	}
 	return nil
 }

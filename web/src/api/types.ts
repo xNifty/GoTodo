@@ -241,6 +241,10 @@ export type TaskList = {
 export type SiteInfo = {
   site_name: string
   show_changelog: boolean
+  enable_registration?: boolean
+  invite_only?: boolean
+  enable_join_requests?: boolean
+  meta_description?: string
   enable_global_announcement: boolean
   global_announcement_text: string
   announcement_dismissed: boolean
@@ -327,6 +331,18 @@ export type Invite = {
   used: boolean
 }
 
+export type JoinRequest = {
+  id: number
+  email: string
+  message: string
+  status: 'pending' | 'approved' | 'denied'
+  created_at: string
+  invite_id?: number
+  reviewed_at?: string
+  reviewed_by?: number
+  invite_token?: string
+}
+
 export type AdminSettings = {
   site_name: string
   default_timezone: string
@@ -334,6 +350,7 @@ export type AdminSettings = {
   site_version: string
   enable_registration: boolean
   invite_only: boolean
+  enable_join_requests: boolean
   meta_description: string
   enable_global_announcement: boolean
   global_announcement_text: string

@@ -347,3 +347,34 @@ func ListAdminEmails() ([]string, error) {
 	}
 	return out, rows.Err()
 }
+
+// ListAdminUserIDs returns IDs of unbanned users with the admin permission.
+func ListAdminUserIDs() ([]int, error) {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return nil, err
+	}
+	defer CloseDatabase(pool)
+
+	rows, err := pool.Query(context.Background(),
+		`SELECT u.id FROM users u
+		 JOIN roles r ON r.id = u.role_id
+		 WHERE r.permissions @> ARRAY['admin']::text[]
+		   AND COALESCE(u.is_banned, FALSE) = FALSE`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		if id > 0 {
+			out = append(out, id)
+		}
+	}
+	return out, rows.Err()
+}
