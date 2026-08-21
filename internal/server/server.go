@@ -86,6 +86,7 @@ func registerAPIV1Routes() {
 	handleBoth("/api/v1/auth/logout", handlers.APIV1AuthLogout)
 	handleBoth("/api/v1/auth/username-available", authPublic(handlers.APIV1UsernameAvailable))
 	handleBoth("/api/v1/auth/forgot-password", utils.RateLimitMiddleware(5, 0.05, 900, utils.KeyByIP)(handlers.APIV1ForgotPassword))
+	handleBoth("/api/v1/join-requests", utils.RateLimitMiddleware(5, 0.05, 900, utils.KeyByIP)(handlers.APIV1JoinRequestsCreate))
 	handleBoth("/api/v1/auth/reset-password", handlers.APIV1ResetPasswordRouter)
 	handleBoth("/api/v1/me", utils.AuthMeChain(handlers.APIV1Me))
 	handleBoth("/api/v1/me/password", utils.AuthSessionChain(handlers.APIV1ChangePassword))
@@ -134,6 +135,8 @@ func registerAPIV1Routes() {
 	handleBoth("/api/v1/admin/settings", utils.AdminAPIChain(handlers.APIV1AdminSettings))
 	handleBoth("/api/v1/admin/users", utils.AdminAPIChain(handlers.APIV1AdminUsersRouter))
 	handleBoth("/api/v1/admin/users/", utils.AdminAPIChain(handlers.APIV1AdminUsersRouter))
+	handleBoth("/api/v1/admin/join-requests", utils.AdminAPIChain(handlers.APIV1AdminJoinRequestsRouter))
+	handleBoth("/api/v1/admin/join-requests/", utils.AdminAPIChain(handlers.APIV1AdminJoinRequestsRouter))
 	handleBoth("/api/v1/announcements/dismiss", utils.AuthSessionChain(handlers.APIV1DismissAnnouncement))
 
 	handleBoth("/cal/", handlers.CalendarFeedHandler)

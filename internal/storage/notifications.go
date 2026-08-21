@@ -10,6 +10,7 @@ import (
 const (
 	NotificationTaskCreated   = "task_created"
 	NotificationTaskCommented = "task_commented"
+	NotificationJoinRequest   = "join_request"
 )
 
 // UserNotification is an in-app notification for a user.

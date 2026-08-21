@@ -208,6 +208,14 @@ func RunMigrations() error {
 		fmt.Printf("migration: MigrateSiteSettingsAddGitHubOAuth failed: %v\n", err)
 		errCount++
 	}
+	if err := MigrateSiteSettingsAddJoinRequests(); err != nil {
+		fmt.Printf("migration: MigrateSiteSettingsAddJoinRequests failed: %v\n", err)
+		errCount++
+	}
+	if err := CreateJoinRequestsTable(); err != nil {
+		fmt.Printf("migration: CreateJoinRequestsTable failed: %v\n", err)
+		errCount++
+	}
 
 	// Ensure password_reset table exists
 	if err := CreatePasswordResetTable(); err != nil {

@@ -57,6 +57,12 @@ const router = createRouter({
       meta: { guest: true },
     },
     {
+      path: '/join',
+      name: 'join',
+      component: () => import('@/views/JoinRequestView.vue'),
+      meta: { guest: true },
+    },
+    {
       path: '/claim-username',
       name: 'claim-username',
       component: () => import('@/views/ClaimUsernameView.vue'),
@@ -65,8 +71,7 @@ const router = createRouter({
     {
       path: '/',
       name: 'tasks',
-      component: () => import('@/views/TasksView.vue'),
-      meta: { requiresAuth: true },
+      component: () => import('@/views/IndexView.vue'),
     },
     {
       path: '/tasks/:id',
@@ -128,6 +133,18 @@ const router = createRouter({
       meta: { requiresAuth: true, permission: 'admin' },
     },
     {
+      path: '/admin/requests',
+      name: 'admin-requests',
+      component: () => import('@/views/AdminJoinRequestsView.vue'),
+      meta: { requiresAuth: true, permission: 'admin' },
+    },
+    {
+      path: '/admin/users',
+      name: 'admin-users',
+      component: () => import('@/views/AdminUsersView.vue'),
+      meta: { requiresAuth: true, permission: 'admin' },
+    },
+    {
       path: '/invites',
       name: 'invites',
       component: () => import('@/views/InvitesView.vue'),
@@ -177,7 +194,7 @@ router.beforeEach(async (to) => {
   if (
     auth.isAuthenticated.value &&
     auth.needsUsernameClaim.value &&
-    to.meta.requiresAuth &&
+    (to.meta.requiresAuth || to.name === 'tasks') &&
     !to.meta.allowUsernameClaim
   ) {
     return { name: 'claim-username' }

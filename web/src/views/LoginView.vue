@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useToast } from '@/composables/useToast'
+import { useSite } from '@/composables/useSite'
 import { APIError } from '@/api/types'
 import {
   isDeviceAuthPath,
@@ -17,6 +18,7 @@ const busy = ref(false)
 const error = ref('')
 const { login } = useAuth()
 const { push } = useToast()
+const { enableJoinRequests } = useSite()
 const router = useRouter()
 const route = useRoute()
 
@@ -85,7 +87,13 @@ async function onSubmit() {
               </div>
             </div>
             <div class="card-footer d-flex justify-content-between align-items-center">
-              <RouterLink to="/register" class="small">Create an account</RouterLink>
+              <span class="small">
+                <RouterLink to="/register">Create an account</RouterLink>
+                <template v-if="enableJoinRequests">
+                  ·
+                  <RouterLink to="/join">Request to join</RouterLink>
+                </template>
+              </span>
               <button type="submit" class="btn btn-primary" :disabled="busy">
                 {{ busy ? 'Signing in…' : 'Login' }}
               </button>

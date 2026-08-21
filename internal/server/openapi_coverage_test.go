@@ -67,6 +67,7 @@ var requiredOpenAPIPaths = []string{
 	"/api/v1/import/cancel",
 	"/api/v1/auth/forgot-password",
 	"/api/v1/auth/reset-password",
+	"/api/v1/join-requests",
 	"/api/v1/announcements/dismiss",
 	"/api/v1/invites",
 	"/api/v1/invites/{id}",
@@ -75,6 +76,9 @@ var requiredOpenAPIPaths = []string{
 	"/api/v1/admin/users/{id}/ban",
 	"/api/v1/admin/users/{id}/unban",
 	"/api/v1/admin/users/{id}/username",
+	"/api/v1/admin/join-requests",
+	"/api/v1/admin/join-requests/{id}/approve",
+	"/api/v1/admin/join-requests/{id}/deny",
 }
 
 func moduleRoot(t *testing.T) string {
