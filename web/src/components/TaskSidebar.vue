@@ -124,6 +124,7 @@ const sidebarTitle = computed(() => {
   if (mode.value === 'edit') return 'Edit Task'
   return 'Add Task'
 })
+const kanbanHeaderTitle = computed(() => (mode.value === 'add' ? 'Add Task' : 'Task'))
 const submitText = computed(() => (mode.value === 'edit' ? 'Save Task' : 'Add Task'))
 const charCount = computed(() => description.value.length)
 const timeSpentLabel = computed(() => formatMinutes(timeSpentMinutes.value))
@@ -170,12 +171,14 @@ function stubParentTask(id: number, titleText: string, pid: number | ''): Task {
 }
 
 const DESCRIPTION_MIN_HEIGHT = 80
+const KANBAN_DESCRIPTION_MIN_HEIGHT = 160
 
 function autosizeDescription() {
   const el = descriptionInput.value
   if (!el) return
+  const min = isKanbanTask.value ? KANBAN_DESCRIPTION_MIN_HEIGHT : DESCRIPTION_MIN_HEIGHT
   el.style.height = 'auto'
-  el.style.height = `${Math.max(el.scrollHeight, DESCRIPTION_MIN_HEIGHT)}px`
+  el.style.height = `${Math.max(el.scrollHeight, min)}px`
 }
 
 function resetForm() {
@@ -561,6 +564,11 @@ async function loadEvents() {
 
 watch(description, validateDescription)
 
+watch(isKanbanTask, async () => {
+  await nextTick()
+  autosizeDescription()
+})
+
 async function onProjectChange() {
   const names = new Set(
     [...taskTags.value, ...allTags.value]
@@ -792,50 +800,110 @@ async function removeTimeEntry(entryId: number) {
     v-if="open"
     id="taskModal"
     class="modal show d-block"
+    :class="{ 'kanban-task-overlay': isKanbanTask }"
     style="background: rgba(0,0,0,0.5);"
     tabindex="-1"
     role="dialog"
     aria-modal="true"
     @click.self="close"
   >
-    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+    <div
+      class="modal-dialog"
+      :class="
+        isKanbanTask
+          ? 'kanban-task-dialog'
+          : 'modal-dialog-centered modal-lg modal-dialog-scrollable'
+      "
+    >
       <div
         class="modal-content border-0 shadow"
+        :class="{ 'kanban-task-content': isKanbanTask }"
         style="background: var(--ordryn-card-bg); color: var(--ordryn-text);"
       >
-        <div class="modal-header border-0 pb-0">
-          <h5 class="modal-title fw-bold d-flex align-items-center gap-2 flex-wrap">
-            {{ sidebarTitle }}
-            <span v-if="showTaskNumber" class="text-muted fw-normal">#{{ taskId }}</span>
-            <button
-              v-if="showTaskNumber"
-              type="button"
-              class="btn btn-sm btn-outline-secondary"
-              title="Copy link"
-              aria-label="Copy task link"
-              @click="copyPermalink"
-            >
-              <i class="bi bi-link-45deg" /> Copy link
-            </button>
-          </h5>
-          <button type="button" class="btn-close" id="closeSidebar" aria-label="Close" @click="close" />
+        <div
+          class="modal-header"
+          :class="isKanbanTask ? 'kanban-task-header' : 'border-0 pb-0'"
+        >
+          <template v-if="isKanbanTask">
+            <div class="d-flex align-items-center gap-2 flex-grow-1 min-w-0 flex-wrap">
+              <h5 class="modal-title fw-bold mb-0">
+                {{ kanbanHeaderTitle }}
+                <span v-if="showTaskNumber" class="text-muted fw-normal">#{{ taskId }}</span>
+              </h5>
+              <button
+                v-if="showTaskNumber"
+                type="button"
+                class="btn btn-sm btn-outline-secondary"
+                title="Copy link"
+                aria-label="Copy task link"
+                @click="copyPermalink"
+              >
+                <i class="bi bi-link-45deg" /> Copy link
+              </button>
+            </div>
+            <div class="d-flex align-items-center gap-2 flex-shrink-0">
+              <button
+                v-if="!readOnly && !loading"
+                type="button"
+                class="btn btn-primary btn-sm"
+                :disabled="saving"
+                @click="save(false)"
+              >
+                {{ saving ? 'Saving…' : submitText }}
+              </button>
+              <button
+                v-if="!readOnly && !loading && mode === 'add'"
+                type="button"
+                class="btn btn-outline-primary btn-sm"
+                :disabled="saving || !title.trim()"
+                @click="save(true)"
+              >
+                Save &amp; Add Another
+              </button>
+              <button type="button" class="btn-close" id="closeSidebar" aria-label="Close" @click="close" />
+            </div>
+          </template>
+          <template v-else>
+            <h5 class="modal-title fw-bold d-flex align-items-center gap-2 flex-wrap">
+              {{ sidebarTitle }}
+              <span v-if="showTaskNumber" class="text-muted fw-normal">#{{ taskId }}</span>
+              <button
+                v-if="showTaskNumber"
+                type="button"
+                class="btn btn-sm btn-outline-secondary"
+                title="Copy link"
+                aria-label="Copy task link"
+                @click="copyPermalink"
+              >
+                <i class="bi bi-link-45deg" /> Copy link
+              </button>
+            </h5>
+            <button type="button" class="btn-close" id="closeSidebar" aria-label="Close" @click="close" />
+          </template>
         </div>
-        <div class="modal-body py-3">
+        <div class="modal-body" :class="isKanbanTask ? 'kanban-task-body' : 'py-3'">
       <div v-if="loading" class="d-flex flex-column align-items-center justify-content-center gap-2 py-5" aria-busy="true">
         <div class="spinner-border text-primary" role="status">
           <span class="visually-hidden">Loading task…</span>
         </div>
         <p class="mb-0">Loading task…</p>
       </div>
-      <form v-else id="newTaskForm" @submit.prevent="save(false)">
-        <div class="form-group">
-          <label for="title">Title:</label>
+      <form
+        v-else
+        id="newTaskForm"
+        :class="{ 'kanban-task-form': isKanbanTask }"
+        @submit.prevent="save(false)"
+      >
+        <div :class="{ 'kanban-task-head': isKanbanTask }">
+        <div class="form-group" :class="{ 'kanban-title-group': isKanbanTask }">
+          <label for="title" :class="{ 'visually-hidden': isKanbanTask }">Title:</label>
           <input
             id="title"
             ref="titleInput"
             v-model="title"
             type="text"
             class="form-control"
+            :class="{ 'kanban-title-input': isKanbanTask }"
             :required="!readOnly"
             :readonly="readOnly"
             :disabled="readOnly"
@@ -846,7 +914,7 @@ async function removeTimeEntry(entryId: number) {
           <div v-if="completed" class="alert alert-success py-2 mb-2">
             <i class="bi bi-check-circle" /> This task is completed
           </div>
-          <label for="description">Description:</label>
+          <label for="description" :class="{ 'kanban-section-label': isKanbanTask }">Description:</label>
           <textarea
             id="description"
             ref="descriptionInput"
@@ -866,7 +934,9 @@ async function removeTimeEntry(entryId: number) {
             {{ descriptionError }}
           </div>
         </div>
-        <div class="form-group mt-2">
+        </div>
+        <div :class="{ 'kanban-task-aside': isKanbanTask }">
+        <div class="form-group mt-2 kanban-order-parent">
           <label for="parent_id">Parent task (optional):</label>
           <ParentTaskCombobox
             v-model="parentId"
@@ -882,7 +952,7 @@ async function removeTimeEntry(entryId: number) {
         </div>
         <div
           v-if="(mode === 'edit' || mode === 'view') && (relatedParent || relatedChildren.length)"
-          class="form-group mt-2"
+          class="form-group mt-2 kanban-order-related"
         >
           <label class="d-block">Related tasks</label>
           <div v-if="relatedParent" class="mb-1">
@@ -910,7 +980,7 @@ async function removeTimeEntry(entryId: number) {
             </ul>
           </div>
         </div>
-        <div class="form-group mt-2">
+        <div class="form-group mt-2 kanban-order-project">
           <label for="project_id">Project (optional):</label>
           <select
             id="project_id"
@@ -923,7 +993,7 @@ async function removeTimeEntry(entryId: number) {
             <option v-for="p in projects" :key="p.id" :value="p.id">{{ projectOptionLabel(p) }}</option>
           </select>
         </div>
-        <div v-if="isKanbanTask" class="form-group mt-2">
+        <div v-if="isKanbanTask" class="form-group mt-2 kanban-order-status">
           <label for="status_id">Status:</label>
           <select id="status_id" v-model="statusId" class="form-select" :disabled="readOnly">
             <option v-if="!statuses.length" value="">No statuses</option>
@@ -932,7 +1002,7 @@ async function removeTimeEntry(entryId: number) {
             </option>
           </select>
         </div>
-        <div v-if="isKanbanTask && (mode === 'edit' || mode === 'view')" class="form-group mt-2">
+        <div v-if="isKanbanTask && (mode === 'edit' || mode === 'view')" class="form-group mt-2 kanban-order-claim">
           <label class="d-block">Claimed by</label>
           <div class="d-flex align-items-center gap-2 flex-wrap">
             <span class="badge border" :class="claimedBy ? 'text-bg-primary' : 'text-bg-light text-muted'">
@@ -960,7 +1030,7 @@ async function removeTimeEntry(entryId: number) {
             </template>
           </div>
         </div>
-        <div v-if="isKanbanTask" class="form-group mt-2">
+        <div v-if="isKanbanTask" class="form-group mt-2 kanban-order-estimate">
           <label for="estimate_points">Estimate (points):</label>
           <input
             id="estimate_points"
@@ -977,7 +1047,7 @@ async function removeTimeEntry(entryId: number) {
         </div>
         <div
           v-if="(mode === 'edit' || mode === 'view') && projectHasGitHub"
-          class="form-group mt-3"
+          class="form-group mt-3 kanban-order-github"
         >
           <label class="d-block">GitHub issue</label>
           <div v-if="githubIssue" class="d-flex flex-column gap-2">
@@ -1043,7 +1113,7 @@ async function removeTimeEntry(entryId: number) {
           </div>
           <p v-else class="text-muted small mb-0">No linked GitHub issue.</p>
         </div>
-        <div class="form-group mt-2">
+        <div class="form-group mt-2 kanban-order-priority">
           <label for="priority">Priority:</label>
           <select id="priority" v-model.number="priority" class="form-select" :disabled="readOnly">
             <option :value="0">None</option>
@@ -1052,17 +1122,17 @@ async function removeTimeEntry(entryId: number) {
             <option :value="3">High</option>
           </select>
         </div>
-        <div class="form-group mt-2">
+        <div class="form-group mt-2 kanban-order-due">
           <label for="due_date">Due Date (optional):</label>
           <input id="due_date" v-model="dueDate" type="date" class="form-control" :disabled="readOnly" :readonly="readOnly" />
-          <div v-if="!readOnly" class="btn-group btn-group-sm mt-1" role="group" aria-label="Due date presets">
+          <div v-if="!readOnly" class="btn-group btn-group-sm mt-1 flex-wrap" role="group" aria-label="Due date presets">
             <button type="button" class="btn btn-outline-secondary" @click="applyDuePreset('today')">Today</button>
             <button type="button" class="btn btn-outline-secondary" @click="applyDuePreset('tomorrow')">Tomorrow</button>
             <button type="button" class="btn btn-outline-secondary" @click="applyDuePreset('week')">+1 week</button>
             <button type="button" class="btn btn-outline-secondary" @click="applyDuePreset('clear')">Clear</button>
           </div>
         </div>
-        <div v-if="readOnly" class="form-group mt-2">
+        <div v-if="readOnly" class="form-group mt-2 kanban-order-tags">
           <label>Tags</label>
           <div v-if="taskTags.length" class="d-flex flex-wrap gap-1 mt-1">
             <span
@@ -1074,21 +1144,41 @@ async function removeTimeEntry(entryId: number) {
           </div>
           <p v-else class="text-muted small mb-0 mt-1">No tags</p>
         </div>
-        <template v-else>
+        <div v-else class="kanban-order-tags">
           <div v-if="allTags.length" class="form-group mt-2">
             <label>Tags (max 5)</label>
-            <div v-for="tag in allTags" :key="tag.id" class="form-check">
-              <input
-                :id="`tag-${tag.id}`"
-                type="checkbox"
-                class="form-check-input"
-                :checked="selectedTagIds.includes(tag.id)"
-                @change="toggleTag(tag.id, ($event.target as HTMLInputElement).checked)"
-              />
-              <label class="form-check-label" :for="`tag-${tag.id}`">
-                <span class="tag-chip" :style="{ backgroundColor: tag.color || '#6c757d' }">{{ tag.name }}</span>
-              </label>
+            <div v-if="isKanbanTask" class="kanban-tag-chips">
+              <button
+                v-for="tag in allTags"
+                :key="tag.id"
+                type="button"
+                class="tag-chip kanban-tag-toggle"
+                :class="{ 'is-selected': selectedTagIds.includes(tag.id) }"
+                :style="
+                  selectedTagIds.includes(tag.id)
+                    ? { backgroundColor: tag.color || '#6c757d' }
+                    : { borderColor: tag.color || '#6c757d', color: 'var(--ordryn-text)' }
+                "
+                :aria-pressed="selectedTagIds.includes(tag.id)"
+                @click="toggleTag(tag.id, !selectedTagIds.includes(tag.id))"
+              >
+                {{ tag.name }}
+              </button>
             </div>
+            <template v-else>
+              <div v-for="tag in allTags" :key="tag.id" class="form-check">
+                <input
+                  :id="`tag-${tag.id}`"
+                  type="checkbox"
+                  class="form-check-input"
+                  :checked="selectedTagIds.includes(tag.id)"
+                  @change="toggleTag(tag.id, ($event.target as HTMLInputElement).checked)"
+                />
+                <label class="form-check-label" :for="`tag-${tag.id}`">
+                  <span class="tag-chip" :style="{ backgroundColor: tag.color || '#6c757d' }">{{ tag.name }}</span>
+                </label>
+              </div>
+            </template>
           </div>
           <div class="form-group mt-2" v-if="canManageTags">
             <label for="new_tags">Add tags (comma-separated)</label>
@@ -1102,11 +1192,11 @@ async function removeTimeEntry(entryId: number) {
             />
             <small class="form-hint">New tag names are created on save (max 5 tags per task).</small>
           </div>
-        </template>
+        </div>
 
         <div
           v-if="isKanbanTask && (mode === 'edit' || mode === 'view')"
-          class="form-group mt-3 border-top pt-3"
+          class="form-group mt-3 border-top pt-3 kanban-order-time"
         >
           <label class="d-block">Time tracking</label>
           <p class="small text-muted mb-2">
@@ -1166,17 +1256,19 @@ async function removeTimeEntry(entryId: number) {
           </ul>
           <p v-else class="small text-muted mb-0">No time entries yet.</p>
         </div>
+        </div>
 
+        <div :class="{ 'kanban-task-rest': isKanbanTask }">
         <TaskDiscussion
           v-if="showDiscussion && taskId"
           ref="discussionRef"
           :task-id="taskId"
           :current-user-id="user?.id ?? null"
           :is-owner="discussionIsOwner"
+          :fill-height="isKanbanTask"
         />
 
-        <!-- Form Submit Action Buttons -->
-        <div v-if="!readOnly" class="d-flex gap-2 mt-3">
+        <div v-if="!readOnly && !isKanbanTask" class="d-flex gap-2 mt-3">
           <button type="submit" class="btn btn-primary flex-grow-1" :disabled="saving">
             {{ saving ? 'Saving…' : submitText }}
           </button>
@@ -1210,6 +1302,7 @@ async function removeTimeEntry(entryId: number) {
             <p v-else class="text-muted small mb-0">No activity recorded.</p>
           </div>
         </details>
+        </div>
       </form>
         </div>
       </div>
@@ -1223,5 +1316,222 @@ textarea.task-description-input {
   min-height: 80px;
   resize: vertical;
   overflow-y: hidden;
+}
+
+.kanban-task-head textarea.task-description-input {
+  min-height: 160px;
+}
+
+.kanban-task-overlay {
+  overflow: hidden;
+  padding: 0;
+}
+
+.kanban-task-dialog {
+  --bs-modal-width: min(1400px, 90vw);
+  max-width: min(1400px, 90vw);
+  width: 90vw;
+  height: 90vh;
+  max-height: 90vh;
+  margin: 5vh auto;
+}
+
+.kanban-task-content {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.kanban-task-header {
+  border-bottom: 1px solid var(--ordryn-card-border, #dee2e6);
+  padding: 0.75rem 1.25rem;
+  flex-shrink: 0;
+  gap: 0.75rem;
+}
+
+.kanban-task-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.kanban-task-body > [aria-busy='true'] {
+  flex: 1;
+}
+
+.kanban-task-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    'head aside'
+    'rest aside';
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+
+.kanban-task-head {
+  grid-area: head;
+  padding: 1rem 1.5rem 0;
+  min-width: 0;
+}
+
+.kanban-task-rest {
+  grid-area: rest;
+  overflow-y: auto;
+  padding: 0 1.5rem 1.5rem;
+  min-width: 0;
+  min-height: 0;
+}
+
+.kanban-task-aside {
+  grid-area: aside;
+  overflow-y: auto;
+  padding: 1rem 1rem 1.25rem;
+  border-left: 1px solid var(--ordryn-card-border, #dee2e6);
+  background: color-mix(in srgb, var(--ordryn-muted-bg, #f8f6ee) 55%, var(--ordryn-card-bg, #fff));
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.kanban-task-aside .form-group,
+.kanban-task-aside :deep(.form-group) {
+  margin-bottom: 0.85rem;
+}
+
+.kanban-task-aside label,
+.kanban-task-aside .form-label,
+.kanban-task-aside :deep(label),
+.kanban-task-aside :deep(.form-label) {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ordryn-muted, #64748b);
+  margin-bottom: 0.2rem;
+}
+
+.kanban-task-aside .form-control,
+.kanban-task-aside .form-select,
+.kanban-task-aside :deep(.form-control),
+.kanban-task-aside :deep(.form-select) {
+  font-size: 0.875rem;
+}
+
+.kanban-task-aside .kanban-order-status,
+.kanban-task-aside :deep(.kanban-order-status) { order: 1; }
+.kanban-task-aside .kanban-order-claim,
+.kanban-task-aside :deep(.kanban-order-claim) { order: 2; }
+.kanban-task-aside .kanban-order-project,
+.kanban-task-aside :deep(.kanban-order-project) { order: 3; }
+.kanban-task-aside .kanban-order-parent,
+.kanban-task-aside :deep(.kanban-order-parent) { order: 4; }
+.kanban-task-aside .kanban-order-related,
+.kanban-task-aside :deep(.kanban-order-related) { order: 5; }
+.kanban-task-aside .kanban-order-priority,
+.kanban-task-aside :deep(.kanban-order-priority) { order: 6; }
+.kanban-task-aside .kanban-order-estimate,
+.kanban-task-aside :deep(.kanban-order-estimate) { order: 7; }
+.kanban-task-aside .kanban-order-due,
+.kanban-task-aside :deep(.kanban-order-due) { order: 8; }
+.kanban-task-aside .kanban-order-tags,
+.kanban-task-aside :deep(.kanban-order-tags) { order: 9; }
+.kanban-task-aside .kanban-order-github,
+.kanban-task-aside :deep(.kanban-order-github) { order: 10; }
+.kanban-task-aside .kanban-order-time,
+.kanban-task-aside :deep(.kanban-order-time) { order: 11; }
+
+.kanban-title-group {
+  margin-bottom: 0.75rem;
+}
+
+.kanban-title-input {
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1.3;
+  border: 1px solid transparent;
+  background: transparent;
+  padding-left: 0.25rem;
+  box-shadow: none;
+}
+
+.kanban-title-input:hover:not(:disabled):not([readonly]) {
+  border-color: var(--ordryn-card-border, #dee2e6);
+}
+
+.kanban-title-input:focus {
+  border-color: var(--ordryn-accent, #2563eb);
+  background: var(--ordryn-input-bg, var(--ordryn-card-bg, #fff));
+  box-shadow: none;
+}
+
+.kanban-section-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ordryn-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.kanban-tag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+.kanban-tag-toggle {
+  border: 1px solid var(--ordryn-card-border, #dee2e6);
+  background: transparent;
+  color: var(--ordryn-text);
+  cursor: pointer;
+}
+
+.kanban-tag-toggle.is-selected {
+  color: #fff;
+  border-color: transparent;
+}
+
+.kanban-tag-toggle:focus-visible {
+  outline: 2px solid var(--ordryn-accent, #2563eb);
+  outline-offset: 2px;
+}
+
+@media (max-width: 991.98px) {
+  .kanban-task-dialog {
+    width: 96vw;
+    max-width: 96vw;
+    height: 96vh;
+    max-height: 96vh;
+    margin: 2vh auto;
+  }
+
+  .kanban-task-body {
+    overflow-y: auto;
+  }
+
+  .kanban-task-form {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+  }
+
+  .kanban-task-head,
+  .kanban-task-rest,
+  .kanban-task-aside {
+    overflow: visible;
+  }
+
+  .kanban-task-head { order: 1; }
+  .kanban-task-rest { order: 2; }
+  .kanban-task-aside {
+    order: 3;
+    border-left: none;
+    border-top: 1px solid var(--ordryn-card-border, #dee2e6);
+  }
 }
 </style>

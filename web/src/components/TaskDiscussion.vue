@@ -16,6 +16,8 @@ const props = defineProps<{
   taskId: number
   currentUserId: number | null
   isOwner: boolean
+  /** Grow with the parent column instead of capping the thread at 360px. */
+  fillHeight?: boolean
 }>()
 
 const toast = useToast()
@@ -196,7 +198,7 @@ defineExpose({ reload })
 </script>
 
 <template>
-  <div class="task-discussion mt-3">
+  <div class="task-discussion" :class="fillHeight ? 'task-discussion--fill' : 'mt-3'">
     <h3 class="h6 mb-2">Discussion</h3>
     <p v-if="loading && !comments.length" class="text-muted small mb-2">Loading discussion…</p>
     <div v-else class="task-discussion-thread mb-2">
@@ -279,6 +281,9 @@ defineExpose({ reload })
 </template>
 
 <style scoped>
+.task-discussion--fill {
+  margin-top: 1.25rem;
+}
 .task-discussion-thread {
   max-height: 360px;
   overflow-y: auto;
@@ -286,6 +291,11 @@ defineExpose({ reload })
   border-radius: 0.5rem;
   background: var(--ordryn-muted-bg, #f8f6ee);
   border: 1px solid var(--ordryn-card-border, #dee2e6);
+}
+.task-discussion--fill .task-discussion-thread {
+  max-height: none;
+  overflow: visible;
+  min-height: 8rem;
 }
 .task-discussion-post + .task-discussion-post {
   margin-top: 0.75rem;
