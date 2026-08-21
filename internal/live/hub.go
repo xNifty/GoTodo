@@ -29,6 +29,7 @@ const (
 	TypeTaskReordered  = "task.reordered"
 	TypeTaskCommented  = "task.commented"
 	TypeProjectUpdated = "project.updated"
+	TypeJoinRequest    = "join.request"
 )
 
 // Hub fans events out to in-process SSE subscribers and, when Redis is

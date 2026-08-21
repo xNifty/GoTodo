@@ -6,9 +6,55 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 
+	"GoTodo/internal/live"
 	"GoTodo/internal/storage"
 )
+
+const joinRequestNotifyPreviewMax = 120
+
+// NotifyAdminsOfJoinRequest fans out in-app notifications when a visitor
+// asks to join. Best-effort: failures are logged and do not fail the create.
+func NotifyAdminsOfJoinRequest(email, message string) {
+	ids, err := storage.ListAdminUserIDs()
+	if err != nil {
+		log.Printf("notify join_request: list admins: %v", err)
+		return
+	}
+	if len(ids) == 0 {
+		return
+	}
+
+	title := "New join request"
+	body := joinRequestNotificationBody(email, message)
+	items := make([]storage.UserNotification, 0, len(ids))
+	for _, id := range ids {
+		items = append(items, storage.UserNotification{
+			UserID: id,
+			Type:   storage.NotificationJoinRequest,
+			Title:  title,
+			Body:   body,
+		})
+	}
+	if err := storage.CreateUserNotificationsBulk(items); err != nil {
+		log.Printf("notify join_request: insert: %v", err)
+		return
+	}
+	live.Push(live.Event{Type: live.TypeJoinRequest}, ids)
+}
+
+func joinRequestNotificationBody(email, message string) string {
+	email = strings.TrimSpace(email)
+	message = strings.TrimSpace(message)
+	if message == "" {
+		return email
+	}
+	if len(message) > joinRequestNotifyPreviewMax {
+		message = message[:joinRequestNotifyPreviewMax-3] + "..."
+	}
+	return email + "\n" + message
+}
 
 // NotifyProjectMembersTaskCreated fans out in-app notifications for a new kanban task.
 // Best-effort: failures are logged and do not fail task creation.

@@ -12,6 +12,7 @@ import type {
   DeviceStatus,
   GitHubConnection,
   Invite,
+  JoinRequest,
   Project,
   ProjectGitHubRepo,
   TaskGitHubIssue,
@@ -714,6 +715,30 @@ export const api = {
     return request<{ ok: boolean; id: number; user_name: string }>(`/api/v1/admin/users/${id}/username`, {
       method: 'PATCH',
       body: JSON.stringify({ user_name }),
+    })
+  },
+
+  createJoinRequest(email: string, message = '') {
+    return request<{ ok: boolean; message: string }>('/api/v1/join-requests', {
+      method: 'POST',
+      body: JSON.stringify({ email, message }),
+    })
+  },
+
+  listAdminJoinRequests() {
+    return request<JoinRequest[]>('/api/v1/admin/join-requests')
+  },
+
+  approveJoinRequest(id: number) {
+    return request<{ ok: boolean; request: JoinRequest; invite: Invite }>(
+      `/api/v1/admin/join-requests/${id}/approve`,
+      { method: 'POST' },
+    )
+  },
+
+  denyJoinRequest(id: number) {
+    return request<{ ok: boolean; request: JoinRequest }>(`/api/v1/admin/join-requests/${id}/deny`, {
+      method: 'POST',
     })
   },
 

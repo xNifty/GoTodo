@@ -1,21 +1,17 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { api } from '@/api/client'
-import type { AdminSettings, AdminSettingsPatch, AdminUser } from '@/api/types'
+import type { AdminSettings, AdminSettingsPatch } from '@/api/types'
 import { APIError } from '@/api/types'
 import { useSite } from '@/composables/useSite'
 import { useToast } from '@/composables/useToast'
-import { useConfirm } from '@/composables/useConfirm'
 import TimezoneSelect from '@/components/TimezoneSelect.vue'
+import AdminSubnav from '@/components/AdminSubnav.vue'
 
 const toast = useToast()
-const { askConfirm } = useConfirm()
 const { refresh: refreshSite } = useSite()
-const users = ref<AdminUser[]>([])
 const busy = ref(false)
 const emailBusy = ref(false)
-const editingUsernameId = ref<number | null>(null)
-const editUsernameValue = ref('')
 const mailgunApiKeyInput = ref('')
 const smtpPasswordInput = ref('')
 const githubOAuthSecretInput = ref('')
@@ -27,6 +23,7 @@ const settings = reactive<AdminSettings>({
   site_version: '',
   enable_registration: true,
   invite_only: false,
+  enable_join_requests: false,
   meta_description: '',
   enable_global_announcement: false,
   global_announcement_text: '',
@@ -48,12 +45,11 @@ const settings = reactive<AdminSettings>({
 
 async function load() {
   try {
-    const [s, u] = await Promise.all([api.getAdminSettings(), api.listAdminUsers()])
+    const s = await api.getAdminSettings()
     Object.assign(settings, s)
     mailgunApiKeyInput.value = ''
     smtpPasswordInput.value = ''
     githubOAuthSecretInput.value = ''
-    users.value = u
   } catch (err) {
     toast.push(err instanceof APIError ? err.message : 'Failed to load admin data', 'error')
   }
@@ -68,6 +64,7 @@ async function saveSettings() {
       show_changelog: settings.show_changelog,
       enable_registration: settings.enable_registration,
       invite_only: settings.invite_only,
+      enable_join_requests: settings.enable_join_requests,
       meta_description: settings.meta_description,
       enable_global_announcement: settings.enable_global_announcement,
       global_announcement_text: settings.global_announcement_text,
@@ -135,61 +132,12 @@ async function saveGitHubOAuthSettings() {
   }
 }
 
-async function toggleBan(user: AdminUser) {
-  const ok = await askConfirm({
-    title: user.is_banned ? 'Unban user?' : 'Ban user?',
-    message: user.is_banned
-      ? `Unban ${user.email}?`
-      : `Ban ${user.email}? They will no longer be able to sign in.`,
-    confirmLabel: user.is_banned ? 'Unban' : 'Ban',
-    danger: !user.is_banned,
-  })
-  if (!ok) return
-  try {
-    if (user.is_banned) {
-      await api.unbanUser(user.id)
-      toast.push('User unbanned', 'success')
-    } else {
-      await api.banUser(user.id)
-      toast.push('User banned', 'info')
-    }
-    await load()
-  } catch (err) {
-    toast.push(err instanceof APIError ? err.message : 'Update failed', 'error')
-  }
-}
-
-function startEditUsername(user: AdminUser) {
-  editingUsernameId.value = user.id
-  editUsernameValue.value = user.user_name || ''
-}
-
-function cancelEditUsername() {
-  editingUsernameId.value = null
-  editUsernameValue.value = ''
-}
-
-async function saveUsername(user: AdminUser) {
-  const next = editUsernameValue.value.trim()
-  if (!next) {
-    toast.push('Username is required', 'error')
-    return
-  }
-  try {
-    await api.setAdminUsername(user.id, next)
-    toast.push('Username updated', 'success')
-    cancelEditUsername()
-    await load()
-  } catch (err) {
-    toast.push(err instanceof APIError ? err.message : 'Failed to update username', 'error')
-  }
-}
-
 onMounted(load)
 </script>
 
 <template>
   <div class="container mt-3">
+    <AdminSubnav />
     <h1>Admin</h1>
     <div class="card mb-4">
       <div class="card-header"><h2 class="h5 mb-0">Site settings</h2></div>
@@ -214,6 +162,10 @@ onMounted(load)
           <div class="form-check mb-2">
             <input id="admin-invite-only" v-model="settings.invite_only" class="form-check-input" type="checkbox" />
             <label class="form-check-label" for="admin-invite-only">Invite only</label>
+          </div>
+          <div class="form-check mb-2">
+            <input id="admin-join-requests" v-model="settings.enable_join_requests" class="form-check-input" type="checkbox" />
+            <label class="form-check-label" for="admin-join-requests">Enable join requests</label>
           </div>
           <div class="form-check mb-2">
             <input id="admin-changelog" v-model="settings.show_changelog" class="form-check-input" type="checkbox" />
@@ -387,47 +339,6 @@ onMounted(load)
           </button>
         </form>
       </div>
-    </div>
-
-    <div class="card">
-      <div class="card-header"><h2 class="h5 mb-0">Users</h2></div>
-      <ul class="list-group list-group-flush">
-        <li v-for="user in users" :key="user.id" class="list-group-item">
-          <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
-            <div class="flex-grow-1">
-              <template v-if="editingUsernameId === user.id">
-                <div class="input-group input-group-sm" style="max-width: 280px">
-                  <input
-                    v-model="editUsernameValue"
-                    type="text"
-                    class="form-control"
-                    minlength="3"
-                    maxlength="32"
-                    pattern="[A-Za-z0-9_]+"
-                    @keyup.enter="saveUsername(user)"
-                  />
-                  <button type="button" class="btn btn-primary" @click="saveUsername(user)">Save</button>
-                  <button type="button" class="btn btn-outline-secondary" @click="cancelEditUsername">Cancel</button>
-                </div>
-              </template>
-              <template v-else>
-                <strong>{{ user.user_name || user.email }}</strong>
-                <button type="button" class="btn btn-link btn-sm py-0" @click="startEditUsername(user)">
-                  Edit username
-                </button>
-              </template>
-              <div class="text-muted small">
-                {{ user.email }}
-                <span v-if="user.is_banned">· banned</span>
-              </div>
-            </div>
-            <button type="button" class="btn btn-sm" :class="user.is_banned ? 'btn-outline-secondary' : 'btn-outline-danger'" @click="toggleBan(user)">
-              {{ user.is_banned ? 'Unban' : 'Ban' }}
-            </button>
-          </div>
-        </li>
-        <li v-if="!users.length" class="list-group-item text-muted">No users found.</li>
-      </ul>
     </div>
   </div>
 </template>

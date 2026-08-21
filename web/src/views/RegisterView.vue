@@ -3,6 +3,7 @@ import { ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useToast } from '@/composables/useToast'
+import { useSite } from '@/composables/useSite'
 import { api } from '@/api/client'
 import { APIError } from '@/api/types'
 import TimezoneSelect from '@/components/TimezoneSelect.vue'
@@ -19,6 +20,7 @@ const usernameHint = ref('')
 const usernameOk = ref<boolean | null>(null)
 const { register } = useAuth()
 const { push } = useToast()
+const { enableJoinRequests } = useSite()
 const router = useRouter()
 
 let availabilityTimer: ReturnType<typeof setTimeout> | null = null
@@ -129,6 +131,10 @@ async function onSubmit() {
             <p class="mt-3 mb-0 text-muted">
               Already registered?
               <RouterLink to="/login">Sign in</RouterLink>
+              <template v-if="enableJoinRequests">
+                ·
+                <RouterLink to="/join">Request to join</RouterLink>
+              </template>
             </p>
           </div>
         </div>
