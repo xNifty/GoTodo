@@ -1248,7 +1248,7 @@ onUnmounted(() => {
 
         <!-- Kanban board -->
         <div v-if="showBoardView" class="mb-3">
-          <div v-if="loading && !tasks.length" class="text-center py-5 text-muted">
+          <div v-if="loading && !tasks.length" class="text-center py-4 text-muted">
             <div class="spinner-border spinner-border-sm me-2" role="status" />Loading tasks…
           </div>
           <KanbanBoard
