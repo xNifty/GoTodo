@@ -31,12 +31,12 @@ onUnmounted(() => {
                     <div v-if="!isAuthenticated" class="alert alert-info" role="alert">
                         <RouterLink to="/login">Log in</RouterLink>
                         and create an API key on your
-                        <RouterLink :to="{ path: '/settings', hash: '#api-keys-section' }">settings</RouterLink>
+                        <RouterLink :to="{ path: '/settings', hash: '#developer' }">settings</RouterLink>
                         page to start using the API.
                     </div>
                     <div v-else class="alert alert-info" role="alert">
                         Create and manage API keys on your
-                        <RouterLink :to="{ path: '/settings', hash: '#api-keys-section' }">settings</RouterLink>
+                        <RouterLink :to="{ path: '/settings', hash: '#developer' }">settings</RouterLink>
                         page.
                         Machine-readable OpenAPI spec:
                         <a :href="`${basePath}/openapi.yaml`"><code>/openapi.yaml</code></a>.
