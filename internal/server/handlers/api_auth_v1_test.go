@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"GoTodo/internal/server/utils"
 	"GoTodo/internal/storage"
 )
 
@@ -122,6 +123,97 @@ func TestAPIV1AuthLogoutMethod(t *testing.T) {
 	}
 }
 
+func TestAPIV1AuthMFAVerifyValidation(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/mfa/verify", nil)
+	rec := httptest.NewRecorder()
+	APIV1AuthMFAVerify(rec, req)
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/auth/mfa/verify", bytes.NewBufferString(`{"code":"123456"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec = httptest.NewRecorder()
+	APIV1AuthMFAVerify(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusUnauthorized, rec.Body.String())
+	}
+	var payload map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["error"] != "mfa_pending_required" {
+		t.Fatalf("error = %q", payload["error"])
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/auth/mfa/verify", bytes.NewBufferString(`{`))
+	req.Header.Set("Content-Type", "application/json")
+	rec = httptest.NewRecorder()
+	// Still unauthorized before JSON parse when no pending session.
+	APIV1AuthMFAVerify(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("bad json without pending: status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestAPIV1AuthMFAVerifyEmptyCodeWithPending(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/mfa/verify", bytes.NewBufferString(`{"code":""}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	if err := utils.EstablishPendingMFASession(rec, req, 7, "a@b.com"); err != nil {
+		t.Fatal(err)
+	}
+	var cookie *http.Cookie
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == "session" {
+			cookie = c
+			break
+		}
+	}
+	if cookie == nil {
+		t.Fatal("expected pending session cookie")
+	}
+
+	req2 := httptest.NewRequest(http.MethodPost, "/api/v1/auth/mfa/verify", bytes.NewBufferString(`{"code":""}`))
+	req2.Header.Set("Content-Type", "application/json")
+	req2.AddCookie(cookie)
+	if utils.GetSessionUserID(req2) != nil {
+		t.Fatal("pending MFA session must not authenticate")
+	}
+	userID, email, ok := utils.GetPendingMFA(req2)
+	if !ok || userID != 7 || email != "a@b.com" {
+		t.Fatalf("pending=%d %q ok=%v", userID, email, ok)
+	}
+	rec2 := httptest.NewRecorder()
+	APIV1AuthMFAVerify(rec2, req2)
+	if rec2.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s", rec2.Code, rec2.Body.String())
+	}
+}
+
+func TestAPIV1MeMFAMethods(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/me/mfa", nil)
+	rec := httptest.NewRecorder()
+	APIV1MeMFA(rec, req)
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/me/mfa/setup", nil)
+	rec = httptest.NewRecorder()
+	APIV1MeMFASetup(rec, req)
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("setup status = %d", rec.Code)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/me/mfa/enable", nil)
+	rec = httptest.NewRecorder()
+	APIV1MeMFAEnable(rec, req)
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("enable status = %d", rec.Code)
+	}
+}
+
 func TestAPIV1MeUnauthenticatedReturnsNull(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
 	rec := httptest.NewRecorder()
@@ -151,7 +243,7 @@ func TestProfileToMeJSON(t *testing.T) {
 	if err := json.Unmarshal(raw, &m); err != nil {
 		t.Fatal(err)
 	}
-	for _, key := range []string{"id", "email", "user_name", "timezone", "items_per_page", "permissions", "digest_enabled", "digest_hour", "allow_project_invites", "username_change_available"} {
+	for _, key := range []string{"id", "email", "user_name", "timezone", "items_per_page", "permissions", "digest_enabled", "digest_hour", "allow_project_invites", "username_change_available", "mfa_enabled"} {
 		if _, ok := m[key]; !ok {
 			t.Fatalf("missing key %q in %s", key, string(raw))
 		}

@@ -168,6 +168,11 @@ onUnmounted(() => {
           Update your profile under
           <RouterLink to="/settings">Settings</RouterLink>,
           grouped into Account, Preferences, Integrations, Data, and Developer.
+          On Account you can optionally enable two-factor authentication with an authenticator app.
+          After you confirm a code, you get five recovery codes — store them somewhere safe.
+          Turning MFA off requires a current authenticator code or a remaining recovery code.
+          Use <strong>Set up</strong> or <strong>Manage</strong> to open the two-factor dialog.
+          Password reset does not disable MFA; the next login still asks for a code.
           For machine clients and integrations, see the
           <RouterLink to="/docs/api/v1">REST API documentation</RouterLink>.
         </p>

@@ -14,6 +14,7 @@ export const PROFILE_SECTION_ALIASES: Record<string, ProfileSection> = {
   'github-section': 'integrations',
   'calendar-feed': 'integrations',
   'api-keys-section': 'developer',
+  'mfa-section': 'account',
 }
 
 function hashId(hash: string): string {

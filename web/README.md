@@ -61,15 +61,16 @@ Browser: `/gotodo/…` · Go receives: `/…` · SPA still knows the public pref
 
 ## Surfaces
 
-- Auth: login / register / forgot password / reset password (session cookie)
+- Auth: login / register / forgot password / reset password (session cookie), optional TOTP MFA
 - Tasks: create, complete, delete, undo, bulk
 - Projects, tags, saved views, dashboard
 - Import: CSV preview + confirm
-- Settings: profile, password, calendar feed + ICS sync, export, API keys
+- Settings: profile, password, two-factor authentication, calendar feed + ICS sync, export, API keys
 - Device approve: `/auth/device` (legacy `/app/auth/device` redirects)
 - Admin + invites (permission-gated)
 
 ## Auth
 
 Login/register use JSON endpoints and the httpOnly session cookie (`credentials: 'include'`).
+If MFA is enabled, `POST /api/v1/auth/login` returns `{ "mfa_required": true }` and `POST /api/v1/auth/mfa/verify` completes the session.
 Anonymous `GET /api/v1/me` returns HTTP 200 with JSON `null` when there is no session.

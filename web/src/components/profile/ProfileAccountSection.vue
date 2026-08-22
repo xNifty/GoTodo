@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { api } from '@/api/client'
 import { APIError } from '@/api/types'
+import MfaModal from '@/components/MfaModal.vue'
 import { useToast } from '@/composables/useToast'
 
 defineProps<{
@@ -15,6 +16,9 @@ const currentPassword = ref('')
 const newPassword = ref('')
 const confirmPassword = ref('')
 const busy = ref(false)
+const mfaEnabled = ref(false)
+const mfaRecoveryRemaining = ref(0)
+const mfaModalOpen = ref(false)
 
 function closePasswordForm() {
   showPasswordForm.value = false
@@ -39,6 +43,20 @@ async function changePassword() {
     busy.value = false
   }
 }
+
+function onMfaUpdated(status: { enabled: boolean; recovery_codes_remaining: number }) {
+  mfaEnabled.value = status.enabled
+  mfaRecoveryRemaining.value = status.recovery_codes_remaining
+}
+
+onMounted(async () => {
+  try {
+    const status = await api.getMFA()
+    onMfaUpdated(status)
+  } catch (err) {
+    push(err instanceof APIError ? err.message : 'Failed to load MFA status', 'error')
+  }
+})
 </script>
 
 <template>
@@ -117,4 +135,22 @@ async function changePassword() {
       </form>
     </div>
   </div>
+
+  <div id="mfa-section" class="card mb-4">
+    <div class="card-header"><h3 class="card-title mb-0">Two-factor authentication</h3></div>
+    <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-2">
+      <div>
+        <span v-if="mfaEnabled" class="badge text-bg-success">Enabled</span>
+        <span v-else class="badge text-bg-secondary">Off</span>
+        <span v-if="mfaEnabled" class="text-muted small ms-2">
+          {{ mfaRecoveryRemaining }} unused recovery code{{ mfaRecoveryRemaining === 1 ? '' : 's' }} remaining
+        </span>
+        <span v-else class="text-muted small ms-2">Optional authenticator-app login codes</span>
+      </div>
+      <button type="button" class="btn btn-outline-primary" @click="mfaModalOpen = true">
+        {{ mfaEnabled ? 'Manage' : 'Set up' }}
+      </button>
+    </div>
+  </div>
+  <MfaModal v-model="mfaModalOpen" @updated="onMfaUpdated" />
 </template>

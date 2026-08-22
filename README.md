@@ -6,7 +6,7 @@ GoTodo (Ordryn) is a self-hosted task manager built with Go, PostgreSQL, Redis, 
 
 ## Features
 
-- User signup / login / logout with forgot-password flow
+- User signup / login / logout with forgot-password flow and optional TOTP MFA
 - Editable profile (display name, timezone, tasks-per-page preference)
 - Per-user tasks: add, edit, duplicate, complete, delete, drag-and-drop reorder
 - Projects with rename and delete; tags with create-on-type, rename, and delete

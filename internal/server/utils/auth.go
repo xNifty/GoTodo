@@ -6,6 +6,16 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
+)
+
+const (
+	mfaPendingUserIDKey = "mfa_pending_user_id"
+	mfaPendingEmailKey  = "mfa_pending_email"
+	mfaPendingUntilKey  = "mfa_pending_until"
+	mfaSetupSecretKey   = "mfa_setup_secret"
+	MFAPendingTTL       = 10 * time.Minute
+	sessionMaxAge       = 86400 * 30
 )
 
 // GetSessionUserID returns the user_id stored in the session as a pointer to int.
@@ -213,4 +223,114 @@ func RequirePermission(permission string, next http.HandlerFunc) http.HandlerFun
 
 		next(w, r)
 	}
+}
+
+func sessionAsInt(v interface{}) (int, bool) {
+	switch n := v.(type) {
+	case int:
+		return n, true
+	case int64:
+		return int(n), true
+	case float64:
+		return int(n), true
+	case string:
+		if parsed, err := strconv.Atoi(n); err == nil {
+			return parsed, true
+		}
+	}
+	return 0, false
+}
+
+func sessionAsInt64(v interface{}) (int64, bool) {
+	switch n := v.(type) {
+	case int64:
+		return n, true
+	case int:
+		return int64(n), true
+	case float64:
+		return int64(n), true
+	}
+	return 0, false
+}
+
+// EstablishPendingMFASession stores a short-lived MFA challenge without granting login.
+func EstablishPendingMFASession(w http.ResponseWriter, r *http.Request, userID int, email string) error {
+	session, err := sessionstore.GetSession(r)
+	if err != nil {
+		return err
+	}
+	session.Values = map[interface{}]interface{}{
+		mfaPendingUserIDKey: userID,
+		mfaPendingEmailKey:  email,
+		mfaPendingUntilKey:  time.Now().Add(MFAPendingTTL).Unix(),
+	}
+	if session.Options == nil && sessionstore.Store != nil && sessionstore.Store.Options != nil {
+		opts := *sessionstore.Store.Options
+		session.Options = &opts
+	}
+	if session.Options != nil {
+		session.Options.MaxAge = int(MFAPendingTTL.Seconds())
+		session.Options.Path = "/"
+		session.Options.HttpOnly = true
+		session.Options.SameSite = http.SameSiteLaxMode
+	}
+	sessionstore.ApplySecureCookieOptions(session)
+	return session.Save(r, w)
+}
+
+// GetPendingMFA returns the pending MFA user if the challenge is still valid.
+func GetPendingMFA(r *http.Request) (userID int, email string, ok bool) {
+	session, err := sessionstore.GetSession(r)
+	if err != nil {
+		return 0, "", false
+	}
+	untilVal, hasUntil := session.Values[mfaPendingUntilKey]
+	until, untilOK := sessionAsInt64(untilVal)
+	if !hasUntil || !untilOK || until < time.Now().Unix() {
+		return 0, "", false
+	}
+	idVal, hasID := session.Values[mfaPendingUserIDKey]
+	userID, idOK := sessionAsInt(idVal)
+	if !hasID || !idOK || userID <= 0 {
+		return 0, "", false
+	}
+	emailVal, _ := session.Values[mfaPendingEmailKey].(string)
+	return userID, emailVal, true
+}
+
+// SetMFASetupSecret stores a pending TOTP secret on the authenticated session.
+func SetMFASetupSecret(w http.ResponseWriter, r *http.Request, totpSecret string) error {
+	session, err := sessionstore.GetSession(r)
+	if err != nil {
+		return err
+	}
+	session.Values[mfaSetupSecretKey] = totpSecret
+	sessionstore.ApplySecureCookieOptions(session)
+	return session.Save(r, w)
+}
+
+// GetMFASetupSecret returns the pending TOTP setup secret, if any.
+func GetMFASetupSecret(r *http.Request) string {
+	session, err := sessionstore.GetSession(r)
+	if err != nil {
+		return ""
+	}
+	s, _ := session.Values[mfaSetupSecretKey].(string)
+	return s
+}
+
+// ClearMFASetupSecret removes the pending TOTP setup secret.
+func ClearMFASetupSecret(w http.ResponseWriter, r *http.Request) error {
+	session, err := sessionstore.GetSession(r)
+	if err != nil {
+		return err
+	}
+	delete(session.Values, mfaSetupSecretKey)
+	sessionstore.ApplySecureCookieOptions(session)
+	return session.Save(r, w)
+}
+
+// SessionMaxAge is the persistent cookie lifetime in seconds.
+func SessionMaxAge() int {
+	return sessionMaxAge
 }

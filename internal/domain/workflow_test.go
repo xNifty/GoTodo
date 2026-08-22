@@ -171,6 +171,14 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "github: %v\n", err)
 		os.Exit(1)
 	}
+	if err := storage.MigrateUsersAddMFA(); err != nil {
+		fmt.Fprintf(os.Stderr, "mfa columns: %v\n", err)
+		os.Exit(1)
+	}
+	if err := storage.CreateMFARecoveryCodesTable(); err != nil {
+		fmt.Fprintf(os.Stderr, "mfa recovery: %v\n", err)
+		os.Exit(1)
+	}
 
 	_, err = pool.Exec(context.Background(), `
 		INSERT INTO users (id, email, password, role_id) VALUES

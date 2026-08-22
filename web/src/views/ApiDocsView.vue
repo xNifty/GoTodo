@@ -74,13 +74,19 @@ onUnmounted(() => {
                         <tbody>
                             <tr><td><span class="badge bg-success">GET</span></td><td><a href="#overview"><code>/api/v1/health</code></a></td><td>Public health probe</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/auth/register</code></a></td><td>Register (session cookie)</td></tr>
-                            <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/auth/login</code></a></td><td>Login (session cookie)</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/auth/login</code></a></td><td>Login (session cookie; may require MFA)</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/auth/mfa/verify</code></a></td><td>Complete MFA login</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/auth/logout</code></a></td><td>Clear session cookie</td></tr>
                             <tr><td><span class="badge bg-success">GET</span></td><td><a href="#session-auth"><code>/api/v1/auth/username-available</code></a></td><td>Check username availability</td></tr>
                             <tr><td><span class="badge bg-success">GET</span></td><td><a href="#session-auth"><code>/api/v1/users/search</code></a></td><td>Search usernames for project invites</td></tr>
                             <tr><td><span class="badge bg-success">GET</span> <span class="badge bg-warning text-dark">PATCH</span></td><td><a href="#session-auth"><code>/api/v1/me</code></a></td><td>Current user / update profile prefs</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/me/username</code></a></td><td>One-time username claim</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/me/password</code></a></td><td>Change password</td></tr>
+                            <tr><td><span class="badge bg-success">GET</span></td><td><a href="#session-auth"><code>/api/v1/me/mfa</code></a></td><td>MFA status</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/me/mfa/setup</code></a></td><td>Start MFA enrollment</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/me/mfa/enable</code></a></td><td>Confirm TOTP and enable MFA</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/me/mfa/disable</code></a></td><td>Disable MFA</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/me/mfa/recovery-codes</code></a></td><td>Replace recovery codes</td></tr>
                             <tr><td><span class="badge bg-success">GET</span> <span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/api-keys</code></a></td><td>List / create API keys</td></tr>
                             <tr><td><span class="badge bg-warning text-dark">PATCH</span> <span class="badge bg-danger">DELETE</span></td><td><a href="#session-auth"><code>/api/v1/api-keys/{id}</code></a></td><td>Rename or revoke an API key</td></tr>
                             <tr><td><span class="badge bg-success">GET</span></td><td><a href="#tasks"><code>/api/v1/tasks</code></a></td><td>List tasks (with filters and pagination)</td></tr>
@@ -135,13 +141,19 @@ onUnmounted(() => {
                         </thead>
                         <tbody>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><code>/api/v1/auth/register</code></td><td>Public (API enabled + Redis)</td><td>Create account with unique <code>user_name</code>; respects invite-only settings; sets session cookie; returns user JSON</td></tr>
-                            <tr><td><span class="badge bg-primary">POST</span></td><td><code>/api/v1/auth/login</code></td><td>Public (API enabled + Redis)</td><td>Email/password login; sets session cookie; returns user JSON</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><code>/api/v1/auth/login</code></td><td>Public (API enabled + Redis)</td><td>Email/password login; if MFA is enabled returns <code>{"mfa_required":true}</code> with a pending cookie instead of a full session</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><code>/api/v1/auth/mfa/verify</code></td><td>Public (pending MFA cookie)</td><td>Submit a TOTP or recovery code to complete login</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><code>/api/v1/auth/logout</code></td><td>API enabled</td><td>Clears session cookie</td></tr>
                             <tr><td><span class="badge bg-success">GET</span></td><td><code>/api/v1/auth/username-available</code></td><td>Public</td><td>Check username format and availability</td></tr>
                             <tr><td><span class="badge bg-success">GET</span></td><td><code>/api/v1/users/search</code></td><td>Session cookie or Bearer</td><td>Username prefix search for project invites (no emails)</td></tr>
                             <tr><td><span class="badge bg-success">GET</span> <span class="badge bg-warning text-dark">PATCH</span></td><td><code>/api/v1/me</code></td><td>Session cookie or Bearer</td><td>Read profile or update prefs (username not editable here)</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><code>/api/v1/me/username</code></td><td>Session cookie or Bearer</td><td>One-time username claim when <code>username_change_available</code></td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><code>/api/v1/me/password</code></td><td>Session cookie or Bearer</td><td>Change password</td></tr>
+                            <tr><td><span class="badge bg-success">GET</span></td><td><code>/api/v1/me/mfa</code></td><td>Session cookie or Bearer</td><td>Whether MFA is enabled and unused recovery codes remaining</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><code>/api/v1/me/mfa/setup</code></td><td>Session cookie or Bearer</td><td>Begin TOTP enrollment; returns secret and otpauth URL</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><code>/api/v1/me/mfa/enable</code></td><td>Session cookie or Bearer</td><td>Confirm a TOTP code; returns five recovery codes once</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><code>/api/v1/me/mfa/disable</code></td><td>Session cookie or Bearer</td><td>Turn MFA off with a TOTP or recovery code</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><code>/api/v1/me/mfa/recovery-codes</code></td><td>Session cookie or Bearer</td><td>Replace recovery codes after proving TOTP or a remaining code</td></tr>
                             <tr><td><span class="badge bg-success">GET</span> <span class="badge bg-primary">POST</span></td><td><code>/api/v1/api-keys</code></td><td>Session cookie or Bearer</td><td>List or create keys</td></tr>
                             <tr><td><span class="badge bg-warning text-dark">PATCH</span> <span class="badge bg-danger">DELETE</span></td><td><code>/api/v1/api-keys/{id}</code></td><td>Session cookie or Bearer</td><td>Rename (label only) or revoke a key</td></tr>
                         </tbody>
@@ -151,10 +163,16 @@ Content-Type: application/json
 
 { "email": "you@example.com", "password": "secret" }
 
-→ 200 { "id", "email", "user_name", "timezone", "items_per_page", "permissions", "username_change_available" }
-   (+ Set-Cookie: session=…)</code></pre>
+→ 200 { "id", "email", "user_name", "timezone", "items_per_page", "permissions", "username_change_available", "mfa_enabled" }
+   (+ Set-Cookie: session=…)
+→ 200 { "mfa_required": true } when MFA is enabled (pending cookie only)
+
+POST {{ basePath }}/api/v1/auth/mfa/verify
+{ "code": "123456" }
+→ 200 user JSON (+ full session cookie)</code></pre>
                     <p class="text-muted small">
                         Password reset is also available via <code>/api/v1/auth/forgot-password</code> and <code>/api/v1/auth/reset-password</code>.
+                        Resetting a password does not disable MFA. Bearer API keys skip the MFA login step.
                     </p>
 
                     <h2 id="device-auth" class="h4 mt-4">Device authorization</h2>

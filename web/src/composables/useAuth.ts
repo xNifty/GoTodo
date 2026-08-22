@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { api } from '@/api/client'
 import type { User } from '@/api/types'
+import { isMFARequired } from '@/api/types'
 
 const user = ref<User | null>(null)
 const loading = ref(false)
@@ -23,7 +24,16 @@ export function useAuth() {
   }
 
   async function login(email: string, password: string) {
-    user.value = await api.login(email, password)
+    const result = await api.login(email, password)
+    if (isMFARequired(result)) {
+      return result
+    }
+    user.value = result
+    return user.value
+  }
+
+  async function verifyMFA(code: string) {
+    user.value = await api.verifyMFA(code)
     return user.value
   }
 
@@ -72,6 +82,7 @@ export function useAuth() {
     hasPermission,
     refresh,
     login,
+    verifyMFA,
     register,
     logout,
     updateProfile,
