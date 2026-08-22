@@ -3,7 +3,6 @@ import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { api } from '@/api/client'
 import { APIError } from '@/api/types'
 import { useToast } from '@/composables/useToast'
-import { useConfirm } from '@/composables/useConfirm'
 import QRCode from 'qrcode'
 
 const open = defineModel<boolean>({ default: false })
@@ -12,7 +11,9 @@ const emit = defineEmits<{
 }>()
 
 const { push } = useToast()
-const { state: confirmState, askConfirm } = useConfirm()
+
+type ConfirmAction = 'disable' | 'regenerate' | null
+const confirmAction = ref<ConfirmAction>(null)
 
 const enabled = ref(false)
 const recoveryRemaining = ref(0)
@@ -39,6 +40,7 @@ function resetTransient() {
   setupCode.value = ''
   disableCode.value = ''
   regenerateCode.value = ''
+  confirmAction.value = null
 }
 
 async function onOpen() {
@@ -99,21 +101,29 @@ async function enableMFA() {
   }
 }
 
+function requestDisable() {
+  if (!disableCode.value.trim()) return
+  confirmAction.value = 'disable'
+}
+
+function requestRegenerate() {
+  if (!regenerateCode.value.trim()) return
+  confirmAction.value = 'regenerate'
+}
+
+function cancelConfirm() {
+  confirmAction.value = null
+}
+
 async function disableMFA() {
   if (!disableCode.value.trim()) return
-  const ok = await askConfirm({
-    title: 'Turn off two-factor authentication?',
-    message: 'You will only need your password to sign in. Recovery codes will be deleted.',
-    confirmLabel: 'Turn off',
-    danger: true,
-  })
-  if (!ok) return
   busy.value = true
   try {
     await api.disableMFA(disableCode.value.trim())
     disableCode.value = ''
     regenerateCode.value = ''
     recoveryCodes.value = null
+    confirmAction.value = null
     await refreshStatus()
     push('Two-factor authentication turned off', 'info')
   } catch (err) {
@@ -125,18 +135,12 @@ async function disableMFA() {
 
 async function regenerateRecoveryCodes() {
   if (!regenerateCode.value.trim()) return
-  const ok = await askConfirm({
-    title: 'Replace recovery codes?',
-    message: 'Your existing unused recovery codes will stop working. Save the new codes somewhere safe.',
-    confirmLabel: 'Replace codes',
-    danger: true,
-  })
-  if (!ok) return
   busy.value = true
   try {
     const result = await api.regenerateMFARecoveryCodes(regenerateCode.value.trim())
     recoveryCodes.value = result.recovery_codes
     regenerateCode.value = ''
+    confirmAction.value = null
     await refreshStatus()
     push('New recovery codes generated', 'success')
   } catch (err) {
@@ -172,9 +176,13 @@ function dismissRecoveryCodes() {
 }
 
 function onKeydown(e: KeyboardEvent) {
-  if (!open.value || confirmState.open) return
+  if (!open.value) return
   if (e.key === 'Escape') {
     e.preventDefault()
+    if (confirmAction.value) {
+      cancelConfirm()
+      return
+    }
     requestClose()
   }
 }
@@ -243,54 +251,83 @@ onUnmounted(() => {
                   {{ recoveryRemaining }} unused recovery code{{ recoveryRemaining === 1 ? '' : 's' }} remaining.
                 </span>
               </p>
-              <form class="mb-4" @submit.prevent="disableMFA">
-                <label class="form-label" for="mfa-disable-code">Turn off with authenticator or recovery code</label>
-                <div class="row g-2">
-                  <div class="col-sm-8">
-                    <input
-                      id="mfa-disable-code"
-                      v-model="disableCode"
-                      type="text"
-                      class="form-control"
-                      autocomplete="one-time-code"
-                      :disabled="busy"
-                    />
-                  </div>
-                  <div class="col-sm-4">
-                    <button
-                      type="submit"
-                      class="btn btn-outline-danger w-100"
-                      :disabled="busy || !disableCode.trim()"
-                    >
-                      Turn off MFA
-                    </button>
-                  </div>
+
+              <div v-if="confirmAction === 'disable'" class="alert alert-danger">
+                <p class="mb-2">
+                  Turn off two-factor authentication? You will only need your password to sign in. Recovery codes will
+                  be deleted.
+                </p>
+                <div class="d-flex flex-wrap gap-2">
+                  <button type="button" class="btn btn-danger" :disabled="busy" @click="disableMFA">Turn off</button>
+                  <button type="button" class="btn btn-outline-secondary" :disabled="busy" @click="cancelConfirm">
+                    Cancel
+                  </button>
                 </div>
-              </form>
-              <form @submit.prevent="regenerateRecoveryCodes">
-                <label class="form-label" for="mfa-regen-code">Replace recovery codes</label>
-                <div class="row g-2">
-                  <div class="col-sm-8">
-                    <input
-                      id="mfa-regen-code"
-                      v-model="regenerateCode"
-                      type="text"
-                      class="form-control"
-                      autocomplete="one-time-code"
-                      :disabled="busy"
-                    />
-                  </div>
-                  <div class="col-sm-4">
-                    <button
-                      type="submit"
-                      class="btn btn-outline-primary w-100"
-                      :disabled="busy || !regenerateCode.trim()"
-                    >
-                      Generate new codes
-                    </button>
-                  </div>
+              </div>
+              <div v-else-if="confirmAction === 'regenerate'" class="alert alert-warning">
+                <p class="mb-2">
+                  Replace recovery codes? Your existing unused codes will stop working. Save the new codes somewhere
+                  safe.
+                </p>
+                <div class="d-flex flex-wrap gap-2">
+                  <button type="button" class="btn btn-primary" :disabled="busy" @click="regenerateRecoveryCodes">
+                    Replace codes
+                  </button>
+                  <button type="button" class="btn btn-outline-secondary" :disabled="busy" @click="cancelConfirm">
+                    Cancel
+                  </button>
                 </div>
-              </form>
+              </div>
+              <template v-else>
+                <form class="mb-4" @submit.prevent="requestDisable">
+                  <label class="form-label" for="mfa-disable-code">Turn off with authenticator or recovery code</label>
+                  <div class="row g-2">
+                    <div class="col-sm-8">
+                      <input
+                        id="mfa-disable-code"
+                        v-model="disableCode"
+                        type="text"
+                        class="form-control"
+                        autocomplete="one-time-code"
+                        :disabled="busy"
+                      />
+                    </div>
+                    <div class="col-sm-4">
+                      <button
+                        type="submit"
+                        class="btn btn-outline-danger w-100"
+                        :disabled="busy || !disableCode.trim()"
+                      >
+                        Turn off MFA
+                      </button>
+                    </div>
+                  </div>
+                </form>
+                <form @submit.prevent="requestRegenerate">
+                  <label class="form-label" for="mfa-regen-code">Replace recovery codes</label>
+                  <div class="row g-2">
+                    <div class="col-sm-8">
+                      <input
+                        id="mfa-regen-code"
+                        v-model="regenerateCode"
+                        type="text"
+                        class="form-control"
+                        autocomplete="one-time-code"
+                        :disabled="busy"
+                      />
+                    </div>
+                    <div class="col-sm-4">
+                      <button
+                        type="submit"
+                        class="btn btn-outline-primary w-100"
+                        :disabled="busy || !regenerateCode.trim()"
+                      >
+                        Generate new codes
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </template>
             </template>
 
             <template v-else-if="setupSecret">
