@@ -41,6 +41,7 @@ type apiUserMeJSON struct {
 	DigestHour              int      `json:"digest_hour"`
 	AllowProjectInvites     bool     `json:"allow_project_invites"`
 	UsernameChangeAvailable bool     `json:"username_change_available"`
+	MFAEnabled              bool     `json:"mfa_enabled"`
 }
 
 func profileToMeJSON(p *storage.UserProfile) apiUserMeJSON {
@@ -59,6 +60,7 @@ func profileToMeJSON(p *storage.UserProfile) apiUserMeJSON {
 		DigestHour:              p.DigestHour,
 		AllowProjectInvites:     p.AllowProjectInvites,
 		UsernameChangeAvailable: p.UsernameChangeAvailable,
+		MFAEnabled:              p.MFAEnabled,
 	}
 }
 
@@ -73,13 +75,25 @@ func establishSession(w http.ResponseWriter, r *http.Request, p *storage.UserPro
 	if err != nil {
 		return err
 	}
-	session.Values["user_id"] = p.ID
-	session.Values["email"] = p.Email
-	session.Values["user_name"] = p.UserName
-	session.Values["role_id"] = p.RoleID
-	session.Values["permissions"] = p.Permissions
-	session.Values["timezone"] = p.Timezone
-	session.Values["items_per_page"] = p.ItemsPerPage
+	session.Values = map[interface{}]interface{}{
+		"user_id":        p.ID,
+		"email":          p.Email,
+		"user_name":      p.UserName,
+		"role_id":        p.RoleID,
+		"permissions":    p.Permissions,
+		"timezone":       p.Timezone,
+		"items_per_page": p.ItemsPerPage,
+	}
+	if session.Options == nil && sessionstore.Store != nil && sessionstore.Store.Options != nil {
+		opts := *sessionstore.Store.Options
+		session.Options = &opts
+	}
+	if session.Options != nil {
+		session.Options.MaxAge = utils.SessionMaxAge()
+		session.Options.Path = "/"
+		session.Options.HttpOnly = true
+		session.Options.SameSite = http.SameSiteLaxMode
+	}
 	sessionstore.ApplySecureCookieOptions(session)
 	return session.Save(r, w)
 }
@@ -266,6 +280,22 @@ func APIV1AuthLogin(w http.ResponseWriter, r *http.Request) {
 	profile, err := storage.GetUserProfileByID(user.ID)
 	if err != nil {
 		utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Internal server error.")
+		return
+	}
+	mfaEnabled, mfaErr := storage.UserHasMFA(user.ID)
+	if mfaErr != nil {
+		utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Internal server error.")
+		return
+	}
+	if mfaEnabled {
+		if err := utils.EstablishPendingMFASession(w, r, user.ID, email); err != nil {
+			fmt.Printf("APIV1AuthLogin pending MFA session: %v\n", err)
+			utils.APIJSONError(w, http.StatusInternalServerError, "session_error", "Failed to create session.")
+			return
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]bool{"mfa_required": true})
 		return
 	}
 	if err := establishSession(w, r, profile); err != nil {

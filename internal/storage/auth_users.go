@@ -22,6 +22,7 @@ type UserProfile struct {
 	DigestHour              int
 	AllowProjectInvites     bool
 	UsernameChangeAvailable bool
+	MFAEnabled              bool
 }
 
 // GetUserProfileByID loads profile fields and role permissions for a user.
@@ -38,12 +39,14 @@ func GetUserProfileByID(userID int) (*UserProfile, error) {
 		       COALESCE(u.items_per_page, 15), u.role_id, COALESCE(r.permissions, '{}'),
 		       COALESCE(u.digest_enabled, false), COALESCE(u.digest_hour, 8),
 		       COALESCE(u.allow_project_invites, true),
-		       COALESCE(u.username_change_available, false)
+		       COALESCE(u.username_change_available, false),
+		       COALESCE(u.mfa_enabled, false)
 		FROM users u
 		LEFT JOIN roles r ON r.id = u.role_id
 		WHERE u.id = $1`, userID).Scan(
 		&p.ID, &p.Email, &p.UserName, &p.Timezone, &p.ItemsPerPage, &p.RoleID, &p.Permissions,
 		&p.DigestEnabled, &p.DigestHour, &p.AllowProjectInvites, &p.UsernameChangeAvailable,
+		&p.MFAEnabled,
 	)
 	if err != nil {
 		return nil, err

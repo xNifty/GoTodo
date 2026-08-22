@@ -32,6 +32,7 @@ func TestOpenAPISpecIncludesSavedViews(t *testing.T) {
 		"/api/v1/tasks/bulk",
 		"/api/v1/tasks/undo",
 		"/api/v1/me/password",
+		"/api/v1/me/mfa",
 		"/api/v1/api-keys",
 		"/api/v1/import/preview",
 		"/api/v1/import/confirm",
