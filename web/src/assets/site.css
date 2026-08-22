@@ -1041,6 +1041,12 @@ td.delete-column {
     padding-bottom: 0.25rem;
 }
 
+@media (max-width: 767.98px) {
+    .profile-section-pills {
+        overflow-x: auto;
+    }
+}
+
 .profile-section-nav .profile-section-link {
     color: var(--text-color);
     white-space: nowrap;
@@ -1071,10 +1077,6 @@ td.delete-column {
 }
 
 @media (min-width: 768px) {
-    .profile-section-nav {
-        position: sticky;
-        top: 5rem;
-    }
     .profile-section-pills {
         padding-bottom: 0;
     }

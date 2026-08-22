@@ -12,7 +12,7 @@ const emit = defineEmits<{
 
 <template>
   <nav class="profile-section-nav" aria-label="Profile sections">
-    <ul class="nav nav-pills profile-section-pills gap-1 flex-nowrap overflow-auto flex-md-column">
+    <ul class="nav nav-pills profile-section-pills gap-1 flex-nowrap flex-md-column">
       <li v-for="item in PROFILE_SECTION_ITEMS" :key="item.id" class="nav-item">
         <button
           type="button"

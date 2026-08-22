@@ -6,10 +6,11 @@ import { isProfileSectionHash } from '@/utils/profileSections'
 
 const router = createRouter({
   history: createWebHistory(appBase()),
-  scrollBehavior(to, _from, savedPosition) {
+  scrollBehavior(to, from, savedPosition) {
     if (savedPosition) return savedPosition
     if (to.hash) {
       if (to.name === 'settings' && isProfileSectionHash(to.hash)) {
+        if (from.name === 'settings') return false
         return { top: 0 }
       }
       return {

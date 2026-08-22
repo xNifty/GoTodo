@@ -136,7 +136,7 @@ onUnmounted(() => {
 <template>
   <div class="container mt-3 profile-settings">
     <h1 class="h3 mb-3">User Profile</h1>
-    <div class="row g-3 g-md-4">
+    <div class="row g-3 g-md-4 align-items-start">
       <div class="col-md-3">
         <ProfileSectionNav :active="activeSection" @select="selectSection" />
       </div>
