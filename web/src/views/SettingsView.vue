@@ -8,6 +8,7 @@ import { api } from '@/api/client'
 import type { APIKey, CalendarInfo, GitHubConnection, Tag } from '@/api/types'
 import { APIError } from '@/api/types'
 import TimezoneSelect from '@/components/TimezoneSelect.vue'
+import MfaModal from '@/components/MfaModal.vue'
 import { useSite } from '@/composables/useSite'
 import { useRoute } from 'vue-router'
 
@@ -26,6 +27,10 @@ const busy = ref(false)
 const currentPassword = ref('')
 const newPassword = ref('')
 const confirmPassword = ref('')
+
+const mfaEnabled = ref(false)
+const mfaRecoveryRemaining = ref(0)
+const mfaModalOpen = ref(false)
 
 const tags = ref<Tag[]>([])
 const tagName = ref('')
@@ -60,16 +65,19 @@ watch(
 
 async function loadExtras() {
   try {
-    const [t, c, k, g] = await Promise.all([
+    const [t, c, k, g, m] = await Promise.all([
       api.listTags({ project_id: 0 }),
       api.getCalendar(),
       api.listAPIKeys(),
       api.getGitHubConnection(),
+      api.getMFA(),
     ])
     tags.value = t
     calendar.value = c
     keys.value = k
     github.value = g
+    mfaEnabled.value = m.enabled
+    mfaRecoveryRemaining.value = m.recovery_codes_remaining
   } catch (err) {
     push(err instanceof APIError ? err.message : 'Failed to load settings extras', 'error')
   }
@@ -152,6 +160,11 @@ async function changePassword() {
   } catch (err) {
     push(err instanceof APIError ? err.message : 'Password change failed', 'error')
   }
+}
+
+function onMfaUpdated(status: { enabled: boolean; recovery_codes_remaining: number }) {
+  mfaEnabled.value = status.enabled
+  mfaRecoveryRemaining.value = status.recovery_codes_remaining
 }
 
 async function createTag() {
@@ -394,6 +407,24 @@ onUnmounted(() => {
         </form>
       </div>
     </div>
+
+    <div id="mfa-section" class="card mb-4">
+      <div class="card-header"><h3 class="card-title mb-0">Two-factor authentication</h3></div>
+      <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div>
+          <span v-if="mfaEnabled" class="badge text-bg-success">Enabled</span>
+          <span v-else class="badge text-bg-secondary">Off</span>
+          <span v-if="mfaEnabled" class="text-muted small ms-2">
+            {{ mfaRecoveryRemaining }} unused recovery code{{ mfaRecoveryRemaining === 1 ? '' : 's' }} remaining
+          </span>
+          <span v-else class="text-muted small ms-2">Optional authenticator-app login codes</span>
+        </div>
+        <button type="button" class="btn btn-outline-primary" @click="mfaModalOpen = true">
+          {{ mfaEnabled ? 'Manage' : 'Set up' }}
+        </button>
+      </div>
+    </div>
+    <MfaModal v-model="mfaModalOpen" @updated="onMfaUpdated" />
 
     <div id="github-section" class="card mb-4">
       <div class="card-header"><h3 class="card-title mb-0">GitHub</h3></div>

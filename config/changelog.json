@@ -1,5 +1,16 @@
 [
   {
+    "version": "2.3.0",
+    "date": "2026-08-22",
+    "title": "Optional two-factor authentication",
+    "notes": [
+      "You can turn on authenticator-app (TOTP) MFA in Settings; it is off by default",
+      "After you confirm a code you get five one-time recovery codes",
+      "Login asks for a TOTP or recovery code when MFA is enabled; turning MFA off requires the same proof",
+      "Password reset does not disable MFA; API keys continue to skip the MFA login step"
+    ]
+  },
+  {
     "version": "2.2.0",
     "date": "2026-08-19",
     "title": "Live task updates",
