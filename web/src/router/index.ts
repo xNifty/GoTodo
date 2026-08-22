@@ -2,12 +2,16 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { appBase } from '@/base'
 import { useAuth } from '@/composables/useAuth'
 import { isDeviceAuthPath, stashDeviceAuthReturn } from '@/deviceAuthReturn'
+import { isProfileSectionHash } from '@/utils/profileSections'
 
 const router = createRouter({
   history: createWebHistory(appBase()),
   scrollBehavior(to, _from, savedPosition) {
     if (savedPosition) return savedPosition
     if (to.hash) {
+      if (to.name === 'settings' && isProfileSectionHash(to.hash)) {
+        return { top: 0 }
+      }
       return {
         el: to.hash,
         behavior: 'smooth',

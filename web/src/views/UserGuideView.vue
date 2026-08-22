@@ -165,8 +165,9 @@ onUnmounted(() => {
 
         <h2 id="settings-api" class="h4 mt-4">Settings and API</h2>
         <p>
-          Update your profile, timezone, and API keys under
-          <RouterLink to="/settings">Settings</RouterLink>.
+          Update your profile under
+          <RouterLink to="/settings">Settings</RouterLink>,
+          grouped into Account, Preferences, Integrations, Data, and Developer.
           For machine clients and integrations, see the
           <RouterLink to="/docs/api/v1">REST API documentation</RouterLink>.
         </p>

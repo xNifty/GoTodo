@@ -1181,7 +1181,7 @@ onUnmounted(() => {
                   </RouterLink>
                 </li>
                 <li>
-                  <RouterLink class="dropdown-item small" to="/settings#calendar-feed">
+                  <RouterLink class="dropdown-item small" to="/settings#integrations">
                     <i class="bi bi-calendar3 me-2" />Calendar Sync (ICS)
                   </RouterLink>
                 </li>

@@ -334,7 +334,7 @@ useLiveUpdates((event) => {
             <i class="bi bi-circle-fill calendar-legend-today" /> Due today &nbsp;
             <i class="bi bi-check-circle-fill calendar-legend-completed" /> Completed
           </span>
-          <RouterLink to="/settings#calendar-feed">Subscribe or sync via ICS on Profile</RouterLink>
+          <RouterLink to="/settings#integrations">Subscribe or sync via ICS on Profile</RouterLink>
         </div>
       </div>
 

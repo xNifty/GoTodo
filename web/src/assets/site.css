@@ -1032,6 +1032,59 @@ td.delete-column {
     }
 }
 
+/* Profile section nav: left column on desktop, horizontal pills on mobile */
+.profile-section-nav {
+    margin-bottom: 0.5rem;
+}
+
+.profile-section-pills {
+    padding-bottom: 0.25rem;
+}
+
+.profile-section-nav .profile-section-link {
+    color: var(--text-color);
+    white-space: nowrap;
+    border: 1px solid transparent;
+}
+
+.profile-section-nav .profile-section-link:hover {
+    color: var(--text-color);
+    background-color: var(--section-label-bg);
+}
+
+.profile-section-nav .profile-section-link.active {
+    color: #fff;
+    background-color: var(--bs-primary, #0d6efd);
+}
+
+[data-theme="dark"] .profile-section-nav .profile-section-link {
+    color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .profile-section-nav .profile-section-link:hover {
+    background-color: var(--section-label-bg);
+}
+
+[data-theme="dark"] .profile-section-nav .profile-section-link.active {
+    color: #fff !important;
+    background-color: var(--bs-primary, #0d6efd);
+}
+
+@media (min-width: 768px) {
+    .profile-section-nav {
+        position: sticky;
+        top: 5rem;
+    }
+    .profile-section-pills {
+        padding-bottom: 0;
+    }
+    .profile-section-nav .profile-section-link {
+        width: 100%;
+        text-align: left;
+        white-space: normal;
+    }
+}
+
 /* Invite-list card polishing for small screens */
 @media (max-width: 1024px) {
     .invite-list-card .table { border: none; }

@@ -1,21 +1,25 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
-import { api } from '@/api/client'
-import type { APIKey, CalendarInfo, GitHubConnection, Tag } from '@/api/types'
 import { APIError } from '@/api/types'
-import TimezoneSelect from '@/components/TimezoneSelect.vue'
-import { useSite } from '@/composables/useSite'
-import { useRoute } from 'vue-router'
+import type { User } from '@/api/types'
+import ProfileSectionNav from '@/components/profile/ProfileSectionNav.vue'
+import ProfileAccountSection from '@/components/profile/ProfileAccountSection.vue'
+import ProfilePreferencesSection from '@/components/profile/ProfilePreferencesSection.vue'
+import ProfileIntegrationsSection from '@/components/profile/ProfileIntegrationsSection.vue'
+import ProfileDataSection from '@/components/profile/ProfileDataSection.vue'
+import ProfileDeveloperSection from '@/components/profile/ProfileDeveloperSection.vue'
+import { resolveProfileSection, type ProfileSection } from '@/utils/profileSections'
 
 const { user, updateProfile } = useAuth()
 const { push } = useToast()
 const { askConfirm } = useConfirm()
-const { siteInfo, refresh: refreshSite } = useSite()
 const route = useRoute()
+const router = useRouter()
+
 const timezone = ref('UTC')
 const itemsPerPage = ref(15)
 const digestEnabled = ref(false)
@@ -23,101 +27,55 @@ const digestHour = ref(8)
 const allowProjectInvites = ref(true)
 const busy = ref(false)
 
-const currentPassword = ref('')
-const newPassword = ref('')
-const confirmPassword = ref('')
+const activeSection = computed(() =>
+  resolveProfileSection(route.hash, String(route.query.github || '')),
+)
 
-const tags = ref<Tag[]>([])
-const tagName = ref('')
-const renameTagId = ref<number | null>(null)
-const renameTagValue = ref('')
+function applyUserPrefs(u: User) {
+  timezone.value = u.timezone || 'UTC'
+  itemsPerPage.value = u.items_per_page || 15
+  digestEnabled.value = u.digest_enabled
+  digestHour.value = u.digest_hour
+  allowProjectInvites.value = u.allow_project_invites !== false
+}
 
-const calendar = ref<CalendarInfo | null>(null)
-const icsFile = ref<File | null>(null)
-const keys = ref<APIKey[]>([])
-const keyName = ref('')
-const mintedKey = ref('')
-const renameKeyId = ref<number | null>(null)
-const renameKeyValue = ref('')
-
-const github = ref<GitHubConnection | null>(null)
-const githubPAT = ref('')
-const githubBusy = ref(false)
-const githubOAuthEnabled = computed(() => !!siteInfo.value?.github_oauth_configured)
+const prefsDirty = computed(() => {
+  const u = user.value
+  if (!u) return false
+  return (
+    timezone.value.trim() !== (u.timezone || 'UTC') ||
+    Number(itemsPerPage.value) !== (u.items_per_page || 15) ||
+    digestEnabled.value !== u.digest_enabled ||
+    Number(digestHour.value) !== u.digest_hour ||
+    allowProjectInvites.value !== (u.allow_project_invites !== false)
+  )
+})
 
 watch(
   user,
   (u) => {
     if (!u) return
-    timezone.value = u.timezone || 'UTC'
-    itemsPerPage.value = u.items_per_page || 15
-    digestEnabled.value = u.digest_enabled
-    digestHour.value = u.digest_hour
-    allowProjectInvites.value = u.allow_project_invites !== false
+    applyUserPrefs(u)
   },
   { immediate: true },
 )
 
-async function loadExtras() {
-  try {
-    const [t, c, k, g] = await Promise.all([
-      api.listTags({ project_id: 0 }),
-      api.getCalendar(),
-      api.listAPIKeys(),
-      api.getGitHubConnection(),
-    ])
-    tags.value = t
-    calendar.value = c
-    keys.value = k
-    github.value = g
-  } catch (err) {
-    push(err instanceof APIError ? err.message : 'Failed to load settings extras', 'error')
-  }
-}
-
-async function connectGitHubPAT() {
-  if (!githubPAT.value.trim()) return
-  githubBusy.value = true
-  try {
-    github.value = await api.connectGitHubPAT(githubPAT.value.trim())
-    githubPAT.value = ''
-    push('GitHub connected', 'success')
-  } catch (err) {
-    push(err instanceof APIError ? err.message : 'GitHub connect failed', 'error')
-  } finally {
-    githubBusy.value = false
-  }
-}
-
-async function connectGitHubOAuth() {
-  githubBusy.value = true
-  try {
-    const { authorize_url } = await api.startGitHubOAuth()
-    window.location.href = authorize_url
-  } catch (err) {
-    push(err instanceof APIError ? err.message : 'Could not start GitHub OAuth', 'error')
-    githubBusy.value = false
-  }
-}
-
-async function disconnectGitHub() {
+async function confirmDiscardPreferences(): Promise<boolean> {
+  if (!prefsDirty.value) return true
   const ok = await askConfirm({
-    title: 'Disconnect GitHub?',
-    message: 'You will need to reconnect before linking repositories or creating issues.',
-    confirmLabel: 'Disconnect',
+    title: 'Unsaved preferences',
+    message: 'You have unsaved preference changes. Discard them and leave this section?',
+    confirmLabel: 'Discard',
     danger: true,
   })
-  if (!ok) return
-  githubBusy.value = true
-  try {
-    await api.disconnectGitHub()
-    github.value = { connected: false }
-    push('GitHub disconnected', 'info')
-  } catch (err) {
-    push(err instanceof APIError ? err.message : 'Disconnect failed', 'error')
-  } finally {
-    githubBusy.value = false
-  }
+  if (!ok) return false
+  if (user.value) applyUserPrefs(user.value)
+  return true
+}
+
+function selectSection(section: ProfileSection) {
+  if (section === activeSection.value) return
+  void router.replace({ hash: `#${section}` })
 }
 
 async function save() {
@@ -138,434 +96,70 @@ async function save() {
   }
 }
 
-async function changePassword() {
-  try {
-    await api.changePassword({
-      current_password: currentPassword.value,
-      new_password: newPassword.value,
-      confirm_password: confirmPassword.value,
-    })
-    currentPassword.value = ''
-    newPassword.value = ''
-    confirmPassword.value = ''
-    push('Password updated', 'success')
-  } catch (err) {
-    push(err instanceof APIError ? err.message : 'Password change failed', 'error')
-  }
+function onBeforeUnload(event: BeforeUnloadEvent) {
+  if (!prefsDirty.value) return
+  event.preventDefault()
+  event.returnValue = ''
 }
 
-async function createTag() {
-  if (!tagName.value.trim()) return
-  try {
-    await api.createTag(tagName.value.trim())
-    tagName.value = ''
-    tags.value = await api.listTags({ project_id: 0 })
-    push('Tag created', 'success')
-  } catch (err) {
-    push(err instanceof APIError ? err.message : 'Create failed', 'error')
-  }
-}
+onBeforeRouteUpdate(async (to) => {
+  if (!prefsDirty.value) return true
+  const nextSection = resolveProfileSection(to.hash, String(to.query.github || ''))
+  if (nextSection === 'preferences') return true
+  return confirmDiscardPreferences()
+})
 
-function beginRenameTag(tag: Tag) {
-  renameTagId.value = tag.id
-  renameTagValue.value = tag.name
-}
-
-async function saveRenameTag() {
-  if (renameTagId.value == null || !renameTagValue.value.trim()) return
-  try {
-    await api.renameTag(renameTagId.value, renameTagValue.value.trim())
-    renameTagId.value = null
-    tags.value = await api.listTags({ project_id: 0 })
-    push('Tag renamed', 'success')
-  } catch (err) {
-    push(err instanceof APIError ? err.message : 'Rename failed', 'error')
-  }
-}
-
-async function removeTag(tag: Tag) {
-  const ok = await askConfirm({
-    title: 'Delete tag?',
-    message: `Delete tag “${tag.name}”? It will be removed from inbox tasks that use it.`,
-    confirmLabel: 'Delete',
-    danger: true,
-  })
-  if (!ok) return
-  try {
-    await api.deleteTag(tag.id)
-    tags.value = await api.listTags({ project_id: 0 })
-    push('Tag deleted', 'info')
-  } catch (err) {
-    push(err instanceof APIError ? err.message : 'Delete failed', 'error')
-  }
-}
-
-async function regenerateCalendar() {
-  const ok = await askConfirm({
-    title: 'Regenerate calendar link?',
-    message: 'This invalidates the current calendar feed URL. Anyone using the old link will lose access.',
-    confirmLabel: 'Regenerate',
-    danger: true,
-  })
-  if (!ok) return
-  try {
-    calendar.value = await api.regenerateCalendar()
-    push('Calendar token regenerated', 'success')
-  } catch (err) {
-    push(err instanceof APIError ? err.message : 'Regenerate failed', 'error')
-  }
-}
-
-function onIcsFileChange(event: Event) {
-  const input = event.target as HTMLInputElement
-  icsFile.value = input.files?.[0] ?? null
-}
-
-async function syncCalendar() {
-  if (!icsFile.value) return
-  try {
-    const result = await api.syncCalendar(icsFile.value)
-    push(`Updated ${result.updated} task due dates`, 'success')
-    icsFile.value = null
-  } catch (err) {
-    push(err instanceof APIError ? err.message : 'Calendar sync failed', 'error')
-  }
-}
-
-async function exportTasks(format: 'json' | 'csv') {
-  try {
-    await api.downloadExport(format)
-    push(`Exported ${format.toUpperCase()}`, 'success')
-  } catch (err) {
-    push(err instanceof APIError ? err.message : 'Export failed', 'error')
-  }
-}
-
-function formatKeyTime(iso: string) {
-  try {
-    return new Date(iso).toLocaleString()
-  } catch {
-    return iso
-  }
-}
-
-async function createKey() {
-  if (!keyName.value.trim()) return
-  try {
-    const created = await api.createAPIKey(keyName.value.trim())
-    mintedKey.value = created.key
-    keyName.value = ''
-    keys.value = await api.listAPIKeys()
-    push('API key created — copy it now', 'success')
-  } catch (err) {
-    push(err instanceof APIError ? err.message : 'Create failed', 'error')
-  }
-}
-
-function beginRenameKey(key: APIKey) {
-  renameKeyId.value = key.id
-  renameKeyValue.value = key.name
-}
-
-async function saveRenameKey() {
-  if (renameKeyId.value == null || !renameKeyValue.value.trim()) return
-  try {
-    await api.renameAPIKey(renameKeyId.value, renameKeyValue.value.trim())
-    renameKeyId.value = null
-    keys.value = await api.listAPIKeys()
-    push('API key renamed', 'success')
-  } catch (err) {
-    push(err instanceof APIError ? err.message : 'Rename failed', 'error')
-  }
-}
-
-async function revokeKey(key: APIKey) {
-  const ok = await askConfirm({
-    title: 'Revoke API key?',
-    message: `Revoke API key “${key.name}”? Apps using it will stop working.`,
-    confirmLabel: 'Revoke',
-    danger: true,
-  })
-  if (!ok) return
-  try {
-    await api.revokeAPIKey(key.id)
-    keys.value = await api.listAPIKeys()
-    push('API key revoked', 'info')
-  } catch (err) {
-    push(err instanceof APIError ? err.message : 'Revoke failed', 'error')
-  }
-}
+onBeforeRouteLeave(async () => {
+  if (!prefsDirty.value) return true
+  return confirmDiscardPreferences()
+})
 
 onMounted(() => {
   document.body.classList.add('profile-page')
-  void refreshSite()
-  void loadExtras()
+  window.addEventListener('beforeunload', onBeforeUnload)
   const gh = String(route.query.github || '')
   if (gh === 'connected') {
     push('GitHub connected', 'success')
+    void router.replace({ name: 'settings', hash: '#integrations', query: {} })
   } else if (gh === 'error') {
     push('GitHub connection failed', 'error')
+    void router.replace({ name: 'settings', hash: '#integrations', query: {} })
   }
 })
 
 onUnmounted(() => {
   document.body.classList.remove('profile-page')
+  window.removeEventListener('beforeunload', onBeforeUnload)
 })
 </script>
 
 <template>
-  <div class="container mt-3">
-    <div class="card mb-4">
-      <div class="card-header">
-        <h2 class="card-title mb-0">User Profile</h2>
+  <div class="container mt-3 profile-settings">
+    <h1 class="h3 mb-3">User Profile</h1>
+    <div class="row g-3 g-md-4">
+      <div class="col-md-3">
+        <ProfileSectionNav :active="activeSection" @select="selectSection" />
       </div>
-      <div class="card-body">
-        <form @submit.prevent="save">
-          <div class="mb-3">
-            <label class="form-label fw-bold">Email</label>
-            <input type="text" class="form-control-plaintext" :value="user?.email || ''" readonly tabindex="-1" />
-          </div>
-          <div class="mb-3">
-            <label class="form-label fw-bold">Username</label>
-            <input type="text" class="form-control-plaintext" :value="user?.user_name || ''" readonly tabindex="-1" />
-            <div class="form-text">
-              Usernames cannot be changed except by an administrator.
-            </div>
-          </div>
-          <div class="mb-3">
-            <label for="profile-timezone" class="form-label">Timezone</label>
-            <TimezoneSelect id="profile-timezone" v-model="timezone" required />
-          </div>
-          <div class="mb-3">
-            <label for="profile-per-page" class="form-label">Tasks per page</label>
-            <select id="profile-per-page" v-model.number="itemsPerPage" class="form-select">
-              <option :value="10">10</option>
-              <option :value="15">15</option>
-              <option :value="25">25</option>
-              <option :value="50">50</option>
-            </select>
-          </div>
-          <div class="form-check mb-3">
-            <input id="profile-digest" v-model="digestEnabled" class="form-check-input" type="checkbox" />
-            <label class="form-check-label" for="profile-digest">Daily email digest</label>
-          </div>
-          <div class="mb-3">
-            <label for="profile-digest-hour" class="form-label">Digest hour (0–23)</label>
-            <input id="profile-digest-hour" v-model.number="digestHour" type="number" class="form-control" min="0" max="23" />
-          </div>
-          <div class="form-check mb-3">
-            <input
-              id="profile-allow-invites"
-              v-model="allowProjectInvites"
-              class="form-check-input"
-              type="checkbox"
-            />
-            <label class="form-check-label" for="profile-allow-invites">
-              Allow project invites
-            </label>
-            <div class="form-text">
-              When off, other users cannot invite you to shared projects. Existing memberships are unchanged.
-            </div>
-          </div>
-          <button type="submit" class="btn btn-primary" :disabled="busy">
-            {{ busy ? 'Saving…' : 'Save profile' }}
-          </button>
-        </form>
-      </div>
-    </div>
-
-    <div class="card mb-4">
-      <div class="card-header"><h3 class="card-title mb-0">Change password</h3></div>
-      <div class="card-body">
-        <form @submit.prevent="changePassword">
-          <div class="mb-3">
-            <label class="form-label">Current password</label>
-            <input v-model="currentPassword" type="password" class="form-control" required autocomplete="current-password" />
-          </div>
-          <div class="mb-3">
-            <label class="form-label">New password</label>
-            <input v-model="newPassword" type="password" class="form-control" required autocomplete="new-password" />
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Confirm new password</label>
-            <input v-model="confirmPassword" type="password" class="form-control" required autocomplete="new-password" />
-          </div>
-          <button type="submit" class="btn btn-primary">Change password</button>
-        </form>
-      </div>
-    </div>
-
-    <div id="github-section" class="card mb-4">
-      <div class="card-header"><h3 class="card-title mb-0">GitHub</h3></div>
-      <div class="card-body">
-        <p class="text-muted small">
-          Connect GitHub to link repositories on projects you own and create or attach issues from board tasks.
-        </p>
-        <div v-if="github?.connected" class="d-flex flex-wrap align-items-center gap-2 mb-3">
-          <span class="badge text-bg-success">Connected as @{{ github.github_login }}</span>
-          <span v-if="github.auth_method" class="text-muted small">via {{ github.auth_method }}</span>
-          <button
-            type="button"
-            class="btn btn-sm btn-outline-danger"
-            :disabled="githubBusy"
-            @click="disconnectGitHub"
-          >
-            Disconnect
-          </button>
-        </div>
-        <template v-else>
-          <div v-if="githubOAuthEnabled" class="mb-3">
-            <button
-              type="button"
-              class="btn btn-primary"
-              :disabled="githubBusy"
-              @click="connectGitHubOAuth"
-            >
-              {{ githubBusy ? 'Redirecting…' : 'Connect with GitHub' }}
-            </button>
-          </div>
-          <form class="row g-2" @submit.prevent="connectGitHubPAT">
-            <div class="col-12">
-              <label class="form-label" for="github-pat">Personal access token</label>
-              <input
-                id="github-pat"
-                v-model="githubPAT"
-                type="password"
-                class="form-control"
-                autocomplete="off"
-                placeholder="ghp_… or github_pat_…"
-                :disabled="githubBusy"
-              />
-              <div class="form-text">
-                Needs access to the repositories you will link (fine-grained: Contents metadata + Issues read/write; classic: <code>repo</code>).
-              </div>
-            </div>
-            <div class="col-12">
-              <button type="submit" class="btn btn-outline-primary" :disabled="githubBusy || !githubPAT.trim()">
-                {{ githubBusy ? 'Connecting…' : 'Connect with token' }}
-              </button>
-            </div>
-          </form>
-        </template>
-      </div>
-    </div>
-
-    <div class="card mb-4">
-      <div class="card-header"><h3 class="card-title mb-0">Personal tags</h3></div>
-      <div class="card-body">
-        <p class="text-muted small mb-3">
-          These tags apply to inbox tasks (tasks not in a project). Project tags are managed in project settings.
-        </p>
-        <form class="row g-2 mb-3" @submit.prevent="createTag">
-          <div class="col-sm-8">
-            <input v-model="tagName" type="text" class="form-control" placeholder="New tag" required maxlength="50" />
-          </div>
-          <div class="col-sm-4">
-            <button type="submit" class="btn btn-primary w-100">Add tag</button>
-          </div>
-        </form>
-        <ul class="list-group">
-          <li v-for="tag in tags" :key="tag.id" class="list-group-item">
-            <div class="d-flex flex-wrap gap-2 align-items-center">
-              <template v-if="renameTagId === tag.id">
-                <input v-model="renameTagValue" type="text" class="form-control form-control-sm" maxlength="50" />
-                <button type="button" class="btn btn-sm btn-primary" @click="saveRenameTag">Save</button>
-                <button type="button" class="btn btn-sm btn-secondary" @click="renameTagId = null">Cancel</button>
-              </template>
-              <template v-else>
-                <span class="flex-grow-1">{{ tag.name }}</span>
-                <button type="button" class="btn btn-sm btn-outline-secondary" @click="beginRenameTag(tag)">Rename</button>
-                <button type="button" class="btn btn-sm btn-outline-danger" @click="removeTag(tag)">Delete</button>
-              </template>
-            </div>
-          </li>
-          <li v-if="!tags.length" class="list-group-item text-muted">No personal tags yet.</li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="card mb-4">
-      <div class="card-header"><h3 class="card-title mb-0">Calendar feed</h3></div>
-      <div class="card-body">
-        <p v-if="calendar" class="text-break"><code>{{ calendar.feed_url }}</code></p>
-        <button type="button" class="btn btn-outline-secondary mb-3" @click="regenerateCalendar">Regenerate token</button>
-        <form @submit.prevent="syncCalendar">
-          <div class="mb-3">
-            <label class="form-label">Sync due dates from ICS export</label>
-            <input type="file" class="form-control" accept=".ics,text/calendar" @change="onIcsFileChange" />
-          </div>
-          <button type="submit" class="btn btn-outline-primary" :disabled="!icsFile">Sync calendar</button>
-        </form>
-      </div>
-    </div>
-
-    <div class="card mb-4">
-      <div class="card-header"><h3 class="card-title mb-0">Export &amp; import</h3></div>
-      <div class="card-body">
-        <div class="d-flex flex-wrap gap-2">
-          <button type="button" class="btn btn-primary" @click="exportTasks('json')">Export JSON</button>
-          <button type="button" class="btn btn-outline-secondary" @click="exportTasks('csv')">Export CSV</button>
-          <RouterLink to="/import" class="btn btn-outline-primary">Import CSV</RouterLink>
-        </div>
-      </div>
-    </div>
-
-    <div id="api-keys-section" class="card mb-4">
-      <div class="card-header"><h3 class="card-title mb-0">API keys</h3></div>
-      <div class="card-body">
-        <form class="row g-2 mb-3" @submit.prevent="createKey">
-          <div class="col-sm-8">
-            <input v-model="keyName" type="text" class="form-control" placeholder="Key name" required maxlength="80" />
-          </div>
-          <div class="col-sm-4">
-            <button type="submit" class="btn btn-primary w-100">Create key</button>
-          </div>
-        </form>
-        <div v-if="mintedKey" class="api-key-reveal-panel">
-          <p class="api-key-reveal-title">New key (shown once)</p>
-          <p class="text-break mb-0"><code>{{ mintedKey }}</code></p>
-        </div>
-        <div class="api-key-list">
-          <div v-for="key in keys" :key="key.id" class="api-key-card">
-            <div class="api-key-card-header">
-              <template v-if="renameKeyId === key.id">
-                <input
-                  v-model="renameKeyValue"
-                  type="text"
-                  class="form-control form-control-sm api-key-rename-input"
-                  maxlength="80"
-                  @keyup.enter="saveRenameKey"
-                />
-                <div class="d-flex gap-2">
-                  <button type="button" class="btn btn-sm btn-primary" :disabled="!renameKeyValue.trim()" @click="saveRenameKey">Save</button>
-                  <button type="button" class="btn btn-sm btn-secondary" @click="renameKeyId = null">Cancel</button>
-                </div>
-              </template>
-              <template v-else>
-                <span class="api-key-name">{{ key.name }}</span>
-                <div class="d-flex gap-2">
-                  <button type="button" class="btn btn-sm btn-outline-secondary" @click="beginRenameKey(key)">Rename</button>
-                  <button type="button" class="btn btn-sm btn-outline-danger" @click="revokeKey(key)">Revoke</button>
-                </div>
-              </template>
-            </div>
-            <div class="api-key-card-fields">
-              <div class="api-key-field">
-                <span class="api-key-field-label">Prefix</span>
-                <span class="api-key-field-value api-key-prefix">{{ key.key_prefix }}</span>
-              </div>
-              <div class="api-key-field">
-                <span class="api-key-field-label">Created</span>
-                <span class="api-key-field-value">{{ formatKeyTime(key.created_at) }}</span>
-              </div>
-              <div class="api-key-field">
-                <span class="api-key-field-label">Last used</span>
-                <span class="api-key-field-value">{{ key.last_used_at ? formatKeyTime(key.last_used_at) : 'Never' }}</span>
-              </div>
-            </div>
-          </div>
-          <p v-if="!keys.length" class="text-muted mb-0">No API keys.</p>
-        </div>
+      <div class="col-md-9">
+        <ProfileAccountSection
+          v-if="activeSection === 'account'"
+          :email="user?.email || ''"
+          :username="user?.user_name || ''"
+        />
+        <ProfilePreferencesSection
+          v-else-if="activeSection === 'preferences'"
+          v-model:timezone="timezone"
+          v-model:items-per-page="itemsPerPage"
+          v-model:digest-enabled="digestEnabled"
+          v-model:digest-hour="digestHour"
+          v-model:allow-project-invites="allowProjectInvites"
+          :busy="busy"
+          :dirty="prefsDirty"
+          @save="save"
+        />
+        <ProfileIntegrationsSection v-else-if="activeSection === 'integrations'" />
+        <ProfileDataSection v-else-if="activeSection === 'data'" />
+        <ProfileDeveloperSection v-else-if="activeSection === 'developer'" />
       </div>
     </div>
   </div>
