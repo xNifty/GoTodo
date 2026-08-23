@@ -910,11 +910,29 @@ async function removeTimeEntry(entryId: number) {
                 <i class="bi bi-link-45deg" /> Copy link
               </button>
             </div>
-            <div class="d-flex align-items-center gap-2 flex-shrink-0">
+            <div class="task-header-actions">
+              <button
+                v-if="!readOnly && !loading && mode === 'edit' && (!claimedBy || claimedBy !== user?.id)"
+                type="button"
+                class="btn btn-sm btn-outline-primary task-header-btn"
+                :disabled="claiming"
+                @click="claimCurrentTask"
+              >
+                {{ claimedBy ? 'Take over' : 'Claim' }}
+              </button>
+              <button
+                v-else-if="!readOnly && !loading && mode === 'edit'"
+                type="button"
+                class="btn btn-sm btn-outline-secondary task-header-btn"
+                :disabled="claiming"
+                @click="unclaimCurrentTask"
+              >
+                Release
+              </button>
               <button
                 v-if="!readOnly && !loading && mode === 'edit'"
                 type="button"
-                class="btn btn-sm"
+                class="btn btn-sm task-header-btn"
                 :class="taskIsArchived ? 'btn-success' : 'btn-warning'"
                 :disabled="saving"
                 @click="taskIsArchived ? restoreCurrentTask() : archiveCurrentTask()"
@@ -924,7 +942,7 @@ async function removeTimeEntry(entryId: number) {
               <button
                 v-if="!readOnly && !loading && mode === 'edit'"
                 type="button"
-                class="btn btn-danger btn-sm"
+                class="btn btn-sm btn-danger task-header-btn"
                 :disabled="saving"
                 @click="deleteCurrentTask"
               >
@@ -933,7 +951,7 @@ async function removeTimeEntry(entryId: number) {
               <button
                 v-if="!readOnly && !loading"
                 type="button"
-                class="btn btn-primary btn-sm"
+                class="btn btn-sm btn-primary task-header-btn"
                 :disabled="saving"
                 @click="save(false)"
               >
@@ -942,13 +960,21 @@ async function removeTimeEntry(entryId: number) {
               <button
                 v-if="!readOnly && !loading && mode === 'add'"
                 type="button"
-                class="btn btn-outline-primary btn-sm"
+                class="btn btn-sm btn-outline-primary task-header-btn"
                 :disabled="saving || !title.trim()"
                 @click="save(true)"
               >
                 Save &amp; Add Another
               </button>
-              <button type="button" class="btn-close" id="closeSidebar" aria-label="Close" @click="close" />
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-secondary task-header-btn task-header-close"
+                id="closeSidebar"
+                aria-label="Close"
+                @click="close"
+              >
+                <i class="bi bi-x-lg" />
+              </button>
             </div>
           </template>
           <template v-else>
@@ -1096,26 +1122,6 @@ async function removeTimeEntry(entryId: number) {
             <span class="badge border" :class="claimedBy ? 'text-bg-primary' : 'text-bg-light text-muted'">
               <i class="bi bi-person me-1" />{{ claimerLabel }}
             </span>
-            <template v-if="!readOnly && taskId">
-              <button
-                v-if="!claimedBy || claimedBy !== user?.id"
-                type="button"
-                class="btn btn-sm btn-outline-primary"
-                :disabled="claiming"
-                @click="claimCurrentTask"
-              >
-                {{ claimedBy ? 'Take over' : 'Claim' }}
-              </button>
-              <button
-                v-else
-                type="button"
-                class="btn btn-sm btn-outline-secondary"
-                :disabled="claiming"
-                @click="unclaimCurrentTask"
-              >
-                Release
-              </button>
-            </template>
           </div>
         </div>
         <div v-if="isKanbanTask" class="form-group mt-2 kanban-order-estimate">
@@ -1356,14 +1362,14 @@ async function removeTimeEntry(entryId: number) {
           :fill-height="isKanbanTask"
         />
 
-        <div v-if="!readOnly && !isKanbanTask" class="d-flex flex-wrap gap-2 mt-3">
-          <button type="submit" class="btn btn-primary flex-grow-1" :disabled="saving">
+        <div v-if="!readOnly && !isKanbanTask" class="task-header-actions mt-3">
+          <button type="submit" class="btn btn-sm btn-primary task-header-btn" :disabled="saving">
             {{ saving ? 'Saving…' : submitText }}
           </button>
           <button
             v-if="mode === 'add'"
             type="button"
-            class="btn btn-outline-primary flex-grow-1"
+            class="btn btn-sm btn-outline-primary task-header-btn"
             :disabled="saving || !title.trim()"
             @click="save(true)"
           >
@@ -1372,7 +1378,7 @@ async function removeTimeEntry(entryId: number) {
           <button
             v-if="mode === 'edit'"
             type="button"
-            class="btn"
+            class="btn btn-sm task-header-btn"
             :class="taskIsArchived ? 'btn-success' : 'btn-warning'"
             :disabled="saving"
             @click="taskIsArchived ? restoreCurrentTask() : archiveCurrentTask()"
@@ -1382,7 +1388,7 @@ async function removeTimeEntry(entryId: number) {
           <button
             v-if="mode === 'edit'"
             type="button"
-            class="btn btn-danger"
+            class="btn btn-sm btn-danger task-header-btn"
             :disabled="saving"
             @click="deleteCurrentTask"
           >
@@ -1458,11 +1464,52 @@ textarea.task-description-input {
   min-height: 0;
 }
 
-.kanban-task-header {
+.kanban-task-header.modal-header {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
   border-bottom: 1px solid var(--ordryn-card-border, #dee2e6);
   padding: 0.75rem 1.25rem;
   flex-shrink: 0;
   gap: 0.75rem;
+}
+
+.task-header-actions {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  grid-template-rows: 32px;
+  align-items: stretch;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+  height: 32px;
+}
+
+.task-header-actions > .task-header-btn.btn {
+  --bs-btn-padding-y: 0;
+  --bs-btn-padding-x: 0.75rem;
+  --bs-btn-line-height: 1;
+  --bs-btn-font-size: 0.875rem;
+  --bs-btn-border-width: 1px;
+  box-sizing: border-box;
+  height: 32px !important;
+  min-height: 0;
+  max-height: 32px;
+  margin: 0 !important;
+  padding: 0 0.75rem !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.task-header-actions > .task-header-close.btn {
+  --bs-btn-padding-x: 0;
+  width: 32px;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
 }
 
 .kanban-task-body {

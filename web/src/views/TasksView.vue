@@ -23,7 +23,7 @@ import { useSidebarState } from '@/composables/useSidebarState'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useLiveUpdates } from '@/composables/useLiveUpdates'
 import { projectOptionLabel } from '@/utils/projectLabel'
-import { uniqueTagsByName, archiveConfirmMessage, isArchivedTask } from '@/utils/tags'
+import { uniqueTagsByName, isArchivedTask } from '@/utils/tags'
 
 defineProps<{
   mobileSidebarOpen?: boolean
@@ -759,35 +759,6 @@ async function removeTask(task: Task) {
   await performDelete(task, { mode: 'cascade' })
 }
 
-async function archiveTask(task: Task) {
-  if (!canWriteTask(task)) return
-  const ok = await askConfirm({
-    title: 'Archive task?',
-    message: archiveConfirmMessage(task),
-    confirmLabel: 'Archive',
-    warning: true,
-  })
-  if (!ok) return
-  try {
-    await api.archiveTask(task.id)
-    toast.push('Task archived', 'info')
-    await reloadInitial()
-  } catch (err) {
-    toast.push(err instanceof APIError ? err.message : 'Archive failed', 'error')
-  }
-}
-
-async function restoreTask(task: Task) {
-  if (!canWriteTask(task)) return
-  try {
-    await api.restoreTask(task.id)
-    toast.push('Task restored', 'success')
-    await reloadInitial()
-  } catch (err) {
-    toast.push(err instanceof APIError ? err.message : 'Restore failed', 'error')
-  }
-}
-
 async function performDelete(
   task: Task,
   opts: { mode: 'cascade' | 'reparent'; new_parent_id?: number | null },
@@ -1303,9 +1274,6 @@ onUnmounted(() => {
             @changed="reloadInitial"
             @task-updated="applyTaskUpdate"
             @board-reorder="applyBoardReorder"
-            @archive="archiveTask"
-            @restore="restoreTask"
-            @remove="removeTask"
           />
           <div v-if="loadingMore" class="text-center py-2 text-muted small">
             <span class="spinner-border spinner-border-sm me-2" />Loading more tasks…
@@ -1493,9 +1461,6 @@ onUnmounted(() => {
                     @patch-task="handleInlineTaskPatch"
                     @add-subtask="openAddSubtask(task)"
                     @edit="openTaskDetails(task.id)"
-                    @archive="archiveTask(task)"
-                    @restore="restoreTask(task)"
-                    @remove="removeTask(task)"
                   />
                   <div
                     v-if="task.children?.length && isParentExpanded(task.id)"
@@ -1516,9 +1481,6 @@ onUnmounted(() => {
                       @toggle-complete="toggleCompleteChild(child)"
                       @patch-task="handleInlineTaskPatch"
                       @edit="openTaskDetails(child.id)"
-                      @archive="archiveTask(child)"
-                      @restore="restoreTask(child)"
-                      @remove="removeTask(child)"
                     />
                   </div>
                 </div>
@@ -1548,9 +1510,6 @@ onUnmounted(() => {
                   @patch-task="handleInlineTaskPatch"
                   @add-subtask="openAddSubtask(task)"
                   @edit="openTaskDetails(task.id)"
-                  @archive="archiveTask(task)"
-                  @restore="restoreTask(task)"
-                  @remove="removeTask(task)"
                 />
                 <div
                   v-if="task.children?.length && isParentExpanded(task.id)"
@@ -1571,9 +1530,6 @@ onUnmounted(() => {
                     @toggle-complete="toggleCompleteChild(child)"
                     @patch-task="handleInlineTaskPatch"
                     @edit="openTaskDetails(child.id)"
-                    @archive="archiveTask(child)"
-                    @restore="restoreTask(child)"
-                    @remove="removeTask(child)"
                   />
                 </div>
               </div>

@@ -187,29 +187,6 @@
                   >
                     Release
                   </button>
-                  <button
-                    v-if="!isArchivedTask(task)"
-                    type="button"
-                    class="btn btn-sm btn-warning py-0 px-2 hover-reveal"
-                    @click.stop="emit('archive', task)"
-                  >
-                    Archive
-                  </button>
-                  <button
-                    v-else
-                    type="button"
-                    class="btn btn-sm btn-success py-0 px-2 hover-reveal"
-                    @click.stop="emit('restore', task)"
-                  >
-                    Restore
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-danger py-0 px-2 hover-reveal"
-                    @click.stop="emit('remove', task)"
-                  >
-                    Delete
-                  </button>
                 </div>
               </div>
             </div>
@@ -231,7 +208,6 @@ import { useAuth } from '@/composables/useAuth'
 import { useToast } from '@/composables/useToast'
 import { pauseLiveReload, resumeLiveReload, useLiveUpdates } from '@/composables/useLiveUpdates'
 import type { ViewDensity } from '@/composables/useViewDensity'
-import { isArchivedTask } from '@/utils/tags'
 
 const props = withDefaults(
   defineProps<{
@@ -253,9 +229,6 @@ const emit = defineEmits<{
   changed: []
   'task-updated': [task: Task]
   'board-reorder': [payload: { statusId: number; taskIds: number[] }]
-  archive: [task: Task]
-  restore: [task: Task]
-  remove: [task: Task]
 }>()
 
 const toast = useToast()
@@ -722,6 +695,9 @@ onBeforeUnmount(destroySortables)
 }
 
 .kanban-claim-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   min-height: 1.5rem;
 }
 

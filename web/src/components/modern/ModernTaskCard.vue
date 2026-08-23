@@ -2,7 +2,6 @@
 import { ref } from 'vue'
 import type { Task } from '@/api/types'
 import type { ViewDensity } from '@/composables/useViewDensity'
-import { isArchivedTask } from '@/utils/tags'
 
 const props = withDefaults(
   defineProps<{
@@ -33,9 +32,6 @@ const emit = defineEmits<{
   'patch-task': [payload: { id: number; title?: string; description?: string }]
   'add-subtask': []
   edit: []
-  archive: []
-  restore: []
-  remove: []
 }>()
 
 const isSubtask = () => props.depth > 0 || !!(props.task.parent_id && props.task.parent_id > 0)
@@ -342,32 +338,6 @@ function formatMinutes(total: number) {
           >
             <i class="bi bi-pencil" />
           </button>
-          <button
-            v-if="!isArchivedTask(task)"
-            type="button"
-            class="btn btn-sm btn-icon text-warning hover-accent border-0 p-1"
-            title="Archive task"
-            @click="emit('archive')"
-          >
-            <i class="bi bi-archive" />
-          </button>
-          <button
-            v-else
-            type="button"
-            class="btn btn-sm btn-icon text-success hover-accent border-0 p-1"
-            title="Restore task"
-            @click="emit('restore')"
-          >
-            <i class="bi bi-arrow-counterclockwise" />
-          </button>
-          <button
-            type="button"
-            class="btn btn-sm btn-icon text-danger hover-danger border-0 p-1"
-            title="Delete task"
-            @click="emit('remove')"
-          >
-            <i class="bi bi-trash" />
-          </button>
         </div>
       </div>
     </div>
@@ -416,25 +386,6 @@ function formatMinutes(total: number) {
           </button>
           <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" @click="emit('edit')">
             <i class="bi bi-pencil me-1" />Edit
-          </button>
-          <button
-            v-if="!isArchivedTask(task)"
-            type="button"
-            class="btn btn-sm btn-warning py-0 px-2"
-            @click="emit('archive')"
-          >
-            <i class="bi bi-archive me-1" />Archive
-          </button>
-          <button
-            v-else
-            type="button"
-            class="btn btn-sm btn-success py-0 px-2"
-            @click="emit('restore')"
-          >
-            Restore
-          </button>
-          <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" @click="emit('remove')">
-            <i class="bi bi-trash me-1" />Delete
           </button>
         </div>
       </div>
