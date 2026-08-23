@@ -61,7 +61,8 @@ function confirm() {
         </div>
         <div class="modal-body">
           <p class="mb-3">
-            This task has <strong>{{ childCount }}</strong> subtask{{ childCount === 1 ? '' : 's' }}.
+            This permanently deletes the task and cannot be undone. This task has
+            <strong>{{ childCount }}</strong> subtask{{ childCount === 1 ? '' : 's' }}.
           </p>
           <div class="form-check mb-2">
             <input id="delete-cascade" v-model="mode" class="form-check-input" type="radio" value="cascade" />

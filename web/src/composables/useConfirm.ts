@@ -6,6 +6,7 @@ export type ConfirmOptions = {
   confirmLabel?: string
   cancelLabel?: string
   danger?: boolean
+  warning?: boolean
 }
 
 type ConfirmState = {
@@ -15,6 +16,7 @@ type ConfirmState = {
   confirmLabel: string
   cancelLabel: string
   danger: boolean
+  warning: boolean
   resolve: ((value: boolean) => void) | null
 }
 
@@ -25,6 +27,7 @@ const state = reactive<ConfirmState>({
   confirmLabel: 'Confirm',
   cancelLabel: 'Cancel',
   danger: false,
+  warning: false,
   resolve: null,
 })
 
@@ -39,6 +42,7 @@ export function useConfirm() {
     state.confirmLabel = options.confirmLabel || 'Confirm'
     state.cancelLabel = options.cancelLabel || 'Cancel'
     state.danger = !!options.danger
+    state.warning = !!options.warning
     state.open = true
     return new Promise((resolve) => {
       state.resolve = resolve

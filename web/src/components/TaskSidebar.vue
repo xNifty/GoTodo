@@ -5,6 +5,7 @@ import { api } from '@/api/client'
 import type { Project, ProjectStatus, Tag, Task, TaskEvent, TaskGitHubIssue, TaskTimeEntry } from '@/api/types'
 import { APIError } from '@/api/types'
 import ParentTaskCombobox from '@/components/ParentTaskCombobox.vue'
+import DeleteTaskDialog from '@/components/DeleteTaskDialog.vue'
 import TaskDiscussion from '@/components/TaskDiscussion.vue'
 import { useAuth } from '@/composables/useAuth'
 import { useTaskSidebar } from '@/composables/useTaskSidebar'
@@ -12,6 +13,7 @@ import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { projectOptionLabel } from '@/utils/projectLabel'
 import { useLiveUpdates, type LiveEvent } from '@/composables/useLiveUpdates'
+import { assignableTags, archiveConfirmMessage, isArchivedTask, isProtectedTag } from '@/utils/tags'
 
 const {
   open,
@@ -46,6 +48,7 @@ async function copyPermalink() {
 
 const loading = ref(false)
 const saving = ref(false)
+const deleteDialogOpen = ref(false)
 const projects = ref<Project[]>([])
 const allTags = ref<Tag[]>([])
 const rootTasks = ref<Task[]>([])
@@ -101,6 +104,8 @@ const canManageTags = computed(() => {
   if (!role) return true
   return role === 'owner' || role === 'editor'
 })
+const pickerTags = computed(() => assignableTags(allTags.value))
+const taskIsArchived = computed(() => isArchivedTask(currentTask.value))
 const parentOptions = computed(() =>
   rootTasks.value.filter((r) => r.id !== taskId.value && taskInSelectedProject(r)),
 )
@@ -421,15 +426,21 @@ useLiveUpdates(async (event: LiveEvent) => {
 })
 
 async function resolveTagIds(): Promise<number[]> {
-  const ids = new Set(selectedTagIds.value)
+  const ids = new Set(
+    selectedTagIds.value.filter((id) => {
+      const tag = allTags.value.find((t) => t.id === id)
+      return tag && !isProtectedTag(tag)
+    }),
+  )
   const parts = newTags.value
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean)
   for (const name of parts) {
+    if (name.toLowerCase() === 'removed') continue
     const existing = allTags.value.find((t) => t.name.toLowerCase() === name.toLowerCase())
     if (existing) {
-      ids.add(existing.id)
+      if (!isProtectedTag(existing)) ids.add(existing.id)
       continue
     }
     const created = await api.createTag(name, projectId.value === '' ? null : Number(projectId.value))
@@ -755,6 +766,64 @@ async function unlinkGitHubIssue() {
   }
 }
 
+async function archiveCurrentTask() {
+  if (!taskId.value || readOnly.value || !currentTask.value) return
+  const ok = await askConfirm({
+    title: 'Archive task?',
+    message: archiveConfirmMessage(currentTask.value),
+    confirmLabel: 'Archive',
+    warning: true,
+  })
+  if (!ok) return
+  try {
+    const updated = await api.archiveTask(taskId.value)
+    toast.push('Task archived', 'info')
+    notifySaved(updated, true)
+  } catch (err) {
+    toast.push(err instanceof APIError ? err.message : 'Archive failed', 'error')
+  }
+}
+
+async function restoreCurrentTask() {
+  if (!taskId.value || readOnly.value) return
+  try {
+    const updated = await api.restoreTask(taskId.value)
+    toast.push('Task restored', 'success')
+    notifySaved(updated, true)
+  } catch (err) {
+    toast.push(err instanceof APIError ? err.message : 'Restore failed', 'error')
+  }
+}
+
+async function deleteCurrentTask() {
+  if (!taskId.value || readOnly.value || !currentTask.value) return
+  const childCount = currentTask.value.child_count ?? currentTask.value.children?.length ?? 0
+  if (childCount > 0) {
+    deleteDialogOpen.value = true
+    return
+  }
+  const ok = await askConfirm({
+    title: 'Delete task?',
+    message: `Permanently delete “${currentTask.value.title}”? This cannot be undone.`,
+    confirmLabel: 'Delete',
+    danger: true,
+  })
+  if (!ok) return
+  await runSidebarDelete({ mode: 'cascade' })
+}
+
+async function runSidebarDelete(opts: { mode: 'cascade' | 'reparent'; new_parent_id?: number | null }) {
+  if (!taskId.value) return
+  try {
+    await api.deleteTask(taskId.value, opts)
+    toast.push('Task deleted', 'info')
+    deleteDialogOpen.value = false
+    close()
+  } catch (err) {
+    toast.push(err instanceof APIError ? err.message : 'Delete failed', 'error')
+  }
+}
+
 async function addTimeEntry() {
   if (!taskId.value || readOnly.value) return
   const minutes = Number(newEntryMinutes.value)
@@ -842,6 +911,25 @@ async function removeTimeEntry(entryId: number) {
               </button>
             </div>
             <div class="d-flex align-items-center gap-2 flex-shrink-0">
+              <button
+                v-if="!readOnly && !loading && mode === 'edit'"
+                type="button"
+                class="btn btn-sm"
+                :class="taskIsArchived ? 'btn-success' : 'btn-warning'"
+                :disabled="saving"
+                @click="taskIsArchived ? restoreCurrentTask() : archiveCurrentTask()"
+              >
+                {{ taskIsArchived ? 'Restore' : 'Archive' }}
+              </button>
+              <button
+                v-if="!readOnly && !loading && mode === 'edit'"
+                type="button"
+                class="btn btn-danger btn-sm"
+                :disabled="saving"
+                @click="deleteCurrentTask"
+              >
+                Delete
+              </button>
               <button
                 v-if="!readOnly && !loading"
                 type="button"
@@ -1145,11 +1233,11 @@ async function removeTimeEntry(entryId: number) {
           <p v-else class="text-muted small mb-0 mt-1">No tags</p>
         </div>
         <div v-else class="kanban-order-tags">
-          <div v-if="allTags.length" class="form-group mt-2">
+          <div v-if="pickerTags.length" class="form-group mt-2">
             <label>Tags (max 5)</label>
             <div v-if="isKanbanTask" class="kanban-tag-chips">
               <button
-                v-for="tag in allTags"
+                v-for="tag in pickerTags"
                 :key="tag.id"
                 type="button"
                 class="tag-chip kanban-tag-toggle"
@@ -1166,7 +1254,7 @@ async function removeTimeEntry(entryId: number) {
               </button>
             </div>
             <template v-else>
-              <div v-for="tag in allTags" :key="tag.id" class="form-check">
+              <div v-for="tag in pickerTags" :key="tag.id" class="form-check">
                 <input
                   :id="`tag-${tag.id}`"
                   type="checkbox"
@@ -1268,7 +1356,7 @@ async function removeTimeEntry(entryId: number) {
           :fill-height="isKanbanTask"
         />
 
-        <div v-if="!readOnly && !isKanbanTask" class="d-flex gap-2 mt-3">
+        <div v-if="!readOnly && !isKanbanTask" class="d-flex flex-wrap gap-2 mt-3">
           <button type="submit" class="btn btn-primary flex-grow-1" :disabled="saving">
             {{ saving ? 'Saving…' : submitText }}
           </button>
@@ -1280,6 +1368,25 @@ async function removeTimeEntry(entryId: number) {
             @click="save(true)"
           >
             Save &amp; Add Another
+          </button>
+          <button
+            v-if="mode === 'edit'"
+            type="button"
+            class="btn"
+            :class="taskIsArchived ? 'btn-success' : 'btn-warning'"
+            :disabled="saving"
+            @click="taskIsArchived ? restoreCurrentTask() : archiveCurrentTask()"
+          >
+            {{ taskIsArchived ? 'Restore' : 'Archive' }}
+          </button>
+          <button
+            v-if="mode === 'edit'"
+            type="button"
+            class="btn btn-danger"
+            :disabled="saving"
+            @click="deleteCurrentTask"
+          >
+            Delete
           </button>
         </div>
 
@@ -1308,6 +1415,14 @@ async function removeTimeEntry(entryId: number) {
       </div>
     </div>
   </div>
+  <DeleteTaskDialog
+    :open="deleteDialogOpen"
+    :task="currentTask"
+    :root-tasks="rootTasks"
+    @cancel="deleteDialogOpen = false"
+    @cascade="runSidebarDelete({ mode: 'cascade' })"
+    @reparent="(id) => runSidebarDelete({ mode: 'reparent', new_parent_id: id })"
+  />
 </template>
 
 <style scoped>

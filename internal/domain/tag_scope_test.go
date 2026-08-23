@@ -48,8 +48,8 @@ func TestProjectTagsAreSharedAndScoped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("viewer list: %v", err)
 	}
-	if len(listed) != 1 || listed[0].ID != ownerTag.ID {
-		t.Fatalf("viewer should see project tags, got %+v", listed)
+	if !containsTagID(listed, ownerTag.ID) || !containsRemovedTag(listed) {
+		t.Fatalf("viewer should see project tags including removed, got %+v", listed)
 	}
 
 	if err := DeleteTag(ctx, 3, ownerTag.ID); !errors.Is(err, ErrForbidden) {
@@ -215,7 +215,7 @@ func TestListTagsQueryScopes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("project list: %v", err)
 	}
-	if len(projectTags) != 1 || !strings.EqualFold(projectTags[0].Name, "project-a") {
+	if !containsTagName(projectTags, "project-a") || !containsRemovedTag(projectTags) {
 		t.Fatalf("project list: %+v", projectTags)
 	}
 
@@ -269,4 +269,31 @@ func TestTagShareLinksRejected(t *testing.T) {
 	if !errors.Is(err, ErrValidation) {
 		t.Fatalf("list tag share: err=%v want validation", err)
 	}
+}
+
+func containsTagID(tags []storage.Tag, id int) bool {
+	for _, tg := range tags {
+		if tg.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+func containsTagName(tags []storage.Tag, name string) bool {
+	for _, tg := range tags {
+		if strings.EqualFold(tg.Name, name) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsRemovedTag(tags []storage.Tag) bool {
+	for _, tg := range tags {
+		if storage.IsRemovedTagName(tg.Name) && tg.Protected {
+			return true
+		}
+	}
+	return false
 }

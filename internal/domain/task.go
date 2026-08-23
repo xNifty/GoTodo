@@ -596,6 +596,75 @@ func DeleteTask(ctx context.Context, userID, taskID int) error {
 	return nil
 }
 
+func descendantTaskIDs(ctx context.Context, rootID int) ([]int, error) {
+	ids := []int{rootID}
+	frontier := []int{rootID}
+	for len(frontier) > 0 {
+		children, err := ChildIDsOf(ctx, frontier)
+		if err != nil {
+			return nil, err
+		}
+		if len(children) == 0 {
+			break
+		}
+		ids = append(ids, children...)
+		frontier = children
+	}
+	return ids, nil
+}
+
+func requireTaskWrite(taskID, userID int) error {
+	canRead, writeRole, _, err := storage.CanUserAccessTask(taskID, userID)
+	if err != nil {
+		return err
+	}
+	if !canRead {
+		return ErrNotFound
+	}
+	if !storage.RoleCanWrite(writeRole) {
+		return ErrForbidden
+	}
+	return nil
+}
+
+// ArchiveTask applies the protected removed tag to a task and its descendants.
+func ArchiveTask(ctx context.Context, userID, taskID int) error {
+	if err := requireTaskWrite(taskID, userID); err != nil {
+		return err
+	}
+	ids, err := descendantTaskIDs(ctx, taskID)
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if err := storage.ApplyRemovedTag(id, userID); err != nil {
+			return err
+		}
+		_ = storage.LogTaskEvent(id, userID, "archived", nil)
+		live.AfterTaskChange(userID, id, live.TypeTaskUpdated)
+	}
+	return nil
+}
+
+// RestoreTask removes the protected removed tag from a task and its descendants.
+func RestoreTask(ctx context.Context, userID, taskID int) error {
+	if err := requireTaskWrite(taskID, userID); err != nil {
+		return err
+	}
+	ids, err := descendantTaskIDs(ctx, taskID)
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if err := storage.ClearRemovedTag(id, userID); err != nil {
+			return err
+		}
+		_ = storage.LogTaskEvent(id, userID, "restored", nil)
+		live.AfterTaskChange(userID, id, live.TypeTaskUpdated)
+	}
+	return nil
+}
+
 // SetTaskCompleted sets completed and logs completed/reopened.
 func SetTaskCompleted(ctx context.Context, userID, taskID int, completed bool) error {
 	pool, err := storage.OpenDatabase()

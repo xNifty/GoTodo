@@ -23,7 +23,7 @@ import { useSidebarState } from '@/composables/useSidebarState'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useLiveUpdates } from '@/composables/useLiveUpdates'
 import { projectOptionLabel } from '@/utils/projectLabel'
-import { uniqueTagsByName } from '@/utils/tags'
+import { uniqueTagsByName, archiveConfirmMessage, isArchivedTask } from '@/utils/tags'
 
 defineProps<{
   mobileSidebarOpen?: boolean
@@ -665,8 +665,20 @@ watch(
   },
 )
 
+function isRemovedTagFilter(): boolean {
+  const q = (filters.tag || '').trim().toLowerCase()
+  if (q === 'removed') return true
+  const tag = tags.value.find((t) => String(t.id) === filters.tag)
+  return !!tag && (!!tag.protected || tag.name.toLowerCase() === 'removed')
+}
+
 watch(lastSavedTask, async (task) => {
   if (!task) return
+  lastSavedTask.value = null
+  if (isArchivedTask(task) !== isRemovedTagFilter()) {
+    await reloadInitial()
+    return
+  }
   if (task.parent_id) expandParent(task.parent_id)
   const exists = !!findTaskInTree(task.id)
   if (exists) {
@@ -674,7 +686,6 @@ watch(lastSavedTask, async (task) => {
   } else {
     registerTaskAdded(task)
   }
-  lastSavedTask.value = null
   await nextTick()
   refreshSortable()
 })
@@ -740,12 +751,41 @@ async function removeTask(task: Task) {
   }
   const ok = await askConfirm({
     title: 'Delete task?',
-    message: `Delete “${task.title}”?`,
+    message: `Permanently delete “${task.title}”? This cannot be undone.`,
     confirmLabel: 'Delete',
     danger: true,
   })
   if (!ok) return
   await performDelete(task, { mode: 'cascade' })
+}
+
+async function archiveTask(task: Task) {
+  if (!canWriteTask(task)) return
+  const ok = await askConfirm({
+    title: 'Archive task?',
+    message: archiveConfirmMessage(task),
+    confirmLabel: 'Archive',
+    warning: true,
+  })
+  if (!ok) return
+  try {
+    await api.archiveTask(task.id)
+    toast.push('Task archived', 'info')
+    await reloadInitial()
+  } catch (err) {
+    toast.push(err instanceof APIError ? err.message : 'Archive failed', 'error')
+  }
+}
+
+async function restoreTask(task: Task) {
+  if (!canWriteTask(task)) return
+  try {
+    await api.restoreTask(task.id)
+    toast.push('Task restored', 'success')
+    await reloadInitial()
+  } catch (err) {
+    toast.push(err instanceof APIError ? err.message : 'Restore failed', 'error')
+  }
 }
 
 async function performDelete(
@@ -1263,6 +1303,9 @@ onUnmounted(() => {
             @changed="reloadInitial"
             @task-updated="applyTaskUpdate"
             @board-reorder="applyBoardReorder"
+            @archive="archiveTask"
+            @restore="restoreTask"
+            @remove="removeTask"
           />
           <div v-if="loadingMore" class="text-center py-2 text-muted small">
             <span class="spinner-border spinner-border-sm me-2" />Loading more tasks…
@@ -1450,6 +1493,8 @@ onUnmounted(() => {
                     @patch-task="handleInlineTaskPatch"
                     @add-subtask="openAddSubtask(task)"
                     @edit="openTaskDetails(task.id)"
+                    @archive="archiveTask(task)"
+                    @restore="restoreTask(task)"
                     @remove="removeTask(task)"
                   />
                   <div
@@ -1471,6 +1516,8 @@ onUnmounted(() => {
                       @toggle-complete="toggleCompleteChild(child)"
                       @patch-task="handleInlineTaskPatch"
                       @edit="openTaskDetails(child.id)"
+                      @archive="archiveTask(child)"
+                      @restore="restoreTask(child)"
                       @remove="removeTask(child)"
                     />
                   </div>
@@ -1501,6 +1548,8 @@ onUnmounted(() => {
                   @patch-task="handleInlineTaskPatch"
                   @add-subtask="openAddSubtask(task)"
                   @edit="openTaskDetails(task.id)"
+                  @archive="archiveTask(task)"
+                  @restore="restoreTask(task)"
                   @remove="removeTask(task)"
                 />
                 <div
@@ -1522,6 +1571,8 @@ onUnmounted(() => {
                     @toggle-complete="toggleCompleteChild(child)"
                     @patch-task="handleInlineTaskPatch"
                     @edit="openTaskDetails(child.id)"
+                    @archive="archiveTask(child)"
+                    @restore="restoreTask(child)"
                     @remove="removeTask(child)"
                   />
                 </div>

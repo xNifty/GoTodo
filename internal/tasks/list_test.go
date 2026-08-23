@@ -82,6 +82,7 @@ func TestMain(m *testing.M) {
 			project_id INTEGER,
 			name TEXT NOT NULL,
 			color VARCHAR(7) DEFAULT '#6c757d',
+			protected BOOLEAN NOT NULL DEFAULT false,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		);
 		CREATE TABLE tasks (

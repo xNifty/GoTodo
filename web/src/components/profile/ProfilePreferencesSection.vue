@@ -6,6 +6,7 @@ import { APIError } from '@/api/types'
 import TimezoneSelect from '@/components/TimezoneSelect.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { useToast } from '@/composables/useToast'
+import { isProtectedTag } from '@/utils/tags'
 
 defineProps<{
   timezone: string
@@ -193,8 +194,23 @@ onMounted(() => {
             </template>
             <template v-else>
               <span class="flex-grow-1">{{ tag.name }}</span>
-              <button type="button" class="btn btn-sm btn-outline-secondary" @click="beginRenameTag(tag)">Rename</button>
-              <button type="button" class="btn btn-sm btn-outline-danger" @click="removeTag(tag)">Delete</button>
+              <span v-if="isProtectedTag(tag)" class="badge text-bg-secondary">System</span>
+              <button
+                v-if="!isProtectedTag(tag)"
+                type="button"
+                class="btn btn-sm btn-outline-secondary"
+                @click="beginRenameTag(tag)"
+              >
+                Rename
+              </button>
+              <button
+                v-if="!isProtectedTag(tag)"
+                type="button"
+                class="btn btn-sm btn-outline-danger"
+                @click="removeTag(tag)"
+              >
+                Delete
+              </button>
             </template>
           </div>
         </li>

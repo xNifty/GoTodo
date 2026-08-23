@@ -108,6 +108,10 @@ func RunMigrations() error {
 		fmt.Printf("migration: CreateTagsTables failed: %v\n", err)
 		errCount++
 	}
+	if err := MigrateTagsAddProtected(); err != nil {
+		fmt.Printf("migration: MigrateTagsAddProtected failed: %v\n", err)
+		errCount++
+	}
 	if err := MigrateTagsAddProjectID(); err != nil {
 		fmt.Printf("migration: MigrateTagsAddProjectID failed: %v\n", err)
 		errCount++

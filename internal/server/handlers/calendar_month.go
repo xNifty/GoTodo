@@ -126,6 +126,7 @@ func fetchCalendarTasksByDate(userID int, timezone, yearMonth string) map[string
 		LEFT JOIN projects p ON t.project_id = p.id
 		WHERE t.user_id = $1 AND t.due_date IS NOT NULL
 		  AND t.due_date >= $2::date AND t.due_date < $3::date
+		  AND NOT ` + storage.ArchivedTaskExistsSQL("t.id") + `
 		ORDER BY t.due_date, t.completed ASC, t.priority DESC, t.id`, userID, start, end)
 	if err != nil {
 		return nil
