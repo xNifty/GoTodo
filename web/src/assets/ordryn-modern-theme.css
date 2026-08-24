@@ -184,14 +184,16 @@ body {
    -------------------------------------------------------------------------- */
 
 .ordryn-sidebar {
+  flex: 0 0 260px;
   width: 260px;
+  min-width: 260px;
   background-color: var(--ordryn-sidebar-bg);
   color: var(--ordryn-sidebar-text);
   border-right: 1px solid var(--ordryn-sidebar-border);
   padding: 1.25rem 1rem;
   display: flex;
   flex-direction: column;
-  transition: width 0.25s ease, transform 0.25s ease;
+  transition: width 0.25s ease, transform 0.25s ease, flex-basis 0.25s ease, min-width 0.25s ease;
   z-index: 1040;
   align-self: stretch;
   overflow-y: auto;
@@ -199,6 +201,8 @@ body {
 }
 
 .ordryn-sidebar.collapsed {
+  flex: 0 0 64px;
+  min-width: 64px;
   width: 64px;
   padding: 1.25rem 0.5rem;
 }
@@ -368,6 +372,8 @@ body {
   transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
   position: relative;
   overflow: visible;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .ordryn-task-card:hover {
@@ -482,7 +488,10 @@ body {
 }
 
 .ordryn-task-card .task-description {
-  max-width: min(36rem, 100%);
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .ordryn-task-card.density-dense .task-description {
