@@ -1201,6 +1201,12 @@ func MigrateTagsAddProtected() error {
 		return fmt.Errorf("failed to convert existing removed tags: %v", err)
 	}
 
+	// Seeding a project "removed" tag reuses (user_id, name) of the personal
+	// row. Drop leftover UNIQUE(user_id, name) first or PostgreSQL raises 23505.
+	if err := dropLegacyTagsUserNameUnique(pool); err != nil {
+		return err
+	}
+
 	if tableExists(pool, "users") {
 		if _, err := pool.Exec(context.Background(), `
 			INSERT INTO tags (user_id, name, color, protected)
