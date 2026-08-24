@@ -1419,7 +1419,11 @@ onUnmounted(() => {
             <!-- Merged Header Row: Select All Checkbox + Starred Tasks Label -->
             <div class="d-flex align-items-center justify-content-between mb-2 px-1">
               <div class="d-flex align-items-center gap-3">
-                <div v-if="!isViewerProjectView" class="form-check d-flex align-items-center m-0 p-0">
+                <div
+                  v-if="!isViewerProjectView"
+                  class="form-check align-items-center m-0 p-0"
+                  :class="isSelecting ? 'd-flex' : 'd-none d-md-flex'"
+                >
                   <input
                     id="select-all-tasks"
                     type="checkbox"

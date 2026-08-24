@@ -171,7 +171,7 @@ function getDueDateLabel(preset: string) {
           type="button"
           data-bs-toggle="dropdown"
         >
-          STATUS: <span class="text-uppercase fw-bold">{{ status || 'ALL' }}</span>
+          <span class="d-none d-sm-inline">STATUS: </span><span class="text-uppercase fw-bold">{{ status || 'ALL' }}</span>
         </button>
         <ul class="dropdown-menu shadow-sm border-0">
           <li><button class="dropdown-item small" @click="emit('update:status', '')">All Statuses</button></li>
@@ -188,7 +188,7 @@ function getDueDateLabel(preset: string) {
           type="button"
           data-bs-toggle="dropdown"
         >
-          TAGS: <span class="fw-bold">{{ selectedTagLabel() }}</span>
+          <span class="d-none d-sm-inline">TAGS: </span><span class="fw-bold">{{ selectedTagLabel() }}</span>
         </button>
         <ul class="dropdown-menu shadow-sm border-0">
           <li><button class="dropdown-item small" @click="emit('update:tag', '')">All Tags</button></li>
@@ -209,7 +209,7 @@ function getDueDateLabel(preset: string) {
           type="button"
           data-bs-toggle="dropdown"
         >
-          DUE DATE: <span class="fw-bold">{{ getDueDateLabel(dueDatePreset) }}</span>
+          <span class="d-none d-sm-inline">DUE DATE: </span><span class="fw-bold">{{ getDueDateLabel(dueDatePreset) }}</span>
         </button>
         <ul class="dropdown-menu shadow-sm border-0">
           <li><button class="dropdown-item small" @click="emit('update:dueDatePreset', '')">ALL</button></li>
@@ -228,7 +228,7 @@ function getDueDateLabel(preset: string) {
           type="button"
           data-bs-toggle="dropdown"
         >
-          PRIORITY: <span class="fw-bold">{{ priority ? (priority === '3' ? 'HIGH' : priority === '2' ? 'MED' : 'LOW') : 'ALL' }}</span>
+          <span class="d-none d-sm-inline">PRIORITY: </span><span class="fw-bold">{{ priority ? (priority === '3' ? 'HIGH' : priority === '2' ? 'MED' : 'LOW') : 'ALL' }}</span>
         </button>
         <ul class="dropdown-menu shadow-sm border-0">
           <li><button class="dropdown-item small" @click="emit('update:priority', '')">All Priorities</button></li>
@@ -246,7 +246,7 @@ function getDueDateLabel(preset: string) {
           type="button"
           data-bs-toggle="dropdown"
         >
-          ORDER: <span class="fw-bold">{{ sort === 'priority' ? 'PRIORITY' : 'CUSTOM' }}</span>
+          <span class="d-none d-sm-inline">ORDER: </span><span class="fw-bold">{{ sort === 'priority' ? 'PRIORITY' : 'CUSTOM' }}</span>
         </button>
         <ul class="dropdown-menu shadow-sm border-0">
           <li><button class="dropdown-item small" @click="emit('update:sort', 'custom')">Custom Order</button></li>
