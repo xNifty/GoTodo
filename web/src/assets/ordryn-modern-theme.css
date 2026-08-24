@@ -128,6 +128,7 @@ html, body {
   height: 100%;
   margin: 0;
   padding: 0;
+  overflow-x: clip;
 }
 
 /* High-contrast keycaps (Bootstrap kbd uses body tokens that wash out in dark modals) */
@@ -169,7 +170,13 @@ body {
   display: flex;
   flex: 1;
   min-height: calc(100vh - 57px);
+  min-width: 0;
   align-items: stretch;
+}
+
+.ordryn-main-pane,
+.ordryn-main-layout > .flex-grow-1 {
+  min-width: 0;
 }
 
 /* --------------------------------------------------------------------------
@@ -187,6 +194,8 @@ body {
   transition: width 0.25s ease, transform 0.25s ease;
   z-index: 1040;
   align-self: stretch;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .ordryn-sidebar.collapsed {
@@ -300,6 +309,10 @@ body {
   background-color: transparent;
   padding: 0.5rem 0;
   margin-bottom: 1.25rem;
+}
+
+.ordryn-filter-search {
+  max-width: 480px;
 }
 
 .filter-pills-container {
@@ -632,41 +645,110 @@ body {
 }
 
 /* --------------------------------------------------------------------------
-   9. Mobile Responsiveness Breakpoints
+   9. Mobile navigation drawer & phone layout
    -------------------------------------------------------------------------- */
 
-@media (max-width: 768px) {
-  .ordryn-sidebar {
-    position: fixed;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    transform: translateX(-100%);
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+.ordryn-mobile-nav-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1055;
+}
+
+.ordryn-mobile-nav {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(22rem, 88vw);
+  max-width: 100%;
+  background-color: var(--ordryn-sidebar-bg);
+  color: var(--ordryn-sidebar-text);
+  z-index: 1060;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(-105%);
+  transition: transform 0.22s ease;
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.28);
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  pointer-events: none;
+}
+
+.ordryn-mobile-nav.is-open {
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.ordryn-mobile-nav-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--ordryn-sidebar-border);
+  flex-shrink: 0;
+}
+
+.ordryn-mobile-nav-body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0.75rem 1rem 1.5rem;
+  flex: 1;
+}
+
+body.ordryn-mobile-nav-open {
+  overflow: hidden;
+}
+
+.ordryn-mobile-fab {
+  position: fixed;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  z-index: 1035;
+  width: 3.25rem;
+  height: 3.25rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--ordryn-accent);
+  color: #fff;
+  font-size: 1.5rem;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ordryn-mobile-fab:focus-visible {
+  outline: 2px solid var(--ordryn-text);
+  outline-offset: 3px;
+}
+
+.app-footer p {
+  text-wrap: pretty;
+}
+
+@media (max-width: 767.98px) {
+  .ordryn-main-layout {
+    min-height: 0;
+    flex: 1;
   }
 
-  .ordryn-sidebar.mobile-open {
-    transform: translateX(0);
-  }
-
-  .ordryn-sidebar-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.4);
-    z-index: 1030;
+  .ordryn-filter-search {
+    max-width: none;
   }
 
   .ordryn-task-card.density-comfortable {
-    padding: 0.85rem;
+    padding: 0.75rem;
   }
 
-  /* Always show hover controls on mobile devices */
-  .hover-reveal {
-    opacity: 1 !important;
-    pointer-events: auto !important;
+  .ordryn-task-card .task-title {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
   }
 
-  /* Position action buttons below task details on mobile */
   .mobile-actions-wrapper {
     width: 100%;
     display: flex;
@@ -674,6 +756,53 @@ body {
     margin-top: 0.5rem;
     padding-top: 0.5rem;
     border-top: 1px dashed var(--ordryn-card-border);
+  }
+
+  .ordryn-main-pane {
+    padding-bottom: 5.5rem;
+  }
+
+  .go-to-top-btn {
+    right: max(1rem, env(safe-area-inset-right));
+    bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  }
+
+  .go-to-top-btn__label {
+    display: none;
+  }
+
+  .filter-pills-container {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0.25rem;
+    margin-inline: -0.25rem;
+    padding-inline: 0.25rem;
+  }
+
+  .table {
+    table-layout: auto;
+  }
+
+  .container {
+    padding-left: max(0.75rem, env(safe-area-inset-left));
+    padding-right: max(0.75rem, env(safe-area-inset-right));
+  }
+
+  .admin-subnav .nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .kanban-columns {
+    margin-inline: -0.5rem;
+    padding-inline: 0.5rem;
+  }
+
+  .toast-host {
+    padding-top: max(0.75rem, env(safe-area-inset-top));
+    padding-right: max(0.75rem, env(safe-area-inset-right));
   }
 }
 

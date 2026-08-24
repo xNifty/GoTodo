@@ -877,7 +877,7 @@ async function removeTimeEntry(entryId: number) {
     @click.self="close"
   >
     <div
-      class="modal-dialog"
+      class="modal-dialog oryryn-task-dialog"
       :class="
         isKanbanTask
           ? 'kanban-task-dialog'
@@ -1664,12 +1664,18 @@ textarea.task-description-input {
 }
 
 @media (max-width: 991.98px) {
-  .kanban-task-dialog {
-    width: 96vw;
-    max-width: 96vw;
-    height: 96vh;
-    max-height: 96vh;
-    margin: 2vh auto;
+  .kanban-task-dialog,
+  .oryryn-task-dialog:not(.kanban-task-dialog) {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+  }
+
+  .oryryn-task-dialog:not(.kanban-task-dialog) .modal-content {
+    min-height: 100dvh;
+    border-radius: 0;
   }
 
   .kanban-task-body {

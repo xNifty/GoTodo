@@ -229,37 +229,34 @@ td.delete-column {
     /*text-align: center;*/
 }
 
-.row {
-    overflow-x: auto;
-}
-
 .col-lg-10 {
     padding: 0;
 }
 
-/* Responsive table tweaks */
+/* Responsive table tweaks — scoped so SPA tables (docs, import, projects)
+   keep a normal table layout on phones. */
 @media (max-width: 600px) {
-    table {
+    .invite-list-card table {
         width: 100%;
     }
 
-    thead {
-        display: none; /* Simplifies table on small screens */
+    .invite-list-card thead {
+        display: none;
     }
 
-    tbody tr {
+    .invite-list-card tbody tr {
         display: block;
         margin-bottom: 15px;
     }
 
-    td {
+    .invite-list-card td {
         display: block;
         padding-left: 50%;
         position: relative;
         text-align: left;
     }
 
-    td::before {
+    .invite-list-card td::before {
         content: attr(data-label);
         position: absolute;
         left: 15px;
@@ -268,18 +265,15 @@ td.delete-column {
     }
 
     /* Hide drag handle on very small screens to avoid overlap */
-    .drag-column {
+    .invite-list-card .drag-column,
+    .projects-table .drag-column {
         display: none;
     }
 
-    /* Make action buttons stack nicely */
-    .status-column, .delete-column {
+    .invite-list-card .status-column,
+    .invite-list-card .delete-column {
         display: inline-block;
         margin-top: 0.5rem;
-        margin-right: 0.5rem;
-    }
-
-    .drag-handle {
         margin-right: 0.5rem;
     }
 }
@@ -484,7 +478,7 @@ td.delete-column {
 @media (max-width: 768px) {
     /* Make each row a compact horizontal card when collapsed (flex),
        and allow switching to block when expanded. */
-    tbody tr {
+    .invite-list-card tbody tr {
         display: flex;
         flex-direction: row;
         flex-wrap: wrap;
@@ -499,7 +493,7 @@ td.delete-column {
     }
 
     /* Stack cells and show label above value */
-    td {
+    .invite-list-card td {
         /* default for collapsed: let cells behave inline inside the flex row */
         display: inline-block;
         padding: 0.12rem 0.25rem;
@@ -510,7 +504,7 @@ td.delete-column {
     }
 
     /* Hide injected labels on small screens — rows are explicit (title, desc, actions) */
-    td::before {
+    .invite-list-card td::before {
         display: none;
     }
 
@@ -801,12 +795,6 @@ td.delete-column {
     .drag-handle i, .description-column .bi {
         font-size: 0.9rem;
     }
-
-    /* Make badges smaller inside cards */
-    .badge {
-        padding: 0.18rem 0.35rem;
-        font-size: 0.72rem;
-    }
 }
 
 /* Touch & Tablet: ensure iPads and other touch devices use mobile-friendly layout
@@ -863,37 +851,6 @@ td.delete-column {
         font-size: 1rem;
     }
 
-}
-
-/* Very narrow screens: stack search input and add button vertically */
-@media (max-width: 420px) {
-    #search-form {
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-        align-items: stretch;
-    }
-    #search-form .search-input { width: 100%; }
-    #search-form button { width: 100%; }
-    #openSidebar { width: 100%; max-width: none; }
-}
-
-/* Align Add button and Search box exactly on very small screens */
-@media (max-width: 420px) {
-    #search-form, #openSidebar {
-        width: 100%;
-        box-sizing: border-box;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-    }
-    /* Ensure button visuals use full width and matching paddings */
-    #search-form button, #openSidebar {
-        width: 100% !important;
-        padding-left: 0.6rem !important;
-        padding-right: 0.6rem !important;
-    }
 }
 
 /* Profile: REST API keys list */
@@ -1193,8 +1150,8 @@ td.delete-column {
         margin-top: 0.5rem !important;
     }
 
-    /* Make action buttons full-width and touch-friendly */
-    .invite-list-card .card-body .btn {
+    /* Make the primary create-invite button easier to tap; keep row actions compact */
+    .invite-list-card #create-invite-form .btn {
         width: 100% !important;
         padding: 0.6rem 0.8rem !important;
         box-sizing: border-box !important;
@@ -1239,10 +1196,10 @@ td.delete-column {
 
 /* Tablet / touch devices: apply accordion/card table layout for iPads and similar */
 @media (max-width: 1024px), (pointer: coarse) and (max-width: 1366px) {
-    table { width: 100%; }
-    thead { display: none; }
+    .invite-list-card table { width: 100%; }
+    .invite-list-card thead { display: none; }
 
-    tbody tr {
+    .invite-list-card tbody tr {
         display: flex;
         flex-direction: row;
         align-items: center;
@@ -1255,7 +1212,7 @@ td.delete-column {
         box-shadow: 0 4px 8px rgba(0,0,0,0.06);
     }
 
-    td {
+    .invite-list-card td {
         display: inline-block;
         padding: 0.18rem 0.35rem;
         position: relative;
@@ -1264,7 +1221,7 @@ td.delete-column {
         vertical-align: middle;
     }
 
-    td::before {
+    .invite-list-card td::before {
         content: attr(data-label);
         display: block;
         font-weight: 600;
@@ -1377,10 +1334,10 @@ tr.expanded .task-toggle::after {
    so it outranks earlier accordion/collapse rules. */
 @media (max-width: 900px) {
     /* remove chevron indicator everywhere on small screens */
-    .task-toggle::after { content: none !important; display: none !important; }
+    .invite-list-card .task-toggle::after { content: none !important; display: none !important; }
 
     /* Ensure rows wrap so first line contains drag + title, others full width */
-    tbody tr {
+    .invite-list-card tbody tr {
         display: flex !important;
         flex-wrap: wrap !important;
         align-items: center !important;
@@ -1426,16 +1383,15 @@ tr.expanded .task-toggle::after {
 /* Remove injected cell titles/labels on mobile and touch devices so each
    task row shows only the structured rows (drag+title, description, actions). */
 @media (max-width: 900px), (pointer: coarse) {
-    /* Hide content generated from data-label (td::before) across task/invite tables */
-    table tbody tr td::before,
-    .invite-list-card tbody tr td::before,
-    td::before {
+    /* Hide content generated from data-label (td::before) across invite tables */
+    .invite-list-card table tbody tr td::before,
+    .invite-list-card tbody tr td::before {
         display: none !important;
         content: none !important;
     }
 
     /* Also hide any .task-toggle pseudo-content used as chevrons */
-    .task-toggle::after { display: none !important; content: none !important; }
+    .invite-list-card .task-toggle::after { display: none !important; content: none !important; }
 }
 /* ========================================
    EXPANDABLE BOX STYLES (Accordion)
@@ -1473,8 +1429,8 @@ tr.expanded .task-toggle::after {
 }
 
 textarea {
-    height: 80px;
-    resize: none;
+    min-height: 80px;
+    resize: vertical;
 }
 
 /* ========================================
@@ -2196,6 +2152,16 @@ select.form-select:focus {
         flex-shrink: 0;
         padding: 0 !important;
         display: block !important;
+        width: 100%;
+        flex-basis: 100%;
+    }
+
+    .projects-table td[data-label="Role"] {
+        display: none !important;
+    }
+
+    .projects-table td:has(.project-drag-handle) {
+        display: none !important;
     }
     
     .projects-table td::before {
@@ -2911,12 +2877,9 @@ button.dashboard-stat-link:focus-visible {
         opacity: 0.85;
     }
 
-    .calendar-weekdays span:not(:nth-child(1)):not(:nth-child(7)) {
-        font-size: 0;
-    }
-
-    .calendar-weekdays span:not(:nth-child(1)):not(:nth-child(7))::first-letter {
+    .calendar-weekdays span {
         font-size: 0.75rem;
+        letter-spacing: 0;
     }
 }
 

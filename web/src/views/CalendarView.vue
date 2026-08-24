@@ -14,14 +14,6 @@ import { useSidebarState } from '@/composables/useSidebarState'
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-defineProps<{
-  mobileSidebarOpen?: boolean
-}>()
-
-const emit = defineEmits<{
-  'close-mobile-sidebar': []
-}>()
-
 const router = useRouter()
 const route = useRoute()
 const { user } = useAuth()
@@ -135,11 +127,9 @@ useLiveUpdates((event) => {
     <!-- Collapsible & Responsive Warm Sidebar -->
     <ModernSidebar
       :collapsed="sidebarCollapsed"
-      :mobile-open="mobileSidebarOpen || false"
       :projects="projects"
       :saved-views="savedViews"
       @toggle-collapse="toggleSidebar"
-      @close-mobile="emit('close-mobile-sidebar')"
       @select-home="selectHome"
       @select-project="selectProject"
       @select-view="selectView"
@@ -251,7 +241,13 @@ useLiveUpdates((event) => {
 
         <div v-if="view" id="calendar-grid" class="calendar-grid-wrap" :data-month="view.year_month">
           <div class="calendar-weekdays" aria-hidden="true">
-            <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+            <span title="Sunday">S<span class="d-none d-sm-inline">un</span></span>
+            <span title="Monday">M<span class="d-none d-sm-inline">on</span></span>
+            <span title="Tuesday">T<span class="d-none d-sm-inline">ue</span></span>
+            <span title="Wednesday">W<span class="d-none d-sm-inline">ed</span></span>
+            <span title="Thursday">T<span class="d-none d-sm-inline">hu</span></span>
+            <span title="Friday">F<span class="d-none d-sm-inline">ri</span></span>
+            <span title="Saturday">S<span class="d-none d-sm-inline">at</span></span>
           </div>
           <div class="calendar-grid" role="grid" :aria-label="`Task calendar for ${view.month_label}`">
             <div v-for="(week, wIdx) in view.weeks" :key="wIdx" class="calendar-week" role="row">
