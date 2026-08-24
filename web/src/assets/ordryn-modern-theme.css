@@ -758,6 +758,10 @@ body.ordryn-mobile-nav-open {
     border-top: 1px dashed var(--ordryn-card-border);
   }
 
+  .ordryn-task-card .drag-handle {
+    display: none !important;
+  }
+
   .ordryn-main-pane {
     padding-bottom: 5.5rem;
   }

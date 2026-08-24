@@ -2533,10 +2533,10 @@ body.htmx-loading #htmx-loading-bar {
     }
 }
 
-/* Touch devices: show drag handles with long-press hint */
+/* Touch devices: keep drag handles visible on desktop/tablet lists, but do not
+   override mobile `d-none` hides on task cards. */
 @media (pointer: coarse) {
     .drag-handle {
-        display: inline-flex !important;
         opacity: 0.85;
     }
 }
