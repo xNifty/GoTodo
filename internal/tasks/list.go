@@ -227,6 +227,7 @@ func appendFilterSQL(where string, args []interface{}, filters ListFilters, time
 	where, args = appendCompletedWeekCondition(where, args, filters.CompletedFilter, timezone, tablePrefix)
 	where += filters.priorityCondition(tablePrefix)
 	where, args = appendTagCondition(where, args, filters, userID, tablePrefix)
+	where = appendArchivedExclusion(where, filters, tablePrefix)
 	if strings.ToLower(strings.TrimSpace(filters.WorkflowClaimScope)) == "mine" {
 		args = append(args, userID)
 		where += filters.workflowClaimCondition(tablePrefix, len(args))
@@ -309,6 +310,28 @@ func appendTagCondition(where string, args []interface{}, filters ListFilters, u
 	return where, args
 }
 
+func isRemovedTagFilter(filters ListFilters) bool {
+	if storage.IsRemovedTagName(strings.TrimSpace(filters.TagNameFilter)) {
+		return true
+	}
+	if filters.TagFilter == nil {
+		return false
+	}
+	tag, err := storage.GetTag(*filters.TagFilter)
+	return err == nil && (tag.Protected || storage.IsRemovedTagName(tag.Name))
+}
+
+func appendArchivedExclusion(where string, filters ListFilters, tablePrefix string) string {
+	if isRemovedTagFilter(filters) {
+		return where
+	}
+	idCol := "id"
+	if tablePrefix != "" {
+		idCol = tablePrefix + ".id"
+	}
+	return where + " AND NOT " + storage.ArchivedTaskExistsSQL(idCol)
+}
+
 func attachTagsToTasks(taskList []Task) error {
 	if len(taskList) == 0 {
 		return nil
@@ -325,7 +348,7 @@ func attachTagsToTasks(taskList []Task) error {
 		if tags, ok := tagMap[taskList[i].ID]; ok {
 			taskList[i].Tags = make([]Tag, len(tags))
 			for j, tg := range tags {
-				taskList[i].Tags[j] = Tag{ID: tg.ID, Name: tg.Name, Color: tg.Color, ProjectID: tg.ProjectID}
+				taskList[i].Tags[j] = Tag{ID: tg.ID, Name: tg.Name, Color: tg.Color, ProjectID: tg.ProjectID, Protected: tg.Protected}
 			}
 		}
 	}

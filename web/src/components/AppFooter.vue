@@ -1,27 +1,24 @@
 <script setup lang="ts">
-import { RouterLink } from "vue-router";
 </script>
 
 <template>
   <footer
     class="text-center py-3 app-footer mt-auto border-top border-opacity-10 w-100"
   >
-    <p class="text-muted small mb-0">
-      Made with <i class="bi bi-heart-fill text-danger" /> by xNifty |
+    <p class="text-muted small mb-0 d-flex flex-wrap justify-content-center gap-1 column-gap-2">
+      Made with <i class="bi bi-heart-fill text-danger" /> by <a
+        href="https://sentienttd.studio"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="text-decoration-none text-muted"
+        >SentientTD Studios</a
+      > |
       <a
         href="https://github.com/SentientTD-Studios/Ordryn"
         target="_blank"
         rel="noopener noreferrer"
         class="text-decoration-none text-muted"
         >Source</a
-      >
-      |
-      <RouterLink to="/docs/guide" class="text-decoration-none text-muted"
-        >Documentation</RouterLink
-      >
-      |
-      <RouterLink to="/docs/api/v1" class="text-decoration-none text-muted"
-        >API</RouterLink
       >
       |
       <a

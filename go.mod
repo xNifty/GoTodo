@@ -7,6 +7,7 @@ require (
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/joho/godotenv v1.5.1
 	github.com/mailgun/mailgun-go/v5 v5.9.1
+	github.com/pquerna/otp v1.5.0
 	github.com/yuin/goldmark v1.5.0
 	golang.org/x/crypto v0.43.0
 )
@@ -19,6 +20,7 @@ require (
 
 require (
 	github.com/aymerick/douceur v0.2.0 // indirect
+	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
 	github.com/gorilla/css v1.0.1 // indirect
 	github.com/lib/pq v1.10.9 // indirect
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect

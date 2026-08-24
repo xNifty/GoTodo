@@ -60,6 +60,11 @@ onUnmounted(() => {
             Use <strong>Copy link</strong> to share a URL such as <code>/tasks/42</code>, or search
             for <code>42</code> / <code>#42</code> to find it.
           </li>
+          <li>
+            Archive a task to hide it from boards and lists. Filter by the <strong>removed</strong> tag
+            to find archived work and restore it. Delete is permanent and cannot be undone (a short
+            undo token may still appear after delete as a safety net).
+          </li>
           <li>Deleting a task may offer undo for a short time when the server returns an undo token.</li>
         </ul>
 
@@ -165,8 +170,14 @@ onUnmounted(() => {
 
         <h2 id="settings-api" class="h4 mt-4">Settings and API</h2>
         <p>
-          Update your profile, timezone, and API keys under
-          <RouterLink to="/settings">Settings</RouterLink>.
+          Update your profile under
+          <RouterLink to="/settings">Settings</RouterLink>,
+          grouped into Account, Preferences, Integrations, Data, and Developer.
+          On Account you can optionally enable two-factor authentication with an authenticator app.
+          After you confirm a code, you get five recovery codes — store them somewhere safe.
+          Turning MFA off requires a current authenticator code or a remaining recovery code.
+          Use <strong>Set up</strong> or <strong>Manage</strong> to open the two-factor dialog.
+          Password reset does not disable MFA; the next login still asks for a code.
           For machine clients and integrations, see the
           <RouterLink to="/docs/api/v1">REST API documentation</RouterLink>.
         </p>

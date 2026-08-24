@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import type { Tag } from '@/api/types'
 import type { ViewDensity } from '@/composables/useViewDensity'
 
@@ -39,6 +39,12 @@ const emit = defineEmits<{
 // Fold/unfold state for the filter toolbar
 const showFilterPills = ref(true)
 
+onMounted(() => {
+  if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767.98px)').matches) {
+    showFilterPills.value = false
+  }
+})
+
 function tagFilterValue(t: Tag) {
   return props.tagByName ? t.name : String(t.id)
 }
@@ -64,7 +70,7 @@ function getDueDateLabel(preset: string) {
   <div class="ordryn-filter-bar mb-2">
     <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2">
       <!-- Search Input & Filter Fold Toggle Button -->
-      <div class="d-flex align-items-center gap-2 flex-grow-1" style="max-width: 480px;">
+        <div class="d-flex align-items-center gap-2 flex-grow-1 oryryn-filter-search">
         <div class="position-relative flex-grow-1">
           <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted" />
           <input
@@ -99,7 +105,7 @@ function getDueDateLabel(preset: string) {
           v-if="showViewMode"
           class="d-flex align-items-center gap-2"
         >
-          <span class="small fw-medium text-muted">View:</span>
+          <span class="small fw-medium text-muted d-none d-sm-inline">View:</span>
           <div
             class="btn-group btn-group-sm p-1 rounded-pill"
             style="background: var(--ordryn-muted-bg);"
@@ -128,25 +134,27 @@ function getDueDateLabel(preset: string) {
         </div>
 
         <div class="d-flex align-items-center gap-2">
-          <span class="small fw-medium text-muted">Density:</span>
+          <span class="small fw-medium text-muted d-none d-sm-inline">Density:</span>
           <div class="btn-group btn-group-sm p-1 rounded-pill" style="background: var(--ordryn-muted-bg);">
             <button
               type="button"
-              class="btn btn-sm rounded-pill px-2.5 py-0.5 border-0 fw-medium transition-all"
+              class="btn btn-sm rounded-pill px-2 px-md-2.5 py-0.5 border-0 fw-medium transition-all"
               :class="density === 'comfortable' ? 'shadow-xs fw-bold' : 'text-muted'"
               :style="density === 'comfortable' ? 'background: var(--ordryn-card-bg); color: var(--ordryn-text);' : ''"
+              title="Comfortable density"
               @click="emit('update:density', 'comfortable')"
             >
-              <i class="bi bi-view-list me-1" />Comfortable
+              <i class="bi bi-view-list" /><span class="d-none d-md-inline ms-1">Comfortable</span>
             </button>
             <button
               type="button"
-              class="btn btn-sm rounded-pill px-2.5 py-0.5 border-0 fw-medium transition-all"
+              class="btn btn-sm rounded-pill px-2 px-md-2.5 py-0.5 border-0 fw-medium transition-all"
               :class="density === 'dense' ? 'shadow-xs fw-bold' : 'text-muted'"
               :style="density === 'dense' ? 'background: var(--ordryn-card-bg); color: var(--ordryn-text);' : ''"
+              title="Dense density"
               @click="emit('update:density', 'dense')"
             >
-              <i class="bi bi-list-task me-1" />Dense
+              <i class="bi bi-list-task" /><span class="d-none d-md-inline ms-1">Dense</span>
             </button>
           </div>
         </div>
@@ -163,7 +171,7 @@ function getDueDateLabel(preset: string) {
           type="button"
           data-bs-toggle="dropdown"
         >
-          STATUS: <span class="text-uppercase fw-bold">{{ status || 'ALL' }}</span>
+          <span class="d-none d-sm-inline">STATUS: </span><span class="text-uppercase fw-bold">{{ status || 'ALL' }}</span>
         </button>
         <ul class="dropdown-menu shadow-sm border-0">
           <li><button class="dropdown-item small" @click="emit('update:status', '')">All Statuses</button></li>
@@ -180,7 +188,7 @@ function getDueDateLabel(preset: string) {
           type="button"
           data-bs-toggle="dropdown"
         >
-          TAGS: <span class="fw-bold">{{ selectedTagLabel() }}</span>
+          <span class="d-none d-sm-inline">TAGS: </span><span class="fw-bold">{{ selectedTagLabel() }}</span>
         </button>
         <ul class="dropdown-menu shadow-sm border-0">
           <li><button class="dropdown-item small" @click="emit('update:tag', '')">All Tags</button></li>
@@ -201,7 +209,7 @@ function getDueDateLabel(preset: string) {
           type="button"
           data-bs-toggle="dropdown"
         >
-          DUE DATE: <span class="fw-bold">{{ getDueDateLabel(dueDatePreset) }}</span>
+          <span class="d-none d-sm-inline">DUE DATE: </span><span class="fw-bold">{{ getDueDateLabel(dueDatePreset) }}</span>
         </button>
         <ul class="dropdown-menu shadow-sm border-0">
           <li><button class="dropdown-item small" @click="emit('update:dueDatePreset', '')">ALL</button></li>
@@ -220,7 +228,7 @@ function getDueDateLabel(preset: string) {
           type="button"
           data-bs-toggle="dropdown"
         >
-          PRIORITY: <span class="fw-bold">{{ priority ? (priority === '3' ? 'HIGH' : priority === '2' ? 'MED' : 'LOW') : 'ALL' }}</span>
+          <span class="d-none d-sm-inline">PRIORITY: </span><span class="fw-bold">{{ priority ? (priority === '3' ? 'HIGH' : priority === '2' ? 'MED' : 'LOW') : 'ALL' }}</span>
         </button>
         <ul class="dropdown-menu shadow-sm border-0">
           <li><button class="dropdown-item small" @click="emit('update:priority', '')">All Priorities</button></li>
@@ -238,7 +246,7 @@ function getDueDateLabel(preset: string) {
           type="button"
           data-bs-toggle="dropdown"
         >
-          ORDER: <span class="fw-bold">{{ sort === 'priority' ? 'PRIORITY' : 'CUSTOM' }}</span>
+          <span class="d-none d-sm-inline">ORDER: </span><span class="fw-bold">{{ sort === 'priority' ? 'PRIORITY' : 'CUSTOM' }}</span>
         </button>
         <ul class="dropdown-menu shadow-sm border-0">
           <li><button class="dropdown-item small" @click="emit('update:sort', 'custom')">Custom Order</button></li>

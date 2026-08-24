@@ -167,8 +167,20 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "tags migrate retry: %v\n", err)
 		os.Exit(1)
 	}
+	if err := storage.MigrateTagsAddProtected(); err != nil {
+		fmt.Fprintf(os.Stderr, "tags protected migrate: %v\n", err)
+		os.Exit(1)
+	}
 	if err := storage.CreateGitHubTables(); err != nil {
 		fmt.Fprintf(os.Stderr, "github: %v\n", err)
+		os.Exit(1)
+	}
+	if err := storage.MigrateUsersAddMFA(); err != nil {
+		fmt.Fprintf(os.Stderr, "mfa columns: %v\n", err)
+		os.Exit(1)
+	}
+	if err := storage.CreateMFARecoveryCodesTable(); err != nil {
+		fmt.Fprintf(os.Stderr, "mfa recovery: %v\n", err)
 		os.Exit(1)
 	}
 

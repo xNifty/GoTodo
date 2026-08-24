@@ -7,7 +7,6 @@ import { projectOptionLabel } from '@/utils/projectLabel'
 
 const props = defineProps<{
   collapsed: boolean
-  mobileOpen: boolean
   projects: Project[]
   savedViews: SavedView[]
   activeProject?: string
@@ -90,19 +89,9 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <!-- Backdrop overlay for mobile drawer -->
-  <div
-    v-if="mobileOpen"
-    class="ordryn-sidebar-backdrop d-md-none"
-    @click="emit('close-mobile')"
-  />
-
   <aside
-    class="ordryn-sidebar"
-    :class="{
-      collapsed: collapsed,
-      'mobile-open': mobileOpen
-    }"
+    class="ordryn-sidebar d-none d-md-flex"
+    :class="{ collapsed: collapsed }"
   >
     <!-- Collapse Toggle Button (Desktop) -->
     <div class="d-none d-md-flex align-items-center justify-content-end mb-3">

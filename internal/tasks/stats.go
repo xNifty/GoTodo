@@ -50,6 +50,7 @@ func GetOverdueCount(userID int, timezone string) (int, error) {
 	defer storage.CloseDatabase(pool)
 
 	where, args := appendDueDateCondition("user_id = $1", []interface{}{userID}, "overdue", timezone, "")
+	where += " AND NOT " + storage.ArchivedTaskExistsSQL("id")
 	var count int
 	if err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE "+where, args...).Scan(&count); err != nil {
 		return 0, fmt.Errorf("overdue count: %w", err)
@@ -78,17 +79,19 @@ func GetDashboardStats(userID int, timezone string) (*DashboardStats, error) {
 	args := []interface{}{userID}
 
 	overdueWhere, overdueArgs := appendDueDateCondition(where, args, "overdue", timezone, "")
+	overdueWhere += " AND NOT " + storage.ArchivedTaskExistsSQL("id")
 	if err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM tasks WHERE "+overdueWhere, overdueArgs...).Scan(&stats.OverdueCount); err != nil {
 		return nil, fmt.Errorf("overdue count: %w", err)
 	}
 
 	todayWhere, todayArgs := appendDueDateCondition(where, args, "today", timezone, "")
-	todayWhere += " AND (completed IS NULL OR completed = false)"
+	todayWhere += " AND (completed IS NULL OR completed = false) AND NOT " + storage.ArchivedTaskExistsSQL("id")
 	if err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM tasks WHERE "+todayWhere, todayArgs...).Scan(&stats.DueTodayCount); err != nil {
 		return nil, fmt.Errorf("due today count: %w", err)
 	}
 
 	throughWeekWhere, throughWeekArgs := appendDueDateCondition(where, args, "through_week", timezone, "")
+	throughWeekWhere += " AND NOT " + storage.ArchivedTaskExistsSQL("id")
 	if err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM tasks WHERE "+throughWeekWhere, throughWeekArgs...).Scan(&stats.DueThisWeekCount); err != nil {
 		return nil, fmt.Errorf("due this week count: %w", err)
 	}
@@ -140,6 +143,7 @@ func GetDashboardStats(userID int, timezone string) (*DashboardStats, error) {
 		FROM tasks t
 		LEFT JOIN projects p ON t.project_id = p.id
 		WHERE t.user_id = $1 AND (t.completed IS NULL OR t.completed = false)
+		  AND NOT ` + storage.ArchivedTaskExistsSQL("t.id") + `
 		GROUP BY COALESCE(p.name, 'No project')
 		ORDER BY cnt DESC`, userID)
 	if err != nil {
@@ -159,6 +163,7 @@ func GetDashboardStats(userID int, timezone string) (*DashboardStats, error) {
 		SELECT COALESCE(priority, 0), COUNT(*)
 		FROM tasks
 		WHERE user_id = $1 AND (completed IS NULL OR completed = false)
+		  AND NOT ` + storage.ArchivedTaskExistsSQL("id") + `
 		GROUP BY COALESCE(priority, 0)
 		ORDER BY COALESCE(priority, 0) DESC`, userID)
 	if err != nil {

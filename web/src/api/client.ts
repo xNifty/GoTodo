@@ -35,6 +35,10 @@ import type {
   User,
   UserSearchHit,
   WorkflowMode,
+  MFARequired,
+  MFAStatus,
+  MFASetup,
+  MFARecoveryCodes,
 } from './types'
 import { APIError, type APIErrorBody } from './types'
 
@@ -146,9 +150,45 @@ export const api = {
   },
 
   login(email: string, password: string) {
-    return request<User>('/api/v1/auth/login', {
+    return request<User | MFARequired>('/api/v1/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
+    })
+  },
+
+  verifyMFA(code: string) {
+    return request<User>('/api/v1/auth/mfa/verify', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    })
+  },
+
+  getMFA() {
+    return request<MFAStatus>('/api/v1/me/mfa')
+  },
+
+  setupMFA() {
+    return request<MFASetup>('/api/v1/me/mfa/setup', { method: 'POST' })
+  },
+
+  enableMFA(code: string) {
+    return request<MFARecoveryCodes>('/api/v1/me/mfa/enable', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    })
+  },
+
+  disableMFA(code: string) {
+    return request<{ ok: boolean }>('/api/v1/me/mfa/disable', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    })
+  },
+
+  regenerateMFARecoveryCodes(code: string) {
+    return request<MFARecoveryCodes>('/api/v1/me/mfa/recovery-codes', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
     })
   },
 
@@ -298,6 +338,14 @@ export const api = {
       `/api/v1/tasks/${id}${qs ? `?${qs}` : ''}`,
       { method: 'DELETE' },
     )
+  },
+
+  archiveTask(id: number) {
+    return request<Task>(`/api/v1/tasks/${id}/archive`, { method: 'POST' })
+  },
+
+  restoreTask(id: number) {
+    return request<Task>(`/api/v1/tasks/${id}/restore`, { method: 'POST' })
   },
 
   undo(undo_token: string) {

@@ -65,6 +65,14 @@ func RunMigrations() error {
 		fmt.Printf("migration: MigrateUsersUsernames failed: %v\n", err)
 		errCount++
 	}
+	if err := MigrateUsersAddMFA(); err != nil {
+		fmt.Printf("migration: MigrateUsersAddMFA failed: %v\n", err)
+		errCount++
+	}
+	if err := CreateMFARecoveryCodesTable(); err != nil {
+		fmt.Printf("migration: CreateMFARecoveryCodesTable failed: %v\n", err)
+		errCount++
+	}
 	if err := MigrateTasksAddIsFavorite(); err != nil {
 		fmt.Printf("migration: MigrateTasksAddIsFavorite failed: %v\n", err)
 		errCount++
@@ -102,6 +110,10 @@ func RunMigrations() error {
 	}
 	if err := MigrateTagsAddProjectID(); err != nil {
 		fmt.Printf("migration: MigrateTagsAddProjectID failed: %v\n", err)
+		errCount++
+	}
+	if err := MigrateTagsAddProtected(); err != nil {
+		fmt.Printf("migration: MigrateTagsAddProtected failed: %v\n", err)
 		errCount++
 	}
 	if err := CreateTaskEventsTable(); err != nil {

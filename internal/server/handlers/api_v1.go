@@ -19,6 +19,7 @@ type apiTagJSON struct {
 	Name      string `json:"name"`
 	Color     string `json:"color"`
 	ProjectID *int   `json:"project_id"`
+	Protected bool   `json:"protected"`
 }
 
 type apiTaskJSON struct {
@@ -180,7 +181,7 @@ type apiTaskEventJSON struct {
 }
 
 func tagToAPIJSON(t storage.Tag) apiTagJSON {
-	return apiTagJSON{ID: t.ID, Name: t.Name, Color: t.Color, ProjectID: t.ProjectID}
+	return apiTagJSON{ID: t.ID, Name: t.Name, Color: t.Color, ProjectID: t.ProjectID, Protected: t.Protected}
 }
 
 func apiUserFromRequest(r *http.Request) (int, bool) {
@@ -190,7 +191,7 @@ func apiUserFromRequest(r *http.Request) (int, bool) {
 func taskToAPIJSON(t tasks.Task) apiTaskJSON {
 	tags := make([]apiTagJSON, 0, len(t.Tags))
 	for _, tg := range t.Tags {
-		tags = append(tags, apiTagJSON{ID: tg.ID, Name: tg.Name, Color: tg.Color, ProjectID: tg.ProjectID})
+		tags = append(tags, apiTagJSON{ID: tg.ID, Name: tg.Name, Color: tg.Color, ProjectID: tg.ProjectID, Protected: tg.Protected})
 	}
 	out := apiTaskJSON{
 		ID:                t.ID,
@@ -323,6 +324,20 @@ func APIV1TasksRouter(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			apiV1TaskClaim(w, r, id)
+			return
+		case "archive":
+			if len(parts) != 2 || r.Method != http.MethodPost {
+				utils.APIJSONError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Method not allowed.")
+				return
+			}
+			apiV1TaskArchive(w, r, id)
+			return
+		case "restore":
+			if len(parts) != 2 || r.Method != http.MethodPost {
+				utils.APIJSONError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Method not allowed.")
+				return
+			}
+			apiV1TaskRestore(w, r, id)
 			return
 		case "github-issue":
 			if len(parts) != 2 {
@@ -610,6 +625,46 @@ func apiV1DeleteTask(w http.ResponseWriter, r *http.Request, taskID int) {
 		"undo_token": token,
 		"expires_in": utils.UndoTTLSeconds,
 	})
+}
+
+func apiV1TaskArchive(w http.ResponseWriter, r *http.Request, taskID int) {
+	userID, ok := apiUserFromRequest(r)
+	if !ok {
+		utils.APIJSONError(w, http.StatusUnauthorized, "unauthorized", "Not authenticated.")
+		return
+	}
+	if err := domain.ArchiveTask(r.Context(), userID, taskID); err != nil {
+		writeWorkflowDomainError(w, err)
+		return
+	}
+	tz := GetUserTimezoneByID(userID)
+	task, err := tasks.FetchTaskByIDForUser(taskID, userID, tz, 1)
+	if err != nil {
+		utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to load task.")
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_ = json.NewEncoder(w).Encode(taskToAPIJSON(task))
+}
+
+func apiV1TaskRestore(w http.ResponseWriter, r *http.Request, taskID int) {
+	userID, ok := apiUserFromRequest(r)
+	if !ok {
+		utils.APIJSONError(w, http.StatusUnauthorized, "unauthorized", "Not authenticated.")
+		return
+	}
+	if err := domain.RestoreTask(r.Context(), userID, taskID); err != nil {
+		writeWorkflowDomainError(w, err)
+		return
+	}
+	tz := GetUserTimezoneByID(userID)
+	task, err := tasks.FetchTaskByIDForUser(taskID, userID, tz, 1)
+	if err != nil {
+		utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to load task.")
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_ = json.NewEncoder(w).Encode(taskToAPIJSON(task))
 }
 
 func apiV1BulkTasks(w http.ResponseWriter, r *http.Request) {

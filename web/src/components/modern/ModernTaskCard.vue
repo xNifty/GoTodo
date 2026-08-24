@@ -13,6 +13,7 @@ const props = withDefaults(
     canWrite?: boolean
     expanded?: boolean
     focused?: boolean
+    selecting?: boolean
   }>(),
   {
     density: 'comfortable',
@@ -21,6 +22,7 @@ const props = withDefaults(
     canWrite: true,
     expanded: false,
     focused: false,
+    selecting: false,
   },
 )
 
@@ -32,7 +34,6 @@ const emit = defineEmits<{
   'patch-task': [payload: { id: number; title?: string; description?: string }]
   'add-subtask': []
   edit: []
-  remove: []
 }>()
 
 const isSubtask = () => props.depth > 0 || !!(props.task.parent_id && props.task.parent_id > 0)
@@ -140,7 +141,7 @@ function formatMinutes(total: number) {
 
         <!-- Drag Handle -->
         <span
-          class="drag-handle text-muted flex-shrink-0 d-inline-flex align-items-center justify-content-center m-0 p-0"
+          class="drag-handle text-muted flex-shrink-0 d-none d-md-inline-flex align-items-center justify-content-center m-0 p-0"
           style="cursor: grab; opacity: 0.5;"
           title="Drag to reorder"
         >
@@ -150,8 +151,8 @@ function formatMinutes(total: number) {
         <!-- Multi-Select Checkbox -->
         <div
           v-if="canWrite"
-          class="hover-reveal flex-shrink-0 d-inline-flex align-items-center justify-content-center m-0 p-0"
-          :class="{ 'is-visible': selected }"
+          class="hover-reveal flex-shrink-0 align-items-center justify-content-center m-0 p-0"
+          :class="selecting || selected ? 'd-inline-flex is-visible' : 'd-none d-md-inline-flex'"
           title="Select task for bulk actions"
         >
           <input
@@ -218,7 +219,7 @@ function formatMinutes(total: number) {
               @click="emit('toggle-expand')"
             >
               <i class="bi bi-diagram-3 me-1" />{{ childProgress() }}
-              <span class="ms-1 opacity-75">{{ expanded ? 'Hide' : 'Show' }}</span>
+              <span class="ms-1 opacity-75 d-none d-sm-inline">{{ expanded ? 'Hide' : 'Show' }}</span>
             </button>
 
             <!-- Project Badge Pill -->
@@ -339,24 +340,18 @@ function formatMinutes(total: number) {
           >
             <i class="bi bi-pencil" />
           </button>
-
-          <button
-            type="button"
-            class="btn btn-sm btn-icon text-danger hover-danger border-0 p-1"
-            title="Delete task"
-            @click="emit('remove')"
-          >
-            <i class="bi bi-trash" />
-          </button>
         </div>
       </div>
     </div>
 
     <!-- Mobile Action Row (Placed below task on mobile screens) -->
-    <div class="d-md-none mobile-actions-wrapper">
+    <div
+      v-if="task.due_date || isKanbanTask() || priorityLabel(task.priority) || canWrite"
+      class="d-md-none mobile-actions-wrapper"
+    >
       <div class="d-flex align-items-center gap-2 justify-content-between w-100">
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-          <div v-if="task.due_date" class="text-muted small">
+        <div class="d-flex align-items-center gap-2 flex-wrap min-w-0">
+          <div v-if="task.due_date" class="text-muted small text-nowrap">
             <i v-if="density !== 'dense'" class="bi bi-calendar-event me-1" />{{ formatDueDate(task.due_date) }}
           </div>
           <span
@@ -368,7 +363,7 @@ function formatMinutes(total: number) {
           </span>
           <span
             v-if="isKanbanTask() && (task.time_spent_minutes ?? 0) > 0"
-            class="text-muted small"
+            class="text-muted small text-nowrap"
             title="Time logged"
           >
             <i v-if="density !== 'dense'" class="bi bi-clock me-1" />{{ formatMinutes(task.time_spent_minutes ?? 0) }}
@@ -385,20 +380,25 @@ function formatMinutes(total: number) {
             {{ priorityLabel(task.priority) }}
           </span>
         </div>
-        <div v-if="canWrite" class="d-flex align-items-center gap-2">
+        <div v-if="canWrite" class="d-flex align-items-center gap-1 flex-shrink-0">
           <button
             v-if="!isSubtask()"
             type="button"
-            class="btn btn-sm btn-outline-secondary py-0 px-2"
+            class="btn btn-sm btn-outline-secondary oryryn-icon-btn"
+            title="Add subtask"
+            aria-label="Add subtask"
             @click="emit('add-subtask')"
           >
-            <i class="bi bi-node-plus me-1" />Subtask
+            <i class="bi bi-node-plus" />
           </button>
-          <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" @click="emit('edit')">
-            <i class="bi bi-pencil me-1" />Edit
-          </button>
-          <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" @click="emit('remove')">
-            <i class="bi bi-trash me-1" />Delete
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-secondary oryryn-icon-btn"
+            title="Open task details"
+            aria-label="Open task details"
+            @click="emit('edit')"
+          >
+            <i class="bi bi-pencil" />
           </button>
         </div>
       </div>
@@ -447,5 +447,13 @@ function formatMinutes(total: number) {
 }
 .nest-progress-btn:hover {
   background: color-mix(in srgb, var(--ordryn-accent) 22%, transparent);
+}
+.ordryn-icon-btn {
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
 }
 </style>

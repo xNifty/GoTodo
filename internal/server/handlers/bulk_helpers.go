@@ -261,6 +261,9 @@ func bulkAddTag(ctx context.Context, db *pgxpool.Pool, ids []int, userID, tagID 
 	if err != nil || !ok {
 		return fmt.Errorf("invalid tag")
 	}
+	if src.Protected || storage.IsRemovedTagName(src.Name) {
+		return fmt.Errorf("cannot assign a protected tag")
+	}
 	for _, taskID := range ids {
 		existing, err := storage.GetTagsForTask(taskID)
 		if err != nil {
@@ -316,6 +319,9 @@ func bulkRemoveTag(ctx context.Context, db *pgxpool.Pool, ids []int, userID, tag
 	ok, err := storage.UserCanAccessTag(userID, *src)
 	if err != nil || !ok {
 		return fmt.Errorf("invalid tag")
+	}
+	if src.Protected || storage.IsRemovedTagName(src.Name) {
+		return fmt.Errorf("cannot remove a protected tag")
 	}
 	for _, taskID := range ids {
 		if _, err := db.Exec(ctx, `

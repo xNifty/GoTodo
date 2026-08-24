@@ -558,7 +558,7 @@ func resolveImportTagIDs(userID int, projectID *int, tagsCSV string) ([]int, err
 	seen := make(map[int]bool)
 	for _, part := range parts {
 		name := strings.TrimSpace(part)
-		if name == "" {
+		if name == "" || storage.IsRemovedTagName(name) {
 			continue
 		}
 		t, err := storage.GetOrCreateTagByName(userID, projectID, name)

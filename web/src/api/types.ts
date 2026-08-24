@@ -8,7 +8,30 @@ export type User = {
   digest_enabled: boolean
   digest_hour: number
   allow_project_invites: boolean
-        username_change_available: boolean
+  username_change_available: boolean
+  mfa_enabled: boolean
+}
+
+export type MFARequired = {
+  mfa_required: true
+}
+
+export type MFAStatus = {
+  enabled: boolean
+  recovery_codes_remaining: number
+}
+
+export type MFASetup = {
+  secret: string
+  otpauth_url: string
+}
+
+export type MFARecoveryCodes = {
+  recovery_codes: string[]
+}
+
+export function isMFARequired(value: User | MFARequired): value is MFARequired {
+  return 'mfa_required' in value && value.mfa_required === true
 }
 
 export type UserSearchHit = {
@@ -20,6 +43,7 @@ export type Tag = {
   name: string
   color: string
   project_id?: number | null
+  protected?: boolean
 }
 
 export type WorkflowMode = 'classic' | 'kanban'

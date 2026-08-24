@@ -31,12 +31,12 @@ onUnmounted(() => {
                     <div v-if="!isAuthenticated" class="alert alert-info" role="alert">
                         <RouterLink to="/login">Log in</RouterLink>
                         and create an API key on your
-                        <RouterLink :to="{ path: '/settings', hash: '#api-keys-section' }">settings</RouterLink>
+                        <RouterLink :to="{ path: '/settings', hash: '#developer' }">settings</RouterLink>
                         page to start using the API.
                     </div>
                     <div v-else class="alert alert-info" role="alert">
                         Create and manage API keys on your
-                        <RouterLink :to="{ path: '/settings', hash: '#api-keys-section' }">settings</RouterLink>
+                        <RouterLink :to="{ path: '/settings', hash: '#developer' }">settings</RouterLink>
                         page.
                         Machine-readable OpenAPI spec:
                         <a :href="`${basePath}/openapi.yaml`"><code>/openapi.yaml</code></a>.
@@ -74,20 +74,28 @@ onUnmounted(() => {
                         <tbody>
                             <tr><td><span class="badge bg-success">GET</span></td><td><a href="#overview"><code>/api/v1/health</code></a></td><td>Public health probe</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/auth/register</code></a></td><td>Register (session cookie)</td></tr>
-                            <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/auth/login</code></a></td><td>Login (session cookie)</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/auth/login</code></a></td><td>Login (session cookie; may require MFA)</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/auth/mfa/verify</code></a></td><td>Complete MFA login</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/auth/logout</code></a></td><td>Clear session cookie</td></tr>
                             <tr><td><span class="badge bg-success">GET</span></td><td><a href="#session-auth"><code>/api/v1/auth/username-available</code></a></td><td>Check username availability</td></tr>
                             <tr><td><span class="badge bg-success">GET</span></td><td><a href="#session-auth"><code>/api/v1/users/search</code></a></td><td>Search usernames for project invites</td></tr>
                             <tr><td><span class="badge bg-success">GET</span> <span class="badge bg-warning text-dark">PATCH</span></td><td><a href="#session-auth"><code>/api/v1/me</code></a></td><td>Current user / update profile prefs</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/me/username</code></a></td><td>One-time username claim</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/me/password</code></a></td><td>Change password</td></tr>
+                            <tr><td><span class="badge bg-success">GET</span></td><td><a href="#session-auth"><code>/api/v1/me/mfa</code></a></td><td>MFA status</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/me/mfa/setup</code></a></td><td>Start MFA enrollment</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/me/mfa/enable</code></a></td><td>Confirm TOTP and enable MFA</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/me/mfa/disable</code></a></td><td>Disable MFA</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/me/mfa/recovery-codes</code></a></td><td>Replace recovery codes</td></tr>
                             <tr><td><span class="badge bg-success">GET</span> <span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/api-keys</code></a></td><td>List / create API keys</td></tr>
                             <tr><td><span class="badge bg-warning text-dark">PATCH</span> <span class="badge bg-danger">DELETE</span></td><td><a href="#session-auth"><code>/api/v1/api-keys/{id}</code></a></td><td>Rename or revoke an API key</td></tr>
                             <tr><td><span class="badge bg-success">GET</span></td><td><a href="#tasks"><code>/api/v1/tasks</code></a></td><td>List tasks (with filters and pagination)</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#tasks"><code>/api/v1/tasks</code></a></td><td>Create a task</td></tr>
                             <tr><td><span class="badge bg-success">GET</span></td><td><a href="#tasks"><code>/api/v1/tasks/{id}</code></a></td><td>Get one task</td></tr>
                             <tr><td><span class="badge bg-warning text-dark">PATCH</span></td><td><a href="#tasks"><code>/api/v1/tasks/{id}</code></a></td><td>Update a task</td></tr>
-                            <tr><td><span class="badge bg-danger">DELETE</span></td><td><a href="#tasks"><code>/api/v1/tasks/{id}</code></a></td><td>Delete a task (returns undo_token)</td></tr>
+                            <tr><td><span class="badge bg-danger">DELETE</span></td><td><a href="#tasks"><code>/api/v1/tasks/{id}</code></a></td><td>Delete a task (permanent; may return undo_token)</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#tasks"><code>/api/v1/tasks/{id}/archive</code></a></td><td>Archive a task (applies protected removed tag)</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#tasks"><code>/api/v1/tasks/{id}/restore</code></a></td><td>Restore an archived task</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#tasks"><code>/api/v1/tasks/reorder</code></a></td><td>Reorder tasks within a favorite group</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#tasks"><code>/api/v1/tasks/bulk</code></a></td><td>Bulk actions</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#tasks"><code>/api/v1/tasks/undo</code></a></td><td>Restore deleted tasks via undo_token</td></tr>
@@ -135,13 +143,19 @@ onUnmounted(() => {
                         </thead>
                         <tbody>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><code>/api/v1/auth/register</code></td><td>Public (API enabled + Redis)</td><td>Create account with unique <code>user_name</code>; respects invite-only settings; sets session cookie; returns user JSON</td></tr>
-                            <tr><td><span class="badge bg-primary">POST</span></td><td><code>/api/v1/auth/login</code></td><td>Public (API enabled + Redis)</td><td>Email/password login; sets session cookie; returns user JSON</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><code>/api/v1/auth/login</code></td><td>Public (API enabled + Redis)</td><td>Email/password login; if MFA is enabled returns <code>{"mfa_required":true}</code> with a pending cookie instead of a full session</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><code>/api/v1/auth/mfa/verify</code></td><td>Public (pending MFA cookie)</td><td>Submit a TOTP or recovery code to complete login</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><code>/api/v1/auth/logout</code></td><td>API enabled</td><td>Clears session cookie</td></tr>
                             <tr><td><span class="badge bg-success">GET</span></td><td><code>/api/v1/auth/username-available</code></td><td>Public</td><td>Check username format and availability</td></tr>
                             <tr><td><span class="badge bg-success">GET</span></td><td><code>/api/v1/users/search</code></td><td>Session cookie or Bearer</td><td>Username prefix search for project invites (no emails)</td></tr>
                             <tr><td><span class="badge bg-success">GET</span> <span class="badge bg-warning text-dark">PATCH</span></td><td><code>/api/v1/me</code></td><td>Session cookie or Bearer</td><td>Read profile or update prefs (username not editable here)</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><code>/api/v1/me/username</code></td><td>Session cookie or Bearer</td><td>One-time username claim when <code>username_change_available</code></td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><code>/api/v1/me/password</code></td><td>Session cookie or Bearer</td><td>Change password</td></tr>
+                            <tr><td><span class="badge bg-success">GET</span></td><td><code>/api/v1/me/mfa</code></td><td>Session cookie or Bearer</td><td>Whether MFA is enabled and unused recovery codes remaining</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><code>/api/v1/me/mfa/setup</code></td><td>Session cookie or Bearer</td><td>Begin TOTP enrollment; returns secret and otpauth URL</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><code>/api/v1/me/mfa/enable</code></td><td>Session cookie or Bearer</td><td>Confirm a TOTP code; returns five recovery codes once</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><code>/api/v1/me/mfa/disable</code></td><td>Session cookie or Bearer</td><td>Turn MFA off with a TOTP or recovery code</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><code>/api/v1/me/mfa/recovery-codes</code></td><td>Session cookie or Bearer</td><td>Replace recovery codes after proving TOTP or a remaining code</td></tr>
                             <tr><td><span class="badge bg-success">GET</span> <span class="badge bg-primary">POST</span></td><td><code>/api/v1/api-keys</code></td><td>Session cookie or Bearer</td><td>List or create keys</td></tr>
                             <tr><td><span class="badge bg-warning text-dark">PATCH</span> <span class="badge bg-danger">DELETE</span></td><td><code>/api/v1/api-keys/{id}</code></td><td>Session cookie or Bearer</td><td>Rename (label only) or revoke a key</td></tr>
                         </tbody>
@@ -151,10 +165,16 @@ Content-Type: application/json
 
 { "email": "you@example.com", "password": "secret" }
 
-→ 200 { "id", "email", "user_name", "timezone", "items_per_page", "permissions", "username_change_available" }
-   (+ Set-Cookie: session=…)</code></pre>
+→ 200 { "id", "email", "user_name", "timezone", "items_per_page", "permissions", "username_change_available", "mfa_enabled" }
+   (+ Set-Cookie: session=…)
+→ 200 { "mfa_required": true } when MFA is enabled (pending cookie only)
+
+POST {{ basePath }}/api/v1/auth/mfa/verify
+{ "code": "123456" }
+→ 200 user JSON (+ full session cookie)</code></pre>
                     <p class="text-muted small">
                         Password reset is also available via <code>/api/v1/auth/forgot-password</code> and <code>/api/v1/auth/reset-password</code>.
+                        Resetting a password does not disable MFA. Bearer API keys skip the MFA login step.
                     </p>
 
                     <h2 id="device-auth" class="h4 mt-4">Device authorization</h2>
@@ -334,9 +354,19 @@ Content-Type: application/json
 }</code></pre>
                     <p>Returns the updated task object.</p>
 
+                    <h3 class="h5 mt-3">Archive / restore</h3>
+                    <p><span class="badge bg-primary">POST</span> <code>/api/v1/tasks/{id}/archive</code></p>
+                    <p>
+                      Applies the protected <code>removed</code> tag in the task’s namespace (and to subtasks).
+                      Archived tasks are hidden from default lists unless you filter by that tag. Returns the updated task.
+                      Owners and editors only (403 for viewers).
+                    </p>
+                    <p><span class="badge bg-primary">POST</span> <code>/api/v1/tasks/{id}/restore</code></p>
+                    <p>Removes the protected <code>removed</code> tag from the task and its subtasks. Returns the updated task.</p>
+
                     <h3 class="h5 mt-3">Delete task</h3>
                     <p><span class="badge bg-danger">DELETE</span> <code>/api/v1/tasks/{id}</code></p>
-                    <p>Returns JSON with a one-time <code>undo_token</code> (valid ~120 seconds):</p>
+                    <p>Permanently deletes the task. Returns JSON with a short-lived <code>undo_token</code> (valid ~120 seconds) as a safety net:</p>
                     <pre class="api-docs-pre"><code>{ "ok": true, "undo_token": "…", "expires_in": 120 }</code></pre>
 
                     <h3 class="h5 mt-3">Bulk actions</h3>

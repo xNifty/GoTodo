@@ -23,15 +23,7 @@ import { useSidebarState } from '@/composables/useSidebarState'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useLiveUpdates } from '@/composables/useLiveUpdates'
 import { projectOptionLabel } from '@/utils/projectLabel'
-import { uniqueTagsByName } from '@/utils/tags'
-
-defineProps<{
-  mobileSidebarOpen?: boolean
-}>()
-
-const emit = defineEmits<{
-  'close-mobile-sidebar': []
-}>()
+import { uniqueTagsByName, isArchivedTask } from '@/utils/tags'
 
 const route = useRoute()
 const router = useRouter()
@@ -101,6 +93,7 @@ const {
 const undoToken = ref<string | null>(null)
 const kanbanColumnsRev = ref(0)
 const selected = ref<number[]>([])
+const selectMode = ref(false)
 const favoriteListEl = ref<HTMLElement | null>(null)
 const taskListEl = ref<HTMLElement | null>(null)
 const loadMoreSentinel = ref<HTMLElement | null>(null)
@@ -118,6 +111,7 @@ const flatSelectableIds = computed(() => {
 const allSelected = computed(
   () => flatSelectableIds.value.length > 0 && selected.value.length === flatSelectableIds.value.length,
 )
+const isSelecting = computed(() => selectMode.value || selected.value.length > 0)
 const isSearching = computed(() => filters.search !== '')
 const showTaskTable = computed(
   () =>
@@ -665,8 +659,20 @@ watch(
   },
 )
 
+function isRemovedTagFilter(): boolean {
+  const q = (filters.tag || '').trim().toLowerCase()
+  if (q === 'removed') return true
+  const tag = tags.value.find((t) => String(t.id) === filters.tag)
+  return !!tag && (!!tag.protected || tag.name.toLowerCase() === 'removed')
+}
+
 watch(lastSavedTask, async (task) => {
   if (!task) return
+  lastSavedTask.value = null
+  if (isArchivedTask(task) !== isRemovedTagFilter()) {
+    await reloadInitial()
+    return
+  }
   if (task.parent_id) expandParent(task.parent_id)
   const exists = !!findTaskInTree(task.id)
   if (exists) {
@@ -674,7 +680,6 @@ watch(lastSavedTask, async (task) => {
   } else {
     registerTaskAdded(task)
   }
-  lastSavedTask.value = null
   await nextTick()
   refreshSortable()
 })
@@ -740,7 +745,7 @@ async function removeTask(task: Task) {
   }
   const ok = await askConfirm({
     title: 'Delete task?',
-    message: `Delete “${task.title}”?`,
+    message: `Permanently delete “${task.title}”? This cannot be undone.`,
     confirmLabel: 'Delete',
     danger: true,
   })
@@ -827,6 +832,11 @@ function toggleSelect(id: number, checked: boolean) {
   } else {
     selected.value = selected.value.filter((x) => x !== id)
   }
+}
+
+function toggleSelectMode() {
+  selectMode.value = !selectMode.value
+  if (!selectMode.value) selected.value = []
 }
 
 function toggleSelectAll(checked: boolean) {
@@ -1126,13 +1136,11 @@ onUnmounted(() => {
     <!-- Collapsible & Responsive Warm Sidebar -->
     <ModernSidebar
       :collapsed="sidebarCollapsed"
-      :mobile-open="mobileSidebarOpen || false"
       :projects="projects"
       :saved-views="savedViews"
       :active-project="filters.project"
       :active-view="activeViewId || undefined"
       @toggle-collapse="toggleSidebar"
-      @close-mobile="emit('close-mobile-sidebar')"
       @select-home="selectHome"
       @select-project="selectProjectFilter"
       @select-view="selectSavedViewFilter"
@@ -1143,36 +1151,48 @@ onUnmounted(() => {
     />
 
     <!-- Main Content Area -->
-    <div class="flex-grow-1 p-3 p-md-4 overflow-hidden d-flex flex-column justify-content-between">
+    <div class="ordryn-main-pane flex-grow-1 p-2 p-sm-3 p-md-4 overflow-auto d-flex flex-column justify-content-between">
       <div>
         <!-- Single Compact Header Toolbar: Stats Pills, Import/Export, Add Task -->
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
           <!-- Compact Inline Task Counts -->
-          <div class="d-flex align-items-center gap-1.5 text-muted small">
-            <span class="badge rounded-pill bg-primary bg-opacity-10 text-primary border border-primary border-opacity-20 px-2.5 py-1">
-              Tasks: {{ total }}
+          <div class="d-flex align-items-center gap-1 flex-wrap text-muted small oryryn-task-stats">
+            <span class="badge rounded-pill bg-primary bg-opacity-10 text-primary border border-primary border-opacity-20 px-2 py-1">
+              {{ total }} <span class="d-none d-sm-inline">tasks</span>
             </span>
-            <span class="badge rounded-pill bg-success bg-opacity-10 text-success border border-success border-opacity-20 px-2.5 py-1">
-              Completed: {{ completedCount }}
+            <span class="badge rounded-pill bg-success bg-opacity-10 text-success border border-success border-opacity-20 px-2 py-1">
+              {{ completedCount }} <span class="d-none d-sm-inline">done</span>
             </span>
-            <span class="badge rounded-pill bg-warning bg-opacity-10 text-warning border border-warning border-opacity-20 px-2.5 py-1">
-              Incomplete: {{ incompleteCount }}
+            <span class="badge rounded-pill bg-warning bg-opacity-10 text-warning border border-warning border-opacity-20 px-2 py-1">
+              {{ incompleteCount }} <span class="d-none d-sm-inline">open</span>
             </span>
-            <span v-if="isViewerProjectView" class="badge rounded-pill bg-info bg-opacity-10 text-info border border-info border-opacity-20 px-2.5 py-1">
-              Viewer (Read Only)
+            <span v-if="isViewerProjectView" class="badge rounded-pill bg-info bg-opacity-10 text-info border border-info border-opacity-20 px-2 py-1">
+              Viewer
             </span>
           </div>
 
           <!-- Actions Group: Import/Export & Add Task -->
           <div class="d-flex align-items-center gap-2">
+            <button
+              v-if="!isViewerProjectView && showTaskTable"
+              type="button"
+              class="btn btn-sm btn-outline-secondary rounded-pill px-2 py-1 d-md-none"
+              :class="{ active: isSelecting }"
+              :aria-pressed="isSelecting"
+              title="Select tasks"
+              @click="toggleSelectMode"
+            >
+              <i class="bi bi-check2-square" />
+            </button>
             <!-- Import/Export Dropdown -->
             <div class="dropdown">
               <button
-                class="btn btn-sm btn-outline-secondary dropdown-toggle rounded-pill px-3 py-1"
+                class="btn btn-sm btn-outline-secondary dropdown-toggle rounded-pill px-2 px-sm-3 py-1"
                 type="button"
                 data-bs-toggle="dropdown"
               >
-                <i class="bi bi-arrow-down-up me-1" /> Import / Export
+                <i class="bi bi-arrow-down-up" />
+                <span class="d-none d-sm-inline ms-1">Import / Export</span>
               </button>
               <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
                 <li>
@@ -1181,7 +1201,7 @@ onUnmounted(() => {
                   </RouterLink>
                 </li>
                 <li>
-                  <RouterLink class="dropdown-item small" to="/settings#calendar-feed">
+                  <RouterLink class="dropdown-item small" to="/settings#integrations">
                     <i class="bi bi-calendar3 me-2" />Calendar Sync (ICS)
                   </RouterLink>
                 </li>
@@ -1203,7 +1223,7 @@ onUnmounted(() => {
             <button
               v-if="!isViewerProjectView"
               type="button"
-              class="btn btn-sm btn-success rounded-pill px-3 py-1 shadow-xs d-flex align-items-center gap-1"
+              class="btn btn-sm btn-success rounded-pill px-3 py-1 shadow-xs d-none d-md-flex align-items-center gap-1"
               @click="openAdd(undefined, filters.project)"
             >
               <i class="bi bi-plus-lg" />
@@ -1399,7 +1419,11 @@ onUnmounted(() => {
             <!-- Merged Header Row: Select All Checkbox + Starred Tasks Label -->
             <div class="d-flex align-items-center justify-content-between mb-2 px-1">
               <div class="d-flex align-items-center gap-3">
-                <div v-if="!isViewerProjectView" class="form-check d-flex align-items-center m-0 p-0">
+                <div
+                  v-if="!isViewerProjectView"
+                  class="form-check align-items-center m-0 p-0"
+                  :class="isSelecting ? 'd-flex' : 'd-none d-md-flex'"
+                >
                   <input
                     id="select-all-tasks"
                     type="checkbox"
@@ -1438,6 +1462,7 @@ onUnmounted(() => {
                   <ModernTaskCard
                     :task="task"
                     :selected="selected.includes(task.id)"
+                    :selecting="isSelecting"
                     :focused="focusedTaskId === task.id"
                     :density="density"
                     :show-project-pill="!filters.project"
@@ -1450,7 +1475,6 @@ onUnmounted(() => {
                     @patch-task="handleInlineTaskPatch"
                     @add-subtask="openAddSubtask(task)"
                     @edit="openTaskDetails(task.id)"
-                    @remove="removeTask(task)"
                   />
                   <div
                     v-if="task.children?.length && isParentExpanded(task.id)"
@@ -1463,6 +1487,7 @@ onUnmounted(() => {
                       :task="child"
                       :depth="1"
                       :selected="selected.includes(child.id)"
+                      :selecting="isSelecting"
                       :focused="focusedTaskId === child.id"
                       :density="density"
                       :show-project-pill="false"
@@ -1471,7 +1496,6 @@ onUnmounted(() => {
                       @toggle-complete="toggleCompleteChild(child)"
                       @patch-task="handleInlineTaskPatch"
                       @edit="openTaskDetails(child.id)"
-                      @remove="removeTask(child)"
                     />
                   </div>
                 </div>
@@ -1489,6 +1513,7 @@ onUnmounted(() => {
                 <ModernTaskCard
                   :task="task"
                   :selected="selected.includes(task.id)"
+                  :selecting="isSelecting"
                   :focused="focusedTaskId === task.id"
                   :density="density"
                   :show-project-pill="!filters.project"
@@ -1501,7 +1526,6 @@ onUnmounted(() => {
                   @patch-task="handleInlineTaskPatch"
                   @add-subtask="openAddSubtask(task)"
                   @edit="openTaskDetails(task.id)"
-                  @remove="removeTask(task)"
                 />
                 <div
                   v-if="task.children?.length && isParentExpanded(task.id)"
@@ -1514,6 +1538,7 @@ onUnmounted(() => {
                     :task="child"
                     :depth="1"
                     :selected="selected.includes(child.id)"
+                    :selecting="isSelecting"
                     :focused="focusedTaskId === child.id"
                     :density="density"
                     :show-project-pill="false"
@@ -1522,7 +1547,6 @@ onUnmounted(() => {
                     @toggle-complete="toggleCompleteChild(child)"
                     @patch-task="handleInlineTaskPatch"
                     @edit="openTaskDetails(child.id)"
-                    @remove="removeTask(child)"
                   />
                 </div>
               </div>
@@ -1681,6 +1705,16 @@ onUnmounted(() => {
 
       <!-- Clean Reusable Footer inside right content area -->
       <AppFooter />
+
+      <button
+        v-if="!isViewerProjectView"
+        type="button"
+        class="ordryn-mobile-fab d-md-none"
+        aria-label="Add task"
+        @click="openAdd(undefined, filters.project)"
+      >
+        <i class="bi bi-plus-lg" />
+      </button>
     </div>
   </div>
 </template>

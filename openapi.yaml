@@ -168,6 +168,33 @@ paths:
               $ref: "#/components/schemas/LoginRequest"
       responses:
         "200":
+          description: Authenticated with a session cookie, or MFA challenge (pending cookie only)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/User"
+                  - $ref: "#/components/schemas/MFARequired"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/v1/auth/mfa/verify:
+    post:
+      tags: [Auth]
+      summary: Complete MFA login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MFACodeRequest"
+      responses:
+        "200":
           description: Authenticated; Set-Cookie session
           content:
             application/json:
@@ -559,6 +586,125 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/me/mfa:
+    get:
+      tags: [Profile]
+      summary: MFA status
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Whether MFA is enabled and unused recovery codes remaining
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MFAStatus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/me/mfa/setup:
+    post:
+      tags: [Profile]
+      summary: Start MFA enrollment
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: TOTP secret and otpauth URL (secret stashed on the session)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MFASetup"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/APIError"
+
+  /api/v1/me/mfa/enable:
+    post:
+      tags: [Profile]
+      summary: Confirm TOTP and enable MFA
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MFACodeRequest"
+      responses:
+        "200":
+          description: MFA enabled; recovery codes shown once
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MFARecoveryCodes"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/APIError"
+
+  /api/v1/me/mfa/disable:
+    post:
+      tags: [Profile]
+      summary: Disable MFA
+      description: Requires a current TOTP code or an unused recovery code.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MFACodeRequest"
+      responses:
+        "200":
+          description: MFA disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OK"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/APIError"
+
+  /api/v1/me/mfa/recovery-codes:
+    post:
+      tags: [Profile]
+      summary: Replace recovery codes
+      description: Requires a current TOTP code or an unused recovery code. New codes are shown once.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MFACodeRequest"
+      responses:
+        "200":
+          description: New recovery codes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MFARecoveryCodes"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/APIError"
 
   /api/v1/users/search:
     get:
@@ -2800,6 +2946,52 @@ components:
         username_change_available:
           type: boolean
           description: When true, the user may call POST /api/v1/me/username once
+        mfa_enabled:
+          type: boolean
+          description: When true, password login requires a TOTP or recovery code
+
+    MFARequired:
+      type: object
+      required: [mfa_required]
+      properties:
+        mfa_required:
+          type: boolean
+          enum: [true]
+
+    MFAStatus:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        recovery_codes_remaining:
+          type: integer
+
+    MFASetup:
+      type: object
+      properties:
+        secret:
+          type: string
+        otpauth_url:
+          type: string
+          format: uri
+
+    MFACodeRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          description: 6-digit TOTP or a recovery code (XXXXX-XXXXX)
+
+    MFARecoveryCodes:
+      type: object
+      properties:
+        recovery_codes:
+          type: array
+          minItems: 5
+          maxItems: 5
+          items:
+            type: string
 
     UserSearchHit:
       type: object
