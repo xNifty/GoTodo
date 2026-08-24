@@ -11,6 +11,37 @@ import (
 )
 
 type apiUserContextKey struct{}
+type apiAuthKindKey struct{}
+
+const (
+	// AuthKindSession is a first-party SPA session cookie.
+	AuthKindSession = "session"
+	// AuthKindAPIKey is an external Bearer API key.
+	AuthKindAPIKey = "apikey"
+
+	// External API token-bucket (per user, read and write are independent).
+	APIReadCapacity  = 120
+	APIReadRefill    = 2.0
+	APIWriteCapacity = 60
+	APIWriteRefill   = 1.0
+	APITTLSeconds    = 120
+
+	// SPA session token-bucket: same shape, higher ceilings so the UI can
+	// move cards and edit boards without sharing the external API budget.
+	SPAReadCapacity  = 600
+	SPAReadRefill    = 10.0
+	SPAWriteCapacity = 240
+	SPAWriteRefill   = 4.0
+	SPATTLSeconds    = 300
+)
+
+// RateLimitSpec is the Redis token-bucket configuration for one request.
+type RateLimitSpec struct {
+	Key      string
+	Capacity int
+	Refill   float64
+	TTL      int
+}
 
 // APIJSONError writes a consistent JSON error response.
 func APIJSONError(w http.ResponseWriter, status int, code, message string) {
@@ -40,6 +71,21 @@ func RedisAvailable() bool {
 func SetAPIUserID(r *http.Request, userID int) *http.Request {
 	ctx := context.WithValue(r.Context(), apiUserContextKey{}, userID)
 	return r.WithContext(ctx)
+}
+
+// SetAPIAuthKind records how the request was authenticated (session vs API key).
+func SetAPIAuthKind(r *http.Request, kind string) *http.Request {
+	ctx := context.WithValue(r.Context(), apiAuthKindKey{}, kind)
+	return r.WithContext(ctx)
+}
+
+// GetAPIAuthKind returns the auth kind, defaulting to API key when unknown.
+func GetAPIAuthKind(r *http.Request) string {
+	v := r.Context().Value(apiAuthKindKey{})
+	if kind, ok := v.(string); ok && kind != "" {
+		return kind
+	}
+	return AuthKindAPIKey
 }
 
 // GetAPIUserID returns the authenticated API user from context.
@@ -113,53 +159,74 @@ func RequireAPIKey(next http.HandlerFunc) http.HandlerFunc {
 				"Invalid or revoked API key.")
 			return
 		}
-		*r = *SetAPIUserID(r, userID)
+		*r = *SetAPIAuthKind(SetAPIUserID(r, userID), AuthKindAPIKey)
 		next(w, r)
 	}
 }
 
-// APIRateLimitMiddleware enforces per-user token bucket limits for the REST API.
-// Fails closed when Redis is unavailable.
-func APIRateLimitMiddleware(readCapacity int, readRefill float64, writeCapacity int, writeRefill float64, ttlSeconds int) func(http.HandlerFunc) http.HandlerFunc {
-	return func(next http.HandlerFunc) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
-			userID, ok := GetAPIUserID(r)
-			if !ok {
-				APIJSONError(w, http.StatusUnauthorized, "unauthorized", "Not authenticated.")
-				return
+// RateLimitSpecFor returns independent read/write buckets for SPA sessions vs API keys.
+func RateLimitSpecFor(userID int, kind string, method string) RateLimitSpec {
+	write := isWriteMethod(method)
+	id := strconv.Itoa(userID)
+	if kind == AuthKindSession {
+		if write {
+			return RateLimitSpec{
+				Key: "rl:tb:spa:write:user:" + id, Capacity: SPAWriteCapacity,
+				Refill: SPAWriteRefill, TTL: SPATTLSeconds,
 			}
-			if RedisClient == nil {
-				APIJSONError(w, http.StatusServiceUnavailable, "api_unavailable",
-					"The REST API requires Redis for rate limiting.")
-				return
-			}
-
-			capacity := readCapacity
-			refill := readRefill
-			if isWriteMethod(r.Method) {
-				capacity = writeCapacity
-				refill = writeRefill
-			}
-
-			key := "rl:tb:api:user:" + strconv.Itoa(userID)
-			allowed, err := AllowRequest(r.Context(), RedisClient, key, capacity, refill, 1, ttlSeconds)
-			if err != nil {
-				APIJSONError(w, http.StatusServiceUnavailable, "api_unavailable",
-					"Rate limiting is temporarily unavailable.")
-				return
-			}
-			if !allowed {
-				retryAfter := int(float64(capacity) / refill)
-				if retryAfter < 1 {
-					retryAfter = 1
-				}
-				w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
-				APIJSONError(w, http.StatusTooManyRequests, "rate_limit_exceeded",
-					"API rate limit exceeded. Try again later.")
-				return
-			}
-			next(w, r)
 		}
+		return RateLimitSpec{
+			Key: "rl:tb:spa:read:user:" + id, Capacity: SPAReadCapacity,
+			Refill: SPAReadRefill, TTL: SPATTLSeconds,
+		}
+	}
+	if write {
+		return RateLimitSpec{
+			Key: "rl:tb:api:write:user:" + id, Capacity: APIWriteCapacity,
+			Refill: APIWriteRefill, TTL: APITTLSeconds,
+		}
+	}
+	return RateLimitSpec{
+		Key: "rl:tb:api:read:user:" + id, Capacity: APIReadCapacity,
+		Refill: APIReadRefill, TTL: APITTLSeconds,
+	}
+}
+
+// APIRateLimitMiddleware enforces per-user token bucket limits.
+// Session (SPA) traffic uses a higher independent budget than Bearer API keys.
+// Read and write methods use separate Redis keys so writes cannot starve reads.
+// Fails closed when Redis is unavailable.
+func APIRateLimitMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := GetAPIUserID(r)
+		if !ok {
+			APIJSONError(w, http.StatusUnauthorized, "unauthorized", "Not authenticated.")
+			return
+		}
+		if RedisClient == nil {
+			APIJSONError(w, http.StatusServiceUnavailable, "api_unavailable",
+				"The REST API requires Redis for rate limiting.")
+			return
+		}
+
+		spec := RateLimitSpecFor(userID, GetAPIAuthKind(r), r.Method)
+		allowed, err := AllowRequest(r.Context(), RedisClient, spec.Key, spec.Capacity, spec.Refill, 1, spec.TTL)
+		if err != nil {
+			APIJSONError(w, http.StatusServiceUnavailable, "api_unavailable",
+				"Rate limiting is temporarily unavailable.")
+			return
+		}
+		if !allowed {
+			retryAfter := RetryAfterSeconds(spec.Capacity, spec.Refill)
+			w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
+			msg := "API rate limit exceeded. Try again later."
+			if GetAPIAuthKind(r) == AuthKindSession {
+				msg = "Too many requests. Please wait a moment and try again."
+			}
+			APIJSONError(w, http.StatusTooManyRequests, "rate_limit_exceeded", msg)
+			return
+		}
+		next(w, r)
 	}
 }
 
@@ -177,7 +244,7 @@ func isWriteMethod(method string) bool {
 func APIChain(handler http.HandlerFunc) http.HandlerFunc {
 	return RequireAPIRedis(
 		RequireSessionOrAPIKey(
-			APIRateLimitMiddleware(120, 2.0, 60, 1.0, 120)(handler),
+			APIRateLimitMiddleware(handler),
 		),
 	)
 }
@@ -210,9 +277,9 @@ func AuthMeChain(handler http.HandlerFunc) http.HandlerFunc {
 						"Invalid or revoked API key.")
 					return
 				}
-				*r = *SetAPIUserID(r, userID)
+				*r = *SetAPIAuthKind(SetAPIUserID(r, userID), AuthKindAPIKey)
 			} else if uid := GetSessionUserID(r); uid != nil {
-				*r = *SetAPIUserID(r, *uid)
+				*r = *SetAPIAuthKind(SetAPIUserID(r, *uid), AuthKindSession)
 			}
 			handler(w, r)
 			return
@@ -240,13 +307,13 @@ func RequireSessionOrAPIKey(next http.HandlerFunc) http.HandlerFunc {
 					"Invalid or revoked API key.")
 				return
 			}
-			*r = *SetAPIUserID(r, userID)
+			*r = *SetAPIAuthKind(SetAPIUserID(r, userID), AuthKindAPIKey)
 			next(w, r)
 			return
 		}
 
 		if uid := GetSessionUserID(r); uid != nil {
-			*r = *SetAPIUserID(r, *uid)
+			*r = *SetAPIAuthKind(SetAPIUserID(r, *uid), AuthKindSession)
 			next(w, r)
 			return
 		}

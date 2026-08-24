@@ -7,6 +7,11 @@ info:
     rate limiting, and live SSE fan-out.
 
     Auth: session cookie (SPA login/register) or `Authorization: Bearer <api_key>`.
+
+    Rate limits (per user, Redis token bucket). Reads and writes are independent.
+    Bearer API keys: 120 GET/min (~2/sec) and 60 writes/min (~1/sec).
+    SPA session cookies use a higher budget (600 GET/min, 240 writes/min) so the
+    web UI is not gated by the external API ceiling.
   version: 1.0.0
   license:
     name: See LICENSE in repository

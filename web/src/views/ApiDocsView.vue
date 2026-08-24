@@ -131,6 +131,7 @@ onUnmounted(() => {
                         Browser / SPA clients can register and log in with JSON and receive an httpOnly session cookie
                         (same cookie store as the legacy web UI). Resource routes under <code>/api/v1</code> accept either
                         that cookie or a Bearer API key (Redis required for rate limiting / key lookup).
+                        Session traffic uses a higher rate-limit budget than Bearer keys; see <a href="#rate-limits">Rate limits</a>.
                     </p>
                     <table class="table table-sm api-docs-table">
                         <thead>
@@ -254,14 +255,22 @@ Content-Type: application/json
 
                     <h2 id="rate-limits" class="h4 mt-4">Rate limits</h2>
                     <p>
-                        Limits apply per user (per API key owner) using a token bucket stored in Redis:
+                        Limits apply per user using independent token buckets in Redis
+                        (reads and writes do not share a budget):
                     </p>
+                    <p class="fw-semibold mb-1">External API (Bearer API key)</p>
                     <ul>
                         <li><strong>Read</strong> requests (<code>GET</code>): 120 requests per minute (refill ~2/sec)</li>
-                        <li><strong>Write</strong> requests (<code>POST</code>, <code>PATCH</code>, <code>DELETE</code>): 60 requests per minute (refill ~1/sec)</li>
+                        <li><strong>Write</strong> requests (<code>POST</code>, <code>PUT</code>, <code>PATCH</code>, <code>DELETE</code>): 60 requests per minute (refill ~1/sec)</li>
+                    </ul>
+                    <p class="fw-semibold mb-1">Web app (session cookie)</p>
+                    <ul>
+                        <li><strong>Read</strong> requests (<code>GET</code>): 600 requests per minute (refill ~10/sec)</li>
+                        <li><strong>Write</strong> requests: 240 requests per minute (refill ~4/sec)</li>
                     </ul>
                     <p class="text-muted small mb-0">
                         When limited, the response is <code>429</code> with a <code>Retry-After</code> header (seconds until you can retry).
+                        Session limits are higher so the UI can move cards and edit boards without competing with machine API clients.
                     </p>
 
                     <h2 id="tasks" class="h4 mt-4">Tasks</h2>
