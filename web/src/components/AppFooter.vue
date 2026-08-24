@@ -5,7 +5,7 @@
   <footer
     class="text-center py-3 app-footer mt-auto border-top border-opacity-10 w-100"
   >
-    <p class="text-muted small mb-0">
+    <p class="text-muted small mb-0 d-flex flex-wrap justify-content-center gap-1 column-gap-2">
       Made with <i class="bi bi-heart-fill text-danger" /> by <a
         href="https://sentienttd.studio"
         target="_blank"

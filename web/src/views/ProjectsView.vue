@@ -91,15 +91,16 @@
                     </td>
                     <td data-label="Role"><span class="badge text-bg-secondary">owner</span></td>
                     <td data-label="Actions">
+                      <div class="d-flex flex-wrap gap-1">
                       <button
-                        class="btn btn-sm btn-outline-primary me-1"
+                        class="btn btn-sm btn-outline-primary"
                         type="button"
                         @click="toggleSharePanel(p.id)"
                       >
                         Share
                       </button>
                       <button
-                        class="btn btn-sm btn-outline-secondary me-1"
+                        class="btn btn-sm btn-outline-secondary"
                         type="button"
                         @click="toggleBoardPanel(p.id)"
                       >
@@ -113,6 +114,7 @@
                       >
                         <i class="bi bi-trash" />
                       </button>
+                      </div>
                     </td>
                   </tr>
                   <tr v-if="!ownedProjects.length">

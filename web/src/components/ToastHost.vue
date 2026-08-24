@@ -11,7 +11,7 @@ function alertClass(tone: string) {
 </script>
 
 <template>
-  <div class="position-fixed top-0 end-0 p-3" style="z-index: 1080" aria-live="polite">
+  <div class="position-fixed top-0 end-0 p-3 toast-host" style="z-index: 1080" aria-live="polite">
     <div
       v-for="t in toasts"
       :key="t.id"

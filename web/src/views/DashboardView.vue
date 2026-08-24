@@ -11,14 +11,6 @@ import { useSidebarState } from '@/composables/useSidebarState'
 import { useTaskSidebar } from '@/composables/useTaskSidebar'
 import { useLiveUpdates } from '@/composables/useLiveUpdates'
 
-defineProps<{
-  mobileSidebarOpen?: boolean
-}>()
-
-const emit = defineEmits<{
-  'close-mobile-sidebar': []
-}>()
-
 const router = useRouter()
 const stats = ref<DashboardStats | null>(null)
 const projects = ref<Project[]>([])
@@ -152,11 +144,9 @@ useLiveUpdates((event) => {
   <div class="ordryn-main-layout">
     <ModernSidebar
       :collapsed="sidebarCollapsed"
-      :mobile-open="mobileSidebarOpen || false"
       :projects="projects"
       :saved-views="savedViews"
       @toggle-collapse="toggleSidebar"
-      @close-mobile="emit('close-mobile-sidebar')"
       @select-home="selectHome"
       @select-project="selectProject"
       @select-view="selectView"
