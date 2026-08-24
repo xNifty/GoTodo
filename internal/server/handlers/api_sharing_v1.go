@@ -142,6 +142,9 @@ func handleProjectSubResource(w http.ResponseWriter, r *http.Request, sub string
 	case "statuses":
 		handleProjectStatusesResource(w, r, projectID, parts[2:])
 		return true
+	case "sprints":
+		handleProjectSprintsResource(w, r, projectID, parts[2:])
+		return true
 	case "github":
 		if len(parts) == 2 {
 			apiV1ProjectGitHub(w, r, projectID)
@@ -366,6 +369,21 @@ func formatProjectEventLabel(eventType string, metadata map[string]interface{}) 
 			return "Status deleted · " + name
 		}
 		return "Status deleted"
+	case "sprint_added":
+		if name != "" {
+			return "Sprint added · " + name
+		}
+		return "Sprint added"
+	case "sprint_updated":
+		if name != "" {
+			return "Sprint updated · " + name
+		}
+		return "Sprint updated"
+	case "sprint_deleted":
+		if name != "" {
+			return "Sprint deleted · " + name
+		}
+		return "Sprint deleted"
 	case "workflow_changed":
 		if mode != "" {
 			return "Workflow set to " + mode

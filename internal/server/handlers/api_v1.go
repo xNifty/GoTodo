@@ -47,6 +47,8 @@ type apiTaskJSON struct {
 	ProjectWorkflow   string             `json:"project_workflow,omitempty"`
 	ClaimedBy         *int               `json:"claimed_by,omitempty"`
 	ClaimedByName     string             `json:"claimed_by_name,omitempty"`
+	SprintID          *int               `json:"sprint_id,omitempty"`
+	SprintName        string             `json:"sprint_name,omitempty"`
 	GitHub            *apiTaskGitHubJSON `json:"github,omitempty"`
 }
 
@@ -72,6 +74,7 @@ type apiTaskCreateRequest struct {
 	TagIDs         []int  `json:"tag_ids"`
 	StatusID       *int   `json:"status_id"`
 	EstimatePoints *int   `json:"estimate_points"`
+	SprintID       *int   `json:"sprint_id"`
 }
 
 type apiTaskPatchRequest struct {
@@ -87,6 +90,7 @@ type apiTaskPatchRequest struct {
 	ClearDue       *bool        `json:"clear_due_date"`
 	StatusID       **int        `json:"status_id"`
 	EstimatePoints *optionalInt `json:"estimate_points"`
+	SprintID       *optionalInt `json:"sprint_id"`
 }
 
 // optionalInt distinguishes omitted / null / value for JSON patch fields.
@@ -212,6 +216,7 @@ func taskToAPIJSON(t tasks.Task) apiTaskJSON {
 		TimeSpentMinutes:  t.TimeSpentMinutes,
 		ProjectWorkflow:   t.ProjectWorkflow,
 		ClaimedByName:     t.ClaimedByName,
+		SprintName:        t.SprintName,
 	}
 	if t.ParentID > 0 {
 		pid := t.ParentID
@@ -231,6 +236,10 @@ func taskToAPIJSON(t tasks.Task) apiTaskJSON {
 	if t.ClaimedBy > 0 {
 		cid := t.ClaimedBy
 		out.ClaimedBy = &cid
+	}
+	if t.SprintID > 0 {
+		sid := t.SprintID
+		out.SprintID = &sid
 	}
 	if t.GitHubIssueNumber > 0 || t.GitHubIssueURL != "" {
 		out.GitHub = &apiTaskGitHubJSON{
@@ -467,6 +476,7 @@ func apiV1CreateTask(w http.ResponseWriter, r *http.Request) {
 		TagIDs:         req.TagIDs,
 		StatusID:       req.StatusID,
 		EstimatePoints: req.EstimatePoints,
+		SprintID:       req.SprintID,
 	}
 	newID, err := domain.CreateTask(r.Context(), userID, in)
 	if err != nil {
@@ -528,6 +538,16 @@ func apiV1PatchTask(w http.ResponseWriter, r *http.Request, taskID int) {
 			v := req.EstimatePoints.Value
 			ptr := &v
 			in.EstimatePoints = &ptr
+		}
+	}
+	if req.SprintID != nil && req.SprintID.Set {
+		if req.SprintID.Null {
+			var clear *int
+			in.SprintID = &clear
+		} else {
+			v := req.SprintID.Value
+			ptr := &v
+			in.SprintID = &ptr
 		}
 	}
 

@@ -6,6 +6,7 @@ import { APIError } from '@/api/types'
 import { useToast } from '@/composables/useToast'
 import ProjectSharePanel from '@/components/ProjectSharePanel.vue'
 import ProjectWorkflowPanel from '@/components/ProjectWorkflowPanel.vue'
+import ProjectSprintsPanel from '@/components/ProjectSprintsPanel.vue'
 import ProjectGitHubPanel from '@/components/ProjectGitHubPanel.vue'
 import ProjectTagsPanel from '@/components/ProjectTagsPanel.vue'
 
@@ -130,6 +131,14 @@ function onPanelChanged() {
           <div class="mb-4">
             <ProjectWorkflowPanel :project="project" @changed="onPanelChanged" />
           </div>
+
+          <template v-if="(project.workflow_mode || 'classic') === 'kanban'">
+            <hr class="my-3 opacity-25" />
+
+            <div class="mb-4">
+              <ProjectSprintsPanel :project="project" @changed="onPanelChanged" />
+            </div>
+          </template>
 
           <hr class="my-3 opacity-25" />
 

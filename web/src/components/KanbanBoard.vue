@@ -141,6 +141,15 @@
                   </span>
 
                   <span
+                    v-if="task.sprint_name"
+                    class="ordryn-badge text-nowrap"
+                    style="background: var(--ordryn-muted-bg); color: var(--ordryn-muted);"
+                    title="Sprint"
+                  >
+                    <i class="bi bi-flag me-1" />{{ task.sprint_name }}
+                  </span>
+
+                  <span
                     v-if="task.estimate_points != null"
                     class="ordryn-badge text-nowrap"
                     style="background: var(--ordryn-muted-bg); color: var(--ordryn-muted);"

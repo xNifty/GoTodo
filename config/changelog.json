@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.4.0",
+    "date": "2026-08-24",
+    "title": "Kanban sprints",
+    "notes": [
+      "Kanban projects can define named sprints with start and end dates in project settings",
+      "Assign a task to a sprint (or leave it in the backlog) from the task sidebar",
+      "The board has a sprint switcher so you can move between the active sprint, other sprints, and the backlog"
+    ]
+  },
+  {
     "version": "2.3.0",
     "date": "2026-08-22",
     "title": "Optional two-factor authentication",

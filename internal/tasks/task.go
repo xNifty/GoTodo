@@ -40,6 +40,8 @@ type Task struct {
 	ProjectWorkflow     string
 	ClaimedBy           int
 	ClaimedByName       string
+	SprintID            int
+	SprintName          string
 	GitHubIssueNumber   int
 	GitHubIssueID       int64
 	GitHubIssueURL      string

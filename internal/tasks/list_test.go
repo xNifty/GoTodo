@@ -85,6 +85,14 @@ func TestMain(m *testing.M) {
 			protected BOOLEAN NOT NULL DEFAULT false,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		);
+		CREATE TABLE project_sprints (
+			id SERIAL PRIMARY KEY,
+			project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+			name TEXT NOT NULL,
+			start_date DATE NOT NULL,
+			end_date DATE NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
 		CREATE TABLE tasks (
 			id SERIAL PRIMARY KEY,
 			title TEXT NOT NULL,
@@ -101,7 +109,8 @@ func TestMain(m *testing.M) {
 			due_date DATE,
 			status_id INTEGER,
 			estimate_points INTEGER,
-			claimed_by INTEGER
+			claimed_by INTEGER,
+			sprint_id INTEGER
 		);
 		CREATE TABLE task_tags (
 			task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,

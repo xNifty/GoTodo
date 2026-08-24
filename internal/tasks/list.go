@@ -226,6 +226,7 @@ func appendFilterSQL(where string, args []interface{}, filters ListFilters, time
 	where, args = appendDueDateCondition(where, args, filters.DueFilter, timezone, tablePrefix)
 	where, args = appendCompletedWeekCondition(where, args, filters.CompletedFilter, timezone, tablePrefix)
 	where += filters.priorityCondition(tablePrefix)
+	where += filters.sprintCondition(tablePrefix)
 	where, args = appendTagCondition(where, args, filters, userID, tablePrefix)
 	where = appendArchivedExclusion(where, filters, tablePrefix)
 	if strings.ToLower(strings.TrimSpace(filters.WorkflowClaimScope)) == "mine" {
@@ -379,6 +380,8 @@ func attachWorkflowFieldsToTasks(taskList []Task) error {
 			t.ProjectWorkflow = f.ProjectWorkflow
 			t.ClaimedBy = f.ClaimedBy
 			t.ClaimedByName = f.ClaimedByName
+			t.SprintID = f.SprintID
+			t.SprintName = f.SprintName
 		}
 	}
 	for i := range taskList {
