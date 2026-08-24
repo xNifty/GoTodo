@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 
@@ -181,7 +180,7 @@ func APIV1AdminJoinRequestsRouter(w http.ResponseWriter, r *http.Request) {
 			writeJoinRequestReviewError(w, err)
 			return
 		}
-		emailJoinApproval(r, jr.Email, inv.Token)
+		emailSiteInvite(r, jr.Email, inv.Token)
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"ok":      true,
@@ -220,23 +219,3 @@ func writeJoinRequestReviewError(w http.ResponseWriter, err error) {
 	}
 }
 
-func emailJoinApproval(r *http.Request, email, token string) {
-	siteName := "GoTodo"
-	if settings, err := storage.GetSiteSettings(); err == nil && settings != nil && strings.TrimSpace(settings.SiteName) != "" {
-		siteName = settings.SiteName
-	}
-	q := url.Values{}
-	q.Set("email", email)
-	q.Set("invite", token)
-	registerURL := utils.AbsoluteURLForRequest(r, "/register?"+q.Encode())
-	subject := fmt.Sprintf("%s - You're invited", siteName)
-	body := fmt.Sprintf(`Hello,
-
-Your request to join %s was approved. Create your account here:
-
-%s
-
-If you did not request this, you can ignore this email.
-`, siteName, registerURL)
-	_ = utils.SendEmail(subject, body, email)
-}

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useToast } from '@/composables/useToast'
 import { useSite } from '@/composables/useSite'
@@ -8,11 +8,21 @@ import { api } from '@/api/client'
 import { APIError } from '@/api/types'
 import TimezoneSelect from '@/components/TimezoneSelect.vue'
 
-const email = ref('')
+function queryString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+const route = useRoute()
+const emailFromQuery = queryString(route.query.email)
+const inviteFromQuery = queryString(route.query.invite)
+const emailLocked = emailFromQuery !== ''
+const inviteLocked = inviteFromQuery !== ''
+
+const email = ref(emailFromQuery)
 const userName = ref('')
 const password = ref('')
 const confirm = ref('')
-const invite = ref('')
+const invite = ref(inviteFromQuery)
 const timezone = ref(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC')
 const busy = ref(false)
 const error = ref('')
@@ -80,7 +90,16 @@ async function onSubmit() {
             <form @submit.prevent="onSubmit">
               <div class="mb-3">
                 <label for="signup-email" class="form-label">Email</label>
-                <input id="signup-email" v-model="email" type="email" class="form-control" required autocomplete="username" />
+                <input
+                  id="signup-email"
+                  v-model="email"
+                  type="email"
+                  class="form-control"
+                  :class="{ 'bg-body-secondary': emailLocked }"
+                  required
+                  autocomplete="username"
+                  :readonly="emailLocked"
+                />
               </div>
               <div class="mb-3">
                 <label for="signup-username" class="form-label">Username</label>
@@ -120,8 +139,19 @@ async function onSubmit() {
                 <TimezoneSelect id="signup-timezone" v-model="timezone" required />
               </div>
               <div class="mb-3">
-                <label for="signup-invite" class="form-label">Invite token <span class="text-muted">(optional)</span></label>
-                <input id="signup-invite" v-model="invite" type="text" class="form-control" autocomplete="off" />
+                <label for="signup-invite" class="form-label">
+                  Invite token
+                  <span v-if="!inviteLocked" class="text-muted">(optional)</span>
+                </label>
+                <input
+                  id="signup-invite"
+                  v-model="invite"
+                  type="text"
+                  class="form-control"
+                  :class="{ 'bg-body-secondary': inviteLocked }"
+                  autocomplete="off"
+                  :readonly="inviteLocked"
+                />
               </div>
               <div v-if="error" class="text-danger mb-3">{{ error }}</div>
               <button type="submit" class="btn btn-primary" :disabled="busy">
