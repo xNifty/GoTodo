@@ -23,7 +23,7 @@ import { useSidebarState } from '@/composables/useSidebarState'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useLiveUpdates } from '@/composables/useLiveUpdates'
 import { projectOptionLabel } from '@/utils/projectLabel'
-import { uniqueTagsByName } from '@/utils/tags'
+import { uniqueTagsByName, isArchivedTask } from '@/utils/tags'
 
 defineProps<{
   mobileSidebarOpen?: boolean
@@ -665,8 +665,20 @@ watch(
   },
 )
 
+function isRemovedTagFilter(): boolean {
+  const q = (filters.tag || '').trim().toLowerCase()
+  if (q === 'removed') return true
+  const tag = tags.value.find((t) => String(t.id) === filters.tag)
+  return !!tag && (!!tag.protected || tag.name.toLowerCase() === 'removed')
+}
+
 watch(lastSavedTask, async (task) => {
   if (!task) return
+  lastSavedTask.value = null
+  if (isArchivedTask(task) !== isRemovedTagFilter()) {
+    await reloadInitial()
+    return
+  }
   if (task.parent_id) expandParent(task.parent_id)
   const exists = !!findTaskInTree(task.id)
   if (exists) {
@@ -674,7 +686,6 @@ watch(lastSavedTask, async (task) => {
   } else {
     registerTaskAdded(task)
   }
-  lastSavedTask.value = null
   await nextTick()
   refreshSortable()
 })
@@ -740,7 +751,7 @@ async function removeTask(task: Task) {
   }
   const ok = await askConfirm({
     title: 'Delete task?',
-    message: `Delete “${task.title}”?`,
+    message: `Permanently delete “${task.title}”? This cannot be undone.`,
     confirmLabel: 'Delete',
     danger: true,
   })
@@ -1450,7 +1461,6 @@ onUnmounted(() => {
                     @patch-task="handleInlineTaskPatch"
                     @add-subtask="openAddSubtask(task)"
                     @edit="openTaskDetails(task.id)"
-                    @remove="removeTask(task)"
                   />
                   <div
                     v-if="task.children?.length && isParentExpanded(task.id)"
@@ -1471,7 +1481,6 @@ onUnmounted(() => {
                       @toggle-complete="toggleCompleteChild(child)"
                       @patch-task="handleInlineTaskPatch"
                       @edit="openTaskDetails(child.id)"
-                      @remove="removeTask(child)"
                     />
                   </div>
                 </div>
@@ -1501,7 +1510,6 @@ onUnmounted(() => {
                   @patch-task="handleInlineTaskPatch"
                   @add-subtask="openAddSubtask(task)"
                   @edit="openTaskDetails(task.id)"
-                  @remove="removeTask(task)"
                 />
                 <div
                   v-if="task.children?.length && isParentExpanded(task.id)"
@@ -1522,7 +1530,6 @@ onUnmounted(() => {
                     @toggle-complete="toggleCompleteChild(child)"
                     @patch-task="handleInlineTaskPatch"
                     @edit="openTaskDetails(child.id)"
-                    @remove="removeTask(child)"
                   />
                 </div>
               </div>

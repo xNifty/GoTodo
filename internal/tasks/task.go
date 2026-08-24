@@ -10,6 +10,7 @@ type Tag struct {
 	Name      string
 	Color     string
 	ProjectID *int
+	Protected bool
 }
 
 type Task struct {

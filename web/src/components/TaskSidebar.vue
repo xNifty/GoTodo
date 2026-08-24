@@ -5,6 +5,7 @@ import { api } from '@/api/client'
 import type { Project, ProjectStatus, Tag, Task, TaskEvent, TaskGitHubIssue, TaskTimeEntry } from '@/api/types'
 import { APIError } from '@/api/types'
 import ParentTaskCombobox from '@/components/ParentTaskCombobox.vue'
+import DeleteTaskDialog from '@/components/DeleteTaskDialog.vue'
 import TaskDiscussion from '@/components/TaskDiscussion.vue'
 import { useAuth } from '@/composables/useAuth'
 import { useTaskSidebar } from '@/composables/useTaskSidebar'
@@ -12,6 +13,7 @@ import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { projectOptionLabel } from '@/utils/projectLabel'
 import { useLiveUpdates, type LiveEvent } from '@/composables/useLiveUpdates'
+import { assignableTags, archiveConfirmMessage, isArchivedTask, isProtectedTag } from '@/utils/tags'
 
 const {
   open,
@@ -46,6 +48,7 @@ async function copyPermalink() {
 
 const loading = ref(false)
 const saving = ref(false)
+const deleteDialogOpen = ref(false)
 const projects = ref<Project[]>([])
 const allTags = ref<Tag[]>([])
 const rootTasks = ref<Task[]>([])
@@ -101,6 +104,8 @@ const canManageTags = computed(() => {
   if (!role) return true
   return role === 'owner' || role === 'editor'
 })
+const pickerTags = computed(() => assignableTags(allTags.value))
+const taskIsArchived = computed(() => isArchivedTask(currentTask.value))
 const parentOptions = computed(() =>
   rootTasks.value.filter((r) => r.id !== taskId.value && taskInSelectedProject(r)),
 )
@@ -421,15 +426,21 @@ useLiveUpdates(async (event: LiveEvent) => {
 })
 
 async function resolveTagIds(): Promise<number[]> {
-  const ids = new Set(selectedTagIds.value)
+  const ids = new Set(
+    selectedTagIds.value.filter((id) => {
+      const tag = allTags.value.find((t) => t.id === id)
+      return tag && !isProtectedTag(tag)
+    }),
+  )
   const parts = newTags.value
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean)
   for (const name of parts) {
+    if (name.toLowerCase() === 'removed') continue
     const existing = allTags.value.find((t) => t.name.toLowerCase() === name.toLowerCase())
     if (existing) {
-      ids.add(existing.id)
+      if (!isProtectedTag(existing)) ids.add(existing.id)
       continue
     }
     const created = await api.createTag(name, projectId.value === '' ? null : Number(projectId.value))
@@ -755,6 +766,64 @@ async function unlinkGitHubIssue() {
   }
 }
 
+async function archiveCurrentTask() {
+  if (!taskId.value || readOnly.value || !currentTask.value) return
+  const ok = await askConfirm({
+    title: 'Archive task?',
+    message: archiveConfirmMessage(currentTask.value),
+    confirmLabel: 'Archive',
+    warning: true,
+  })
+  if (!ok) return
+  try {
+    const updated = await api.archiveTask(taskId.value)
+    toast.push('Task archived', 'info')
+    notifySaved(updated, true)
+  } catch (err) {
+    toast.push(err instanceof APIError ? err.message : 'Archive failed', 'error')
+  }
+}
+
+async function restoreCurrentTask() {
+  if (!taskId.value || readOnly.value) return
+  try {
+    const updated = await api.restoreTask(taskId.value)
+    toast.push('Task restored', 'success')
+    notifySaved(updated, true)
+  } catch (err) {
+    toast.push(err instanceof APIError ? err.message : 'Restore failed', 'error')
+  }
+}
+
+async function deleteCurrentTask() {
+  if (!taskId.value || readOnly.value || !currentTask.value) return
+  const childCount = currentTask.value.child_count ?? currentTask.value.children?.length ?? 0
+  if (childCount > 0) {
+    deleteDialogOpen.value = true
+    return
+  }
+  const ok = await askConfirm({
+    title: 'Delete task?',
+    message: `Permanently delete “${currentTask.value.title}”? This cannot be undone.`,
+    confirmLabel: 'Delete',
+    danger: true,
+  })
+  if (!ok) return
+  await runSidebarDelete({ mode: 'cascade' })
+}
+
+async function runSidebarDelete(opts: { mode: 'cascade' | 'reparent'; new_parent_id?: number | null }) {
+  if (!taskId.value) return
+  try {
+    await api.deleteTask(taskId.value, opts)
+    toast.push('Task deleted', 'info')
+    deleteDialogOpen.value = false
+    close()
+  } catch (err) {
+    toast.push(err instanceof APIError ? err.message : 'Delete failed', 'error')
+  }
+}
+
 async function addTimeEntry() {
   if (!taskId.value || readOnly.value) return
   const minutes = Number(newEntryMinutes.value)
@@ -841,11 +910,48 @@ async function removeTimeEntry(entryId: number) {
                 <i class="bi bi-link-45deg" /> Copy link
               </button>
             </div>
-            <div class="d-flex align-items-center gap-2 flex-shrink-0">
+            <div class="task-header-actions">
+              <button
+                v-if="!readOnly && !loading && mode === 'edit' && (!claimedBy || claimedBy !== user?.id)"
+                type="button"
+                class="btn btn-sm btn-outline-primary task-header-btn"
+                :disabled="claiming"
+                @click="claimCurrentTask"
+              >
+                {{ claimedBy ? 'Take over' : 'Claim' }}
+              </button>
+              <button
+                v-else-if="!readOnly && !loading && mode === 'edit'"
+                type="button"
+                class="btn btn-sm btn-outline-secondary task-header-btn"
+                :disabled="claiming"
+                @click="unclaimCurrentTask"
+              >
+                Release
+              </button>
+              <button
+                v-if="!readOnly && !loading && mode === 'edit'"
+                type="button"
+                class="btn btn-sm task-header-btn"
+                :class="taskIsArchived ? 'btn-success' : 'btn-warning'"
+                :disabled="saving"
+                @click="taskIsArchived ? restoreCurrentTask() : archiveCurrentTask()"
+              >
+                {{ taskIsArchived ? 'Restore' : 'Archive' }}
+              </button>
+              <button
+                v-if="!readOnly && !loading && mode === 'edit'"
+                type="button"
+                class="btn btn-sm btn-danger task-header-btn"
+                :disabled="saving"
+                @click="deleteCurrentTask"
+              >
+                Delete
+              </button>
               <button
                 v-if="!readOnly && !loading"
                 type="button"
-                class="btn btn-primary btn-sm"
+                class="btn btn-sm btn-primary task-header-btn"
                 :disabled="saving"
                 @click="save(false)"
               >
@@ -854,13 +960,21 @@ async function removeTimeEntry(entryId: number) {
               <button
                 v-if="!readOnly && !loading && mode === 'add'"
                 type="button"
-                class="btn btn-outline-primary btn-sm"
+                class="btn btn-sm btn-outline-primary task-header-btn"
                 :disabled="saving || !title.trim()"
                 @click="save(true)"
               >
                 Save &amp; Add Another
               </button>
-              <button type="button" class="btn-close" id="closeSidebar" aria-label="Close" @click="close" />
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-secondary task-header-btn task-header-close"
+                id="closeSidebar"
+                aria-label="Close"
+                @click="close"
+              >
+                <i class="bi bi-x-lg" />
+              </button>
             </div>
           </template>
           <template v-else>
@@ -1008,26 +1122,6 @@ async function removeTimeEntry(entryId: number) {
             <span class="badge border" :class="claimedBy ? 'text-bg-primary' : 'text-bg-light text-muted'">
               <i class="bi bi-person me-1" />{{ claimerLabel }}
             </span>
-            <template v-if="!readOnly && taskId">
-              <button
-                v-if="!claimedBy || claimedBy !== user?.id"
-                type="button"
-                class="btn btn-sm btn-outline-primary"
-                :disabled="claiming"
-                @click="claimCurrentTask"
-              >
-                {{ claimedBy ? 'Take over' : 'Claim' }}
-              </button>
-              <button
-                v-else
-                type="button"
-                class="btn btn-sm btn-outline-secondary"
-                :disabled="claiming"
-                @click="unclaimCurrentTask"
-              >
-                Release
-              </button>
-            </template>
           </div>
         </div>
         <div v-if="isKanbanTask" class="form-group mt-2 kanban-order-estimate">
@@ -1145,11 +1239,11 @@ async function removeTimeEntry(entryId: number) {
           <p v-else class="text-muted small mb-0 mt-1">No tags</p>
         </div>
         <div v-else class="kanban-order-tags">
-          <div v-if="allTags.length" class="form-group mt-2">
+          <div v-if="pickerTags.length" class="form-group mt-2">
             <label>Tags (max 5)</label>
             <div v-if="isKanbanTask" class="kanban-tag-chips">
               <button
-                v-for="tag in allTags"
+                v-for="tag in pickerTags"
                 :key="tag.id"
                 type="button"
                 class="tag-chip kanban-tag-toggle"
@@ -1166,7 +1260,7 @@ async function removeTimeEntry(entryId: number) {
               </button>
             </div>
             <template v-else>
-              <div v-for="tag in allTags" :key="tag.id" class="form-check">
+              <div v-for="tag in pickerTags" :key="tag.id" class="form-check">
                 <input
                   :id="`tag-${tag.id}`"
                   type="checkbox"
@@ -1268,18 +1362,37 @@ async function removeTimeEntry(entryId: number) {
           :fill-height="isKanbanTask"
         />
 
-        <div v-if="!readOnly && !isKanbanTask" class="d-flex gap-2 mt-3">
-          <button type="submit" class="btn btn-primary flex-grow-1" :disabled="saving">
+        <div v-if="!readOnly && !isKanbanTask" class="task-header-actions mt-3">
+          <button type="submit" class="btn btn-sm btn-primary task-header-btn" :disabled="saving">
             {{ saving ? 'Saving…' : submitText }}
           </button>
           <button
             v-if="mode === 'add'"
             type="button"
-            class="btn btn-outline-primary flex-grow-1"
+            class="btn btn-sm btn-outline-primary task-header-btn"
             :disabled="saving || !title.trim()"
             @click="save(true)"
           >
             Save &amp; Add Another
+          </button>
+          <button
+            v-if="mode === 'edit'"
+            type="button"
+            class="btn btn-sm task-header-btn"
+            :class="taskIsArchived ? 'btn-success' : 'btn-warning'"
+            :disabled="saving"
+            @click="taskIsArchived ? restoreCurrentTask() : archiveCurrentTask()"
+          >
+            {{ taskIsArchived ? 'Restore' : 'Archive' }}
+          </button>
+          <button
+            v-if="mode === 'edit'"
+            type="button"
+            class="btn btn-sm btn-danger task-header-btn"
+            :disabled="saving"
+            @click="deleteCurrentTask"
+          >
+            Delete
           </button>
         </div>
 
@@ -1308,6 +1421,14 @@ async function removeTimeEntry(entryId: number) {
       </div>
     </div>
   </div>
+  <DeleteTaskDialog
+    :open="deleteDialogOpen"
+    :task="currentTask"
+    :root-tasks="rootTasks"
+    @cancel="deleteDialogOpen = false"
+    @cascade="runSidebarDelete({ mode: 'cascade' })"
+    @reparent="(id) => runSidebarDelete({ mode: 'reparent', new_parent_id: id })"
+  />
 </template>
 
 <style scoped>
@@ -1343,11 +1464,52 @@ textarea.task-description-input {
   min-height: 0;
 }
 
-.kanban-task-header {
+.kanban-task-header.modal-header {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
   border-bottom: 1px solid var(--ordryn-card-border, #dee2e6);
   padding: 0.75rem 1.25rem;
   flex-shrink: 0;
   gap: 0.75rem;
+}
+
+.task-header-actions {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  grid-template-rows: 32px;
+  align-items: stretch;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+  height: 32px;
+}
+
+.task-header-actions > .task-header-btn.btn {
+  --bs-btn-padding-y: 0;
+  --bs-btn-padding-x: 0.75rem;
+  --bs-btn-line-height: 1;
+  --bs-btn-font-size: 0.875rem;
+  --bs-btn-border-width: 1px;
+  box-sizing: border-box;
+  height: 32px !important;
+  min-height: 0;
+  max-height: 32px;
+  margin: 0 !important;
+  padding: 0 0.75rem !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.task-header-actions > .task-header-close.btn {
+  --bs-btn-padding-x: 0;
+  width: 32px;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
 }
 
 .kanban-task-body {

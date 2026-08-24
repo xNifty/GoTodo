@@ -60,6 +60,11 @@ onUnmounted(() => {
             Use <strong>Copy link</strong> to share a URL such as <code>/tasks/42</code>, or search
             for <code>42</code> / <code>#42</code> to find it.
           </li>
+          <li>
+            Archive a task to hide it from boards and lists. Filter by the <strong>removed</strong> tag
+            to find archived work and restore it. Delete is permanent and cannot be undone (a short
+            undo token may still appear after delete as a safety net).
+          </li>
           <li>Deleting a task may offer undo for a short time when the server returns an undo token.</li>
         </ul>
 

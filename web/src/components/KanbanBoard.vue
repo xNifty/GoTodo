@@ -695,6 +695,9 @@ onBeforeUnmount(destroySortables)
 }
 
 .kanban-claim-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   min-height: 1.5rem;
 }
 

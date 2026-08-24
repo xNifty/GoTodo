@@ -340,6 +340,14 @@ export const api = {
     )
   },
 
+  archiveTask(id: number) {
+    return request<Task>(`/api/v1/tasks/${id}/archive`, { method: 'POST' })
+  },
+
+  restoreTask(id: number) {
+    return request<Task>(`/api/v1/tasks/${id}/restore`, { method: 'POST' })
+  },
+
   undo(undo_token: string) {
     return request<{ ok: boolean; restored: number }>('/api/v1/tasks/undo', {
       method: 'POST',

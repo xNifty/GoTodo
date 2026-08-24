@@ -62,7 +62,7 @@ onUnmounted(() => {
             <button
               type="button"
               class="btn"
-              :class="state.danger ? 'btn-danger' : 'btn-primary'"
+              :class="state.danger ? 'btn-danger' : state.warning ? 'btn-warning' : 'btn-primary'"
               @click="accept"
             >
               {{ state.confirmLabel }}

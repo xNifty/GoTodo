@@ -32,7 +32,6 @@ const emit = defineEmits<{
   'patch-task': [payload: { id: number; title?: string; description?: string }]
   'add-subtask': []
   edit: []
-  remove: []
 }>()
 
 const isSubtask = () => props.depth > 0 || !!(props.task.parent_id && props.task.parent_id > 0)
@@ -339,15 +338,6 @@ function formatMinutes(total: number) {
           >
             <i class="bi bi-pencil" />
           </button>
-
-          <button
-            type="button"
-            class="btn btn-sm btn-icon text-danger hover-danger border-0 p-1"
-            title="Delete task"
-            @click="emit('remove')"
-          >
-            <i class="bi bi-trash" />
-          </button>
         </div>
       </div>
     </div>
@@ -396,9 +386,6 @@ function formatMinutes(total: number) {
           </button>
           <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" @click="emit('edit')">
             <i class="bi bi-pencil me-1" />Edit
-          </button>
-          <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" @click="emit('remove')">
-            <i class="bi bi-trash me-1" />Delete
           </button>
         </div>
       </div>

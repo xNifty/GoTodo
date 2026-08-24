@@ -47,6 +47,10 @@ func CreateProject(userID int, name, description string) (*Project, error) {
 	if err := EnsureProjectOwnerMember(p.ID, userID); err != nil {
 		return nil, fmt.Errorf("failed to create project owner membership: %v", err)
 	}
+	pid := p.ID
+	if _, err := EnsureRemovedTag(userID, &pid); err != nil {
+		return nil, fmt.Errorf("failed to seed removed tag: %v", err)
+	}
 	return &p, nil
 }
 

@@ -5,6 +5,7 @@ import type { Project, Tag } from '@/api/types'
 import { APIError } from '@/api/types'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import { isProtectedTag } from '@/utils/tags'
 
 const props = defineProps<{
   project: Project
@@ -121,11 +122,22 @@ async function removeTag(tag: Tag) {
           </template>
           <template v-else>
             <span class="tag-chip" :style="{ backgroundColor: tag.color || '#6c757d' }">{{ tag.name }}</span>
+            <span v-if="isProtectedTag(tag)" class="badge text-bg-secondary">System</span>
             <span class="flex-grow-1" />
-            <button v-if="canManage" type="button" class="btn btn-sm btn-outline-secondary" @click="beginRenameTag(tag)">
+            <button
+              v-if="canManage && !isProtectedTag(tag)"
+              type="button"
+              class="btn btn-sm btn-outline-secondary"
+              @click="beginRenameTag(tag)"
+            >
               Rename
             </button>
-            <button v-if="canManage" type="button" class="btn btn-sm btn-outline-danger" @click="removeTag(tag)">
+            <button
+              v-if="canManage && !isProtectedTag(tag)"
+              type="button"
+              class="btn btn-sm btn-outline-danger"
+              @click="removeTag(tag)"
+            >
               Delete
             </button>
           </template>
