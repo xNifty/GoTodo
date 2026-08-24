@@ -46,7 +46,8 @@ func ApplyRelativeReorder(allIDs []int, orderedIDs []int) ([]int, error) {
 
 // ReorderTasks validates IDs and renumbers position within a favorite/project/parent/status group.
 // parentID nil or 0 reorders root tasks; otherwise reorders siblings under that parent.
-// statusFilter, when set, limits the reorder group to tasks in that kanban column.
+// statusFilter, when set, is the destination kanban column: tasks in ids that are not
+// already in that column are moved (status + completed) then the column is reordered.
 func ReorderTasks(ctx context.Context, userID int, ids []int, isFav bool, projectFilter *int, parentID *int, statusFilter *int) error {
 	if len(ids) == 0 {
 		return fmt.Errorf("%w: empty task_ids", ErrValidation)
@@ -67,10 +68,11 @@ func ReorderTasks(ctx context.Context, userID int, ids []int, isFav bool, projec
 		if !canRead || !storage.RoleCanWrite(writeRole) {
 			return fmt.Errorf("%w: task %d does not belong to user or mismatched favorite group/project", ErrValidation, id)
 		}
-		var isFavorite bool
+		var isFavorite, completed bool
 		var proj, pid, sid sql.NullInt64
 		err := pool.QueryRow(ctx,
-			`SELECT COALESCE(is_favorite,false), project_id, parent_id, status_id FROM tasks WHERE id = $1`, id).Scan(&isFavorite, &proj, &pid, &sid)
+			`SELECT COALESCE(is_favorite,false), COALESCE(completed,false), project_id, parent_id, status_id FROM tasks WHERE id = $1`,
+			id).Scan(&isFavorite, &completed, &proj, &pid, &sid)
 		if err != nil {
 			return err
 		}
@@ -95,8 +97,20 @@ func ReorderTasks(ctx context.Context, userID int, ids []int, isFav bool, projec
 				}
 			}
 			if statusFilter != nil {
-				if !sid.Valid || int(sid.Int64) != *statusFilter {
-					return fmt.Errorf("%w: task %d does not belong to user or mismatched favorite group/project", ErrValidation, id)
+				oldStatusID := 0
+				if sid.Valid {
+					oldStatusID = int(sid.Int64)
+				}
+				if oldStatusID != *statusFilter {
+					projectID := 0
+					if projectFilter != nil && *projectFilter > 0 {
+						projectID = *projectFilter
+					} else if proj.Valid {
+						projectID = int(proj.Int64)
+					}
+					if err := applyKanbanColumnMove(userID, id, projectID, *statusFilter, oldStatusID, completed); err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -170,8 +184,8 @@ func ReorderTasks(ctx context.Context, userID int, ids []int, isFav bool, projec
 		return err
 	}
 
-	// Kanban column reorders follow a status change (or are same-column position
-	// updates). Do not log a per-task "reordered" row; that event is also written
+	// Kanban column reorders may also move cards into the destination status.
+	// Do not log a per-task "reordered" row; that event is also written
 	// against ids[0], which is often not the card that moved.
 	if statusFilter == nil {
 		_ = storage.LogTaskEvent(ids[0], userID, "reordered", map[string]interface{}{"count": len(ids)})

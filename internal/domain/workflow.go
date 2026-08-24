@@ -370,11 +370,41 @@ func ApplyCompletedStatusSync(taskID, projectID int, completed bool) error {
 
 // ApplyStatusChange sets status and syncs completed for a kanban task.
 func ApplyStatusChange(taskID, projectID, statusID int) error {
+	_, err := applyStatusChange(taskID, projectID, statusID)
+	return err
+}
+
+func applyStatusChange(taskID, projectID, statusID int) (*storage.ProjectStatus, error) {
 	st, err := storage.GetProjectStatus(projectID, statusID)
 	if err != nil {
-		return fmt.Errorf("%w: invalid status_id", ErrValidation)
+		return nil, fmt.Errorf("%w: invalid status_id", ErrValidation)
 	}
-	return storage.AssignTaskStatusAndCompleted(taskID, st.ID, st.IsDone)
+	if err := storage.AssignTaskStatusAndCompleted(taskID, st.ID, st.IsDone); err != nil {
+		return nil, err
+	}
+	return st, nil
+}
+
+// applyKanbanColumnMove updates status (and completed) when a card is dropped
+// into a different column. No-op when the task is already in that status.
+func applyKanbanColumnMove(userID, taskID, projectID, newStatusID, oldStatusID int, oldCompleted bool) error {
+	if newStatusID <= 0 || oldStatusID == newStatusID {
+		return nil
+	}
+	st, err := applyStatusChange(taskID, projectID, newStatusID)
+	if err != nil {
+		return err
+	}
+	_ = storage.LogTaskEvent(taskID, userID, "status_changed", statusChangeMetadata(projectID, oldStatusID, newStatusID))
+	if st.IsDone != oldCompleted {
+		if st.IsDone {
+			_ = storage.LogTaskEvent(taskID, userID, "completed", nil)
+		} else {
+			_ = storage.LogTaskEvent(taskID, userID, "reopened", nil)
+		}
+	}
+	go SyncGitHubIssueFromOrdrynState(context.Background(), userID, taskID, st.IsDone)
+	return nil
 }
 
 // AssignWorkflowOnProjectEnter sets default/done status when a task enters a kanban project.
