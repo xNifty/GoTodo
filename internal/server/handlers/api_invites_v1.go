@@ -47,6 +47,7 @@ func APIV1InvitesRouter(w http.ResponseWriter, r *http.Request) {
 				utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", err.Error())
 				return
 			}
+			emailSiteInvite(r, inv.Email, inv.Token)
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{

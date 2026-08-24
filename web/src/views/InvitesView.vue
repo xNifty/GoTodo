@@ -23,9 +23,10 @@ async function load() {
 async function create() {
   if (!email.value.trim()) return
   try {
-    await api.createInvite(email.value.trim())
+    const to = email.value.trim()
+    await api.createInvite(to)
     email.value = ''
-    toast.push('Invite created', 'success')
+    toast.push(`Invite sent to ${to}`, 'success')
     await load()
   } catch (err) {
     toast.push(err instanceof APIError ? err.message : 'Create failed', 'error')
