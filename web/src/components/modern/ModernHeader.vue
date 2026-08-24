@@ -10,7 +10,11 @@ import { useToast } from '@/composables/useToast'
 import { useLiveUpdates } from '@/composables/useLiveUpdates'
 
 const emit = defineEmits<{
-  'toggle-mobile-sidebar': []
+  'toggle-mobile-nav': []
+}>()
+
+const props = defineProps<{
+  mobileNavOpen?: boolean
 }>()
 
 const { isAuthenticated, user, logout, hasPermission } = useAuth()
@@ -154,25 +158,26 @@ async function onLogout() {
 </script>
 
 <template>
-  <header class="ordryn-header border-bottom py-2 px-3" style="background-color: var(--ordryn-header-bg); border-color: var(--ordryn-header-border) !important;">
-    <div class="d-flex align-items-center justify-content-between">
+  <header class="ordryn-header border-bottom py-2 px-2 px-sm-3">
+    <div class="d-flex align-items-center justify-content-between gap-2 min-w-0">
       <!-- Left: Mobile Toggle & Brand Logo -->
-      <div class="d-flex align-items-center gap-3">
+      <div class="d-flex align-items-center gap-2 gap-sm-3 min-w-0">
         <button
           type="button"
-          class="btn btn-link text-decoration-none p-0 d-md-none me-1"
-          style="color: var(--ordryn-text); font-size: 1.25rem;"
-          aria-label="Toggle mobile menu"
-          @click="emit('toggle-mobile-sidebar')"
+          class="btn btn-link text-decoration-none p-1 d-md-none oryryn-header-menu-btn"
+          :aria-label="props.mobileNavOpen ? 'Close menu' : 'Open menu'"
+          :aria-expanded="!!props.mobileNavOpen"
+          aria-controls="ordryn-mobile-nav"
+          @click="emit('toggle-mobile-nav')"
         >
-          <i class="bi bi-list" />
+          <i :class="props.mobileNavOpen ? 'bi bi-x-lg' : 'bi bi-list'" />
         </button>
 
-        <RouterLink to="/" class="d-flex align-items-center gap-2 text-decoration-none" style="color: var(--ordryn-text);">
-          <div class="brand-logo-icon d-flex align-items-center justify-content-center rounded-3 px-2 py-1" style="background: var(--ordryn-accent-light); color: var(--ordryn-accent); font-weight: 800;">
+        <RouterLink to="/" class="d-flex align-items-center gap-2 text-decoration-none min-w-0" style="color: var(--ordryn-text);">
+          <div class="brand-logo-icon d-flex align-items-center justify-content-center rounded-3 px-2 py-1 flex-shrink-0" style="background: var(--ordryn-accent-light); color: var(--ordryn-accent); font-weight: 800;">
             <i class="bi bi-layers-half" style="font-size: 1.2rem;" />
           </div>
-          <span class="fw-bold fs-5 tracking-tight">{{ siteName }}</span>
+          <span class="fw-bold fs-5 tracking-tight text-truncate oryryn-brand-name">{{ siteName }}</span>
         </RouterLink>
 
         <!-- Top Navigation Links (Desktop) -->
@@ -203,14 +208,15 @@ async function onLogout() {
       </div>
 
       <!-- Right Actions: Multi-Theme Dropdown & Auth Controls -->
-      <div class="d-flex align-items-center gap-2">
+      <div class="d-flex align-items-center gap-1 gap-sm-2 flex-shrink-0">
         <!-- Theme Picker Dropdown -->
-        <div class="dropdown me-2">
+        <div class="dropdown">
           <button
             class="btn btn-sm dropdown-toggle d-flex align-items-center gap-1 border-0 shadow-none"
             type="button"
             data-bs-toggle="dropdown"
             aria-expanded="false"
+            aria-label="Theme"
             style="background: var(--ordryn-muted-bg); color: var(--ordryn-text);"
           >
             <i :class="availableThemes.find(t => t.id === currentTheme)?.icon || 'bi-palette'" />
@@ -231,7 +237,7 @@ async function onLogout() {
         </div>
 
         <template v-if="isAuthenticated">
-          <div class="dropdown me-1">
+          <div class="dropdown me-0">
             <button
               class="btn btn-sm btn-outline-secondary position-relative d-flex align-items-center"
               type="button"
@@ -283,18 +289,18 @@ async function onLogout() {
             </div>
           </div>
           <span class="text-muted small d-none d-lg-inline me-1">{{ user?.user_name || user?.email }}</span>
-          <RouterLink to="/settings" class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1" title="Profile Settings">
+          <RouterLink to="/settings" class="btn btn-outline-secondary btn-sm d-none d-md-flex align-items-center gap-1" title="Profile Settings">
             <i class="bi bi-person-circle" />
             <span class="d-none d-sm-inline">Profile</span>
           </RouterLink>
-          <button type="button" class="btn btn-outline-danger btn-sm d-flex align-items-center gap-1" @click="onLogout">
+          <button type="button" class="btn btn-outline-danger btn-sm d-none d-md-flex align-items-center gap-1" @click="onLogout">
             <i class="bi bi-box-arrow-right" />
             <span class="d-none d-sm-inline">Logout</span>
           </button>
         </template>
         <template v-else>
-          <RouterLink to="/register" class="btn btn-outline-secondary btn-sm">Sign Up</RouterLink>
-          <RouterLink to="/login" class="btn btn-primary btn-sm ms-1">Login</RouterLink>
+          <RouterLink to="/register" class="btn btn-outline-secondary btn-sm d-none d-sm-inline-block">Sign Up</RouterLink>
+          <RouterLink to="/login" class="btn btn-primary btn-sm">Login</RouterLink>
         </template>
       </div>
     </div>
@@ -302,6 +308,27 @@ async function onLogout() {
 </template>
 
 <style scoped>
+.ordryn-header {
+  background-color: var(--ordryn-header-bg);
+  border-color: var(--ordryn-header-border) !important;
+  position: sticky;
+  top: 0;
+  z-index: 1050;
+  padding-top: max(0.5rem, env(safe-area-inset-top));
+}
+.ordryn-header-menu-btn {
+  color: var(--ordryn-text);
+  font-size: 1.5rem;
+  line-height: 1;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ordryn-brand-name {
+  max-width: min(42vw, 12rem);
+}
 .nav-link-item:hover {
   color: var(--ordryn-text) !important;
 }

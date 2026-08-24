@@ -7,6 +7,7 @@ import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { startLiveUpdates, stopLiveUpdates, useLiveUpdates } from '@/composables/useLiveUpdates'
 import { api } from '@/api/client'
 import ModernHeader from '@/components/modern/ModernHeader.vue'
+import MobileNavDrawer from '@/components/modern/MobileNavDrawer.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import ToastHost from '@/components/ToastHost.vue'
 import GoToTopButton from '@/components/GoToTopButton.vue'
@@ -21,7 +22,7 @@ const { siteInfo, refresh: refreshSite } = useSite()
 const { initKeyboardShortcuts, destroyKeyboardShortcuts } = useKeyboardShortcuts()
 const overdueCount = ref(0)
 const pendingInviteCount = ref(0)
-const mobileSidebarOpen = ref(false)
+const mobileNavOpen = ref(false)
 
 provide('overdueCount', overdueCount)
 provide('pendingInviteCount', pendingInviteCount)
@@ -71,9 +72,31 @@ async function dismissAnnouncement() {
   }
 }
 
-function toggleMobileSidebar() {
-  mobileSidebarOpen.value = !mobileSidebarOpen.value
+function toggleMobileNav() {
+  mobileNavOpen.value = !mobileNavOpen.value
 }
+
+function closeMobileNav() {
+  mobileNavOpen.value = false
+}
+
+function onMobileNavKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && mobileNavOpen.value) {
+    e.preventDefault()
+    closeMobileNav()
+  }
+}
+
+watch(mobileNavOpen, (open) => {
+  document.body.classList.toggle('ordryn-mobile-nav-open', open)
+})
+
+watch(
+  () => route.fullPath,
+  () => {
+    closeMobileNav()
+  },
+)
 
 watch(
   isAuthenticated,
@@ -112,17 +135,21 @@ watch(
 onMounted(() => {
   initKeyboardShortcuts()
   void refreshSite()
+  window.addEventListener('keydown', onMobileNavKeydown)
 })
 
 onUnmounted(() => {
   destroyKeyboardShortcuts()
   stopLiveUpdates()
+  window.removeEventListener('keydown', onMobileNavKeydown)
+  document.body.classList.remove('ordryn-mobile-nav-open')
 })
 </script>
 
 <template>
   <div class="ordryn-app-shell">
-    <ModernHeader @toggle-mobile-sidebar="toggleMobileSidebar" />
+    <ModernHeader :mobile-nav-open="mobileNavOpen" @toggle-mobile-nav="toggleMobileNav" />
+    <MobileNavDrawer :open="mobileNavOpen" @close="closeMobileNav" />
 
     <div
       v-if="showAnnouncement && siteInfo?.global_announcement_text"
@@ -144,7 +171,7 @@ onUnmounted(() => {
     </div>
 
     <main class="site-main flex-grow-1 d-flex flex-column" data-page="spa">
-      <RouterView :mobile-sidebar-open="mobileSidebarOpen" @close-mobile-sidebar="mobileSidebarOpen = false" />
+      <RouterView />
     </main>
 
     <!-- Global Footer on all pages EXCEPT sidebar layout pages (/, /dashboard, /calendar) -->
