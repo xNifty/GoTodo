@@ -18,6 +18,7 @@ const emit = defineEmits<{
   close: []
   saved: []
   changed: []
+  'columns-changed': []
 }>()
 
 const toast = useToast()
@@ -60,6 +61,10 @@ async function saveBasics() {
 
 function onPanelChanged() {
   emit('changed')
+}
+
+function onColumnsChanged() {
+  emit('columns-changed')
 }
 </script>
 
@@ -128,7 +133,11 @@ function onPanelChanged() {
           <hr class="my-3 opacity-25" />
 
           <div class="mb-4">
-            <ProjectWorkflowPanel :project="project" @changed="onPanelChanged" />
+            <ProjectWorkflowPanel
+              :project="project"
+              @changed="onPanelChanged"
+              @columns-changed="onColumnsChanged"
+            />
           </div>
 
           <hr class="my-3 opacity-25" />

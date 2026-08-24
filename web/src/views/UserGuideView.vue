@@ -111,7 +111,8 @@ onUnmounted(() => {
           <li>
             Owners, editors, and viewers can discuss a project task in the sidebar. Deleting a comment
             leaves a tombstone (“Message deleted by user” or “Message deleted by project owner”). New
-            comments show up live for anyone with the task open, and in the notification bell.
+            comments show up live for anyone with the task open. The notification bell
+            refreshes when you open it, change pages, or return to the tab.
           </li>
           <li>
             Paste <code>#123</code> in a comment to link another task you can access (including tasks

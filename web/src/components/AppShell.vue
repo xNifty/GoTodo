@@ -4,7 +4,8 @@ import { RouterView, useRoute } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useSite } from '@/composables/useSite'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
-import { startLiveUpdates, stopLiveUpdates, useLiveUpdates } from '@/composables/useLiveUpdates'
+import { startLiveUpdates, stopLiveUpdates } from '@/composables/useLiveUpdates'
+import { usePageActivity } from '@/composables/usePageActivity'
 import { api } from '@/api/client'
 import ModernHeader from '@/components/modern/ModernHeader.vue'
 import MobileNavDrawer from '@/components/modern/MobileNavDrawer.vue'
@@ -114,23 +115,11 @@ watch(
   { immediate: true },
 )
 
-useLiveUpdates((event) => {
+usePageActivity(() => {
   if (!isAuthenticated.value) return
-  if (event.type === 'task.commented') return
   void loadOverdue()
-  if (event.type === 'project.updated') {
-    void loadPendingInvites()
-  }
+  void loadPendingInvites()
 })
-
-watch(
-  () => route.name,
-  (name, prev) => {
-    if (prev === 'projects' || name === 'projects') {
-      void loadPendingInvites()
-    }
-  },
-)
 
 onMounted(() => {
   initKeyboardShortcuts()

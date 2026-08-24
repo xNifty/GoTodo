@@ -206,7 +206,7 @@ import type { ProjectStatus, Task } from '@/api/types'
 import { APIError } from '@/api/types'
 import { useAuth } from '@/composables/useAuth'
 import { useToast } from '@/composables/useToast'
-import { pauseLiveReload, resumeLiveReload, useLiveUpdates } from '@/composables/useLiveUpdates'
+import { pauseLiveReload, resumeLiveReload, useLiveUpdates, isOwnFocusedLiveEvent } from '@/composables/useLiveUpdates'
 import type { ViewDensity } from '@/composables/useViewDensity'
 
 const props = withDefaults(
@@ -440,8 +440,16 @@ async function onCardDrop(evt: Sortable.SortableEvent) {
 
   try {
     if (statusChanged) {
-      const updated = await api.patchTask(taskId, { status_id: statusId })
-      emit('task-updated', updated)
+      const col = statuses.value.find((s) => s.id === statusId)
+      const current = boardTasks.value.find((t) => t.id === taskId)
+      if (current && col) {
+        emit('task-updated', {
+          ...current,
+          status_id: statusId,
+          status_name: col.name,
+          completed: col.is_done,
+        })
+      }
     }
     if (rootIds.length) {
       await api.reorderTasks({
@@ -505,6 +513,7 @@ watch(
 useLiveUpdates((event) => {
   if (event.type !== 'project.updated') return
   if (event.project_id && event.project_id !== props.projectId) return
+  if (isOwnFocusedLiveEvent(event, user.value?.id)) return
   void loadStatuses(true)
 })
 

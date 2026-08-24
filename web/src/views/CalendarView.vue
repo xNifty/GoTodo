@@ -8,7 +8,7 @@ import ModernSidebar from '@/components/modern/ModernSidebar.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import { useAuth } from '@/composables/useAuth'
 import { useTaskSidebar } from '@/composables/useTaskSidebar'
-import { useLiveUpdates } from '@/composables/useLiveUpdates'
+import { useLiveUpdates, isOwnFocusedLiveEvent } from '@/composables/useLiveUpdates'
 import { useToast } from '@/composables/useToast'
 import { useSidebarState } from '@/composables/useSidebarState'
 
@@ -118,8 +118,9 @@ watch(lastSavedTask, () => {
 
 useLiveUpdates((event) => {
   if (event.type === 'task.commented') return
+  if (isOwnFocusedLiveEvent(event, user.value?.id)) return
   if (month.value) void loadMonth(month.value)
-})
+}, 500)
 </script>
 
 <template>

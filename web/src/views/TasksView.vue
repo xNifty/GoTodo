@@ -21,7 +21,7 @@ import { useConfirm } from '@/composables/useConfirm'
 import { useViewDensity } from '@/composables/useViewDensity'
 import { useSidebarState } from '@/composables/useSidebarState'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
-import { useLiveUpdates } from '@/composables/useLiveUpdates'
+import { useLiveUpdates, isOwnFocusedLiveEvent } from '@/composables/useLiveUpdates'
 import { projectOptionLabel } from '@/utils/projectLabel'
 import { uniqueTagsByName, isArchivedTask } from '@/utils/tags'
 
@@ -1002,6 +1002,10 @@ async function onProjectSettingsChanged() {
   }
 }
 
+async function onProjectColumnsChanged() {
+  kanbanColumnsRev.value++
+}
+
 async function onReorderProjects(projectIds: number[]) {
   const previous = [...projects.value]
   const owned = projects.value.filter((p) => !p.role || p.role === 'owner')
@@ -1119,12 +1123,13 @@ onMounted(async () => {
 
 useLiveUpdates((event) => {
   if (event.type === 'task.commented') return
+  if (isOwnFocusedLiveEvent(event, user.value?.id)) return
   if (event.type === 'project.updated') {
     void loadMeta()
     kanbanColumnsRev.value++
   }
   void reloadInitial()
-})
+}, 500)
 
 onUnmounted(() => {
   unregisterTaskShortcuts()
@@ -1692,6 +1697,7 @@ onUnmounted(() => {
         @close="closeEditProject"
         @saved="onProjectSettingsSaved"
         @changed="onProjectSettingsChanged"
+        @columns-changed="onProjectColumnsChanged"
       />
 
       <DeleteTaskDialog
