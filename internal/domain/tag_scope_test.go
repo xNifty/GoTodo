@@ -259,6 +259,112 @@ func TestMigrateTagsSplitsLegacySharedTag(t *testing.T) {
 	}
 }
 
+func TestUpdateTaskLogsTagAddedAndRemoved(t *testing.T) {
+	ctx := context.Background()
+	proj, err := CreateProject(ctx, 1, "Tag Activity Proj", "")
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	pid := proj.ID
+	alpha, err := CreateTag(ctx, 1, "alpha", &pid)
+	if err != nil {
+		t.Fatalf("alpha tag: %v", err)
+	}
+	bravo, err := CreateTag(ctx, 1, "bravo", &pid)
+	if err != nil {
+		t.Fatalf("bravo tag: %v", err)
+	}
+
+	taskID, err := CreateTask(ctx, 1, CreateTaskInput{Title: "Tag activity", ProjectID: &pid})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if n := len(eventsOfType(t, taskID, 1, "tag_added")); n != 0 {
+		t.Fatalf("create tag_added count=%d want 0", n)
+	}
+
+	ids := []int{alpha.ID}
+	if _, err := UpdateTask(ctx, 1, taskID, UpdateTaskInput{TagIDs: &ids}); err != nil {
+		t.Fatalf("add tag: %v", err)
+	}
+	added := eventsOfType(t, taskID, 1, "tag_added")
+	if len(added) != 1 {
+		t.Fatalf("tag_added count=%d want 1", len(added))
+	}
+	if added[0].Metadata["tag"] != "alpha" {
+		t.Errorf("tag_added name=%v want alpha", added[0].Metadata["tag"])
+	}
+	if eventTagID(added[0]) != alpha.ID {
+		t.Errorf("tag_added tag_id=%d want %d", eventTagID(added[0]), alpha.ID)
+	}
+	if n := len(eventsOfType(t, taskID, 1, "tag_removed")); n != 0 {
+		t.Fatalf("tag_removed count=%d want 0 after add", n)
+	}
+
+	if _, err := UpdateTask(ctx, 1, taskID, UpdateTaskInput{TagIDs: &ids}); err != nil {
+		t.Fatalf("same tags: %v", err)
+	}
+	if got := eventsOfType(t, taskID, 1, "tag_added"); len(got) != 1 {
+		t.Fatalf("after no-op tag_added count=%d want 1", len(got))
+	}
+	if got := eventsOfType(t, taskID, 1, "tag_removed"); len(got) != 0 {
+		t.Fatalf("after no-op tag_removed count=%d want 0", len(got))
+	}
+
+	swap := []int{bravo.ID}
+	if _, err := UpdateTask(ctx, 1, taskID, UpdateTaskInput{TagIDs: &swap}); err != nil {
+		t.Fatalf("swap tags: %v", err)
+	}
+	added = eventsOfType(t, taskID, 1, "tag_added")
+	removed := eventsOfType(t, taskID, 1, "tag_removed")
+	if len(added) != 2 {
+		t.Fatalf("after swap tag_added count=%d want 2", len(added))
+	}
+	if added[0].Metadata["tag"] != "bravo" {
+		t.Errorf("newest tag_added=%v want bravo", added[0].Metadata["tag"])
+	}
+	if eventTagID(added[0]) != bravo.ID {
+		t.Errorf("newest tag_added tag_id=%d want %d", eventTagID(added[0]), bravo.ID)
+	}
+	if len(removed) != 1 {
+		t.Fatalf("after swap tag_removed count=%d want 1", len(removed))
+	}
+	if removed[0].Metadata["tag"] != "alpha" {
+		t.Errorf("tag_removed name=%v want alpha", removed[0].Metadata["tag"])
+	}
+	if eventTagID(removed[0]) != alpha.ID {
+		t.Errorf("tag_removed tag_id=%d want %d", eventTagID(removed[0]), alpha.ID)
+	}
+
+	empty := []int{}
+	if _, err := UpdateTask(ctx, 1, taskID, UpdateTaskInput{TagIDs: &empty}); err != nil {
+		t.Fatalf("remove tags: %v", err)
+	}
+	removed = eventsOfType(t, taskID, 1, "tag_removed")
+	if len(removed) != 2 {
+		t.Fatalf("after clear tag_removed count=%d want 2", len(removed))
+	}
+	if removed[0].Metadata["tag"] != "bravo" {
+		t.Errorf("newest tag_removed=%v want bravo", removed[0].Metadata["tag"])
+	}
+	if eventTagID(removed[0]) != bravo.ID {
+		t.Errorf("newest tag_removed tag_id=%d want %d", eventTagID(removed[0]), bravo.ID)
+	}
+}
+
+func eventTagID(ev storage.TaskEvent) int {
+	switch v := ev.Metadata["tag_id"].(type) {
+	case float64:
+		return int(v)
+	case int:
+		return v
+	case int64:
+		return int(v)
+	default:
+		return 0
+	}
+}
+
 func TestTagShareLinksRejected(t *testing.T) {
 	ctx := context.Background()
 	_, err := CreateShareLinkForScope(ctx, 1, "tag", 1, nil)

@@ -484,7 +484,7 @@ useLiveUpdates(async (event: LiveEvent) => {
   }
   try {
     await loadTask(taskId.value)
-    if (eventsLoaded.value) await loadEvents()
+    if (eventsLoaded.value) await loadEvents(true)
   } catch {
     toast.push('This task is no longer available', 'info')
     close()
@@ -597,6 +597,7 @@ async function save(keepOpen = false) {
     const updated = await api.patchTask(taskId.value, payload)
     notifySaved(updated, true)
     toast.push('Task saved', 'success')
+    if (eventsLoaded.value) await loadEvents(true)
   } catch (err) {
     const msg = err instanceof APIError ? err.message : err instanceof Error ? err.message : 'Save failed'
     toast.push(msg, 'error')
@@ -628,8 +629,9 @@ function toggleTag(id: number, checked: boolean) {
   }
 }
 
-async function loadEvents() {
-  if (!taskId.value || eventsLoaded.value || eventsLoading.value) return
+async function loadEvents(force = false) {
+  if (!taskId.value || eventsLoading.value) return
+  if (eventsLoaded.value && !force) return
   eventsLoading.value = true
   try {
     events.value = await api.listTaskEvents(taskId.value)

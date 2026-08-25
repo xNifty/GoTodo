@@ -14,27 +14,6 @@ func logTaskEvent(taskID, userID int, eventType string, metadata map[string]inte
 	}
 }
 
-func logTagChanges(taskID, userID int, before, after []storage.Tag) {
-	beforeMap := make(map[int]string, len(before))
-	for _, t := range before {
-		beforeMap[t.ID] = t.Name
-	}
-	afterMap := make(map[int]string, len(after))
-	for _, t := range after {
-		afterMap[t.ID] = t.Name
-	}
-	for id, name := range afterMap {
-		if _, ok := beforeMap[id]; !ok {
-			logTaskEvent(taskID, userID, "tag_added", map[string]interface{}{"tag": name, "tag_id": id})
-		}
-	}
-	for id, name := range beforeMap {
-		if _, ok := afterMap[id]; !ok {
-			logTaskEvent(taskID, userID, "tag_removed", map[string]interface{}{"tag": name, "tag_id": id})
-		}
-	}
-}
-
 func priorityLabel(p int) string {
 	switch p {
 	case 1:

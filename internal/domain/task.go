@@ -561,8 +561,15 @@ func UpdateTask(ctx context.Context, userID, taskID int, in UpdateTaskInput) (*U
 	}
 
 	if in.TagIDs != nil {
+		beforeTags, err := storage.GetTagsForTask(taskID)
+		if err != nil {
+			return nil, err
+		}
 		if err := storage.SetTaskTags(taskID, userID, *in.TagIDs); err != nil {
 			return nil, fmt.Errorf("%w: %s", ErrValidation, err.Error())
+		}
+		if afterTags, err := storage.GetTagsForTask(taskID); err == nil {
+			logTagChanges(taskID, userID, beforeTags, afterTags)
 		}
 	}
 
@@ -594,6 +601,36 @@ func UpdateTask(ctx context.Context, userID, taskID int, in UpdateTaskInput) (*U
 		live.AfterTaskChange(userID, taskID, live.TypeTaskUpdated)
 	}
 	return result, nil
+}
+
+func logTagChanges(taskID, userID int, before, after []storage.Tag) {
+	beforeMap := tagActivityMap(before)
+	afterMap := tagActivityMap(after)
+	for key, t := range afterMap {
+		if _, ok := beforeMap[key]; !ok {
+			_ = storage.LogTaskEvent(taskID, userID, "tag_added", map[string]interface{}{"tag": t.Name, "tag_id": t.ID})
+		}
+	}
+	for key, t := range beforeMap {
+		if _, ok := afterMap[key]; !ok {
+			_ = storage.LogTaskEvent(taskID, userID, "tag_removed", map[string]interface{}{"tag": t.Name, "tag_id": t.ID})
+		}
+	}
+}
+
+func tagActivityMap(tags []storage.Tag) map[string]storage.Tag {
+	m := make(map[string]storage.Tag, len(tags))
+	for _, t := range tags {
+		if t.Protected || storage.IsRemovedTagName(t.Name) {
+			continue
+		}
+		key := strings.ToLower(strings.TrimSpace(t.Name))
+		if key == "" {
+			continue
+		}
+		m[key] = t
+	}
+	return m
 }
 
 func statusChangeMetadata(projectID, oldStatusID, newStatusID int) map[string]interface{} {
