@@ -77,7 +77,9 @@ onUnmounted(() => {
           <li>
             Manage projects from
             <RouterLink to="/projects">Projects</RouterLink>
-            — create, rename, share, and invite collaborators. Kanban projects can name sprints
+            — create, rename, share, invite collaborators, and archive. Archived projects move
+            into an Archived section so they do not clutter the main list, are tagged archived
+            automatically, and cannot accept new tasks until the owner restores them. Kanban projects can name sprints
             with optional descriptions, date ranges, and a lock date on the Sprints tab
             in project settings; ranges cannot overlap. After a sprint's lock date,
             only the project owner can add tasks. The board switcher filters tasks by

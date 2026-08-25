@@ -6,7 +6,7 @@ import type { Project, SavedView } from '@/api/types'
 import { useAuth } from '@/composables/useAuth'
 import { useSite } from '@/composables/useSite'
 import { useToast } from '@/composables/useToast'
-import { projectOptionLabel } from '@/utils/projectLabel'
+import { projectOptionLabel, isArchivedProject, isProjectOwner } from '@/utils/projectLabel'
 
 const props = defineProps<{
   open: boolean
@@ -27,14 +27,20 @@ const pendingInviteCount = inject<Ref<number>>('pendingInviteCount', ref(0))
 const projects = ref<Project[]>([])
 const savedViews = ref<SavedView[]>([])
 const projectsCollapsed = ref(false)
+const archivedCollapsed = ref(true)
 const viewsCollapsed = ref(false)
 
 const showChangelog = computed(() => siteInfo.value?.show_changelog !== false)
 const activeProject = computed(() => (typeof route.query.project === 'string' ? route.query.project : ''))
 const activeView = computed(() => (typeof route.query.view === 'string' ? route.query.view : ''))
 
-const ownedProjects = computed(() => projects.value.filter((p) => !p.role || p.role === 'owner'))
-const sharedProjects = computed(() => projects.value.filter((p) => p.role && p.role !== 'owner'))
+const ownedProjects = computed(() =>
+  projects.value.filter((p) => isProjectOwner(p) && !isArchivedProject(p)),
+)
+const sharedProjects = computed(() =>
+  projects.value.filter((p) => !isProjectOwner(p) && !isArchivedProject(p)),
+)
+const archivedProjectList = computed(() => projects.value.filter(isArchivedProject))
 
 async function loadLists() {
   if (!isAuthenticated.value) {
@@ -257,6 +263,32 @@ watch(isAuthenticated, (ok) => {
                 @click.prevent="selectProject(String(proj.id))"
               >
                 <i class="bi bi-folder2" />
+                <span class="text-truncate">{{ projectOptionLabel(proj) }}</span>
+              </a>
+            </li>
+            <li v-if="archivedProjectList.length" class="sidebar-nav-item">
+              <button
+                type="button"
+                class="sidebar-nav-link text-start w-100 border-0 bg-transparent"
+                @click="archivedCollapsed = !archivedCollapsed"
+              >
+                <i class="bi bi-archive" />
+                <span>Archived</span>
+                <i :class="archivedCollapsed ? 'bi bi-chevron-down' : 'bi bi-chevron-up'" class="ms-auto" />
+              </button>
+            </li>
+            <li
+              v-for="proj in archivedCollapsed ? [] : archivedProjectList"
+              :key="'arch-' + proj.id"
+              class="sidebar-nav-item"
+            >
+              <a
+                href="#"
+                class="sidebar-nav-link"
+                :class="{ active: activeProject === String(proj.id) }"
+                @click.prevent="selectProject(String(proj.id))"
+              >
+                <i class="bi bi-archive" />
                 <span class="text-truncate">{{ projectOptionLabel(proj) }}</span>
               </a>
             </li>

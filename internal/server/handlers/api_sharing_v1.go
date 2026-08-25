@@ -150,6 +150,26 @@ func handleProjectSubResource(w http.ResponseWriter, r *http.Request, sub string
 			apiV1ProjectGitHub(w, r, projectID)
 			return true
 		}
+	case "archive":
+		if len(parts) != 2 {
+			return false
+		}
+		if r.Method != http.MethodPost {
+			utils.APIJSONError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Method not allowed.")
+			return true
+		}
+		apiV1ArchiveProject(w, r, projectID)
+		return true
+	case "restore":
+		if len(parts) != 2 {
+			return false
+		}
+		if r.Method != http.MethodPost {
+			utils.APIJSONError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Method not allowed.")
+			return true
+		}
+		apiV1RestoreProject(w, r, projectID)
+		return true
 	}
 	return false
 }
@@ -334,6 +354,36 @@ func apiV1ProjectEvents(w http.ResponseWriter, r *http.Request, projectID int) {
 	json.NewEncoder(w).Encode(out)
 }
 
+func apiV1ArchiveProject(w http.ResponseWriter, r *http.Request, projectID int) {
+	userID, ok := apiUserFromRequest(r)
+	if !ok {
+		utils.APIJSONError(w, http.StatusUnauthorized, "unauthorized", "Not authenticated.")
+		return
+	}
+	project, err := domain.ArchiveProject(r.Context(), userID, projectID)
+	if err != nil {
+		writeWorkflowDomainError(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	json.NewEncoder(w).Encode(projectStorageToAPIJSON(project, storage.RoleOwner))
+}
+
+func apiV1RestoreProject(w http.ResponseWriter, r *http.Request, projectID int) {
+	userID, ok := apiUserFromRequest(r)
+	if !ok {
+		utils.APIJSONError(w, http.StatusUnauthorized, "unauthorized", "Not authenticated.")
+		return
+	}
+	project, err := domain.RestoreProject(r.Context(), userID, projectID)
+	if err != nil {
+		writeWorkflowDomainError(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	json.NewEncoder(w).Encode(projectStorageToAPIJSON(project, storage.RoleOwner))
+}
+
 func formatProjectEventLabel(eventType string, metadata map[string]interface{}) string {
 	name := metadataString(metadata, "name")
 	mode := metadataString(metadata, "mode")
@@ -403,6 +453,10 @@ func formatProjectEventLabel(eventType string, metadata map[string]interface{}) 
 		return "GitHub repo linked"
 	case "github_repo_unlinked":
 		return "GitHub repo unlinked"
+	case "archived":
+		return "Project archived"
+	case "restored":
+		return "Project restored"
 	default:
 		return eventType
 	}

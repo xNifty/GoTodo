@@ -22,7 +22,7 @@ import { useViewDensity } from '@/composables/useViewDensity'
 import { useSidebarState } from '@/composables/useSidebarState'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useLiveUpdates, isOwnFocusedLiveEvent } from '@/composables/useLiveUpdates'
-import { projectOptionLabel } from '@/utils/projectLabel'
+import { projectOptionLabel, activeProjects, isArchivedProject } from '@/utils/projectLabel'
 import { sprintOptionLabel } from '@/utils/sprintLabel'
 import { uniqueTagsByName, isArchivedTask } from '@/utils/tags'
 
@@ -135,6 +135,10 @@ const activeProjectObj = computed(() => {
 const isViewerProjectView = computed(
   () => activeProjectObj.value?.role === 'viewer',
 )
+
+const isArchivedProjectView = computed(() => !!activeProjectObj.value?.archived)
+
+const canAddTasks = computed(() => !isViewerProjectView.value && !isArchivedProjectView.value)
 
 const tagFilterByName = computed(() => !filters.project)
 const displayTags = computed(() => (tagFilterByName.value ? uniqueTagsByName(tags.value) : tags.value))
@@ -750,7 +754,7 @@ function isRemovedTagFilter(): boolean {
   const q = (filters.tag || '').trim().toLowerCase()
   if (q === 'removed') return true
   const tag = tags.value.find((t) => String(t.id) === filters.tag)
-  return !!tag && (!!tag.protected || tag.name.toLowerCase() === 'removed')
+  return !!tag && tag.name.toLowerCase() === 'removed'
 }
 
 watch(lastSavedTask, async (task) => {
@@ -887,6 +891,13 @@ function expandParent(taskId: number) {
 }
 
 function openAddSubtask(task: Task) {
+  if (task.project_id) {
+    const p = projects.value.find((pr) => pr.id === task.project_id)
+    if (p && isArchivedProject(p)) {
+      toast.push('Cannot add tasks to an archived project', 'error')
+      return
+    }
+  }
   expandParent(task.id)
   openAdd(undefined, task.project_id ?? null, { id: task.id, title: task.title })
 }
@@ -1096,11 +1107,11 @@ async function onProjectColumnsChanged() {
 
 async function onReorderProjects(projectIds: number[]) {
   const previous = [...projects.value]
-  const owned = projects.value.filter((p) => !p.role || p.role === 'owner')
-  const shared = projects.value.filter((p) => p.role && p.role !== 'owner')
-  const byId = new Map(owned.map((p) => [p.id, p]))
+  const ownedActive = projects.value.filter((p) => (!p.role || p.role === 'owner') && !isArchivedProject(p))
+  const rest = projects.value.filter((p) => !ownedActive.some((o) => o.id === p.id))
+  const byId = new Map(ownedActive.map((p) => [p.id, p]))
   const nextOwned = projectIds.map((id) => byId.get(id)!).filter(Boolean)
-  projects.value = [...nextOwned, ...shared]
+  projects.value = [...nextOwned, ...rest]
   try {
     await api.reorderProjects(projectIds)
   } catch (err) {
@@ -1193,7 +1204,7 @@ function showShortcutsHintOnce() {
 onMounted(async () => {
   registerTaskShortcuts({
     newTask: () => {
-      if (isViewerProjectView.value) return
+      if (!canAddTasks.value) return
       openAddFromView()
     },
     focusSearch: focusSearchInput,
@@ -1262,12 +1273,15 @@ onUnmounted(() => {
             <span v-if="isViewerProjectView" class="badge rounded-pill bg-info bg-opacity-10 text-info border border-info border-opacity-20 px-2 py-1">
               Viewer
             </span>
+            <span v-if="isArchivedProjectView" class="badge rounded-pill bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-20 px-2 py-1">
+              Archived
+            </span>
           </div>
 
           <!-- Actions Group: Import/Export & Add Task -->
           <div class="d-flex align-items-center gap-2">
             <button
-              v-if="!isViewerProjectView && showTaskTable"
+              v-if="!isViewerProjectView && !isArchivedProjectView && showTaskTable"
               type="button"
               class="btn btn-sm btn-outline-secondary rounded-pill px-2 py-1 d-md-none"
               :class="{ active: isSelecting }"
@@ -1314,7 +1328,7 @@ onUnmounted(() => {
 
             <!-- Add Task Button (Hidden for read-only viewer role) -->
             <button
-              v-if="!isViewerProjectView"
+              v-if="canAddTasks"
               type="button"
               class="btn btn-sm btn-success rounded-pill px-3 py-1 shadow-xs d-none d-md-flex align-items-center gap-1"
               @click="openAddFromView"
@@ -1435,7 +1449,7 @@ onUnmounted(() => {
                   <select v-model="bulkProject" class="form-select form-select-sm mb-2">
                     <option value="">Select project...</option>
                     <option value="0">No Project</option>
-                    <option v-for="p in projects" :key="p.id" :value="String(p.id)">{{ projectOptionLabel(p) }}</option>
+                    <option v-for="p in activeProjects(projects)" :key="p.id" :value="String(p.id)">{{ projectOptionLabel(p) }}</option>
                   </select>
                   <button
                     type="button"
@@ -1723,9 +1737,10 @@ onUnmounted(() => {
             <i class="bi bi-clipboard-check display-4 text-muted opacity-50" />
             <h4 class="mt-3 fw-bold">No tasks yet</h4>
             <p class="text-muted">Get started by creating your first task.</p>
-            <button v-if="!isViewerProjectView" type="button" class="btn btn-success rounded-pill px-4" @click="openAddFromView">
+            <button v-if="canAddTasks" type="button" class="btn btn-success rounded-pill px-4" @click="openAddFromView">
               <i class="bi bi-plus-lg me-1" /> Add Task
             </button>
+            <p v-else-if="isArchivedProjectView" class="text-muted small mb-0">This project is archived, so new tasks cannot be added.</p>
           </div>
         </div>
       </div>
@@ -1829,7 +1844,7 @@ onUnmounted(() => {
       <AppFooter />
 
       <button
-        v-if="!isViewerProjectView"
+        v-if="canAddTasks"
         type="button"
         class="ordryn-mobile-fab d-md-none"
         aria-label="Add task"
