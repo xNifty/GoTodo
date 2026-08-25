@@ -46,6 +46,47 @@ func SprintIsActive(start, end, now time.Time) bool {
 	return today >= s && today <= e
 }
 
+// SprintDatesOverlap reports whether two inclusive [start, end] ranges share a day.
+func SprintDatesOverlap(aStart, aEnd, bStart, bEnd time.Time) bool {
+	as := FormatSprintDate(aStart)
+	ae := FormatSprintDate(aEnd)
+	bs := FormatSprintDate(bStart)
+	be := FormatSprintDate(bEnd)
+	return as <= be && bs <= ae
+}
+
+// FindOverlappingProjectSprint returns one sprint whose inclusive dates overlap
+// [start, end]. excludeID skips that sprint (use 0 when creating).
+func FindOverlappingProjectSprint(projectID int, start, end time.Time, excludeID int) (*ProjectSprint, error) {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return nil, err
+	}
+	defer CloseDatabase(pool)
+
+	query := `SELECT ` + projectSprintSelectCols + `
+		 FROM project_sprints
+		 WHERE project_id = $1
+		   AND start_date <= $3::date
+		   AND end_date >= $2::date`
+	args := []interface{}{projectID, FormatSprintDate(start), FormatSprintDate(end)}
+	if excludeID > 0 {
+		query += ` AND id <> $4`
+		args = append(args, excludeID)
+	}
+	query += ` ORDER BY start_date ASC, id ASC LIMIT 1`
+
+	var s ProjectSprint
+	err = scanProjectSprint(pool.QueryRow(context.Background(), query, args...), &s)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &s, nil
+}
+
 // CreateProjectSprintsTable creates the project_sprints table.
 func CreateProjectSprintsTable() error {
 	pool, err := OpenDatabase()

@@ -2,8 +2,9 @@
   <div v-if="isKanban" class="sprints-panel">
     <h4 class="h6 mb-2">Sprints</h4>
     <p class="small text-muted mb-3">
-      Name a sprint and give it a date range. The board can switch between sprints; tasks with no
-      sprint stay in the backlog.
+      Name a sprint and give it a date range. Ranges cannot overlap; a sprint may
+      start the day after another ends. The board can switch between sprints; tasks
+      with no sprint stay in the backlog.
     </p>
 
     <ul class="list-unstyled mb-3">
@@ -155,6 +156,20 @@ function formatRange(start: string, end: string) {
   return `${start} – ${end}`
 }
 
+function datesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string): boolean {
+  return aStart <= bEnd && bStart <= aEnd
+}
+
+function overlappingSprint(start: string, end: string, exceptId?: number): ProjectSprint | undefined {
+  return sprints.value.find(
+    (s) => (exceptId == null || s.id !== exceptId) && datesOverlap(start, end, s.start_date, s.end_date),
+  )
+}
+
+function overlapMessage(hit: ProjectSprint): string {
+  return `Dates overlap ${hit.name} (${formatRange(hit.start_date, hit.end_date)})`
+}
+
 async function loadSprints() {
   if (!isKanban.value) {
     sprints.value = []
@@ -177,6 +192,15 @@ function beginEdit(s: ProjectSprint) {
 
 async function addSprint() {
   if (!newName.value.trim() || !newStart.value || !newEnd.value) return
+  if (newEnd.value < newStart.value) {
+    toast.push('End date must be on or after start date', 'error')
+    return
+  }
+  const hit = overlappingSprint(newStart.value, newEnd.value)
+  if (hit) {
+    toast.push(overlapMessage(hit), 'error')
+    return
+  }
   adding.value = true
   try {
     await api.createProjectSprint(props.project.id, {
@@ -199,6 +223,15 @@ async function addSprint() {
 
 async function saveEdit(s: ProjectSprint) {
   if (!editName.value.trim() || !editStart.value || !editEnd.value) return
+  if (editEnd.value < editStart.value) {
+    toast.push('End date must be on or after start date', 'error')
+    return
+  }
+  const hit = overlappingSprint(editStart.value, editEnd.value, s.id)
+  if (hit) {
+    toast.push(overlapMessage(hit), 'error')
+    return
+  }
   saving.value = true
   try {
     await api.updateProjectSprint(props.project.id, s.id, {

@@ -50,6 +50,18 @@ func parseSprintDateRange(startRaw, endRaw string) (time.Time, time.Time, error)
 	return start, end, nil
 }
 
+func rejectOverlappingSprint(projectID, excludeID int, start, end time.Time) error {
+	hit, err := storage.FindOverlappingProjectSprint(projectID, start, end, excludeID)
+	if err != nil {
+		return err
+	}
+	if hit == nil {
+		return nil
+	}
+	return fmt.Errorf("%w: dates overlap %s (%s – %s)", ErrValidation, hit.Name,
+		storage.FormatSprintDate(hit.StartDate), storage.FormatSprintDate(hit.EndDate))
+}
+
 func sprintConflictError(err error) error {
 	if err == nil {
 		return nil
@@ -89,6 +101,9 @@ func CreateProjectSprintForUser(ctx context.Context, userID, projectID int, in C
 	}
 	start, end, err := parseSprintDateRange(in.StartDate, in.EndDate)
 	if err != nil {
+		return nil, err
+	}
+	if err := rejectOverlappingSprint(projectID, 0, start, end); err != nil {
 		return nil, err
 	}
 	n, err := storage.CountProjectSprints(projectID)
@@ -137,6 +152,9 @@ func UpdateProjectSprintForUser(ctx context.Context, userID, projectID, sprintID
 	}
 	start, end, err := parseSprintDateRange(startRaw, endRaw)
 	if err != nil {
+		return nil, err
+	}
+	if err := rejectOverlappingSprint(projectID, sprintID, start, end); err != nil {
 		return nil, err
 	}
 	s, err := storage.UpdateProjectSprint(projectID, sprintID, name, &start, &end)

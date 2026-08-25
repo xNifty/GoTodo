@@ -1578,9 +1578,11 @@ paths:
                 start_date:
                   type: string
                   format: date
+                  description: Inclusive start (YYYY-MM-DD). Must not overlap another sprint in this project.
                 end_date:
                   type: string
                   format: date
+                  description: Inclusive end (YYYY-MM-DD). Adjacent ranges (next day after another sprint ends) are allowed.
       responses:
         "201":
           description: Created
@@ -1588,6 +1590,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProjectSprint"
+        "400":
+          description: Invalid dates, inverted range, or overlap with another sprint
         "409":
           description: Sprint limit or name conflict
 
@@ -1618,9 +1622,11 @@ paths:
                 start_date:
                   type: string
                   format: date
+                  description: Inclusive start (YYYY-MM-DD). Must not overlap another sprint in this project.
                 end_date:
                   type: string
                   format: date
+                  description: Inclusive end (YYYY-MM-DD). Adjacent ranges are allowed.
       responses:
         "200":
           description: Updated
@@ -3310,6 +3316,7 @@ components:
         end_date:
           type: string
           format: date
+          description: Inclusive range; sprints in a project must not overlap
         is_active:
           type: boolean
           description: True when today's UTC date falls in start_date..end_date inclusive

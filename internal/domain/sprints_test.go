@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -241,6 +242,73 @@ func TestSprintIsActiveWindow(t *testing.T) {
 	after, _ := time.Parse(time.RFC3339, "2026-09-07T00:00:00Z")
 	if storage.SprintIsActive(start, end, after) {
 		t.Fatal("expected inactive after end")
+	}
+}
+
+func TestSprintDatesOverlap(t *testing.T) {
+	parse := func(s string) time.Time {
+		d, err := time.Parse("2006-01-02", s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return d
+	}
+	if !storage.SprintDatesOverlap(parse("2026-08-01"), parse("2026-08-15"), parse("2026-08-15"), parse("2026-08-31")) {
+		t.Fatal("sharing an endpoint day should overlap")
+	}
+	if storage.SprintDatesOverlap(parse("2026-08-01"), parse("2026-08-14"), parse("2026-08-15"), parse("2026-08-31")) {
+		t.Fatal("adjacent ranges should not overlap")
+	}
+	if !storage.SprintDatesOverlap(parse("2026-08-01"), parse("2026-08-31"), parse("2026-08-10"), parse("2026-08-12")) {
+		t.Fatal("contained range should overlap")
+	}
+}
+
+func TestSprintRejectsOverlappingDates(t *testing.T) {
+	ctx := context.Background()
+	proj, err := CreateProject(ctx, 1, "No Overlap Board", "")
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	if _, err := SetProjectWorkflowMode(ctx, 1, proj.ID, storage.WorkflowKanban); err != nil {
+		t.Fatalf("enable kanban: %v", err)
+	}
+	first, err := CreateProjectSprintForUser(ctx, 1, proj.ID, CreateProjectSprintInput{
+		Name:      "Sprint A",
+		StartDate: "2026-08-01",
+		EndDate:   "2026-08-14",
+	})
+	if err != nil {
+		t.Fatalf("create first: %v", err)
+	}
+	if _, err := CreateProjectSprintForUser(ctx, 1, proj.ID, CreateProjectSprintInput{
+		Name:      "Sprint B",
+		StartDate: "2026-08-15",
+		EndDate:   "2026-08-31",
+	}); err != nil {
+		t.Fatalf("adjacent sprint should be allowed: %v", err)
+	}
+	_, err = CreateProjectSprintForUser(ctx, 1, proj.ID, CreateProjectSprintInput{
+		Name:      "Overlap",
+		StartDate: "2026-08-10",
+		EndDate:   "2026-08-20",
+	})
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("overlapping create err=%v", err)
+	}
+	if err == nil || !strings.Contains(err.Error(), "Sprint A") {
+		t.Fatalf("overlap error should name the other sprint, got %v", err)
+	}
+	_, err = UpdateProjectSprintForUser(ctx, 1, proj.ID, first.ID, UpdateProjectSprintInput{
+		EndDate: strPtr("2026-08-20"),
+	})
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("overlapping update err=%v", err)
+	}
+	if _, err := UpdateProjectSprintForUser(ctx, 1, proj.ID, first.ID, UpdateProjectSprintInput{
+		EndDate: strPtr("2026-08-14"),
+	}); err != nil {
+		t.Fatalf("updating a sprint to its own range should be allowed: %v", err)
 	}
 }
 

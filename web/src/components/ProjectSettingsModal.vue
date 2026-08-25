@@ -46,15 +46,23 @@ const tabs = computed(() => {
 })
 
 watch(
-  () => [props.open, props.project] as const,
-  ([open, project]) => {
-    if (open && project) {
-      name.value = project.name
-      description.value = project.description || ''
-      tab.value = 'details'
-    }
+  () => props.open,
+  (open) => {
+    if (!open || !props.project) return
+    name.value = props.project.name
+    description.value = props.project.description || ''
+    tab.value = 'details'
   },
-  { immediate: true },
+)
+
+watch(
+  () => props.project?.id,
+  (id, prevId) => {
+    if (!props.open || !props.project) return
+    name.value = props.project.name
+    description.value = props.project.description || ''
+    if (prevId !== undefined && id !== prevId) tab.value = 'details'
+  },
 )
 
 watch(isKanban, (kanban) => {
