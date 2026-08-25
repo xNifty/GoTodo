@@ -12,16 +12,18 @@ import (
 
 // CreateProjectSprintInput is the create payload for a sprint.
 type CreateProjectSprintInput struct {
-	Name      string
-	StartDate string
-	EndDate   string
+	Name        string
+	Description string
+	StartDate   string
+	EndDate     string
 }
 
 // UpdateProjectSprintInput is a partial sprint update.
 type UpdateProjectSprintInput struct {
-	Name      *string
-	StartDate *string
-	EndDate   *string
+	Name        *string
+	Description *string
+	StartDate   *string
+	EndDate     *string
 }
 
 func normalizeSprintName(raw string) (string, error) {
@@ -33,6 +35,14 @@ func normalizeSprintName(raw string) (string, error) {
 		return "", fmt.Errorf("%w: sprint name must be %d characters or less", ErrValidation, storage.MaxSprintNameLen)
 	}
 	return name, nil
+}
+
+func normalizeSprintDescription(raw string) (string, error) {
+	desc := strings.TrimSpace(raw)
+	if len(desc) > storage.MaxSprintDescriptionLen {
+		return "", fmt.Errorf("%w: sprint description must be %d characters or less", ErrValidation, storage.MaxSprintDescriptionLen)
+	}
+	return desc, nil
 }
 
 func parseSprintDateRange(startRaw, endRaw string) (time.Time, time.Time, error) {
@@ -99,6 +109,10 @@ func CreateProjectSprintForUser(ctx context.Context, userID, projectID int, in C
 	if err != nil {
 		return nil, err
 	}
+	desc, err := normalizeSprintDescription(in.Description)
+	if err != nil {
+		return nil, err
+	}
 	start, end, err := parseSprintDateRange(in.StartDate, in.EndDate)
 	if err != nil {
 		return nil, err
@@ -113,7 +127,7 @@ func CreateProjectSprintForUser(ctx context.Context, userID, projectID int, in C
 	if n >= storage.MaxProjectSprints {
 		return nil, fmt.Errorf("%w: a maximum of %d sprints is allowed", ErrConflict, storage.MaxProjectSprints)
 	}
-	s, err := storage.CreateProjectSprint(projectID, name, start, end)
+	s, err := storage.CreateProjectSprint(projectID, name, desc, start, end)
 	if err != nil {
 		return nil, sprintConflictError(err)
 	}
@@ -142,6 +156,14 @@ func UpdateProjectSprintForUser(ctx context.Context, userID, projectID, sprintID
 		}
 		name = &n
 	}
+	var description *string
+	if in.Description != nil {
+		d, err := normalizeSprintDescription(*in.Description)
+		if err != nil {
+			return nil, err
+		}
+		description = &d
+	}
 	startRaw := storage.FormatSprintDate(cur.StartDate)
 	endRaw := storage.FormatSprintDate(cur.EndDate)
 	if in.StartDate != nil {
@@ -157,7 +179,7 @@ func UpdateProjectSprintForUser(ctx context.Context, userID, projectID, sprintID
 	if err := rejectOverlappingSprint(projectID, sprintID, start, end); err != nil {
 		return nil, err
 	}
-	s, err := storage.UpdateProjectSprint(projectID, sprintID, name, &start, &end)
+	s, err := storage.UpdateProjectSprint(projectID, sprintID, name, description, &start, &end)
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "sprint not found") {
 			return nil, ErrNotFound

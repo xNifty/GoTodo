@@ -12,6 +12,7 @@ import { useTaskSidebar } from '@/composables/useTaskSidebar'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { projectOptionLabel } from '@/utils/projectLabel'
+import { sprintOptionLabel } from '@/utils/sprintLabel'
 import { useLiveUpdates, type LiveEvent } from '@/composables/useLiveUpdates'
 import { assignableTags, archiveConfirmMessage, isArchivedTask, isProtectedTag } from '@/utils/tags'
 
@@ -1188,7 +1189,7 @@ async function removeTimeEntry(entryId: number) {
           >
             <option value="">Backlog</option>
             <option v-for="s in sprints" :key="s.id" :value="String(s.id)">
-              {{ s.name }}{{ s.is_active ? ' (active)' : '' }}
+              {{ sprintOptionLabel(s, { activeSuffix: true }) }}
             </option>
           </select>
         </div>
