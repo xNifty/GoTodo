@@ -13,7 +13,10 @@ import (
 
 const maxCommentPreview = 120
 
-var commentTaskRefPattern = regexp.MustCompile(`\[\[(\d+)\]\]|#(\d+)\b`)
+var (
+	commentTaskRefPattern = regexp.MustCompile(`\[\[(\d+)\]\]|#(\d+)\b`)
+	commentMentionPattern = regexp.MustCompile(`(^|[^A-Za-z0-9_@])@([A-Za-z0-9_]{3,32})\b`)
+)
 
 func requireProjectTaskAccess(taskID, userID int) (projectID int, err error) {
 	canRead, _, projectID, err := storage.CanUserAccessTask(taskID, userID)
@@ -53,6 +56,63 @@ func ParseCommentTaskIDs(body string) []int {
 		ids = append(ids, id)
 	}
 	return ids
+}
+
+// ParseCommentMentions returns unique @usernames from a comment body, in first-seen order.
+// Email addresses are not treated as mentions.
+func ParseCommentMentions(body string) []string {
+	matches := commentMentionPattern.FindAllStringSubmatch(body, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(matches))
+	names := make([]string, 0, len(matches))
+	for _, m := range matches {
+		name := strings.TrimSpace(m[2])
+		if name == "" {
+			continue
+		}
+		key := strings.ToLower(name)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		names = append(names, name)
+	}
+	return names
+}
+
+// ResolveCommentMentions maps @usernames in body to current project members.
+func ResolveCommentMentions(projectID int, body string) []storage.ProjectMember {
+	names := ParseCommentMentions(body)
+	if projectID <= 0 || len(names) == 0 {
+		return nil
+	}
+	members, err := storage.ListProjectMembers(projectID)
+	if err != nil || len(members) == 0 {
+		return nil
+	}
+	wanted := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		wanted[strings.ToLower(name)] = struct{}{}
+	}
+	out := make([]storage.ProjectMember, 0, len(names))
+	seen := make(map[int]struct{}, len(names))
+	for _, m := range members {
+		key := strings.ToLower(strings.TrimSpace(m.UserName))
+		if key == "" {
+			continue
+		}
+		if _, ok := wanted[key]; !ok {
+			continue
+		}
+		if _, ok := seen[m.UserID]; ok {
+			continue
+		}
+		seen[m.UserID] = struct{}{}
+		out = append(out, m)
+	}
+	return out
 }
 
 // ResolveCommentTaskLinks returns titles for referenced tasks the user can access.

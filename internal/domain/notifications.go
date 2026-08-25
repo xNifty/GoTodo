@@ -132,23 +132,43 @@ func NotifyProjectMembersTaskCommented(taskID, actorUserID, projectID int, comme
 		taskTitle = td.Title
 	}
 
-	title := "New comment on a task"
+	commentTitle := "New comment on a task"
 	if taskTitle != "" {
-		title = fmt.Sprintf("New comment on %s", taskTitle)
+		commentTitle = fmt.Sprintf("New comment on %s", taskTitle)
 	} else if projectName != "" {
-		title = fmt.Sprintf("New comment in %s", projectName)
+		commentTitle = fmt.Sprintf("New comment in %s", projectName)
+	}
+	mentionTitle := "You were mentioned on a task"
+	if taskTitle != "" {
+		mentionTitle = fmt.Sprintf("You were mentioned on %s", taskTitle)
+	} else if projectName != "" {
+		mentionTitle = fmt.Sprintf("You were mentioned in %s", projectName)
 	}
 	body := commentPreview(commentBody)
+
+	mentioned := make(map[int]struct{})
+	for _, m := range ResolveCommentMentions(projectID, commentBody) {
+		if m.UserID == actorUserID {
+			continue
+		}
+		mentioned[m.UserID] = struct{}{}
+	}
 
 	items := make([]storage.UserNotification, 0, len(members))
 	for _, m := range members {
 		if m.UserID == actorUserID {
 			continue
 		}
+		nType := storage.NotificationTaskCommented
+		title := commentTitle
+		if _, ok := mentioned[m.UserID]; ok {
+			nType = storage.NotificationTaskMentioned
+			title = mentionTitle
+		}
 		items = append(items, storage.UserNotification{
 			UserID:      m.UserID,
 			ActorUserID: actorUserID,
-			Type:        storage.NotificationTaskCommented,
+			Type:        nType,
 			ProjectID:   projectID,
 			TaskID:      taskID,
 			Title:       title,

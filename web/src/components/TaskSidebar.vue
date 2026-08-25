@@ -1457,6 +1457,7 @@ async function removeTimeEntry(entryId: number) {
           v-if="showDiscussion && taskId"
           ref="discussionRef"
           :task-id="taskId"
+          :project-id="currentTask?.project_id ?? null"
           :current-user-id="user?.id ?? null"
           :is-owner="discussionIsOwner"
           :fill-height="isKanbanTask"

@@ -118,6 +118,11 @@ onUnmounted(() => {
             comments show up live for anyone with the task open, and in the notification bell.
           </li>
           <li>
+            Type <code>@</code> in a comment to mention a project member. Autocomplete lists matching
+            members of that project only (same prefix search as project invites). Mentioned members
+            get a notification; other members still see the usual new-comment notice.
+          </li>
+          <li>
             Paste <code>#123</code> in a comment to link another task you can access (including tasks
             only you can see). Click <strong>Insert link</strong>, and it renders as
             <em>Task #123 - Title</em> for anyone who can open that task.

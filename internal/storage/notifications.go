@@ -10,6 +10,7 @@ import (
 const (
 	NotificationTaskCreated   = "task_created"
 	NotificationTaskCommented = "task_commented"
+	NotificationTaskMentioned = "task_mentioned"
 	NotificationJoinRequest   = "join_request"
 )
 
