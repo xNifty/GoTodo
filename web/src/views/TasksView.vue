@@ -1370,12 +1370,15 @@ onUnmounted(() => {
             >
               <option value="backlog">Backlog</option>
               <option v-for="s in boardSprints" :key="s.id" :value="String(s.id)">
-                {{ sprintOptionLabel(s, { activeSuffix: true }) }}
+                {{ sprintOptionLabel(s, { activeSuffix: true, lockedSuffix: true }) }}
               </option>
             </select>
             <span v-if="selectedBoardSprint" class="small text-muted">
               <template v-if="selectedBoardSprint.description">{{ selectedBoardSprint.description }} · </template>
               {{ selectedBoardSprint.start_date }} – {{ selectedBoardSprint.end_date }}
+              <template v-if="selectedBoardSprint.lock_date">
+                · {{ selectedBoardSprint.is_locked ? 'locked' : 'locks' }} {{ selectedBoardSprint.lock_date }}
+              </template>
               · {{ selectedBoardSprint.task_count }} task{{ selectedBoardSprint.task_count === 1 ? '' : 's' }}
             </span>
             <span v-else class="small text-muted">Tasks not assigned to a sprint</span>

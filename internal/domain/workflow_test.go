@@ -120,6 +120,10 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "sprint description: %v\n", err)
 		os.Exit(1)
 	}
+	if err := storage.MigrateProjectSprintsAddLockDate(); err != nil {
+		fmt.Fprintf(os.Stderr, "sprint lock_date: %v\n", err)
+		os.Exit(1)
+	}
 	if err := storage.MigrateTasksAddSprintID(); err != nil {
 		fmt.Fprintf(os.Stderr, "sprint_id: %v\n", err)
 		os.Exit(1)

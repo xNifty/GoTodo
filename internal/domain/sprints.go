@@ -16,6 +16,7 @@ type CreateProjectSprintInput struct {
 	Description string
 	StartDate   string
 	EndDate     string
+	LockDate    string
 }
 
 // UpdateProjectSprintInput is a partial sprint update.
@@ -24,6 +25,8 @@ type UpdateProjectSprintInput struct {
 	Description *string
 	StartDate   *string
 	EndDate     *string
+	// LockDate: nil = leave; pointer to "" = clear; pointer to YYYY-MM-DD = set.
+	LockDate *string
 }
 
 func normalizeSprintName(raw string) (string, error) {
@@ -120,6 +123,10 @@ func CreateProjectSprintForUser(ctx context.Context, userID, projectID int, in C
 	if err := rejectOverlappingSprint(projectID, 0, start, end); err != nil {
 		return nil, err
 	}
+	lockDate, err := parseOptionalLockDate(in.LockDate)
+	if err != nil {
+		return nil, err
+	}
 	n, err := storage.CountProjectSprints(projectID)
 	if err != nil {
 		return nil, err
@@ -127,7 +134,7 @@ func CreateProjectSprintForUser(ctx context.Context, userID, projectID int, in C
 	if n >= storage.MaxProjectSprints {
 		return nil, fmt.Errorf("%w: a maximum of %d sprints is allowed", ErrConflict, storage.MaxProjectSprints)
 	}
-	s, err := storage.CreateProjectSprint(projectID, name, desc, start, end)
+	s, err := storage.CreateProjectSprint(projectID, name, desc, start, end, lockDate)
 	if err != nil {
 		return nil, sprintConflictError(err)
 	}
@@ -179,7 +186,14 @@ func UpdateProjectSprintForUser(ctx context.Context, userID, projectID, sprintID
 	if err := rejectOverlappingSprint(projectID, sprintID, start, end); err != nil {
 		return nil, err
 	}
-	s, err := storage.UpdateProjectSprint(projectID, sprintID, name, description, &start, &end)
+	lockDate := cur.LockDate
+	if in.LockDate != nil {
+		lockDate, err = parseOptionalLockDate(*in.LockDate)
+		if err != nil {
+			return nil, err
+		}
+	}
+	s, err := storage.UpdateProjectSprint(projectID, sprintID, name, description, &start, &end, lockDate)
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "sprint not found") {
 			return nil, ErrNotFound
@@ -232,7 +246,33 @@ func DeleteProjectSprintForUser(ctx context.Context, userID, projectID, sprintID
 	return nil
 }
 
-func applyTaskSprint(taskID, projectID int, sprintID *int) error {
+func parseOptionalLockDate(raw string) (*time.Time, error) {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return nil, nil
+	}
+	t, err := storage.ParseSprintDate(s)
+	if err != nil {
+		return nil, fmt.Errorf("%w: lock_date %s", ErrValidation, err.Error())
+	}
+	return &t, nil
+}
+
+func rejectLockedSprintAssignment(userID, projectID int, sprint *storage.ProjectSprint) error {
+	if sprint == nil || !storage.SprintIsLocked(sprint.LockDate, time.Now()) {
+		return nil
+	}
+	proj, err := storage.GetAccessibleProjectByID(projectID, userID)
+	if err != nil {
+		return ErrNotFound
+	}
+	if storage.RoleCanManage(proj.Role) {
+		return nil
+	}
+	return fmt.Errorf("%w: sprint is locked; only the project owner can add items", ErrForbidden)
+}
+
+func applyTaskSprint(taskID, projectID, userID int, sprintID *int) error {
 	if sprintID == nil || *sprintID <= 0 {
 		return storage.SetTaskSprintID(taskID, nil)
 	}
@@ -246,8 +286,18 @@ func applyTaskSprint(taskID, projectID int, sprintID *int) error {
 	if mode != storage.WorkflowKanban {
 		return fmt.Errorf("%w: sprint requires a kanban project", ErrValidation)
 	}
-	if _, err := storage.GetProjectSprint(projectID, *sprintID); err != nil {
+	sprint, err := storage.GetProjectSprint(projectID, *sprintID)
+	if err != nil {
 		return fmt.Errorf("%w: invalid sprint_id", ErrValidation)
+	}
+	current, err := storage.GetTaskSprintID(taskID)
+	if err != nil {
+		return err
+	}
+	if current != *sprintID {
+		if err := rejectLockedSprintAssignment(userID, projectID, sprint); err != nil {
+			return err
+		}
 	}
 	return storage.SetTaskSprintID(taskID, sprintID)
 }

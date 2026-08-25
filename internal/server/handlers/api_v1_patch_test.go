@@ -83,3 +83,46 @@ func TestAPITaskPatchEstimatePointsJSONNullClears(t *testing.T) {
 		t.Fatal("omitted estimate_points should leave the field unchanged")
 	}
 }
+
+func TestAPISprintPatchLockDateJSON(t *testing.T) {
+	t.Run("omitted leaves unchanged", func(t *testing.T) {
+		var req apiSprintPatchRequest
+		if err := json.Unmarshal([]byte(`{"name":"Keep lock"}`), &req); err != nil {
+			t.Fatal(err)
+		}
+		if req.LockDate.Set {
+			t.Fatal("omitted lock_date should not be set")
+		}
+		if got := req.LockDate.toPatchString(); got != nil {
+			t.Fatalf("omitted lock_date patch=%#v, want nil", got)
+		}
+	})
+
+	t.Run("null clears lock", func(t *testing.T) {
+		var req apiSprintPatchRequest
+		if err := json.Unmarshal([]byte(`{"lock_date":null}`), &req); err != nil {
+			t.Fatal(err)
+		}
+		if !req.LockDate.Set || !req.LockDate.Null {
+			t.Fatalf("null lock_date: set=%v null=%v", req.LockDate.Set, req.LockDate.Null)
+		}
+		got := req.LockDate.toPatchString()
+		if got == nil || *got != "" {
+			t.Fatalf("null lock_date patch=%#v, want empty string", got)
+		}
+	})
+
+	t.Run("value sets lock date", func(t *testing.T) {
+		var req apiSprintPatchRequest
+		if err := json.Unmarshal([]byte(`{"lock_date":"2026-08-25"}`), &req); err != nil {
+			t.Fatal(err)
+		}
+		if !req.LockDate.Set || req.LockDate.Null || req.LockDate.Value != "2026-08-25" {
+			t.Fatalf("value lock_date: %+v", req.LockDate)
+		}
+		got := req.LockDate.toPatchString()
+		if got == nil || *got != "2026-08-25" {
+			t.Fatalf("value lock_date patch=%#v, want 2026-08-25", got)
+		}
+	})
+}

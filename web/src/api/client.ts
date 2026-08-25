@@ -521,7 +521,13 @@ export const api = {
 
   createProjectSprint(
     projectId: number,
-    payload: { name: string; description?: string; start_date: string; end_date: string },
+    payload: {
+      name: string
+      description?: string
+      start_date: string
+      end_date: string
+      lock_date?: string | null
+    },
   ) {
     return request<ProjectSprint>(`/api/v1/projects/${projectId}/sprints`, {
       method: 'POST',
@@ -532,7 +538,13 @@ export const api = {
   updateProjectSprint(
     projectId: number,
     sprintId: number,
-    payload: Partial<{ name: string; description: string; start_date: string; end_date: string }>,
+    payload: Partial<{
+      name: string
+      description: string
+      start_date: string
+      end_date: string
+      lock_date: string | null
+    }>,
   ) {
     return request<ProjectSprint>(`/api/v1/projects/${projectId}/sprints/${sprintId}`, {
       method: 'PATCH',
