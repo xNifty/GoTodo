@@ -69,6 +69,54 @@ func SearchUsersByUsernamePrefix(q string, excludeUserID, limit int) ([]string, 
 	return out, rows.Err()
 }
 
+// SearchProjectMembersByUsernamePrefix returns usernames of members of projectID
+// whose user_name starts with q (case-insensitive). Excludes banned users and
+// empty usernames. Does not apply the project-invite opt-out. Limit is capped at 10.
+func SearchProjectMembersByUsernamePrefix(projectID int, q string, limit int) ([]string, error) {
+	q = strings.TrimSpace(q)
+	if q == "" || projectID <= 0 {
+		return []string{}, nil
+	}
+	if limit <= 0 || limit > userSearchDefaultLimit {
+		limit = userSearchDefaultLimit
+	}
+
+	pool, err := OpenDatabase()
+	if err != nil {
+		return nil, err
+	}
+	defer CloseDatabase(pool)
+
+	pattern := EscapeLikePattern(q) + "%"
+	rows, err := pool.Query(context.Background(), `
+		SELECT COALESCE(u.user_name, '')
+		FROM project_members pm
+		JOIN users u ON u.id = pm.user_id
+		WHERE pm.project_id = $1
+		  AND TRIM(COALESCE(u.user_name, '')) <> ''
+		  AND COALESCE(u.is_banned, FALSE) = FALSE
+		  AND LOWER(u.user_name) LIKE LOWER($2) ESCAPE E'\\'
+		ORDER BY LOWER(u.user_name) ASC
+		LIMIT $3`,
+		projectID, pattern, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]string, 0, limit)
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		if name != "" {
+			out = append(out, name)
+		}
+	}
+	return out, rows.Err()
+}
+
 // GetUserByUsername loads a user by username (case-insensitive).
 func GetUserByUsername(name string) (*User, error) {
 	pool, err := OpenDatabase()

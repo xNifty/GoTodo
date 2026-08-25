@@ -1,52 +1,19 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { api } from '@/api/client'
-
-const SEARCH_LIMIT = 10
-const MIN_QUERY = 2
-const DEBOUNCE_MS = 300
-
-type CacheEntry = { names: string[]; complete: boolean }
-
-const searchCache = new Map<string, CacheEntry>()
-
-function cacheKey(q: string) {
-  return q.trim().toLowerCase()
-}
-
-function filterPrefix(names: string[], key: string) {
-  return names.filter((n) => n.toLowerCase().startsWith(key))
-}
-
-/** Cached names for q, or null if a network fetch is still needed. */
-function namesFromCache(q: string): string[] | null {
-  const key = cacheKey(q)
-  if (key.length < MIN_QUERY) return []
-
-  const exact = searchCache.get(key)
-  if (exact) return filterPrefix(exact.names, key)
-
-  for (let len = key.length - 1; len >= MIN_QUERY; len--) {
-    const entry = searchCache.get(key.slice(0, len))
-    if (entry?.complete) return filterPrefix(entry.names, key)
-  }
-  return null
-}
-
-function remember(q: string, names: string[]) {
-  searchCache.set(cacheKey(q), { names, complete: names.length < SEARCH_LIMIT })
-}
+import { USER_SEARCH_MIN_QUERY, useUserSearch } from '@/composables/useUserSearch'
 
 const props = withDefaults(
   defineProps<{
     modelValue: string
     inputId?: string
     excludeUsernames?: string[]
+    projectId?: number | null
     disabled?: boolean
   }>(),
   {
     inputId: 'invite-username',
     excludeUsernames: () => [],
+    projectId: null,
     disabled: false,
   },
 )
@@ -56,45 +23,23 @@ const emit = defineEmits<{
 }>()
 
 const open = ref(false)
-const highlight = ref(0)
 const inputEl = ref<HTMLInputElement | null>(null)
 const listEl = ref<HTMLElement | null>(null)
-const hits = ref<string[]>([])
-const loading = ref(false)
 const menuStyle = ref<Record<string, string>>({})
 
-const excludeSet = computed(
-  () => new Set(props.excludeUsernames.map((n) => n.toLowerCase()).filter(Boolean)),
-)
-
-const filtered = computed(() =>
-  hits.value.filter((name) => !excludeSet.value.has(name.toLowerCase())),
-)
+const { filtered, loading, highlight, scheduleSearch, cancelPending, applyLocal, cachedNames } =
+  useUserSearch({
+    projectId: () => props.projectId,
+    excludeUsernames: () => props.excludeUsernames,
+  })
 
 const showMenu = computed(() => open.value && !props.disabled && !!props.modelValue.trim())
-
-let debounceTimer: number | undefined
-let searchGen = 0
-let abort: AbortController | undefined
-
-function abortInFlight() {
-  abort?.abort()
-  abort = undefined
-}
-
-function cancelPending() {
-  window.clearTimeout(debounceTimer)
-  abortInFlight()
-  searchGen += 1
-  loading.value = false
-}
 
 watch(
   () => props.modelValue,
   (q) => {
     if (!q.trim()) {
       cancelPending()
-      hits.value = []
       open.value = false
     }
   },
@@ -137,91 +82,38 @@ function updateMenuPosition() {
   }
 }
 
-function applyLocal(names: string[]) {
-  hits.value = names
-  open.value = true
-  highlight.value = 0
-  loading.value = false
-  void nextTick(() => updateMenuPosition())
-}
-
-function scheduleSearch(raw: string) {
-  window.clearTimeout(debounceTimer)
-  const q = raw.trim()
-  if (q.length < MIN_QUERY) {
-    cancelPending()
-    hits.value = []
-    open.value = false
-    return
-  }
-
-  const local = namesFromCache(q)
-  if (local) {
-    cancelPending()
-    applyLocal(local)
-    return
-  }
-
-  open.value = true
-  loading.value = true
-  void nextTick(() => updateMenuPosition())
-  debounceTimer = window.setTimeout(() => {
-    void runSearch(q)
-  }, DEBOUNCE_MS)
-}
-
-async function runSearch(q: string) {
-  const local = namesFromCache(q)
-  if (local) {
-    applyLocal(local)
-    return
-  }
-
-  const gen = ++searchGen
-  abortInFlight()
-  abort = new AbortController()
-  const { signal } = abort
-  loading.value = true
-  try {
-    const results = await api.searchUsers(q, { signal })
-    if (gen !== searchGen) return
-    const names = results.map((h) => h.user_name)
-    remember(q, names)
-    hits.value = names
-    open.value = true
-    highlight.value = 0
-    void nextTick(() => updateMenuPosition())
-  } catch {
-    if (gen !== searchGen || signal.aborted) return
-    hits.value = []
-    open.value = true
-  } finally {
-    if (gen === searchGen) loading.value = false
-  }
-}
-
 function onInput(e: Event) {
   if (props.disabled) return
   const value = (e.target as HTMLInputElement).value
   emit('update:modelValue', value)
+  const q = value.trim()
+  if (q.length < USER_SEARCH_MIN_QUERY) {
+    cancelPending()
+    open.value = false
+    return
+  }
+  open.value = true
   scheduleSearch(value)
+  void nextTick(() => updateMenuPosition())
 }
 
 function onFocus() {
   if (props.disabled) return
   const q = props.modelValue.trim()
-  if (q.length < MIN_QUERY) return
-  const local = namesFromCache(q)
+  if (q.length < USER_SEARCH_MIN_QUERY) return
+  const local = cachedNames(q)
   if (local) {
     applyLocal(local)
+    open.value = true
+    void nextTick(() => updateMenuPosition())
     return
   }
+  open.value = true
   scheduleSearch(q)
 }
 
 function selectName(name: string) {
   emit('update:modelValue', name)
-  hits.value = []
   open.value = false
 }
 

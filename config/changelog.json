@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.5.0",
+    "date": "2026-08-25",
+    "title": "Mention teammates in task discussions",
+    "notes": [
+      "Type @ in a task comment to autocomplete project members, using the same prefix search as project invites",
+      "Autocomplete only lists members of that project who match what you typed",
+      "Mentioned members get a You were mentioned notification; other members still get the usual new-comment notice"
+    ]
+  },
+  {
     "version": "2.4.0",
     "date": "2026-08-24",
     "title": "Kanban sprints",

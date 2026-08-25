@@ -635,9 +635,11 @@ export const api = {
     return request<ProjectInvite[]>(`/api/v1/projects/${projectId}/invites`)
   },
 
-  searchUsers(q: string, init: RequestInit = {}) {
+  searchUsers(q: string, init: RequestInit & { projectId?: number } = {}) {
+    const { projectId, ...rest } = init
     const qs = new URLSearchParams({ q })
-    return request<UserSearchHit[]>(`/api/v1/users/search?${qs}`, init)
+    if (projectId && projectId > 0) qs.set('project_id', String(projectId))
+    return request<UserSearchHit[]>(`/api/v1/users/search?${qs}`, rest)
   },
 
   createProjectInvite(projectId: number, username: string, role: 'editor' | 'viewer') {

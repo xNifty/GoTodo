@@ -709,12 +709,18 @@ paths:
   /api/v1/users/search:
     get:
       tags: [Projects]
-      summary: Search usernames for project invites
+      summary: Search usernames for project invites or discussion mentions
       description: |
-        Case-insensitive username prefix match. Excludes the current user, banned
-        users, and users who opted out of project invites. Empty `q` or queries
-        shorter than 2 characters return `[]`. Does not return emails. Rate limited
-        more tightly than other read endpoints.
+        Case-insensitive username prefix match. Empty `q` or queries shorter than
+        2 characters return `[]`. Does not return emails. Rate limited more tightly
+        than other read endpoints.
+
+        Without `project_id`, this is the invite picker: it excludes the current
+        user, banned users, and users who opted out of project invites.
+
+        With `project_id`, results are limited to members of that project (including
+        the current user). The caller must be able to access the project. Invite
+        opt-out does not apply; banned members are still excluded.
       security:
         - SessionCookie: []
         - BearerAuth: []
@@ -724,6 +730,13 @@ paths:
           required: false
           schema:
             type: string
+        - name: project_id
+          in: query
+          required: false
+          description: When set, only matching members of this project are returned.
+          schema:
+            type: integer
+            minimum: 1
       responses:
         "200":
           description: Matching usernames
@@ -735,8 +748,10 @@ paths:
                   $ref: "#/components/schemas/UserSearchHit"
         "401":
           $ref: "#/components/responses/Unauthorized"
-
-  /api/v1/me/github:
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
     get:
       tags: [GitHub]
       summary: GitHub connection status for the current user
@@ -1910,6 +1925,9 @@ paths:
     post:
       tags: [Tasks]
       summary: Add a discussion comment (any project member, including viewers)
+      description: |
+        `@username` mentions matching current project members notify those users
+        (`task_mentioned`). Other members still receive `task_commented`.
       security:
         - SessionCookie: []
         - BearerAuth: []

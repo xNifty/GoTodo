@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"GoTodo/internal/storage"
@@ -188,6 +189,210 @@ func TestCommentsNotifyOtherMembers(t *testing.T) {
 	}
 	if !foundViewer {
 		t.Fatal("viewer should receive task_commented")
+	}
+}
+
+func TestParseCommentMentions(t *testing.T) {
+	names := ParseCommentMentions("Hey @Bob_Editor and @alice, also ping @Bob_Editor again")
+	if len(names) != 2 || names[0] != "Bob_Editor" || names[1] != "alice" {
+		t.Fatalf("names=%v", names)
+	}
+	if ParseCommentMentions("email me@host.com please") != nil {
+		t.Fatal("email should not be a mention")
+	}
+	if ParseCommentMentions("@@alice") != nil {
+		t.Fatal("double-at should not mention")
+	}
+	got := ParseCommentMentions("(@carol_viewer) and #12")
+	if len(got) != 1 || got[0] != "carol_viewer" {
+		t.Fatalf("paren mention=%v", got)
+	}
+	if ParseCommentMentions("hi @ab") != nil {
+		t.Fatal("short token is not a username")
+	}
+}
+
+func TestCommentsMentionNotifiesMemberOnce(t *testing.T) {
+	ctx := context.Background()
+	if err := storage.SetUsername(1, "alice", false); err != nil {
+		t.Fatalf("set alice: %v", err)
+	}
+	if err := storage.SetUsername(2, "bob_editor", false); err != nil {
+		t.Fatalf("set bob: %v", err)
+	}
+	if err := storage.SetUsername(3, "carol_viewer", false); err != nil {
+		t.Fatalf("set carol: %v", err)
+	}
+
+	proj, err := CreateProject(ctx, 1, "Mention Proj", "")
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := storage.UpsertProjectMember(proj.ID, 2, storage.RoleEditor); err != nil {
+		t.Fatalf("add editor: %v", err)
+	}
+	if err := storage.UpsertProjectMember(proj.ID, 3, storage.RoleViewer); err != nil {
+		t.Fatalf("add viewer: %v", err)
+	}
+	pid := proj.ID
+	taskID, err := CreateTask(ctx, 1, CreateTaskInput{Title: "Need Bob", ProjectID: &pid})
+	if err != nil {
+		t.Fatalf("create task: %v", err)
+	}
+
+	if _, err := AddCommentForUser(ctx, 1, taskID, "Please look @bob_editor"); err != nil {
+		t.Fatalf("post: %v", err)
+	}
+
+	forEditor, _, err := storage.ListUserNotifications(2, 50, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundMention := false
+	for _, n := range forEditor {
+		if n.TaskID != taskID {
+			continue
+		}
+		if n.Type == storage.NotificationTaskCommented {
+			t.Fatal("mentioned member should not also get task_commented")
+		}
+		if n.Type == storage.NotificationTaskMentioned {
+			foundMention = true
+			if !strings.Contains(n.Title, "mentioned") {
+				t.Fatalf("title=%q", n.Title)
+			}
+			if n.Body != "Please look @bob_editor" {
+				t.Fatalf("body=%q", n.Body)
+			}
+		}
+	}
+	if !foundMention {
+		t.Fatal("editor should receive task_mentioned")
+	}
+
+	foundViewerComment := false
+	forViewer, _, err := storage.ListUserNotifications(3, 50, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range forViewer {
+		if n.TaskID == taskID && n.Type == storage.NotificationTaskMentioned {
+			t.Fatal("unmentioned viewer should not receive task_mentioned")
+		}
+		if n.TaskID == taskID && n.Type == storage.NotificationTaskCommented {
+			foundViewerComment = true
+		}
+	}
+	if !foundViewerComment {
+		t.Fatal("unmentioned viewer should still receive task_commented")
+	}
+
+	forOwner, _, err := storage.ListUserNotifications(1, 50, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range forOwner {
+		if n.TaskID == taskID && (n.Type == storage.NotificationTaskCommented || n.Type == storage.NotificationTaskMentioned) {
+			t.Fatal("actor should not receive a mention or comment notification")
+		}
+	}
+}
+
+func TestCommentsMentionIgnoresNonMembers(t *testing.T) {
+	ctx := context.Background()
+	if err := storage.SetUsername(1, "alice", false); err != nil {
+		t.Fatalf("set alice: %v", err)
+	}
+	if err := storage.SetUsername(2, "bob_editor", false); err != nil {
+		t.Fatalf("set bob: %v", err)
+	}
+
+	proj, err := CreateProject(ctx, 1, "No Ghost Mentions", "")
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := storage.UpsertProjectMember(proj.ID, 2, storage.RoleEditor); err != nil {
+		t.Fatalf("add editor: %v", err)
+	}
+	pid := proj.ID
+	taskID, err := CreateTask(ctx, 1, CreateTaskInput{Title: "Ghost ping", ProjectID: &pid})
+	if err != nil {
+		t.Fatalf("create task: %v", err)
+	}
+
+	if _, err := AddCommentForUser(ctx, 1, taskID, "Calling @not_a_member"); err != nil {
+		t.Fatalf("post: %v", err)
+	}
+
+	forEditor, _, err := storage.ListUserNotifications(2, 50, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, n := range forEditor {
+		if n.TaskID == taskID && n.Type == storage.NotificationTaskMentioned {
+			t.Fatal("non-member mention should not create task_mentioned")
+		}
+		if n.TaskID == taskID && n.Type == storage.NotificationTaskCommented {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("editor should still get task_commented")
+	}
+}
+
+func TestSearchUsernamesProjectMembersOnly(t *testing.T) {
+	ctx := context.Background()
+	if err := storage.SetUsername(1, "alice", false); err != nil {
+		t.Fatalf("set alice: %v", err)
+	}
+	if err := storage.SetUsername(2, "bob_editor", false); err != nil {
+		t.Fatalf("set bob: %v", err)
+	}
+	if err := storage.SetUsername(3, "carol_viewer", false); err != nil {
+		t.Fatalf("set carol: %v", err)
+	}
+
+	proj, err := CreateProject(ctx, 1, "Search Mentions", "")
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := storage.UpsertProjectMember(proj.ID, 2, storage.RoleEditor); err != nil {
+		t.Fatalf("add editor: %v", err)
+	}
+
+	other, err := CreateProject(ctx, 3, "Other Search Proj", "")
+	if err != nil {
+		t.Fatalf("other project: %v", err)
+	}
+
+	hits, err := SearchUsernames(ctx, 1, "bo", proj.ID)
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(hits) != 1 || hits[0] != "bob_editor" {
+		t.Fatalf("hits=%v, want [bob_editor]", hits)
+	}
+
+	carolHits, err := SearchUsernames(ctx, 1, "ca", proj.ID)
+	if err != nil {
+		t.Fatalf("carol search: %v", err)
+	}
+	if len(carolHits) != 0 {
+		t.Fatalf("non-member carol should not appear, got %v", carolHits)
+	}
+
+	if _, err := SearchUsernames(ctx, 2, "bo", other.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("outsider search err=%v, want not found", err)
+	}
+
+	aliceHits, err := SearchUsernames(ctx, 2, "al", proj.ID)
+	if err != nil {
+		t.Fatalf("member searching owner: %v", err)
+	}
+	if len(aliceHits) != 1 || aliceHits[0] != "alice" {
+		t.Fatalf("alice hits=%v", aliceHits)
 	}
 }
 
