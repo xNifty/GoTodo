@@ -16,7 +16,7 @@ const (
 	MaxSprintDescriptionLen = 80
 	MaxProjectSprints       = 50
 
-	projectSprintSelectCols = `id, project_id, name, description, start_date, end_date, created_at`
+	projectSprintSelectCols = `id, project_id, name, description, start_date, end_date, lock_date, created_at`
 )
 
 // ProjectSprint is a named date range on a kanban project.
@@ -27,12 +27,33 @@ type ProjectSprint struct {
 	Description string
 	StartDate   time.Time
 	EndDate     time.Time
+	LockDate    *time.Time
 	CreatedAt   time.Time
 	TaskCount   int
 }
 
 func scanProjectSprint(row projectStatusScanner, s *ProjectSprint) error {
-	return row.Scan(&s.ID, &s.ProjectID, &s.Name, &s.Description, &s.StartDate, &s.EndDate, &s.CreatedAt)
+	var lock sql.NullTime
+	if err := row.Scan(&s.ID, &s.ProjectID, &s.Name, &s.Description, &s.StartDate, &s.EndDate, &lock, &s.CreatedAt); err != nil {
+		return err
+	}
+	s.LockDate = nullTimePtr(lock)
+	return nil
+}
+
+func nullTimePtr(t sql.NullTime) *time.Time {
+	if !t.Valid {
+		return nil
+	}
+	v := t.Time
+	return &v
+}
+
+func sprintDateArg(t *time.Time) interface{} {
+	if t == nil {
+		return nil
+	}
+	return FormatSprintDate(*t)
 }
 
 // FormatSprintDate returns a DATE value as YYYY-MM-DD in UTC.
@@ -46,6 +67,16 @@ func SprintIsActive(start, end, now time.Time) bool {
 	s := FormatSprintDate(start)
 	e := FormatSprintDate(end)
 	return today >= s && today <= e
+}
+
+// SprintIsLocked reports whether today (UTC calendar date) is on or after lockDate.
+// A nil lockDate means the sprint never locks automatically.
+func SprintIsLocked(lockDate *time.Time, now time.Time) bool {
+	if lockDate == nil {
+		return false
+	}
+	today := now.UTC().Format("2006-01-02")
+	return today >= FormatSprintDate(*lockDate)
 }
 
 // SprintDatesOverlap reports whether two inclusive [start, end] ranges share a day.
@@ -105,6 +136,7 @@ func CreateProjectSprintsTable() error {
 			description TEXT NOT NULL DEFAULT '',
 			start_date DATE NOT NULL,
 			end_date DATE NOT NULL,
+			lock_date DATE,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 			CHECK (end_date >= start_date)
 		)`,
@@ -133,6 +165,22 @@ func MigrateProjectSprintsAddDescription() error {
 		`ALTER TABLE project_sprints ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT ''`)
 	if err != nil {
 		return fmt.Errorf("failed to add sprint description: %v", err)
+	}
+	return nil
+}
+
+// MigrateProjectSprintsAddLockDate adds an optional lock date on sprints.
+func MigrateProjectSprintsAddLockDate() error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return err
+	}
+	defer CloseDatabase(pool)
+
+	_, err = pool.Exec(context.Background(),
+		`ALTER TABLE project_sprints ADD COLUMN IF NOT EXISTS lock_date DATE`)
+	if err != nil {
+		return fmt.Errorf("failed to add sprint lock_date: %v", err)
 	}
 	return nil
 }
@@ -181,7 +229,7 @@ func ListProjectSprints(projectID int) ([]ProjectSprint, error) {
 	defer CloseDatabase(pool)
 
 	rows, err := pool.Query(context.Background(),
-		`SELECT s.id, s.project_id, s.name, s.description, s.start_date, s.end_date, s.created_at,
+		`SELECT s.id, s.project_id, s.name, s.description, s.start_date, s.end_date, s.lock_date, s.created_at,
 		        COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.sprint_id = s.id), 0)
 		 FROM project_sprints s
 		 WHERE s.project_id = $1
@@ -194,9 +242,11 @@ func ListProjectSprints(projectID int) ([]ProjectSprint, error) {
 	var out []ProjectSprint
 	for rows.Next() {
 		var s ProjectSprint
-		if err := rows.Scan(&s.ID, &s.ProjectID, &s.Name, &s.Description, &s.StartDate, &s.EndDate, &s.CreatedAt, &s.TaskCount); err != nil {
+		var lock sql.NullTime
+		if err := rows.Scan(&s.ID, &s.ProjectID, &s.Name, &s.Description, &s.StartDate, &s.EndDate, &lock, &s.CreatedAt, &s.TaskCount); err != nil {
 			return nil, err
 		}
+		s.LockDate = nullTimePtr(lock)
 		out = append(out, s)
 	}
 	return out, rows.Err()
@@ -238,7 +288,7 @@ func GetProjectSprint(projectID, sprintID int) (*ProjectSprint, error) {
 }
 
 // CreateProjectSprint inserts a sprint.
-func CreateProjectSprint(projectID int, name, description string, startDate, endDate time.Time) (*ProjectSprint, error) {
+func CreateProjectSprint(projectID int, name, description string, startDate, endDate time.Time, lockDate *time.Time) (*ProjectSprint, error) {
 	pool, err := OpenDatabase()
 	if err != nil {
 		return nil, err
@@ -247,10 +297,10 @@ func CreateProjectSprint(projectID int, name, description string, startDate, end
 
 	var s ProjectSprint
 	err = scanProjectSprint(pool.QueryRow(context.Background(),
-		`INSERT INTO project_sprints (project_id, name, description, start_date, end_date)
-		 VALUES ($1, $2, $3, $4::date, $5::date)
+		`INSERT INTO project_sprints (project_id, name, description, start_date, end_date, lock_date)
+		 VALUES ($1, $2, $3, $4::date, $5::date, $6::date)
 		 RETURNING `+projectSprintSelectCols,
-		projectID, name, description, FormatSprintDate(startDate), FormatSprintDate(endDate)), &s)
+		projectID, name, description, FormatSprintDate(startDate), FormatSprintDate(endDate), sprintDateArg(lockDate)), &s)
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +308,7 @@ func CreateProjectSprint(projectID int, name, description string, startDate, end
 }
 
 // UpdateProjectSprint updates mutable sprint fields.
-func UpdateProjectSprint(projectID, sprintID int, name *string, description *string, startDate, endDate *time.Time) (*ProjectSprint, error) {
+func UpdateProjectSprint(projectID, sprintID int, name *string, description *string, startDate, endDate *time.Time, lockDate *time.Time) (*ProjectSprint, error) {
 	cur, err := GetProjectSprint(projectID, sprintID)
 	if err != nil {
 		return nil, err
@@ -287,9 +337,9 @@ func UpdateProjectSprint(projectID, sprintID int, name *string, description *str
 	defer CloseDatabase(pool)
 
 	_, err = pool.Exec(context.Background(),
-		`UPDATE project_sprints SET name = $1, description = $2, start_date = $3::date, end_date = $4::date
-		 WHERE id = $5 AND project_id = $6`,
-		newName, newDescription, FormatSprintDate(newStart), FormatSprintDate(newEnd), sprintID, projectID)
+		`UPDATE project_sprints SET name = $1, description = $2, start_date = $3::date, end_date = $4::date, lock_date = $5::date
+		 WHERE id = $6 AND project_id = $7`,
+		newName, newDescription, FormatSprintDate(newStart), FormatSprintDate(newEnd), sprintDateArg(lockDate), sprintID, projectID)
 	if err != nil {
 		return nil, err
 	}

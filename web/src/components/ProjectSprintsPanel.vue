@@ -2,9 +2,10 @@
   <div v-if="isKanban" class="sprints-panel">
     <h4 class="h6 mb-2">Sprints</h4>
     <p class="small text-muted mb-3">
-      Name a sprint, optionally describe it, and give it a date range. Ranges cannot
-      overlap; a sprint may start the day after another ends. The board can switch
-      between sprints; tasks with no sprint stay in the backlog.
+      Name a sprint, optionally describe it, and give it a date range. After the
+      lock date, only the project owner can add tasks. Ranges cannot overlap;
+      a sprint may start the day after another ends. The board can switch between
+      sprints; tasks with no sprint stay in the backlog.
     </p>
 
     <ul class="list-unstyled mb-3">
@@ -50,7 +51,14 @@
                 required
                 aria-label="Sprint end date"
               />
+              <input
+                v-model="editLock"
+                type="date"
+                class="form-control form-control-sm"
+                aria-label="Sprint lock date"
+              />
             </div>
+            <small class="form-hint">Lock date is optional. After that day, only you can add tasks.</small>
             <div class="d-flex gap-1">
               <button class="btn btn-sm btn-primary" type="submit" :disabled="saving">Save</button>
               <button class="btn btn-sm btn-secondary" type="button" @click="editId = null">Cancel</button>
@@ -62,6 +70,7 @@
             <div class="d-flex align-items-center gap-1 flex-wrap">
               <strong>{{ s.name }}</strong>
               <span v-if="s.is_active" class="badge text-bg-success">active</span>
+              <span v-if="s.is_locked" class="badge text-bg-warning">locked</span>
               <button
                 v-if="isOwner"
                 class="btn btn-sm btn-link p-0"
@@ -75,6 +84,7 @@
             <div v-if="s.description" class="small text-muted text-break">{{ s.description }}</div>
             <div class="small text-muted">
               {{ formatRange(s.start_date, s.end_date) }}
+              <template v-if="s.lock_date"> · locks {{ s.lock_date }}</template>
               · {{ s.task_count }} task{{ s.task_count === 1 ? '' : 's' }}
             </div>
           </div>
@@ -142,6 +152,18 @@
           required
         />
       </div>
+      <div class="col-sm-6">
+        <label class="form-label small mb-0" :for="`new-sprint-lock-${project.id}`">Lock date</label>
+        <input
+          :id="`new-sprint-lock-${project.id}`"
+          v-model="newLock"
+          type="date"
+          class="form-control form-control-sm"
+        />
+      </div>
+      <div class="col-12">
+        <small class="form-hint">After the lock date, only the project owner can add tasks. Leave blank to keep the sprint open.</small>
+      </div>
       <div class="col-12">
         <button class="btn btn-sm btn-primary" type="submit" :disabled="adding">Add sprint</button>
       </div>
@@ -174,11 +196,13 @@ const newName = ref('')
 const newDescription = ref('')
 const newStart = ref('')
 const newEnd = ref('')
+const newLock = ref('')
 const editId = ref<number | null>(null)
 const editName = ref('')
 const editDescription = ref('')
 const editStart = ref('')
 const editEnd = ref('')
+const editLock = ref('')
 
 const isKanban = computed(() => (props.project.workflow_mode || 'classic') === 'kanban')
 const isOwner = computed(() => (props.project.role || 'owner') === 'owner')
@@ -220,6 +244,7 @@ function beginEdit(s: ProjectSprint) {
   editDescription.value = s.description || ''
   editStart.value = s.start_date
   editEnd.value = s.end_date
+  editLock.value = s.lock_date || ''
 }
 
 async function addSprint() {
@@ -240,11 +265,13 @@ async function addSprint() {
       description: newDescription.value.trim(),
       start_date: newStart.value,
       end_date: newEnd.value,
+      lock_date: newLock.value || null,
     })
     newName.value = ''
     newDescription.value = ''
     newStart.value = ''
     newEnd.value = ''
+    newLock.value = ''
     toast.push('Sprint created', 'success')
     await loadSprints()
     emit('changed')
@@ -273,6 +300,7 @@ async function saveEdit(s: ProjectSprint) {
       description: editDescription.value.trim(),
       start_date: editStart.value,
       end_date: editEnd.value,
+      lock_date: editLock.value || null,
     })
     editId.value = null
     toast.push('Sprint updated', 'success')

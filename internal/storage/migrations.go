@@ -211,6 +211,10 @@ func RunMigrations() error {
 		fmt.Printf("migration: MigrateProjectSprintsAddDescription failed: %v\n", err)
 		errCount++
 	}
+	if err := MigrateProjectSprintsAddLockDate(); err != nil {
+		fmt.Printf("migration: MigrateProjectSprintsAddLockDate failed: %v\n", err)
+		errCount++
+	}
 	if err := MigrateTasksAddSprintID(); err != nil {
 		fmt.Printf("migration: MigrateTasksAddSprintID failed: %v\n", err)
 		errCount++

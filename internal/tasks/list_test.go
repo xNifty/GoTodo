@@ -91,6 +91,7 @@ func TestMain(m *testing.M) {
 			name TEXT NOT NULL,
 			start_date DATE NOT NULL,
 			end_date DATE NOT NULL,
+			lock_date DATE,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);
 		CREATE TABLE tasks (

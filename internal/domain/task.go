@@ -127,7 +127,7 @@ func CreateTask(ctx context.Context, userID int, in CreateTaskInput) (int, error
 		if err != nil {
 			return 0, err
 		}
-		if err := applyCreateWorkflow(newID, projectArg, in); err != nil {
+		if err := applyCreateWorkflow(newID, projectArg, userID, in); err != nil {
 			return 0, err
 		}
 		if len(in.TagIDs) > 0 {
@@ -179,7 +179,7 @@ func CreateTask(ctx context.Context, userID int, in CreateTaskInput) (int, error
 		return 0, err
 	}
 
-	if err := applyCreateWorkflow(newID, projectArg, in); err != nil {
+	if err := applyCreateWorkflow(newID, projectArg, userID, in); err != nil {
 		return 0, err
 	}
 
@@ -196,7 +196,7 @@ func CreateTask(ctx context.Context, userID int, in CreateTaskInput) (int, error
 	return newID, nil
 }
 
-func applyCreateWorkflow(taskID int, projectArg interface{}, in CreateTaskInput) error {
+func applyCreateWorkflow(taskID int, projectArg interface{}, userID int, in CreateTaskInput) error {
 	projectID := 0
 	switch v := projectArg.(type) {
 	case int:
@@ -236,6 +236,7 @@ func applyCreateWorkflow(taskID int, projectArg interface{}, in CreateTaskInput)
 			return err
 		}
 	}
+	explicitSprint := in.SprintID != nil
 	sprintID := in.SprintID
 	if sprintID == nil && in.ParentID != nil && *in.ParentID > 0 {
 		if parentSprint, err := storage.GetTaskSprintID(*in.ParentID); err == nil && parentSprint > 0 {
@@ -243,7 +244,11 @@ func applyCreateWorkflow(taskID int, projectArg interface{}, in CreateTaskInput)
 		}
 	}
 	if sprintID != nil {
-		return applyTaskSprint(taskID, projectID, sprintID)
+		err := applyTaskSprint(taskID, projectID, userID, sprintID)
+		if err != nil && !explicitSprint && errors.Is(err, ErrForbidden) {
+			return nil
+		}
+		return err
 	}
 	return nil
 }
@@ -540,13 +545,13 @@ func UpdateTask(ctx context.Context, userID, taskID int, in UpdateTaskInput) (*U
 	newSprintID := oldSprintID
 	if in.SprintID != nil {
 		if *in.SprintID == nil || **in.SprintID == 0 {
-			if err := applyTaskSprint(taskID, effectiveProjectID, nil); err != nil {
+			if err := applyTaskSprint(taskID, effectiveProjectID, userID, nil); err != nil {
 				return nil, err
 			}
 			newSprintID = 0
 		} else {
 			sid := **in.SprintID
-			if err := applyTaskSprint(taskID, effectiveProjectID, &sid); err != nil {
+			if err := applyTaskSprint(taskID, effectiveProjectID, userID, &sid); err != nil {
 				return nil, err
 			}
 			newSprintID = sid

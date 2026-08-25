@@ -126,6 +126,34 @@ func (o optionalInt) toPatchInt(zeroClears bool) **int {
 	return &ptr
 }
 
+// optionalString distinguishes omitted / null / value for JSON patch fields.
+type optionalString struct {
+	Set   bool
+	Null  bool
+	Value string
+}
+
+func (o *optionalString) UnmarshalJSON(b []byte) error {
+	o.Set = true
+	if string(b) == "null" {
+		o.Null = true
+		return nil
+	}
+	return json.Unmarshal(b, &o.Value)
+}
+
+func (o optionalString) toPatchString() *string {
+	if !o.Set {
+		return nil
+	}
+	if o.Null {
+		empty := ""
+		return &empty
+	}
+	v := o.Value
+	return &v
+}
+
 type apiTaskReorderRequest struct {
 	TaskIDs  []int   `json:"task_ids"`
 	Favorite *bool   `json:"favorite"`
@@ -503,7 +531,7 @@ func apiV1CreateTask(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if errors.Is(err, domain.ErrForbidden) {
-			utils.APIJSONError(w, http.StatusForbidden, "forbidden", "Forbidden.")
+			utils.APIJSONError(w, http.StatusForbidden, "forbidden", sharingClientMessage(err, "Forbidden."))
 			return
 		}
 		utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to create task.")
@@ -561,7 +589,7 @@ func apiV1PatchTask(w http.ResponseWriter, r *http.Request, taskID int) {
 			return
 		}
 		if errors.Is(err, domain.ErrForbidden) {
-			utils.APIJSONError(w, http.StatusForbidden, "forbidden", "Forbidden.")
+			utils.APIJSONError(w, http.StatusForbidden, "forbidden", sharingClientMessage(err, "Forbidden."))
 			return
 		}
 		if errors.Is(err, domain.ErrConflict) {

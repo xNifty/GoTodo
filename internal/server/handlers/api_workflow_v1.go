@@ -94,7 +94,7 @@ func writeWorkflowDomainError(w http.ResponseWriter, err error) {
 	case errors.Is(err, domain.ErrNotFound):
 		utils.APIJSONError(w, http.StatusNotFound, "not_found", "Not found.")
 	case errors.Is(err, domain.ErrForbidden):
-		utils.APIJSONError(w, http.StatusForbidden, "forbidden", "Forbidden.")
+		utils.APIJSONError(w, http.StatusForbidden, "forbidden", sharingClientMessage(err, "Forbidden."))
 	case errors.Is(err, domain.ErrConflict):
 		utils.APIJSONError(w, http.StatusConflict, "conflict", err.Error())
 	case errors.Is(err, domain.ErrValidation):
@@ -342,29 +342,33 @@ func handleTaskTimeEntries(w http.ResponseWriter, r *http.Request, taskID int, r
 }
 
 type apiProjectSprintJSON struct {
-	ID          int    `json:"id"`
-	ProjectID   int    `json:"project_id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	StartDate   string `json:"start_date"`
-	EndDate     string `json:"end_date"`
-	IsActive    bool   `json:"is_active"`
-	TaskCount   int    `json:"task_count"`
-	CreatedAt   string `json:"created_at"`
+	ID          int     `json:"id"`
+	ProjectID   int     `json:"project_id"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	StartDate   string  `json:"start_date"`
+	EndDate     string  `json:"end_date"`
+	LockDate    *string `json:"lock_date"`
+	IsActive    bool    `json:"is_active"`
+	IsLocked    bool    `json:"is_locked"`
+	TaskCount   int     `json:"task_count"`
+	CreatedAt   string  `json:"created_at"`
 }
 
 type apiSprintCreateRequest struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	StartDate   string `json:"start_date"`
-	EndDate     string `json:"end_date"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	StartDate   string  `json:"start_date"`
+	EndDate     string  `json:"end_date"`
+	LockDate    *string `json:"lock_date"`
 }
 
 type apiSprintPatchRequest struct {
-	Name        *string `json:"name"`
-	Description *string `json:"description"`
-	StartDate   *string `json:"start_date"`
-	EndDate     *string `json:"end_date"`
+	Name        *string        `json:"name"`
+	Description *string        `json:"description"`
+	StartDate   *string        `json:"start_date"`
+	EndDate     *string        `json:"end_date"`
+	LockDate    optionalString `json:"lock_date"`
 }
 
 type apiSprintDeleteRequest struct {
@@ -372,6 +376,12 @@ type apiSprintDeleteRequest struct {
 }
 
 func sprintToAPIJSON(s storage.ProjectSprint) apiProjectSprintJSON {
+	now := time.Now()
+	var lockDate *string
+	if s.LockDate != nil {
+		d := storage.FormatSprintDate(*s.LockDate)
+		lockDate = &d
+	}
 	return apiProjectSprintJSON{
 		ID:          s.ID,
 		ProjectID:   s.ProjectID,
@@ -379,7 +389,9 @@ func sprintToAPIJSON(s storage.ProjectSprint) apiProjectSprintJSON {
 		Description: s.Description,
 		StartDate:   storage.FormatSprintDate(s.StartDate),
 		EndDate:     storage.FormatSprintDate(s.EndDate),
-		IsActive:    storage.SprintIsActive(s.StartDate, s.EndDate, time.Now()),
+		LockDate:    lockDate,
+		IsActive:    storage.SprintIsActive(s.StartDate, s.EndDate, now),
+		IsLocked:    storage.SprintIsLocked(s.LockDate, now),
 		TaskCount:   s.TaskCount,
 		CreatedAt:   s.CreatedAt.UTC().Format(time.RFC3339),
 	}
@@ -413,11 +425,16 @@ func handleProjectSprintsResource(w http.ResponseWriter, r *http.Request, projec
 				utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid JSON body.")
 				return
 			}
+			lockDate := ""
+			if req.LockDate != nil {
+				lockDate = *req.LockDate
+			}
 			s, err := domain.CreateProjectSprintForUser(r.Context(), userID, projectID, domain.CreateProjectSprintInput{
 				Name:        req.Name,
 				Description: req.Description,
 				StartDate:   req.StartDate,
 				EndDate:     req.EndDate,
+				LockDate:    lockDate,
 			})
 			if err != nil {
 				writeWorkflowDomainError(w, err)
@@ -450,6 +467,7 @@ func handleProjectSprintsResource(w http.ResponseWriter, r *http.Request, projec
 			Description: req.Description,
 			StartDate:   req.StartDate,
 			EndDate:     req.EndDate,
+			LockDate:    req.LockDate.toPatchString(),
 		})
 		if err != nil {
 			writeWorkflowDomainError(w, err)
