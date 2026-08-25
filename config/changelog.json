@@ -4,7 +4,7 @@
     "date": "2026-08-24",
     "title": "Kanban sprints",
     "notes": [
-      "Kanban projects can define named sprints with start and end dates in project settings",
+      "Kanban projects can define named sprints with start and end dates on the Sprints tab in project settings",
       "Assign a task to a sprint (or leave it in the backlog) from the task sidebar",
       "Saving a task actually updates its sprint assignment, including moving it to the backlog",
       "The board has a sprint switcher so you can move between the active sprint, other sprints, and the backlog",

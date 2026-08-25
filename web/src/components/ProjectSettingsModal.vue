@@ -10,6 +10,8 @@ import ProjectSprintsPanel from '@/components/ProjectSprintsPanel.vue'
 import ProjectGitHubPanel from '@/components/ProjectGitHubPanel.vue'
 import ProjectTagsPanel from '@/components/ProjectTagsPanel.vue'
 
+type SettingsTab = 'details' | 'board' | 'sprints' | 'tags' | 'github' | 'sharing'
+
 const props = defineProps<{
   open: boolean
   project: Project | null
@@ -25,7 +27,23 @@ const toast = useToast()
 const name = ref('')
 const description = ref('')
 const saving = ref(false)
+const tab = ref<SettingsTab>('details')
 const isOwner = computed(() => (props.project?.role || 'owner') === 'owner')
+const isKanban = computed(() => (props.project?.workflow_mode || 'classic') === 'kanban')
+
+const tabs = computed(() => {
+  const items: { id: SettingsTab; label: string }[] = [
+    { id: 'details', label: 'Details' },
+    { id: 'board', label: 'Board' },
+  ]
+  if (isKanban.value) items.push({ id: 'sprints', label: 'Sprints' })
+  items.push(
+    { id: 'tags', label: 'Tags' },
+    { id: 'github', label: 'GitHub' },
+    { id: 'sharing', label: 'Sharing' },
+  )
+  return items
+})
 
 watch(
   () => [props.open, props.project] as const,
@@ -33,10 +51,15 @@ watch(
     if (open && project) {
       name.value = project.name
       description.value = project.description || ''
+      tab.value = 'details'
     }
   },
   { immediate: true },
 )
+
+watch(isKanban, (kanban) => {
+  if (!kanban && tab.value === 'sprints') tab.value = 'details'
+})
 
 function close() {
   emit('close')
@@ -82,79 +105,97 @@ function onPanelChanged() {
           <button type="button" class="btn-close" aria-label="Close" @click="close" />
         </div>
         <div class="modal-body py-3">
-          <div class="mb-3">
-            <label for="edit-project-name" class="form-label small fw-bold">Project Name</label>
-            <input
-              id="edit-project-name"
-              v-model="name"
-              type="text"
-              class="form-control"
-              maxlength="50"
-              placeholder="Project Name"
-              :readonly="!isOwner"
-            />
-            <div class="d-flex justify-content-between">
-              <small class="form-hint">Max 50 characters</small>
-              <small class="text-muted">{{ name.length }}/50</small>
+          <nav class="mb-3" aria-label="Project settings sections">
+            <ul class="nav nav-pills gap-1 flex-wrap">
+              <li v-for="item in tabs" :key="item.id" class="nav-item">
+                <button
+                  type="button"
+                  class="nav-link"
+                  :class="{ active: tab === item.id }"
+                  :aria-current="tab === item.id ? 'page' : undefined"
+                  @click="tab = item.id"
+                >
+                  {{ item.label }}
+                </button>
+              </li>
+            </ul>
+          </nav>
+
+          <div v-if="tab === 'details'">
+            <div class="mb-3">
+              <label for="edit-project-name" class="form-label small fw-bold">Project Name</label>
+              <input
+                id="edit-project-name"
+                v-model="name"
+                type="text"
+                class="form-control"
+                maxlength="50"
+                placeholder="Project Name"
+                :readonly="!isOwner"
+              />
+              <div class="d-flex justify-content-between">
+                <small class="form-hint">Max 50 characters</small>
+                <small class="text-muted">{{ name.length }}/50</small>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="edit-project-description" class="form-label small fw-bold">Description</label>
+              <textarea
+                id="edit-project-description"
+                v-model="description"
+                class="form-control"
+                rows="3"
+                maxlength="1000"
+                placeholder="Optional details about this project"
+                :readonly="!isOwner"
+              />
+              <div class="d-flex justify-content-end">
+                <small class="text-muted">{{ description.length }}/1000</small>
+              </div>
+            </div>
+
+            <div v-if="isOwner" class="d-flex justify-content-end">
+              <button
+                type="button"
+                class="btn btn-sm btn-primary px-3"
+                :disabled="saving || !name.trim()"
+                @click="saveBasics"
+              >
+                Save details
+              </button>
             </div>
           </div>
 
-          <div class="mb-3">
-            <label for="edit-project-description" class="form-label small fw-bold">Description</label>
-            <textarea
-              id="edit-project-description"
-              v-model="description"
-              class="form-control"
-              rows="3"
-              maxlength="1000"
-              placeholder="Optional details about this project"
-              :readonly="!isOwner"
-            />
-            <div class="d-flex justify-content-end">
-              <small class="text-muted">{{ description.length }}/1000</small>
-            </div>
-          </div>
+          <ProjectWorkflowPanel
+            v-else-if="tab === 'board'"
+            :project="project"
+            @changed="onPanelChanged"
+          />
 
-          <div v-if="isOwner" class="d-flex justify-content-end mb-4">
-            <button
-              type="button"
-              class="btn btn-sm btn-primary px-3"
-              :disabled="saving || !name.trim()"
-              @click="saveBasics"
-            >
-              Save details
-            </button>
-          </div>
+          <ProjectSprintsPanel
+            v-else-if="tab === 'sprints' && isKanban"
+            :project="project"
+            @changed="onPanelChanged"
+          />
 
-          <hr class="my-3 opacity-25" />
+          <ProjectTagsPanel
+            v-else-if="tab === 'tags'"
+            :project="project"
+            @changed="onPanelChanged"
+          />
 
-          <div class="mb-4">
-            <ProjectWorkflowPanel :project="project" @changed="onPanelChanged" />
-          </div>
+          <ProjectGitHubPanel
+            v-else-if="tab === 'github'"
+            :project="project"
+            @changed="onPanelChanged"
+          />
 
-          <template v-if="(project.workflow_mode || 'classic') === 'kanban'">
-            <hr class="my-3 opacity-25" />
-
-            <div class="mb-4">
-              <ProjectSprintsPanel :project="project" @changed="onPanelChanged" />
-            </div>
-          </template>
-
-          <hr class="my-3 opacity-25" />
-
-          <div class="mb-4">
-            <ProjectGitHubPanel :project="project" @changed="onPanelChanged" />
-          </div>
-
-          <hr class="my-3 opacity-25" />
-
-          <div class="mb-4">
-            <ProjectTagsPanel :project="project" @changed="onPanelChanged" />
-          </div>
-
-          <hr class="my-3 opacity-25" />
-
-          <ProjectSharePanel :project="project" @changed="onPanelChanged" />
+          <ProjectSharePanel
+            v-else-if="tab === 'sharing'"
+            :project="project"
+            @changed="onPanelChanged"
+          />
         </div>
         <div class="modal-footer border-0 pt-0 justify-content-end">
           <button type="button" class="btn btn-sm btn-outline-secondary" @click="close">Close</button>
