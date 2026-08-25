@@ -253,6 +253,8 @@ func bulkMoveProject(ctx context.Context, db *pgxpool.Pool, ids []int, userID in
 }
 
 func bulkAddTag(ctx context.Context, db *pgxpool.Pool, ids []int, userID, tagID int) error {
+	_ = db
+	_ = ctx
 	src, err := storage.GetTag(tagID)
 	if err != nil {
 		return fmt.Errorf("invalid tag")
