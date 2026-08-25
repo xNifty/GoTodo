@@ -280,6 +280,79 @@ func TestSubtaskInheritsParentSprint(t *testing.T) {
 	}
 }
 
+func TestSprintBoardSeparatesParentAndChildAssignments(t *testing.T) {
+	ctx := context.Background()
+	proj, err := CreateProject(ctx, 1, "Mixed Sprint Board", "")
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	if _, err := SetProjectWorkflowMode(ctx, 1, proj.ID, storage.WorkflowKanban); err != nil {
+		t.Fatalf("enable kanban: %v", err)
+	}
+	sprint, err := CreateProjectSprintForUser(ctx, 1, proj.ID, CreateProjectSprintInput{
+		Name:      "Sprint 1",
+		StartDate: "2026-08-01",
+		EndDate:   "2026-08-31",
+	})
+	if err != nil {
+		t.Fatalf("create sprint: %v", err)
+	}
+	pid := proj.ID
+	sid := sprint.ID
+	parentID, err := CreateTask(ctx, 1, CreateTaskInput{Title: "Kanban Project 2", ProjectID: &pid})
+	if err != nil {
+		t.Fatalf("create parent: %v", err)
+	}
+	childID, err := CreateTask(ctx, 1, CreateTaskInput{Title: "Sub task", ProjectID: &pid, ParentID: &parentID, SprintID: &sid})
+	if err != nil {
+		t.Fatalf("create child: %v", err)
+	}
+
+	tz := "UTC"
+	uid := 1
+	zero := 0
+	backlog, _, err := tasks.ReturnPaginationForUserWithFilters(1, 50, &uid, tz, tasks.ListFilters{
+		ProjectFilter:      &pid,
+		WorkflowClaimScope: "all",
+		SprintFilter:       &zero,
+	})
+	if err != nil {
+		t.Fatalf("backlog list: %v", err)
+	}
+	parent := sprintTopLevel(backlog, parentID)
+	if parent == nil {
+		t.Fatalf("backlog missing parent: %v", sprintTaskIDs(backlog))
+	}
+	if sprintNestedHasID(*parent, childID) {
+		t.Fatal("sprint-1 subtask should not nest under a backlog parent")
+	}
+	if sprintTopLevel(backlog, childID) != nil {
+		t.Fatal("sprint-1 subtask should not appear as a backlog card")
+	}
+
+	sprintTasks, _, err := tasks.ReturnPaginationForUserWithFilters(1, 50, &uid, tz, tasks.ListFilters{
+		ProjectFilter:      &pid,
+		WorkflowClaimScope: "all",
+		SprintFilter:       &sid,
+	})
+	if err != nil {
+		t.Fatalf("sprint list: %v", err)
+	}
+	if sprintTopLevel(sprintTasks, parentID) != nil {
+		t.Fatal("backlog parent should not appear on sprint 1")
+	}
+	child := sprintTopLevel(sprintTasks, childID)
+	if child == nil {
+		t.Fatalf("sprint-1 missing subtask card: %v", sprintTaskIDs(sprintTasks))
+	}
+	if child.ParentID != parentID {
+		t.Fatalf("subtask parent_id=%d want %d", child.ParentID, parentID)
+	}
+	if child.ParentTitle != "Kanban Project 2" {
+		t.Fatalf("subtask parent_title=%q", child.ParentTitle)
+	}
+}
+
 func strPtr(s string) *string { return &s }
 
 func ptrToIntPtr(v int) **int {
@@ -296,6 +369,24 @@ func sprintListHasID(list []tasks.Task, id int) bool {
 			if c.ID == id {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+func sprintTopLevel(list []tasks.Task, id int) *tasks.Task {
+	for i := range list {
+		if list[i].ID == id {
+			return &list[i]
+		}
+	}
+	return nil
+}
+
+func sprintNestedHasID(parent tasks.Task, id int) bool {
+	for _, c := range parent.Children {
+		if c.ID == id {
+			return true
 		}
 	}
 	return false

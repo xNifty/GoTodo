@@ -210,6 +210,7 @@ export type Task = {
   claimed_by_name?: string
   sprint_id?: number | null
   sprint_name?: string
+  parent_title?: string
   github?: TaskGitHubIssue | null
 }
 

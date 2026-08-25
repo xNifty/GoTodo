@@ -49,6 +49,7 @@ type apiTaskJSON struct {
 	ClaimedByName     string             `json:"claimed_by_name,omitempty"`
 	SprintID          *int               `json:"sprint_id,omitempty"`
 	SprintName        string             `json:"sprint_name,omitempty"`
+	ParentTitle       string             `json:"parent_title,omitempty"`
 	GitHub            *apiTaskGitHubJSON `json:"github,omitempty"`
 }
 
@@ -233,6 +234,7 @@ func taskToAPIJSON(t tasks.Task) apiTaskJSON {
 		ProjectWorkflow:   t.ProjectWorkflow,
 		ClaimedByName:     t.ClaimedByName,
 		SprintName:        t.SprintName,
+		ParentTitle:       t.ParentTitle,
 	}
 	if t.ParentID > 0 {
 		pid := t.ParentID

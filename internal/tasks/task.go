@@ -30,6 +30,7 @@ type Task struct {
 	Priority            int
 	Tags                []Tag
 	ParentID            int // 0 = root
+	ParentTitle         string
 	ChildCount          int
 	ChildrenCompleted   int
 	Children            []Task

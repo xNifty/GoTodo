@@ -503,13 +503,13 @@ function applyTaskUpdate(updated: Task) {
       refreshParentCounts(found.parent)
       return
     }
-    // Newly nested or moved under a parent already in the list
-    if (found && !found.parent) {
-      tasks.value = tasks.value.filter((t) => t.id !== updated.id)
-      total.value = Math.max(0, total.value - 1)
-    }
     const parent = tasks.value.find((t) => t.id === updated.parent_id)
     if (parent) {
+      // Newly nested or moved under a parent already in the list
+      if (found && !found.parent) {
+        tasks.value = tasks.value.filter((t) => t.id !== updated.id)
+        total.value = Math.max(0, total.value - 1)
+      }
       if (!parent.children) parent.children = []
       parent.children = [...parent.children.filter((c) => c.id !== updated.id), { ...updated, children: undefined }]
       refreshParentCounts(parent)
@@ -1389,6 +1389,7 @@ onUnmounted(() => {
             :role="activeProjectObj.role"
             :density="density"
             :columns-rev="kanbanColumnsRev"
+            :sprint-filter="boardSprintKey"
             @open-task="openTaskDetails"
             @changed="reloadInitial"
             @task-updated="applyTaskUpdate"

@@ -85,6 +85,16 @@ func (f ListFilters) sprintCondition(tablePrefix string) string {
 	return fmt.Sprintf(" AND (%ssprint_id = %d)", prefix, *f.SprintFilter)
 }
 
+func matchesSprintFilter(sprintID int, filter *int) bool {
+	if filter == nil {
+		return true
+	}
+	if *filter == 0 {
+		return sprintID == 0
+	}
+	return sprintID == *filter
+}
+
 func (f ListFilters) orderByClause(tablePrefix string) string {
 	prefix := ""
 	if tablePrefix != "" {
