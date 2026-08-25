@@ -157,6 +157,27 @@ func TestProjectSprintsCRUDAndTaskAssignment(t *testing.T) {
 		t.Fatalf("backlog filter mismatch: %+v", sprintTaskIDs(backlogTasks))
 	}
 
+	sprint2, err := CreateProjectSprintForUser(ctx, 1, proj.ID, CreateProjectSprintInput{
+		Name:      "Sprint Two",
+		StartDate: "2026-09-07",
+		EndDate:   "2026-09-20",
+	})
+	if err != nil {
+		t.Fatalf("create sprint 2: %v", err)
+	}
+	sid2 := sprint2.ID
+	set2 := &sid2
+	if _, err := UpdateTask(ctx, 1, taskID, UpdateTaskInput{SprintID: &set2}); err != nil {
+		t.Fatalf("move to sprint 2: %v", err)
+	}
+	fields, _ = storage.GetWorkflowFieldsForTasks([]int{taskID})
+	if fields[taskID].SprintID != sid2 {
+		t.Fatalf("moved sprint_id=%d want %d", fields[taskID].SprintID, sid2)
+	}
+	if _, err := UpdateTask(ctx, 1, taskID, UpdateTaskInput{SprintID: &set}); err != nil {
+		t.Fatalf("move back to sprint 1: %v", err)
+	}
+
 	if err := DeleteProjectSprintForUser(ctx, 1, proj.ID, sprint.ID, nil); err != nil {
 		t.Fatalf("delete sprint: %v", err)
 	}

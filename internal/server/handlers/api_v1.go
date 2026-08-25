@@ -78,22 +78,25 @@ type apiTaskCreateRequest struct {
 }
 
 type apiTaskPatchRequest struct {
-	Title          *string      `json:"title"`
-	Description    *string      `json:"description"`
-	DueDate        *string      `json:"due_date"`
-	ProjectID      **int        `json:"project_id"`
-	ParentID       **int        `json:"parent_id"`
-	Priority       *int         `json:"priority"`
-	Completed      *bool        `json:"completed"`
-	Favorite       *bool        `json:"favorite"`
-	TagIDs         *[]int       `json:"tag_ids"`
-	ClearDue       *bool        `json:"clear_due_date"`
-	StatusID       **int        `json:"status_id"`
-	EstimatePoints *optionalInt `json:"estimate_points"`
-	SprintID       *optionalInt `json:"sprint_id"`
+	Title          *string     `json:"title"`
+	Description    *string     `json:"description"`
+	DueDate        *string     `json:"due_date"`
+	ProjectID      **int       `json:"project_id"`
+	ParentID       **int       `json:"parent_id"`
+	Priority       *int        `json:"priority"`
+	Completed      *bool       `json:"completed"`
+	Favorite       *bool       `json:"favorite"`
+	TagIDs         *[]int      `json:"tag_ids"`
+	ClearDue       *bool       `json:"clear_due_date"`
+	StatusID       **int       `json:"status_id"`
+	EstimatePoints optionalInt `json:"estimate_points"`
+	SprintID       optionalInt `json:"sprint_id"`
 }
 
 // optionalInt distinguishes omitted / null / value for JSON patch fields.
+// It must be a non-pointer struct field: encoding/json sets pointer fields to
+// nil on JSON null without calling UnmarshalJSON, which would make null look
+// the same as an omitted field.
 type optionalInt struct {
 	Set   bool
 	Null  bool
@@ -107,6 +110,19 @@ func (o *optionalInt) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 	return json.Unmarshal(b, &o.Value)
+}
+
+func (o optionalInt) toPatchInt(zeroClears bool) **int {
+	if !o.Set {
+		return nil
+	}
+	if o.Null || (zeroClears && o.Value == 0) {
+		var clear *int
+		return &clear
+	}
+	v := o.Value
+	ptr := &v
+	return &ptr
 }
 
 type apiTaskReorderRequest struct {
@@ -530,26 +546,8 @@ func apiV1PatchTask(w http.ResponseWriter, r *http.Request, taskID int) {
 	if req.ClearDue != nil && *req.ClearDue {
 		in.ClearDue = true
 	}
-	if req.EstimatePoints != nil && req.EstimatePoints.Set {
-		if req.EstimatePoints.Null {
-			var clear *int
-			in.EstimatePoints = &clear
-		} else {
-			v := req.EstimatePoints.Value
-			ptr := &v
-			in.EstimatePoints = &ptr
-		}
-	}
-	if req.SprintID != nil && req.SprintID.Set {
-		if req.SprintID.Null {
-			var clear *int
-			in.SprintID = &clear
-		} else {
-			v := req.SprintID.Value
-			ptr := &v
-			in.SprintID = &ptr
-		}
-	}
+	in.EstimatePoints = req.EstimatePoints.toPatchInt(false)
+	in.SprintID = req.SprintID.toPatchInt(true)
 
 	if _, err := domain.UpdateTask(r.Context(), userID, taskID, in); err != nil {
 		if errors.Is(err, domain.ErrNotFound) {

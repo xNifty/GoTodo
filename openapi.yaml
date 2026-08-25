@@ -3778,7 +3778,7 @@ components:
         sprint_id:
           type: integer
           nullable: true
-          description: Assign the task to a sprint in its kanban project
+          description: Assign the task to a sprint in its kanban project; 0 or omit leaves it in the backlog
 
     TaskPatch:
       type: object
@@ -3817,7 +3817,7 @@ components:
         sprint_id:
           type: integer
           nullable: true
-          description: Set a sprint in the task's kanban project, or null for the backlog
+          description: Set a sprint in the task's kanban project. null or 0 moves the task to the backlog; omit to leave the assignment unchanged.
 
     TaskReorder:
       type: object

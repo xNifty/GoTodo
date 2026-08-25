@@ -161,6 +161,23 @@ function taskInSelectedProject(t: Task): boolean {
   return t.project_id === Number(projectId.value)
 }
 
+function formSprintId(value: number | string | '' | null | undefined): number | '' {
+  if (value === '' || value == null) return ''
+  const n = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(n) || n <= 0) return ''
+  return n
+}
+
+function sprintPayloadId(value: number | string | '' | null | undefined): number {
+  const id = formSprintId(value)
+  return id === '' ? 0 : id
+}
+
+function onSprintChange(event: Event) {
+  const target = event.target as HTMLSelectElement | null
+  sprintId.value = formSprintId(target?.value)
+}
+
 function stubParentTask(id: number, titleText: string, pid: number | ''): Task {
   return {
     id,
@@ -371,7 +388,7 @@ async function loadTask(id: number) {
   events.value = []
   eventsLoaded.value = false
   statusId.value = task.status_id ?? ''
-  sprintId.value = task.sprint_id ?? ''
+  sprintId.value = formSprintId(task.sprint_id)
   estimatePoints.value = task.estimate_points ?? ''
   claimedBy.value = task.claimed_by ?? null
   claimedByName.value = task.claimed_by_name || ''
@@ -403,7 +420,7 @@ function isFormDirty(): boolean {
   const parent = t.parent_id ?? ''
   const due = t.due_date || ''
   const status = t.status_id ?? ''
-  const sprint = t.sprint_id ?? ''
+  const sprint = formSprintId(t.sprint_id)
   const estimate = t.estimate_points ?? ''
   const tagIds = (t.tags || []).map((x) => x.id)
   return (
@@ -415,7 +432,7 @@ function isFormDirty(): boolean {
     dueDate.value !== due ||
     completed.value !== t.completed ||
     statusId.value !== status ||
-    sprintId.value !== sprint ||
+    formSprintId(sprintId.value) !== sprint ||
     estimatePoints.value !== estimate ||
     newTags.value.trim() !== '' ||
     !sameIdSet(selectedTagIds.value, tagIds)
@@ -520,7 +537,7 @@ async function save(keepOpen = false) {
         ...(isKanbanTask.value && statusId.value !== ''
           ? { status_id: Number(statusId.value) }
           : {}),
-        ...(isKanbanTask.value ? { sprint_id: sprintId.value === '' ? 0 : Number(sprintId.value) } : {}),
+        ...(isKanbanTask.value ? { sprint_id: sprintPayloadId(sprintId.value) } : {}),
         ...(isKanbanTask.value && estimatePoints.value !== ''
           ? { estimate_points: Number(estimatePoints.value) }
           : {}),
@@ -558,7 +575,7 @@ async function save(keepOpen = false) {
     else payload.clear_due_date = true
     if (isKanbanTask.value) {
       if (statusId.value !== '') payload.status_id = Number(statusId.value)
-      payload.sprint_id = sprintId.value === '' ? null : Number(sprintId.value)
+      payload.sprint_id = sprintPayloadId(sprintId.value)
       payload.estimate_points =
         estimatePoints.value === '' ? null : Number(estimatePoints.value)
     }
@@ -628,7 +645,8 @@ async function onProjectChange() {
   if (statusId.value !== '' && !statuses.value.some((s) => s.id === statusId.value)) {
     statusId.value = ''
   }
-  if (sprintId.value !== '' && !sprints.value.some((s) => s.id === sprintId.value)) {
+  const selectedSprint = formSprintId(sprintId.value)
+  if (selectedSprint !== '' && !sprints.value.some((s) => s.id === selectedSprint)) {
     sprintId.value = ''
   }
   await refreshProjectGitHub(projectId.value)
@@ -718,7 +736,7 @@ async function onParentChange() {
   if (p?.project_id) projectId.value = p.project_id
   else projectId.value = ''
   taskWorkflow.value = p?.project_workflow || ''
-  if (p?.sprint_id) sprintId.value = p.sprint_id
+  if (p?.sprint_id) sprintId.value = formSprintId(p.sprint_id)
   await loadStatusesForProject(projectId.value)
   await loadSprintsForProject(projectId.value)
   await refreshProjectGitHub(projectId.value)
@@ -1161,9 +1179,15 @@ async function removeTimeEntry(entryId: number) {
         </div>
         <div v-if="isKanbanTask" class="form-group mt-2 kanban-order-sprint">
           <label for="sprint_id">Sprint:</label>
-          <select id="sprint_id" v-model="sprintId" class="form-select" :disabled="readOnly">
+          <select
+            id="sprint_id"
+            class="form-select"
+            :disabled="readOnly"
+            :value="sprintId === '' ? '' : String(sprintId)"
+            @change="onSprintChange"
+          >
             <option value="">Backlog</option>
-            <option v-for="s in sprints" :key="s.id" :value="s.id">
+            <option v-for="s in sprints" :key="s.id" :value="String(s.id)">
               {{ s.name }}{{ s.is_active ? ' (active)' : '' }}
             </option>
           </select>

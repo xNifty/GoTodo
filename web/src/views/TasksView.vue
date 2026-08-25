@@ -369,8 +369,16 @@ function getNextWeekStr() {
   return d.toISOString().slice(0, 10)
 }
 
+function taskMatchesBoardSprint(task: Task): boolean {
+  if (!isKanbanProjectView.value || viewMode.value !== 'board') return true
+  const assigned = task.sprint_id && task.sprint_id > 0 ? task.sprint_id : 0
+  if (boardSprintKey.value === 'backlog') return assigned === 0
+  return assigned === parseInt(boardSprintKey.value, 10)
+}
+
 function taskMatchesCurrentFilters(task: Task): boolean {
   if (!taskMatchesStatusFilter(task)) return false
+  if (!taskMatchesBoardSprint(task)) return false
   if (filters.project === '0' && task.project_id != null) return false
   if (filters.project && filters.project !== '0') {
     const pid = parseInt(filters.project, 10)
@@ -510,7 +518,7 @@ function applyTaskUpdate(updated: Task) {
     }
   }
 
-  if (!taskMatchesStatusFilter(updated)) {
+  if (!taskMatchesStatusFilter(updated) || !taskMatchesBoardSprint(updated)) {
     if (found) {
       removeTaskLocally(found.task)
     }
