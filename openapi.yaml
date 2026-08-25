@@ -1575,6 +1575,10 @@ paths:
                 name:
                   type: string
                   maxLength: 60
+                description:
+                  type: string
+                  maxLength: 80
+                  description: Optional short goal shown with the sprint name (e.g. "features required for v3.0.0 release")
                 start_date:
                   type: string
                   format: date
@@ -1619,6 +1623,10 @@ paths:
                 name:
                   type: string
                   maxLength: 60
+                description:
+                  type: string
+                  maxLength: 80
+                  description: Optional short goal shown with the sprint name. Empty string clears it.
                 start_date:
                   type: string
                   format: date
@@ -3310,6 +3318,10 @@ components:
           type: integer
         name:
           type: string
+        description:
+          type: string
+          maxLength: 80
+          description: Optional short goal shown with the sprint name
         start_date:
           type: string
           format: date

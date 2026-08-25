@@ -40,6 +40,9 @@ func TestProjectSprintsCRUDAndTaskAssignment(t *testing.T) {
 	if sprint.Name != "Sprint 1" {
 		t.Fatalf("name=%q", sprint.Name)
 	}
+	if sprint.Description != "" {
+		t.Fatalf("description=%q want empty", sprint.Description)
+	}
 	if storage.FormatSprintDate(sprint.StartDate) != "2026-08-24" {
 		t.Fatalf("start=%q", storage.FormatSprintDate(sprint.StartDate))
 	}
@@ -225,6 +228,90 @@ func TestSprintRequiresKanbanAndValidDates(t *testing.T) {
 	bad := 999999
 	if _, err := UpdateTask(ctx, 1, taskID, UpdateTaskInput{SprintID: ptrToIntPtr(bad)}); !errors.Is(err, ErrValidation) {
 		t.Fatalf("invalid sprint_id err=%v", err)
+	}
+}
+
+func TestProjectSprintDescription(t *testing.T) {
+	ctx := context.Background()
+	proj, err := CreateProject(ctx, 1, "Sprint Desc Board", "")
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	if _, err := SetProjectWorkflowMode(ctx, 1, proj.ID, storage.WorkflowKanban); err != nil {
+		t.Fatalf("enable kanban: %v", err)
+	}
+
+	created, err := CreateProjectSprintForUser(ctx, 1, proj.ID, CreateProjectSprintInput{
+		Name:        "3.0.0",
+		Description: "  features required for v3.0.0 release  ",
+		StartDate:   "2026-08-24",
+		EndDate:     "2026-09-06",
+	})
+	if err != nil {
+		t.Fatalf("create with description: %v", err)
+	}
+	if created.Description != "features required for v3.0.0 release" {
+		t.Fatalf("create description=%q", created.Description)
+	}
+
+	listed, err := ListProjectSprintsForUser(ctx, 1, proj.ID)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(listed) != 1 || listed[0].Description != "features required for v3.0.0 release" {
+		t.Fatalf("list description=%v", listed)
+	}
+
+	tooLong := strings.Repeat("x", storage.MaxSprintDescriptionLen+1)
+	_, err = CreateProjectSprintForUser(ctx, 1, proj.ID, CreateProjectSprintInput{
+		Name:        "Too Long",
+		Description: tooLong,
+		StartDate:   "2026-09-07",
+		EndDate:     "2026-09-20",
+	})
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("create over-limit: err=%v want validation", err)
+	}
+
+	desc := "ship the public API"
+	updated, err := UpdateProjectSprintForUser(ctx, 1, proj.ID, created.ID, UpdateProjectSprintInput{
+		Description: &desc,
+	})
+	if err != nil {
+		t.Fatalf("update description: %v", err)
+	}
+	if updated.Description != desc {
+		t.Fatalf("updated description=%q want %q", updated.Description, desc)
+	}
+	if updated.Name != "3.0.0" {
+		t.Fatalf("name should be unchanged, got %q", updated.Name)
+	}
+
+	over := strings.Repeat("y", storage.MaxSprintDescriptionLen+1)
+	_, err = UpdateProjectSprintForUser(ctx, 1, proj.ID, created.ID, UpdateProjectSprintInput{
+		Description: &over,
+	})
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("update over-limit: err=%v want validation", err)
+	}
+
+	empty := ""
+	cleared, err := UpdateProjectSprintForUser(ctx, 1, proj.ID, created.ID, UpdateProjectSprintInput{
+		Description: &empty,
+	})
+	if err != nil {
+		t.Fatalf("clear description: %v", err)
+	}
+	if cleared.Description != "" {
+		t.Fatalf("cleared description=%q want empty", cleared.Description)
+	}
+
+	got, err := storage.GetProjectSprint(proj.ID, created.ID)
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	if got.Description != "" {
+		t.Fatalf("persisted description=%q want empty", got.Description)
 	}
 }
 

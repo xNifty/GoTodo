@@ -2,9 +2,9 @@
   <div v-if="isKanban" class="sprints-panel">
     <h4 class="h6 mb-2">Sprints</h4>
     <p class="small text-muted mb-3">
-      Name a sprint and give it a date range. Ranges cannot overlap; a sprint may
-      start the day after another ends. The board can switch between sprints; tasks
-      with no sprint stay in the backlog.
+      Name a sprint, optionally describe it, and give it a date range. Ranges cannot
+      overlap; a sprint may start the day after another ends. The board can switch
+      between sprints; tasks with no sprint stay in the backlog.
     </p>
 
     <ul class="list-unstyled mb-3">
@@ -23,6 +23,18 @@
               required
               aria-label="Sprint name"
             />
+            <input
+              v-model="editDescription"
+              type="text"
+              class="form-control form-control-sm"
+              :maxlength="maxSprintDescription"
+              placeholder="Short description (optional)"
+              aria-label="Sprint description"
+            />
+            <div class="d-flex justify-content-between">
+              <small class="form-hint">Max {{ maxSprintDescription }} characters</small>
+              <small class="text-muted">{{ editDescription.length }}/{{ maxSprintDescription }}</small>
+            </div>
             <div class="d-flex flex-wrap gap-2">
               <input
                 v-model="editStart"
@@ -60,6 +72,7 @@
                 <i class="bi bi-pencil" />
               </button>
             </div>
+            <div v-if="s.description" class="small text-muted text-break">{{ s.description }}</div>
             <div class="small text-muted">
               {{ formatRange(s.start_date, s.end_date) }}
               · {{ s.task_count }} task{{ s.task_count === 1 ? '' : 's' }}
@@ -93,6 +106,21 @@
           required
           placeholder="Sprint name"
         />
+      </div>
+      <div class="col-12">
+        <label class="form-label small mb-0" :for="`new-sprint-desc-${project.id}`">Description</label>
+        <input
+          :id="`new-sprint-desc-${project.id}`"
+          v-model="newDescription"
+          type="text"
+          class="form-control form-control-sm"
+          :maxlength="maxSprintDescription"
+          placeholder="e.g. features required for v3.0.0 release"
+        />
+        <div class="d-flex justify-content-between">
+          <small class="form-hint">Max {{ maxSprintDescription }} characters</small>
+          <small class="text-muted">{{ newDescription.length }}/{{ maxSprintDescription }}</small>
+        </div>
       </div>
       <div class="col-sm-6">
         <label class="form-label small mb-0" :for="`new-sprint-start-${project.id}`">Starts</label>
@@ -141,11 +169,14 @@ const sprints = ref<ProjectSprint[]>([])
 const adding = ref(false)
 const saving = ref(false)
 const deletingId = ref<number | null>(null)
+const maxSprintDescription = 80
 const newName = ref('')
+const newDescription = ref('')
 const newStart = ref('')
 const newEnd = ref('')
 const editId = ref<number | null>(null)
 const editName = ref('')
+const editDescription = ref('')
 const editStart = ref('')
 const editEnd = ref('')
 
@@ -186,6 +217,7 @@ async function loadSprints() {
 function beginEdit(s: ProjectSprint) {
   editId.value = s.id
   editName.value = s.name
+  editDescription.value = s.description || ''
   editStart.value = s.start_date
   editEnd.value = s.end_date
 }
@@ -205,10 +237,12 @@ async function addSprint() {
   try {
     await api.createProjectSprint(props.project.id, {
       name: newName.value.trim(),
+      description: newDescription.value.trim(),
       start_date: newStart.value,
       end_date: newEnd.value,
     })
     newName.value = ''
+    newDescription.value = ''
     newStart.value = ''
     newEnd.value = ''
     toast.push('Sprint created', 'success')
@@ -236,6 +270,7 @@ async function saveEdit(s: ProjectSprint) {
   try {
     await api.updateProjectSprint(props.project.id, s.id, {
       name: editName.value.trim(),
+      description: editDescription.value.trim(),
       start_date: editStart.value,
       end_date: editEnd.value,
     })

@@ -23,6 +23,7 @@ import { useSidebarState } from '@/composables/useSidebarState'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useLiveUpdates } from '@/composables/useLiveUpdates'
 import { projectOptionLabel } from '@/utils/projectLabel'
+import { sprintOptionLabel } from '@/utils/sprintLabel'
 import { uniqueTagsByName, isArchivedTask } from '@/utils/tags'
 
 const route = useRoute()
@@ -1364,15 +1365,16 @@ onUnmounted(() => {
               id="board-sprint"
               v-model="boardSprintKey"
               class="form-select form-select-sm"
-              style="max-width: 18rem;"
+              style="max-width: 28rem;"
               @change="onBoardSprintChange"
             >
               <option value="backlog">Backlog</option>
               <option v-for="s in boardSprints" :key="s.id" :value="String(s.id)">
-                {{ s.name }}{{ s.is_active ? ' (active)' : '' }}
+                {{ sprintOptionLabel(s, { activeSuffix: true }) }}
               </option>
             </select>
             <span v-if="selectedBoardSprint" class="small text-muted">
+              <template v-if="selectedBoardSprint.description">{{ selectedBoardSprint.description }} · </template>
               {{ selectedBoardSprint.start_date }} – {{ selectedBoardSprint.end_date }}
               · {{ selectedBoardSprint.task_count }} task{{ selectedBoardSprint.task_count === 1 ? '' : 's' }}
             </span>

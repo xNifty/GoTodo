@@ -342,26 +342,29 @@ func handleTaskTimeEntries(w http.ResponseWriter, r *http.Request, taskID int, r
 }
 
 type apiProjectSprintJSON struct {
-	ID        int    `json:"id"`
-	ProjectID int    `json:"project_id"`
-	Name      string `json:"name"`
-	StartDate string `json:"start_date"`
-	EndDate   string `json:"end_date"`
-	IsActive  bool   `json:"is_active"`
-	TaskCount int    `json:"task_count"`
-	CreatedAt string `json:"created_at"`
+	ID          int    `json:"id"`
+	ProjectID   int    `json:"project_id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	StartDate   string `json:"start_date"`
+	EndDate     string `json:"end_date"`
+	IsActive    bool   `json:"is_active"`
+	TaskCount   int    `json:"task_count"`
+	CreatedAt   string `json:"created_at"`
 }
 
 type apiSprintCreateRequest struct {
-	Name      string `json:"name"`
-	StartDate string `json:"start_date"`
-	EndDate   string `json:"end_date"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	StartDate   string `json:"start_date"`
+	EndDate     string `json:"end_date"`
 }
 
 type apiSprintPatchRequest struct {
-	Name      *string `json:"name"`
-	StartDate *string `json:"start_date"`
-	EndDate   *string `json:"end_date"`
+	Name        *string `json:"name"`
+	Description *string `json:"description"`
+	StartDate   *string `json:"start_date"`
+	EndDate     *string `json:"end_date"`
 }
 
 type apiSprintDeleteRequest struct {
@@ -370,14 +373,15 @@ type apiSprintDeleteRequest struct {
 
 func sprintToAPIJSON(s storage.ProjectSprint) apiProjectSprintJSON {
 	return apiProjectSprintJSON{
-		ID:        s.ID,
-		ProjectID: s.ProjectID,
-		Name:      s.Name,
-		StartDate: storage.FormatSprintDate(s.StartDate),
-		EndDate:   storage.FormatSprintDate(s.EndDate),
-		IsActive:  storage.SprintIsActive(s.StartDate, s.EndDate, time.Now()),
-		TaskCount: s.TaskCount,
-		CreatedAt: s.CreatedAt.UTC().Format(time.RFC3339),
+		ID:          s.ID,
+		ProjectID:   s.ProjectID,
+		Name:        s.Name,
+		Description: s.Description,
+		StartDate:   storage.FormatSprintDate(s.StartDate),
+		EndDate:     storage.FormatSprintDate(s.EndDate),
+		IsActive:    storage.SprintIsActive(s.StartDate, s.EndDate, time.Now()),
+		TaskCount:   s.TaskCount,
+		CreatedAt:   s.CreatedAt.UTC().Format(time.RFC3339),
 	}
 }
 
@@ -410,9 +414,10 @@ func handleProjectSprintsResource(w http.ResponseWriter, r *http.Request, projec
 				return
 			}
 			s, err := domain.CreateProjectSprintForUser(r.Context(), userID, projectID, domain.CreateProjectSprintInput{
-				Name:      req.Name,
-				StartDate: req.StartDate,
-				EndDate:   req.EndDate,
+				Name:        req.Name,
+				Description: req.Description,
+				StartDate:   req.StartDate,
+				EndDate:     req.EndDate,
 			})
 			if err != nil {
 				writeWorkflowDomainError(w, err)
@@ -441,9 +446,10 @@ func handleProjectSprintsResource(w http.ResponseWriter, r *http.Request, projec
 			return
 		}
 		s, err := domain.UpdateProjectSprintForUser(r.Context(), userID, projectID, sprintID, domain.UpdateProjectSprintInput{
-			Name:      req.Name,
-			StartDate: req.StartDate,
-			EndDate:   req.EndDate,
+			Name:        req.Name,
+			Description: req.Description,
+			StartDate:   req.StartDate,
+			EndDate:     req.EndDate,
 		})
 		if err != nil {
 			writeWorkflowDomainError(w, err)

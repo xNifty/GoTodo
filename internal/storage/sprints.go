@@ -12,25 +12,27 @@ import (
 )
 
 const (
-	MaxSprintNameLen  = 60
-	MaxProjectSprints = 50
+	MaxSprintNameLen        = 60
+	MaxSprintDescriptionLen = 80
+	MaxProjectSprints       = 50
 
-	projectSprintSelectCols = `id, project_id, name, start_date, end_date, created_at`
+	projectSprintSelectCols = `id, project_id, name, description, start_date, end_date, created_at`
 )
 
 // ProjectSprint is a named date range on a kanban project.
 type ProjectSprint struct {
-	ID        int
-	ProjectID int
-	Name      string
-	StartDate time.Time
-	EndDate   time.Time
-	CreatedAt time.Time
-	TaskCount int
+	ID          int
+	ProjectID   int
+	Name        string
+	Description string
+	StartDate   time.Time
+	EndDate     time.Time
+	CreatedAt   time.Time
+	TaskCount   int
 }
 
 func scanProjectSprint(row projectStatusScanner, s *ProjectSprint) error {
-	return row.Scan(&s.ID, &s.ProjectID, &s.Name, &s.StartDate, &s.EndDate, &s.CreatedAt)
+	return row.Scan(&s.ID, &s.ProjectID, &s.Name, &s.Description, &s.StartDate, &s.EndDate, &s.CreatedAt)
 }
 
 // FormatSprintDate returns a DATE value as YYYY-MM-DD in UTC.
@@ -100,6 +102,7 @@ func CreateProjectSprintsTable() error {
 			id SERIAL PRIMARY KEY,
 			project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
 			name TEXT NOT NULL,
+			description TEXT NOT NULL DEFAULT '',
 			start_date DATE NOT NULL,
 			end_date DATE NOT NULL,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -114,6 +117,22 @@ func CreateProjectSprintsTable() error {
 		if _, err := pool.Exec(context.Background(), s); err != nil {
 			return fmt.Errorf("failed to create project_sprints: %v", err)
 		}
+	}
+	return nil
+}
+
+// MigrateProjectSprintsAddDescription adds an optional short description on sprints.
+func MigrateProjectSprintsAddDescription() error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return err
+	}
+	defer CloseDatabase(pool)
+
+	_, err = pool.Exec(context.Background(),
+		`ALTER TABLE project_sprints ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT ''`)
+	if err != nil {
+		return fmt.Errorf("failed to add sprint description: %v", err)
 	}
 	return nil
 }
@@ -162,7 +181,7 @@ func ListProjectSprints(projectID int) ([]ProjectSprint, error) {
 	defer CloseDatabase(pool)
 
 	rows, err := pool.Query(context.Background(),
-		`SELECT s.id, s.project_id, s.name, s.start_date, s.end_date, s.created_at,
+		`SELECT s.id, s.project_id, s.name, s.description, s.start_date, s.end_date, s.created_at,
 		        COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.sprint_id = s.id), 0)
 		 FROM project_sprints s
 		 WHERE s.project_id = $1
@@ -175,7 +194,7 @@ func ListProjectSprints(projectID int) ([]ProjectSprint, error) {
 	var out []ProjectSprint
 	for rows.Next() {
 		var s ProjectSprint
-		if err := rows.Scan(&s.ID, &s.ProjectID, &s.Name, &s.StartDate, &s.EndDate, &s.CreatedAt, &s.TaskCount); err != nil {
+		if err := rows.Scan(&s.ID, &s.ProjectID, &s.Name, &s.Description, &s.StartDate, &s.EndDate, &s.CreatedAt, &s.TaskCount); err != nil {
 			return nil, err
 		}
 		out = append(out, s)
@@ -219,7 +238,7 @@ func GetProjectSprint(projectID, sprintID int) (*ProjectSprint, error) {
 }
 
 // CreateProjectSprint inserts a sprint.
-func CreateProjectSprint(projectID int, name string, startDate, endDate time.Time) (*ProjectSprint, error) {
+func CreateProjectSprint(projectID int, name, description string, startDate, endDate time.Time) (*ProjectSprint, error) {
 	pool, err := OpenDatabase()
 	if err != nil {
 		return nil, err
@@ -228,10 +247,10 @@ func CreateProjectSprint(projectID int, name string, startDate, endDate time.Tim
 
 	var s ProjectSprint
 	err = scanProjectSprint(pool.QueryRow(context.Background(),
-		`INSERT INTO project_sprints (project_id, name, start_date, end_date)
-		 VALUES ($1, $2, $3::date, $4::date)
+		`INSERT INTO project_sprints (project_id, name, description, start_date, end_date)
+		 VALUES ($1, $2, $3, $4::date, $5::date)
 		 RETURNING `+projectSprintSelectCols,
-		projectID, name, FormatSprintDate(startDate), FormatSprintDate(endDate)), &s)
+		projectID, name, description, FormatSprintDate(startDate), FormatSprintDate(endDate)), &s)
 	if err != nil {
 		return nil, err
 	}
@@ -239,7 +258,7 @@ func CreateProjectSprint(projectID int, name string, startDate, endDate time.Tim
 }
 
 // UpdateProjectSprint updates mutable sprint fields.
-func UpdateProjectSprint(projectID, sprintID int, name *string, startDate, endDate *time.Time) (*ProjectSprint, error) {
+func UpdateProjectSprint(projectID, sprintID int, name *string, description *string, startDate, endDate *time.Time) (*ProjectSprint, error) {
 	cur, err := GetProjectSprint(projectID, sprintID)
 	if err != nil {
 		return nil, err
@@ -247,6 +266,10 @@ func UpdateProjectSprint(projectID, sprintID int, name *string, startDate, endDa
 	newName := cur.Name
 	if name != nil {
 		newName = *name
+	}
+	newDescription := cur.Description
+	if description != nil {
+		newDescription = *description
 	}
 	newStart := cur.StartDate
 	if startDate != nil {
@@ -264,9 +287,9 @@ func UpdateProjectSprint(projectID, sprintID int, name *string, startDate, endDa
 	defer CloseDatabase(pool)
 
 	_, err = pool.Exec(context.Background(),
-		`UPDATE project_sprints SET name = $1, start_date = $2::date, end_date = $3::date
-		 WHERE id = $4 AND project_id = $5`,
-		newName, FormatSprintDate(newStart), FormatSprintDate(newEnd), sprintID, projectID)
+		`UPDATE project_sprints SET name = $1, description = $2, start_date = $3::date, end_date = $4::date
+		 WHERE id = $5 AND project_id = $6`,
+		newName, newDescription, FormatSprintDate(newStart), FormatSprintDate(newEnd), sprintID, projectID)
 	if err != nil {
 		return nil, err
 	}
