@@ -77,7 +77,9 @@ export type ProjectSprint = {
   description?: string
   start_date: string
   end_date: string
+  lock_date?: string | null
   is_active: boolean
+  is_locked: boolean
   task_count: number
   created_at: string
 }

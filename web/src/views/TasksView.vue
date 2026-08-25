@@ -21,7 +21,7 @@ import { useConfirm } from '@/composables/useConfirm'
 import { useViewDensity } from '@/composables/useViewDensity'
 import { useSidebarState } from '@/composables/useSidebarState'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
-import { useLiveUpdates } from '@/composables/useLiveUpdates'
+import { useLiveUpdates, isOwnFocusedLiveEvent } from '@/composables/useLiveUpdates'
 import { projectOptionLabel } from '@/utils/projectLabel'
 import { sprintOptionLabel } from '@/utils/sprintLabel'
 import { uniqueTagsByName, isArchivedTask } from '@/utils/tags'
@@ -1090,6 +1090,10 @@ async function onProjectSettingsChanged() {
   }
 }
 
+async function onProjectColumnsChanged() {
+  kanbanColumnsRev.value++
+}
+
 async function onReorderProjects(projectIds: number[]) {
   const previous = [...projects.value]
   const owned = projects.value.filter((p) => !p.role || p.role === 'owner')
@@ -1207,12 +1211,13 @@ onMounted(async () => {
 
 useLiveUpdates((event) => {
   if (event.type === 'task.commented') return
+  if (isOwnFocusedLiveEvent(event, user.value?.id)) return
   if (event.type === 'project.updated') {
     void loadMeta()
     kanbanColumnsRev.value++
   }
   void reloadInitial()
-})
+}, 500)
 
 onUnmounted(() => {
   unregisterTaskShortcuts()
@@ -1370,12 +1375,15 @@ onUnmounted(() => {
             >
               <option value="backlog">Backlog</option>
               <option v-for="s in boardSprints" :key="s.id" :value="String(s.id)">
-                {{ sprintOptionLabel(s, { activeSuffix: true }) }}
+                {{ sprintOptionLabel(s, { activeSuffix: true, lockedSuffix: true }) }}
               </option>
             </select>
             <span v-if="selectedBoardSprint" class="small text-muted">
               <template v-if="selectedBoardSprint.description">{{ selectedBoardSprint.description }} · </template>
               {{ selectedBoardSprint.start_date }} – {{ selectedBoardSprint.end_date }}
+              <template v-if="selectedBoardSprint.lock_date">
+                · {{ selectedBoardSprint.is_locked ? 'locked' : 'locks' }} {{ selectedBoardSprint.lock_date }}
+              </template>
               · {{ selectedBoardSprint.task_count }} task{{ selectedBoardSprint.task_count === 1 ? '' : 's' }}
             </span>
             <span v-else class="small text-muted">Tasks not assigned to a sprint</span>
@@ -1805,6 +1813,7 @@ onUnmounted(() => {
         @close="closeEditProject"
         @saved="onProjectSettingsSaved"
         @changed="onProjectSettingsChanged"
+        @columns-changed="onProjectColumnsChanged"
       />
 
       <DeleteTaskDialog

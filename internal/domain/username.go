@@ -109,6 +109,25 @@ func EnsureUsernameForRegister(raw string) (string, error) {
 	return name, nil
 }
 
+const userSearchLimit = 10
+
+// SearchUsernames returns username prefix matches. When projectID > 0, results
+// are limited to members of that project (caller must be able to access it).
+func SearchUsernames(ctx context.Context, userID int, q string, projectID int) ([]string, error) {
+	_ = ctx
+	q = strings.TrimSpace(q)
+	if q == "" {
+		return []string{}, nil
+	}
+	if projectID > 0 {
+		if _, err := storage.GetAccessibleProjectByID(projectID, userID); err != nil {
+			return nil, ErrNotFound
+		}
+		return storage.SearchProjectMembersByUsernamePrefix(projectID, q, userSearchLimit)
+	}
+	return storage.SearchUsersByUsernamePrefix(q, userID, userSearchLimit)
+}
+
 // UpdateProfileWithoutUsername keeps profile prefs without touching user_name.
 func UpdateProfileWithoutUsername(ctx context.Context, userID int, in UpdateProfileInput, timezoneOK bool, itemsPerPageOK bool) (*storage.UserProfile, error) {
 	_ = ctx

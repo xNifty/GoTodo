@@ -43,6 +43,9 @@ func TestProjectSprintsCRUDAndTaskAssignment(t *testing.T) {
 	if sprint.Description != "" {
 		t.Fatalf("description=%q want empty", sprint.Description)
 	}
+	if sprint.LockDate != nil {
+		t.Fatalf("lock_date=%v want nil", sprint.LockDate)
+	}
 	if storage.FormatSprintDate(sprint.StartDate) != "2026-08-24" {
 		t.Fatalf("start=%q", storage.FormatSprintDate(sprint.StartDate))
 	}
@@ -315,6 +318,199 @@ func TestProjectSprintDescription(t *testing.T) {
 	}
 }
 
+func utcDay(offset int) string {
+	return time.Now().UTC().AddDate(0, 0, offset).Format("2006-01-02")
+}
+
+func TestProjectSprintLockDate(t *testing.T) {
+	ctx := context.Background()
+	proj, err := CreateProject(ctx, 1, "Sprint Lock Board", "")
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	if _, err := SetProjectWorkflowMode(ctx, 1, proj.ID, storage.WorkflowKanban); err != nil {
+		t.Fatalf("enable kanban: %v", err)
+	}
+
+	created, err := CreateProjectSprintForUser(ctx, 1, proj.ID, CreateProjectSprintInput{
+		Name:      "Lock Me",
+		StartDate: "2026-08-24",
+		EndDate:   "2026-09-06",
+		LockDate:  "2026-08-24",
+	})
+	if err != nil {
+		t.Fatalf("create with lock: %v", err)
+	}
+	if created.LockDate == nil || storage.FormatSprintDate(*created.LockDate) != "2026-08-24" {
+		t.Fatalf("create lock_date=%v", created.LockDate)
+	}
+
+	listed, err := ListProjectSprintsForUser(ctx, 1, proj.ID)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(listed) != 1 || listed[0].LockDate == nil || storage.FormatSprintDate(*listed[0].LockDate) != "2026-08-24" {
+		t.Fatalf("list lock_date=%v", listed)
+	}
+
+	if _, err := CreateProjectSprintForUser(ctx, 1, proj.ID, CreateProjectSprintInput{
+		Name:      "Bad lock",
+		StartDate: "2026-09-07",
+		EndDate:   "2026-09-20",
+		LockDate:  "not-a-date",
+	}); !errors.Is(err, ErrValidation) {
+		t.Fatalf("invalid lock_date err=%v", err)
+	}
+
+	next := "2026-08-31"
+	updated, err := UpdateProjectSprintForUser(ctx, 1, proj.ID, created.ID, UpdateProjectSprintInput{
+		LockDate: &next,
+	})
+	if err != nil {
+		t.Fatalf("update lock: %v", err)
+	}
+	if updated.LockDate == nil || storage.FormatSprintDate(*updated.LockDate) != "2026-08-31" {
+		t.Fatalf("updated lock_date=%v", updated.LockDate)
+	}
+	if updated.Name != "Lock Me" {
+		t.Fatalf("name should be unchanged, got %q", updated.Name)
+	}
+
+	empty := ""
+	cleared, err := UpdateProjectSprintForUser(ctx, 1, proj.ID, created.ID, UpdateProjectSprintInput{
+		LockDate: &empty,
+	})
+	if err != nil {
+		t.Fatalf("clear lock: %v", err)
+	}
+	if cleared.LockDate != nil {
+		t.Fatalf("cleared lock_date=%v want nil", cleared.LockDate)
+	}
+
+	got, err := storage.GetProjectSprint(proj.ID, created.ID)
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	if got.LockDate != nil {
+		t.Fatalf("persisted lock_date=%v want nil", got.LockDate)
+	}
+}
+
+func TestSprintLockBlocksNonOwnerAdds(t *testing.T) {
+	ctx := context.Background()
+	proj, err := CreateProject(ctx, 1, "Locked Sprint Access", "")
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	if _, err := SetProjectWorkflowMode(ctx, 1, proj.ID, storage.WorkflowKanban); err != nil {
+		t.Fatalf("enable kanban: %v", err)
+	}
+	if err := storage.UpsertProjectMember(proj.ID, 2, storage.RoleEditor); err != nil {
+		t.Fatalf("add editor: %v", err)
+	}
+
+	locked, err := CreateProjectSprintForUser(ctx, 1, proj.ID, CreateProjectSprintInput{
+		Name:      "Already Locked",
+		StartDate: utcDay(-7),
+		EndDate:   utcDay(7),
+		LockDate:  utcDay(-1),
+	})
+	if err != nil {
+		t.Fatalf("create locked sprint: %v", err)
+	}
+	future, err := CreateProjectSprintForUser(ctx, 1, proj.ID, CreateProjectSprintInput{
+		Name:      "Locks Later",
+		StartDate: utcDay(10),
+		EndDate:   utcDay(20),
+		LockDate:  utcDay(10),
+	})
+	if err != nil {
+		t.Fatalf("create future-lock sprint: %v", err)
+	}
+	open, err := CreateProjectSprintForUser(ctx, 1, proj.ID, CreateProjectSprintInput{
+		Name:      "Never Locks",
+		StartDate: utcDay(21),
+		EndDate:   utcDay(30),
+	})
+	if err != nil {
+		t.Fatalf("create unlocked sprint: %v", err)
+	}
+
+	pid := proj.ID
+	lockedID := locked.ID
+	futureID := future.ID
+	openID := open.ID
+
+	ownerTask, err := CreateTask(ctx, 1, CreateTaskInput{Title: "Owner in locked", ProjectID: &pid, SprintID: &lockedID})
+	if err != nil {
+		t.Fatalf("owner add to locked: %v", err)
+	}
+
+	_, err = CreateTask(ctx, 2, CreateTaskInput{Title: "Editor in locked", ProjectID: &pid, SprintID: &lockedID})
+	if !errors.Is(err, ErrForbidden) {
+		t.Fatalf("editor add to locked err=%v", err)
+	}
+	if err == nil || !strings.Contains(err.Error(), "locked") {
+		t.Fatalf("editor add error should mention lock, got %v", err)
+	}
+
+	if _, err := CreateTask(ctx, 2, CreateTaskInput{Title: "Editor future lock", ProjectID: &pid, SprintID: &futureID}); err != nil {
+		t.Fatalf("editor add before lock date: %v", err)
+	}
+	openTask, err := CreateTask(ctx, 2, CreateTaskInput{Title: "Editor open", ProjectID: &pid, SprintID: &openID})
+	if err != nil {
+		t.Fatalf("editor add to unlocked: %v", err)
+	}
+
+	if _, err := UpdateTask(ctx, 2, openTask, UpdateTaskInput{SprintID: ptrToIntPtr(lockedID)}); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("editor move into locked err=%v", err)
+	}
+
+	if _, err := UpdateTask(ctx, 2, ownerTask, UpdateTaskInput{Title: strPtr("still in locked")}); err != nil {
+		t.Fatalf("editor edit fields on locked-sprint task: %v", err)
+	}
+	if _, err := UpdateTask(ctx, 2, ownerTask, UpdateTaskInput{SprintID: ptrToIntPtr(lockedID)}); err != nil {
+		t.Fatalf("editor keep current locked sprint: %v", err)
+	}
+
+	clear := (*int)(nil)
+	if _, err := UpdateTask(ctx, 2, ownerTask, UpdateTaskInput{SprintID: &clear}); err != nil {
+		t.Fatalf("editor remove from locked: %v", err)
+	}
+
+	parentID, err := CreateTask(ctx, 1, CreateTaskInput{Title: "Locked parent", ProjectID: &pid, SprintID: &lockedID})
+	if err != nil {
+		t.Fatalf("owner parent: %v", err)
+	}
+	childID, err := CreateTask(ctx, 2, CreateTaskInput{Title: "Editor child", ParentID: &parentID})
+	if err != nil {
+		t.Fatalf("editor child of locked parent: %v", err)
+	}
+	fields, err := storage.GetWorkflowFieldsForTasks([]int{childID})
+	if err != nil {
+		t.Fatalf("child fields: %v", err)
+	}
+	if fields[childID].SprintID != 0 {
+		t.Fatalf("inherited locked sprint should be skipped for editor, got %d", fields[childID].SprintID)
+	}
+
+	openParent, err := CreateTask(ctx, 1, CreateTaskInput{Title: "Open parent", ProjectID: &pid, SprintID: &openID})
+	if err != nil {
+		t.Fatalf("open parent: %v", err)
+	}
+	openChild, err := CreateTask(ctx, 2, CreateTaskInput{Title: "Editor open child", ParentID: &openParent})
+	if err != nil {
+		t.Fatalf("editor child of open parent: %v", err)
+	}
+	fields, err = storage.GetWorkflowFieldsForTasks([]int{openChild})
+	if err != nil {
+		t.Fatalf("open child fields: %v", err)
+	}
+	if fields[openChild].SprintID != openID {
+		t.Fatalf("open parent sprint should inherit, got %d want %d", fields[openChild].SprintID, openID)
+	}
+}
+
 func TestSprintIsActiveWindow(t *testing.T) {
 	start, _ := time.Parse("2006-01-02", "2026-08-24")
 	end, _ := time.Parse("2006-01-02", "2026-09-06")
@@ -329,6 +525,25 @@ func TestSprintIsActiveWindow(t *testing.T) {
 	after, _ := time.Parse(time.RFC3339, "2026-09-07T00:00:00Z")
 	if storage.SprintIsActive(start, end, after) {
 		t.Fatal("expected inactive after end")
+	}
+}
+
+func TestSprintIsLockedWindow(t *testing.T) {
+	lock, _ := time.Parse("2006-01-02", "2026-08-25")
+	if storage.SprintIsLocked(nil, lock) {
+		t.Fatal("nil lock date should not lock")
+	}
+	on, _ := time.Parse(time.RFC3339, "2026-08-25T00:00:00Z")
+	if !storage.SprintIsLocked(&lock, on) {
+		t.Fatal("expected locked on lock date")
+	}
+	before, _ := time.Parse(time.RFC3339, "2026-08-24T23:59:59Z")
+	if storage.SprintIsLocked(&lock, before) {
+		t.Fatal("expected unlocked before lock date")
+	}
+	after, _ := time.Parse(time.RFC3339, "2026-08-26T00:00:00Z")
+	if !storage.SprintIsLocked(&lock, after) {
+		t.Fatal("expected locked after lock date")
 	}
 }
 

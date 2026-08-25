@@ -21,6 +21,7 @@ const emit = defineEmits<{
   close: []
   saved: []
   changed: []
+  'columns-changed': []
 }>()
 
 const toast = useToast()
@@ -92,6 +93,10 @@ async function saveBasics() {
 
 function onPanelChanged() {
   emit('changed')
+}
+
+function onColumnsChanged() {
+  emit('columns-changed')
 }
 </script>
 
@@ -179,6 +184,7 @@ function onPanelChanged() {
             v-else-if="tab === 'board'"
             :project="project"
             @changed="onPanelChanged"
+            @columns-changed="onColumnsChanged"
           />
 
           <ProjectSprintsPanel

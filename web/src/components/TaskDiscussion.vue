@@ -5,15 +5,20 @@ import type { TaskComment } from '@/api/types'
 import { useConfirm } from '@/composables/useConfirm'
 import { useTaskSidebar } from '@/composables/useTaskSidebar'
 import { useToast } from '@/composables/useToast'
+import { USER_SEARCH_MIN_QUERY, useUserSearch } from '@/composables/useUserSearch'
 import {
   extractTaskRefIDs,
+  insertMention,
   insertTaskRef,
   isInsertedTaskRef,
+  mentionTokenAtCursor,
   splitCommentBody,
+  type MentionToken,
 } from '@/utils/taskCommentBody'
 
 const props = defineProps<{
   taskId: number
+  projectId?: number | null
   currentUserId: number | null
   isOwner: boolean
   /** Grow with the parent column instead of capping the thread at 360px. */
@@ -28,6 +33,8 @@ const comments = ref<TaskComment[]>([])
 const loading = ref(false)
 const posting = ref(false)
 const draft = ref('')
+const draftEl = ref<HTMLTextAreaElement | null>(null)
+const mentionListEl = ref<HTMLElement | null>(null)
 const bottomEl = ref<HTMLElement | null>(null)
 const MAX_BODY = 2000
 
@@ -40,6 +47,22 @@ type DraftLink = {
 const draftLinks = ref<DraftLink[]>([])
 const titleCache = new Map<number, string | null>()
 let lookupTimer: ReturnType<typeof setTimeout> | null = null
+
+const mentionOpen = ref(false)
+const mentionToken = ref<MentionToken | null>(null)
+const mentionMenuStyle = ref<Record<string, string>>({})
+
+const { filtered: mentionHits, loading: mentionLoading, highlight: mentionHighlight, scheduleSearch, cancelPending, applyLocal, cachedNames } =
+  useUserSearch({
+    projectId: () => props.projectId,
+  })
+
+const showMentionMenu = computed(
+  () =>
+    mentionOpen.value &&
+    !!props.projectId &&
+    (mentionToken.value?.query.length ?? 0) >= USER_SEARCH_MIN_QUERY,
+)
 
 async function reload() {
   if (!props.taskId) return
@@ -139,6 +162,128 @@ function insertLink(id: number) {
   void lookupDraftLinks()
 }
 
+function updateMentionMenuPosition() {
+  const el = draftEl.value
+  if (!el) return
+  const r = el.getBoundingClientRect()
+  const gap = 2
+  const maxHeight = 220
+  const spaceBelow = window.innerHeight - r.bottom - gap
+  const openAbove = spaceBelow < 120 && r.top > spaceBelow
+  if (openAbove) {
+    mentionMenuStyle.value = {
+      position: 'fixed',
+      top: 'auto',
+      bottom: `${window.innerHeight - r.top + gap}px`,
+      left: `${r.left}px`,
+      width: `${Math.max(r.width, 160)}px`,
+      maxHeight: `${Math.min(maxHeight, r.top - gap)}px`,
+      zIndex: '2000',
+    }
+  } else {
+    mentionMenuStyle.value = {
+      position: 'fixed',
+      top: `${r.bottom + gap}px`,
+      bottom: 'auto',
+      left: `${r.left}px`,
+      width: `${Math.max(r.width, 160)}px`,
+      maxHeight: `${Math.min(maxHeight, Math.max(spaceBelow, 80))}px`,
+      zIndex: '2000',
+    }
+  }
+}
+
+function closeMentionMenu() {
+  mentionOpen.value = false
+  mentionToken.value = null
+  cancelPending()
+}
+
+function syncMentionFromEl() {
+  const el = draftEl.value
+  if (!el || !props.projectId) {
+    closeMentionMenu()
+    return
+  }
+  const token = mentionTokenAtCursor(el.value, el.selectionStart ?? 0)
+  mentionToken.value = token
+  if (!token || token.query.length < USER_SEARCH_MIN_QUERY) {
+    cancelPending()
+    mentionOpen.value = false
+    return
+  }
+  mentionOpen.value = true
+  const local = cachedNames(token.query)
+  if (local) {
+    cancelPending()
+    applyLocal(local)
+  } else {
+    scheduleSearch(token.query)
+  }
+  void nextTick(() => updateMentionMenuPosition())
+}
+
+function selectMention(name: string) {
+  const token = mentionToken.value
+  if (!token) return
+  const inserted = insertMention(draft.value, token, name)
+  draft.value = inserted.body
+  closeMentionMenu()
+  void nextTick(() => {
+    const el = draftEl.value
+    if (el) {
+      el.focus()
+      el.setSelectionRange(inserted.cursor, inserted.cursor)
+    }
+    scheduleDraftLookup()
+  })
+}
+
+async function scrollMentionHighlight() {
+  await nextTick()
+  const active = mentionListEl.value?.querySelector<HTMLElement>('[data-active="true"]')
+  active?.scrollIntoView({ block: 'nearest' })
+}
+
+function onDraftInput(e: Event) {
+  const el = e.target as HTMLTextAreaElement
+  draft.value = el.value
+  syncMentionFromEl()
+}
+
+function onDraftKeydown(e: KeyboardEvent) {
+  if (!showMentionMenu.value) return
+  if (e.key === 'Escape') {
+    closeMentionMenu()
+    e.preventDefault()
+    return
+  }
+  if (e.key === 'ArrowDown') {
+    if (!mentionHits.value.length) return
+    mentionHighlight.value = Math.min(mentionHighlight.value + 1, mentionHits.value.length - 1)
+    void scrollMentionHighlight()
+    e.preventDefault()
+    return
+  }
+  if (e.key === 'ArrowUp') {
+    mentionHighlight.value = Math.max(mentionHighlight.value - 1, 0)
+    void scrollMentionHighlight()
+    e.preventDefault()
+    return
+  }
+  if (e.key === 'Enter' || e.key === 'Tab') {
+    const name = mentionHits.value[mentionHighlight.value]
+    if (name) {
+      selectMention(name)
+      e.preventDefault()
+    }
+  }
+}
+
+function onMentionReposition() {
+  if (showMentionMenu.value) updateMentionMenuPosition()
+}
+
 const charCount = computed(() => draft.value.length)
 
 async function post() {
@@ -150,6 +295,7 @@ async function post() {
     comments.value = [...comments.value, created]
     draft.value = ''
     draftLinks.value = []
+    closeMentionMenu()
     await nextTick()
     bottomEl.value?.scrollIntoView({ block: 'nearest' })
   } catch (err) {
@@ -186,12 +332,21 @@ watch(draft, () => {
   scheduleDraftLookup()
 })
 
+watch(showMentionMenu, (visible) => {
+  if (visible) void nextTick(() => updateMentionMenuPosition())
+})
+
 onMounted(() => {
   void reload()
+  window.addEventListener('scroll', onMentionReposition, true)
+  window.addEventListener('resize', onMentionReposition)
 })
 
 onUnmounted(() => {
   if (lookupTimer) clearTimeout(lookupTimer)
+  cancelPending()
+  window.removeEventListener('scroll', onMentionReposition, true)
+  window.removeEventListener('resize', onMentionReposition)
 })
 
 defineExpose({ reload })
@@ -226,6 +381,7 @@ defineExpose({ reload })
             <div v-else class="task-post-body">
               <template v-for="(part, i) in splitCommentBody(c.body)" :key="i">
                 <span v-if="part.type === 'text'" style="white-space: pre-wrap;">{{ part.value }}</span>
+                <span v-else-if="part.type === 'mention'" class="task-post-mention">{{ part.raw }}</span>
                 <button
                   v-else-if="linkTitle(c, part.id)"
                   type="button"
@@ -246,12 +402,55 @@ defineExpose({ reload })
     <label class="form-label small mb-1" for="task-comment-body">Add a comment</label>
     <textarea
       id="task-comment-body"
-      v-model="draft"
+      ref="draftEl"
+      :value="draft"
       class="form-control"
       rows="3"
       :maxlength="MAX_BODY"
-      placeholder="Write a comment… Paste #123 to link a task."
+      placeholder="Write a comment… Type @ to mention a member, or paste #123 to link a task."
+      @input="onDraftInput"
+      @keydown="onDraftKeydown"
+      @click="syncMentionFromEl"
+      @keyup="syncMentionFromEl"
     />
+    <Teleport to="body">
+      <ul
+        v-if="showMentionMenu"
+        id="task-comment-mention-listbox"
+        ref="mentionListEl"
+        class="user-search-menu list-unstyled mb-0"
+        role="listbox"
+        :style="mentionMenuStyle"
+      >
+        <li
+          v-for="(name, idx) in mentionHits"
+          :key="name"
+          role="option"
+          class="user-search-option"
+          :class="{ active: mentionHighlight === idx }"
+          :data-active="mentionHighlight === idx ? 'true' : undefined"
+          :aria-selected="mentionToken?.query.toLowerCase() === name.toLowerCase()"
+          @mousedown.prevent
+          @click="selectMention(name)"
+        >
+          {{ name }}
+        </li>
+        <li
+          v-if="mentionLoading && !mentionHits.length"
+          class="user-search-option text-muted"
+          aria-disabled="true"
+        >
+          Searching…
+        </li>
+        <li
+          v-else-if="!mentionHits.length"
+          class="user-search-option text-muted"
+          aria-disabled="true"
+        >
+          No matching project members
+        </li>
+      </ul>
+    </Teleport>
     <div v-if="draftLinks.length" class="task-discussion-suggestions mt-2">
       <div v-for="link in draftLinks" :key="link.id" class="task-discussion-suggestion">
         <span class="small">{{ taskLinkLabel(link.id, link.title) }}</span>
@@ -367,6 +566,10 @@ defineExpose({ reload })
 .task-post-task-link:hover {
   filter: brightness(1.1);
 }
+.task-post-mention {
+  font-weight: 600;
+  color: var(--ordryn-accent, #2563eb);
+}
 .task-discussion-suggestions {
   display: flex;
   flex-direction: column;
@@ -381,5 +584,27 @@ defineExpose({ reload })
   border: 1px solid var(--ordryn-card-border, #dee2e6);
   border-radius: 0.375rem;
   background: var(--ordryn-muted-bg, #f8f6ee);
+}
+.user-search-menu {
+  overflow-y: auto;
+  border: 1px solid var(--ordryn-card-border, #dee2e6);
+  border-radius: 0.375rem;
+  background: var(--ordryn-card-bg, #fff);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+.user-search-option {
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+  color: var(--ordryn-text, inherit);
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+.user-search-option[aria-disabled='true'] {
+  cursor: default;
+  font-weight: 400;
+}
+.user-search-option.active,
+.user-search-option:hover:not([aria-disabled='true']) {
+  background: color-mix(in srgb, var(--ordryn-accent, #0d6efd) 14%, transparent);
 }
 </style>

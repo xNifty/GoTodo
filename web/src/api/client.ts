@@ -521,7 +521,13 @@ export const api = {
 
   createProjectSprint(
     projectId: number,
-    payload: { name: string; description?: string; start_date: string; end_date: string },
+    payload: {
+      name: string
+      description?: string
+      start_date: string
+      end_date: string
+      lock_date?: string | null
+    },
   ) {
     return request<ProjectSprint>(`/api/v1/projects/${projectId}/sprints`, {
       method: 'POST',
@@ -532,7 +538,13 @@ export const api = {
   updateProjectSprint(
     projectId: number,
     sprintId: number,
-    payload: Partial<{ name: string; description: string; start_date: string; end_date: string }>,
+    payload: Partial<{
+      name: string
+      description: string
+      start_date: string
+      end_date: string
+      lock_date: string | null
+    }>,
   ) {
     return request<ProjectSprint>(`/api/v1/projects/${projectId}/sprints/${sprintId}`, {
       method: 'PATCH',
@@ -635,9 +647,11 @@ export const api = {
     return request<ProjectInvite[]>(`/api/v1/projects/${projectId}/invites`)
   },
 
-  searchUsers(q: string, init: RequestInit = {}) {
+  searchUsers(q: string, init: RequestInit & { projectId?: number } = {}) {
+    const { projectId, ...rest } = init
     const qs = new URLSearchParams({ q })
-    return request<UserSearchHit[]>(`/api/v1/users/search?${qs}`, init)
+    if (projectId && projectId > 0) qs.set('project_id', String(projectId))
+    return request<UserSearchHit[]>(`/api/v1/users/search?${qs}`, rest)
   },
 
   createProjectInvite(projectId: number, username: string, role: 'editor' | 'viewer') {

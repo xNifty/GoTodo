@@ -78,7 +78,7 @@ onUnmounted(() => {
                             <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/auth/mfa/verify</code></a></td><td>Complete MFA login</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/auth/logout</code></a></td><td>Clear session cookie</td></tr>
                             <tr><td><span class="badge bg-success">GET</span></td><td><a href="#session-auth"><code>/api/v1/auth/username-available</code></a></td><td>Check username availability</td></tr>
-                            <tr><td><span class="badge bg-success">GET</span></td><td><a href="#session-auth"><code>/api/v1/users/search</code></a></td><td>Search usernames for project invites</td></tr>
+                            <tr><td><span class="badge bg-success">GET</span></td><td><a href="#session-auth"><code>/api/v1/users/search</code></a></td><td>Search usernames for project invites or discussion mentions</td></tr>
                             <tr><td><span class="badge bg-success">GET</span> <span class="badge bg-warning text-dark">PATCH</span></td><td><a href="#session-auth"><code>/api/v1/me</code></a></td><td>Current user / update profile prefs</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/me/username</code></a></td><td>One-time username claim</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#session-auth"><code>/api/v1/me/password</code></a></td><td>Change password</td></tr>
@@ -131,6 +131,7 @@ onUnmounted(() => {
                         Browser / SPA clients can register and log in with JSON and receive an httpOnly session cookie
                         (same cookie store as the legacy web UI). Resource routes under <code>/api/v1</code> accept either
                         that cookie or a Bearer API key (Redis required for rate limiting / key lookup).
+                        Session traffic uses a higher rate-limit budget than Bearer keys; see <a href="#rate-limits">Rate limits</a>.
                     </p>
                     <table class="table table-sm api-docs-table">
                         <thead>
@@ -147,7 +148,7 @@ onUnmounted(() => {
                             <tr><td><span class="badge bg-primary">POST</span></td><td><code>/api/v1/auth/mfa/verify</code></td><td>Public (pending MFA cookie)</td><td>Submit a TOTP or recovery code to complete login</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><code>/api/v1/auth/logout</code></td><td>API enabled</td><td>Clears session cookie</td></tr>
                             <tr><td><span class="badge bg-success">GET</span></td><td><code>/api/v1/auth/username-available</code></td><td>Public</td><td>Check username format and availability</td></tr>
-                            <tr><td><span class="badge bg-success">GET</span></td><td><code>/api/v1/users/search</code></td><td>Session cookie or Bearer</td><td>Username prefix search for project invites (no emails)</td></tr>
+                            <tr><td><span class="badge bg-success">GET</span></td><td><code>/api/v1/users/search</code></td><td>Session cookie or Bearer</td><td>Username prefix search for project invites, or project members when <code>project_id</code> is set (no emails)</td></tr>
                             <tr><td><span class="badge bg-success">GET</span> <span class="badge bg-warning text-dark">PATCH</span></td><td><code>/api/v1/me</code></td><td>Session cookie or Bearer</td><td>Read profile or update prefs (username not editable here)</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><code>/api/v1/me/username</code></td><td>Session cookie or Bearer</td><td>One-time username claim when <code>username_change_available</code></td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><code>/api/v1/me/password</code></td><td>Session cookie or Bearer</td><td>Change password</td></tr>
@@ -254,14 +255,22 @@ Content-Type: application/json
 
                     <h2 id="rate-limits" class="h4 mt-4">Rate limits</h2>
                     <p>
-                        Limits apply per user (per API key owner) using a token bucket stored in Redis:
+                        Limits apply per user using independent token buckets in Redis
+                        (reads and writes do not share a budget):
                     </p>
+                    <p class="fw-semibold mb-1">External API (Bearer API key)</p>
                     <ul>
                         <li><strong>Read</strong> requests (<code>GET</code>): 120 requests per minute (refill ~2/sec)</li>
-                        <li><strong>Write</strong> requests (<code>POST</code>, <code>PATCH</code>, <code>DELETE</code>): 60 requests per minute (refill ~1/sec)</li>
+                        <li><strong>Write</strong> requests (<code>POST</code>, <code>PUT</code>, <code>PATCH</code>, <code>DELETE</code>): 60 requests per minute (refill ~1/sec)</li>
+                    </ul>
+                    <p class="fw-semibold mb-1">Web app (session cookie)</p>
+                    <ul>
+                        <li><strong>Read</strong> requests (<code>GET</code>): 600 requests per minute (refill ~10/sec)</li>
+                        <li><strong>Write</strong> requests: 240 requests per minute (refill ~4/sec)</li>
                     </ul>
                     <p class="text-muted small mb-0">
                         When limited, the response is <code>429</code> with a <code>Retry-After</code> header (seconds until you can retry).
+                        Session limits are higher so the UI can move cards and edit boards without competing with machine API clients.
                     </p>
 
                     <h2 id="tasks" class="h4 mt-4">Tasks</h2>

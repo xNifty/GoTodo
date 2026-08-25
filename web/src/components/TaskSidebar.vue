@@ -12,8 +12,8 @@ import { useTaskSidebar } from '@/composables/useTaskSidebar'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { projectOptionLabel } from '@/utils/projectLabel'
-import { sprintOptionLabel } from '@/utils/sprintLabel'
-import { useLiveUpdates, type LiveEvent } from '@/composables/useLiveUpdates'
+import { sprintLockedForUser, sprintOptionLabel } from '@/utils/sprintLabel'
+import { useLiveUpdates, isOwnFocusedLiveEvent, type LiveEvent } from '@/composables/useLiveUpdates'
 import { assignableTags, archiveConfirmMessage, isArchivedTask, isProtectedTag } from '@/utils/tags'
 
 const {
@@ -169,6 +169,16 @@ function formSprintId(value: number | string | '' | null | undefined): number | 
   return n
 }
 
+function canAssignSprint(sprint: ProjectSprint | undefined): boolean {
+  if (!sprint) return false
+  return !sprintLockedForUser(sprint, selectedProject.value?.role)
+}
+
+function sprintSelectDisabled(sprint: ProjectSprint): boolean {
+  if (canAssignSprint(sprint)) return false
+  return formSprintId(sprintId.value) !== sprint.id
+}
+
 function sprintPayloadId(value: number | string | '' | null | undefined): number {
   const id = formSprintId(value)
   return id === '' ? 0 : id
@@ -297,8 +307,11 @@ async function loadSprintsForProject(pid: number | '') {
   try {
     sprints.value = await api.listProjectSprints(Number(pid))
     if (mode.value === 'add' && sprintId.value === '' && defaultSprintId.value != null) {
-      if (defaultSprintId.value > 0 && sprints.value.some((s) => s.id === defaultSprintId.value)) {
-        sprintId.value = defaultSprintId.value
+      if (defaultSprintId.value > 0) {
+        const target = sprints.value.find((s) => s.id === defaultSprintId.value)
+        if (canAssignSprint(target)) {
+          sprintId.value = defaultSprintId.value
+        }
       }
     }
   } catch {
@@ -442,6 +455,7 @@ function isFormDirty(): boolean {
 
 useLiveUpdates(async (event: LiveEvent) => {
   if (!open.value || !taskId.value) return
+  if (isOwnFocusedLiveEvent(event, user.value?.id)) return
   if (event.type === 'task.commented') {
     if (!event.task_id || event.task_id === taskId.value) {
       await discussionRef.value?.reload()
@@ -737,9 +751,14 @@ async function onParentChange() {
   if (p?.project_id) projectId.value = p.project_id
   else projectId.value = ''
   taskWorkflow.value = p?.project_workflow || ''
-  if (p?.sprint_id) sprintId.value = formSprintId(p.sprint_id)
   await loadStatusesForProject(projectId.value)
   await loadSprintsForProject(projectId.value)
+  if (p?.sprint_id) {
+    const inherited = sprints.value.find((s) => s.id === p.sprint_id)
+    if (canAssignSprint(inherited)) {
+      sprintId.value = formSprintId(p.sprint_id)
+    }
+  }
   await refreshProjectGitHub(projectId.value)
 }
 
@@ -1188,8 +1207,13 @@ async function removeTimeEntry(entryId: number) {
             @change="onSprintChange"
           >
             <option value="">Backlog</option>
-            <option v-for="s in sprints" :key="s.id" :value="String(s.id)">
-              {{ sprintOptionLabel(s, { activeSuffix: true }) }}
+            <option
+              v-for="s in sprints"
+              :key="s.id"
+              :value="String(s.id)"
+              :disabled="sprintSelectDisabled(s)"
+            >
+              {{ sprintOptionLabel(s, { activeSuffix: true, lockedSuffix: true }) }}
             </option>
           </select>
         </div>
@@ -1434,6 +1458,7 @@ async function removeTimeEntry(entryId: number) {
           v-if="showDiscussion && taskId"
           ref="discussionRef"
           :task-id="taskId"
+          :project-id="currentTask?.project_id ?? null"
           :current-user-id="user?.id ?? null"
           :is-owner="discussionIsOwner"
           :fill-height="isKanbanTask"

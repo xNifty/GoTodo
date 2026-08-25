@@ -8,8 +8,9 @@ import ModernSidebar from '@/components/modern/ModernSidebar.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import { useToast } from '@/composables/useToast'
 import { useSidebarState } from '@/composables/useSidebarState'
+import { useAuth } from '@/composables/useAuth'
 import { useTaskSidebar } from '@/composables/useTaskSidebar'
-import { useLiveUpdates } from '@/composables/useLiveUpdates'
+import { useLiveUpdates, isOwnFocusedLiveEvent } from '@/composables/useLiveUpdates'
 
 const router = useRouter()
 const stats = ref<DashboardStats | null>(null)
@@ -22,6 +23,7 @@ const doneThisWeekTasks = ref<Task[]>([])
 const completing = ref<Record<number, boolean>>({})
 const { sidebarCollapsed, toggleSidebar } = useSidebarState()
 const { openEdit, lastSavedTask } = useTaskSidebar()
+const { user } = useAuth()
 const overdueCount = inject<Ref<number>>('overdueCount')
 const loading = ref(true)
 const toast = useToast()
@@ -134,10 +136,11 @@ watch(lastSavedTask, () => {
 
 useLiveUpdates((event) => {
   if (event.type === 'task.commented') return
+  if (isOwnFocusedLiveEvent(event, user.value?.id)) return
   void refreshDashboard().catch(() => {
     /* keep current view if refresh fails */
   })
-})
+}, 500)
 </script>
 
 <template>

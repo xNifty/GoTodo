@@ -120,6 +120,10 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "sprint description: %v\n", err)
 		os.Exit(1)
 	}
+	if err := storage.MigrateProjectSprintsAddLockDate(); err != nil {
+		fmt.Fprintf(os.Stderr, "sprint lock_date: %v\n", err)
+		os.Exit(1)
+	}
 	if err := storage.MigrateTasksAddSprintID(); err != nil {
 		fmt.Fprintf(os.Stderr, "sprint_id: %v\n", err)
 		os.Exit(1)
@@ -542,6 +546,83 @@ func TestReorderSkipsEventForKanbanColumn(t *testing.T) {
 	}
 	if n := len(eventsOfType(t, id2, 1, "reordered")); n != 0 {
 		t.Fatalf("task B reordered events=%d want 0", n)
+	}
+}
+
+func TestReorderMovesTaskIntoKanbanColumn(t *testing.T) {
+	ctx := context.Background()
+	proj, err := CreateProject(ctx, 1, "Move Column Board", "")
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	if _, err := SetProjectWorkflowMode(ctx, 1, proj.ID, storage.WorkflowKanban); err != nil {
+		t.Fatalf("enable kanban: %v", err)
+	}
+	statuses, err := ListProjectStatusesForUser(ctx, 1, proj.ID)
+	if err != nil {
+		t.Fatalf("list statuses: %v", err)
+	}
+	var todoID, doneID int
+	for _, s := range statuses {
+		switch s.Name {
+		case "To Do":
+			todoID = s.ID
+		case "Done":
+			doneID = s.ID
+		}
+	}
+	if todoID == 0 || doneID == 0 {
+		t.Fatalf("missing default statuses: %+v", statuses)
+	}
+
+	pid := proj.ID
+	taskID, err := CreateTask(ctx, 1, CreateTaskInput{Title: "Card", ProjectID: &pid})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	if err := ReorderTasks(ctx, 1, []int{taskID}, false, &pid, nil, &doneID); err != nil {
+		t.Fatalf("move via reorder: %v", err)
+	}
+
+	pool, err := storage.OpenDatabase()
+	if err != nil {
+		t.Fatalf("db: %v", err)
+	}
+	defer storage.CloseDatabase(pool)
+	var statusID int
+	var completed bool
+	if err := pool.QueryRow(ctx,
+		`SELECT status_id, COALESCE(completed,false) FROM tasks WHERE id = $1`, taskID,
+	).Scan(&statusID, &completed); err != nil {
+		t.Fatalf("load task: %v", err)
+	}
+	if statusID != doneID {
+		t.Fatalf("status_id=%d want %d (Done)", statusID, doneID)
+	}
+	if !completed {
+		t.Fatal("expected completed=true after move to Done")
+	}
+	if n := len(eventsOfType(t, taskID, 1, "status_changed")); n != 1 {
+		t.Fatalf("status_changed events=%d want 1", n)
+	}
+	if n := len(eventsOfType(t, taskID, 1, "completed")); n != 1 {
+		t.Fatalf("completed events=%d want 1", n)
+	}
+
+	if err := ReorderTasks(ctx, 1, []int{taskID}, false, &pid, nil, &todoID); err != nil {
+		t.Fatalf("move back: %v", err)
+	}
+	if err := pool.QueryRow(ctx,
+		`SELECT status_id, COALESCE(completed,false) FROM tasks WHERE id = $1`, taskID,
+	).Scan(&statusID, &completed); err != nil {
+		t.Fatalf("reload task: %v", err)
+	}
+	if statusID != todoID {
+		t.Fatalf("status_id=%d want %d (To Do)", statusID, todoID)
+	}
+	if completed {
+		t.Fatal("expected completed=false after move to To Do")
 	}
 }
 

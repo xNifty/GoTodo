@@ -238,10 +238,11 @@ import { api } from '@/api/client'
 import type { Project, ProjectStatus } from '@/api/types'
 import { APIError } from '@/api/types'
 import { useToast } from '@/composables/useToast'
-import { useLiveUpdates } from '@/composables/useLiveUpdates'
+import { useLiveUpdates, isOwnFocusedLiveEvent } from '@/composables/useLiveUpdates'
+import { useAuth } from '@/composables/useAuth'
 
 const props = defineProps<{ project: Project }>()
-const emit = defineEmits<{ changed: [] }>()
+const emit = defineEmits<{ changed: []; 'columns-changed': [] }>()
 
 const maxStatuses = 8
 const maxStatusDescription = 50
@@ -260,6 +261,7 @@ const deleteTarget = ref<ProjectStatus | null>(null)
 const moveToStatusId = ref(0)
 const statusListEl = ref<HTMLElement | null>(null)
 const toast = useToast()
+const { user } = useAuth()
 let sortable: Sortable | null = null
 
 const isKanban = computed(() => (props.project.workflow_mode || 'classic') === 'kanban')
@@ -294,7 +296,7 @@ async function persistOrder(orderedIds: number[]) {
   reordering.value = true
   try {
     await api.reorderProjectStatuses(props.project.id, orderedIds)
-    emit('changed')
+    emit('columns-changed')
   } catch (err) {
     statuses.value = previous
     toast.push(err instanceof APIError ? err.message : 'Could not reorder statuses', 'error')
@@ -373,14 +375,14 @@ async function saveRename(s: ProjectStatus) {
   const name = renameValue.value.trim()
   if (!name) return
   try {
-    await api.updateProjectStatus(props.project.id, s.id, {
+    const updated = await api.updateProjectStatus(props.project.id, s.id, {
       name,
       description: renameDescription.value.trim(),
     })
+    statuses.value = statuses.value.map((row) => (row.id === updated.id ? updated : row))
     renameId.value = null
     toast.push('Status updated', 'success')
-    await loadStatuses()
-    emit('changed')
+    emit('columns-changed')
   } catch (err) {
     toast.push(err instanceof APIError ? err.message : 'Update failed', 'error')
   }
@@ -389,10 +391,13 @@ async function saveRename(s: ProjectStatus) {
 async function setDefault(s: ProjectStatus) {
   if (s.is_default) return
   try {
-    await api.updateProjectStatus(props.project.id, s.id, { is_default: true })
+    const updated = await api.updateProjectStatus(props.project.id, s.id, { is_default: true })
+    statuses.value = statuses.value.map((row) => ({
+      ...row,
+      is_default: row.id === updated.id,
+    }))
     toast.push('Default status updated', 'success')
-    await loadStatuses()
-    emit('changed')
+    emit('columns-changed')
   } catch (err) {
     toast.push(err instanceof APIError ? err.message : 'Update failed', 'error')
     await loadStatuses()
@@ -401,9 +406,9 @@ async function setDefault(s: ProjectStatus) {
 
 async function toggleDone(s: ProjectStatus, isDone: boolean) {
   try {
-    await api.updateProjectStatus(props.project.id, s.id, { is_done: isDone })
+    const updated = await api.updateProjectStatus(props.project.id, s.id, { is_done: isDone })
+    statuses.value = statuses.value.map((row) => (row.id === updated.id ? updated : row))
     toast.push('Status updated', 'success')
-    await loadStatuses()
     emit('changed')
   } catch (err) {
     toast.push(err instanceof APIError ? err.message : 'Update failed', 'error')
@@ -416,17 +421,19 @@ async function addStatus() {
   if (!name) return
   adding.value = true
   try {
-    await api.createProjectStatus(props.project.id, {
+    const created = await api.createProjectStatus(props.project.id, {
       name,
       description: newStatusDescription.value.trim(),
       is_done: newStatusDone.value,
     })
+    statuses.value = [...statuses.value, created]
     newStatusName.value = ''
     newStatusDescription.value = ''
     newStatusDone.value = false
     toast.push('Status added', 'success')
-    await loadStatuses()
-    emit('changed')
+    emit('columns-changed')
+    await nextTick()
+    initSortable()
   } catch (err) {
     toast.push(err instanceof APIError ? err.message : 'Could not add status', 'error')
   } finally {
@@ -479,6 +486,7 @@ useLiveUpdates((event) => {
   if (event.type !== 'project.updated') return
   if (event.project_id && event.project_id !== props.project.id) return
   if (renameId.value != null || deleteTarget.value) return
+  if (isOwnFocusedLiveEvent(event, user.value?.id)) return
   void loadStatuses()
 })
 

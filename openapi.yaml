@@ -7,6 +7,11 @@ info:
     rate limiting, and live SSE fan-out.
 
     Auth: session cookie (SPA login/register) or `Authorization: Bearer <api_key>`.
+
+    Rate limits (per user, Redis token bucket). Reads and writes are independent.
+    Bearer API keys: 120 GET/min (~2/sec) and 60 writes/min (~1/sec).
+    SPA session cookies use a higher budget (600 GET/min, 240 writes/min) so the
+    web UI is not gated by the external API ceiling.
   version: 1.0.0
   license:
     name: See LICENSE in repository
@@ -709,12 +714,18 @@ paths:
   /api/v1/users/search:
     get:
       tags: [Projects]
-      summary: Search usernames for project invites
+      summary: Search usernames for project invites or discussion mentions
       description: |
-        Case-insensitive username prefix match. Excludes the current user, banned
-        users, and users who opted out of project invites. Empty `q` or queries
-        shorter than 2 characters return `[]`. Does not return emails. Rate limited
-        more tightly than other read endpoints.
+        Case-insensitive username prefix match. Empty `q` or queries shorter than
+        2 characters return `[]`. Does not return emails. Rate limited more tightly
+        than other read endpoints.
+
+        Without `project_id`, this is the invite picker: it excludes the current
+        user, banned users, and users who opted out of project invites.
+
+        With `project_id`, results are limited to members of that project (including
+        the current user). The caller must be able to access the project. Invite
+        opt-out does not apply; banned members are still excluded.
       security:
         - SessionCookie: []
         - BearerAuth: []
@@ -724,6 +735,13 @@ paths:
           required: false
           schema:
             type: string
+        - name: project_id
+          in: query
+          required: false
+          description: When set, only matching members of this project are returned.
+          schema:
+            type: integer
+            minimum: 1
       responses:
         "200":
           description: Matching usernames
@@ -735,8 +753,10 @@ paths:
                   $ref: "#/components/schemas/UserSearchHit"
         "401":
           $ref: "#/components/responses/Unauthorized"
-
-  /api/v1/me/github:
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
     get:
       tags: [GitHub]
       summary: GitHub connection status for the current user
@@ -1587,6 +1607,11 @@ paths:
                   type: string
                   format: date
                   description: Inclusive end (YYYY-MM-DD). Adjacent ranges (next day after another sprint ends) are allowed.
+                lock_date:
+                  type: string
+                  format: date
+                  nullable: true
+                  description: Optional. From this UTC date onward, only the project owner can add tasks to the sprint. Omit or null to leave the sprint unlocked.
       responses:
         "201":
           description: Created
@@ -1635,6 +1660,11 @@ paths:
                   type: string
                   format: date
                   description: Inclusive end (YYYY-MM-DD). Adjacent ranges are allowed.
+                lock_date:
+                  type: string
+                  format: date
+                  nullable: true
+                  description: Optional. From this UTC date onward, only the project owner can add tasks. Null or empty clears the lock date.
       responses:
         "200":
           description: Updated
@@ -1910,6 +1940,9 @@ paths:
     post:
       tags: [Tasks]
       summary: Add a discussion comment (any project member, including viewers)
+      description: |
+        `@username` mentions matching current project members notify those users
+        (`task_mentioned`). Other members still receive `task_commented`.
       security:
         - SessionCookie: []
         - BearerAuth: []
@@ -3329,9 +3362,17 @@ components:
           type: string
           format: date
           description: Inclusive range; sprints in a project must not overlap
+        lock_date:
+          type: string
+          format: date
+          nullable: true
+          description: Optional. From this UTC date onward, only the project owner can add tasks
         is_active:
           type: boolean
           description: True when today's UTC date falls in start_date..end_date inclusive
+        is_locked:
+          type: boolean
+          description: True when lock_date is set and today's UTC date is on or after lock_date
         task_count:
           type: integer
         created_at:
@@ -3800,7 +3841,7 @@ components:
         sprint_id:
           type: integer
           nullable: true
-          description: Assign the task to a sprint in its kanban project; 0 or omit leaves it in the backlog
+          description: Assign the task to a sprint in its kanban project; 0 or omit leaves it in the backlog. After a sprint lock date, only the project owner can assign tasks to that sprint.
 
     TaskPatch:
       type: object
@@ -3839,7 +3880,7 @@ components:
         sprint_id:
           type: integer
           nullable: true
-          description: Set a sprint in the task's kanban project. null or 0 moves the task to the backlog; omit to leave the assignment unchanged.
+          description: Set a sprint in the task's kanban project. null or 0 moves the task to the backlog; omit to leave the assignment unchanged. After a sprint lock date, only the project owner can assign tasks to that sprint.
 
     TaskReorder:
       type: object
