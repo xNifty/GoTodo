@@ -10,6 +10,17 @@ import (
 	"GoTodo/internal/storage"
 )
 
+func setTestUsername(t *testing.T, userID int, name string) {
+	t.Helper()
+	pool, err := storage.OpenDatabase()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(context.Background(), `UPDATE users SET user_name = $1 WHERE id = $2`, name, userID); err != nil {
+		t.Fatalf("set username %s: %v", name, err)
+	}
+}
+
 func TestCommentsViewerCanPostNonMemberCannot(t *testing.T) {
 	ctx := context.Background()
 	proj, err := CreateProject(ctx, 1, "Discuss Proj", "")
@@ -214,15 +225,9 @@ func TestParseCommentMentions(t *testing.T) {
 
 func TestCommentsMentionNotifiesMemberOnce(t *testing.T) {
 	ctx := context.Background()
-	if err := storage.SetUsername(1, "alice", false); err != nil {
-		t.Fatalf("set alice: %v", err)
-	}
-	if err := storage.SetUsername(2, "bob_editor", false); err != nil {
-		t.Fatalf("set bob: %v", err)
-	}
-	if err := storage.SetUsername(3, "carol_viewer", false); err != nil {
-		t.Fatalf("set carol: %v", err)
-	}
+	setTestUsername(t, 1, "alice")
+	setTestUsername(t, 2, "bob_editor")
+	setTestUsername(t, 3, "carol_viewer")
 
 	proj, err := CreateProject(ctx, 1, "Mention Proj", "")
 	if err != nil {
@@ -300,12 +305,8 @@ func TestCommentsMentionNotifiesMemberOnce(t *testing.T) {
 
 func TestCommentsMentionIgnoresNonMembers(t *testing.T) {
 	ctx := context.Background()
-	if err := storage.SetUsername(1, "alice", false); err != nil {
-		t.Fatalf("set alice: %v", err)
-	}
-	if err := storage.SetUsername(2, "bob_editor", false); err != nil {
-		t.Fatalf("set bob: %v", err)
-	}
+	setTestUsername(t, 1, "alice")
+	setTestUsername(t, 2, "bob_editor")
 
 	proj, err := CreateProject(ctx, 1, "No Ghost Mentions", "")
 	if err != nil {
@@ -344,15 +345,9 @@ func TestCommentsMentionIgnoresNonMembers(t *testing.T) {
 
 func TestSearchUsernamesProjectMembersOnly(t *testing.T) {
 	ctx := context.Background()
-	if err := storage.SetUsername(1, "alice", false); err != nil {
-		t.Fatalf("set alice: %v", err)
-	}
-	if err := storage.SetUsername(2, "bob_editor", false); err != nil {
-		t.Fatalf("set bob: %v", err)
-	}
-	if err := storage.SetUsername(3, "carol_viewer", false); err != nil {
-		t.Fatalf("set carol: %v", err)
-	}
+	setTestUsername(t, 1, "alice")
+	setTestUsername(t, 2, "bob_editor")
+	setTestUsername(t, 3, "carol_viewer")
 
 	proj, err := CreateProject(ctx, 1, "Search Mentions", "")
 	if err != nil {
