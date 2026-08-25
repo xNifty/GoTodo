@@ -427,6 +427,13 @@ func SyncGitHubIssueFromOrdrynState(ctx context.Context, actorUserID, taskID int
 	if err != nil || issue == nil {
 		return
 	}
+	desired := "open"
+	if completed {
+		desired = "closed"
+	}
+	if strings.EqualFold(issue.IssueState, desired) {
+		return
+	}
 	projectID, err := storage.GetTaskProjectID(taskID)
 	if err != nil || projectID <= 0 {
 		return
@@ -441,23 +448,27 @@ func SyncGitHubIssueFromOrdrynState(ctx context.Context, actorUserID, taskID int
 	}
 	client, err := githubClientForUser(ctx, tokenUserID)
 	if err != nil {
-		_ = storage.UpdateTaskGitHubIssueState(taskID, issue.IssueState, err.Error())
-		return
-	}
-	desired := "open"
-	if completed {
-		desired = "closed"
-	}
-	if strings.EqualFold(issue.IssueState, desired) {
+		recordGitHubSyncError(taskID, err)
 		return
 	}
 	updated, err := client.SetIssueState(ctx, repo.GitHubOwner, repo.GitHubRepo, issue.IssueNumber, desired)
 	if err != nil {
 		log.Printf("github sync task=%d: %v", taskID, err)
-		_ = storage.UpdateTaskGitHubIssueState(taskID, issue.IssueState, err.Error())
+		recordGitHubSyncError(taskID, err)
 		return
 	}
 	_ = storage.UpdateTaskGitHubIssueState(taskID, updated.State, "")
+}
+
+func recordGitHubSyncError(taskID int, syncErr error) {
+	if syncErr == nil {
+		return
+	}
+	issue, err := storage.GetTaskGitHubIssue(taskID)
+	if err != nil || issue == nil {
+		return
+	}
+	_ = storage.UpdateTaskGitHubIssueState(taskID, issue.IssueState, syncErr.Error())
 }
 
 // ApplyGitHubIssueWebhookState updates Ordryn from a GitHub issues webhook (never creates tasks).

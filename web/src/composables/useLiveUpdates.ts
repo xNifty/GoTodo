@@ -76,6 +76,13 @@ export function subscribeLiveUpdates(handler: LiveHandler): () => void {
   }
 }
 
+/** True when this focused tab already applied the actor's own mutation. */
+export function isOwnFocusedLiveEvent(event: LiveEvent, userId?: number | null): boolean {
+  if (!userId || !event.actor_id || event.actor_id !== userId) return false
+  if (typeof document === 'undefined') return false
+  return document.hasFocus()
+}
+
 /** Subscribe while the caller is mounted; debounce bursts of events. */
 export function useLiveUpdates(handler: LiveHandler, debounceMs = 200): void {
   let timer: ReturnType<typeof setTimeout> | null = null

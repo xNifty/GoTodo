@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { computed, inject, onMounted, ref, watch, type Ref } from 'vue'
+import { computed, inject, ref, watch, type Ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { api } from '@/api/client'
 import type { Project, SavedView } from '@/api/types'
 import { useAuth } from '@/composables/useAuth'
-import { useLiveUpdates } from '@/composables/useLiveUpdates'
 import { useSite } from '@/composables/useSite'
 import { useToast } from '@/composables/useToast'
 import { projectOptionLabel } from '@/utils/projectLabel'
@@ -85,20 +84,10 @@ watch(
 )
 
 watch(isAuthenticated, (ok) => {
-  if (ok) void loadLists()
-  else {
+  if (!ok) {
     projects.value = []
     savedViews.value = []
   }
-})
-
-useLiveUpdates((event) => {
-  if (!isAuthenticated.value) return
-  if (event.type === 'project.updated') void loadLists()
-})
-
-onMounted(() => {
-  if (isAuthenticated.value) void loadLists()
 })
 </script>
 

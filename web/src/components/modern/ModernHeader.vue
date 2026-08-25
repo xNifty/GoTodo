@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { api } from '@/api/client'
 import type { Notification } from '@/api/types'
@@ -7,7 +7,7 @@ import { useAuth } from '@/composables/useAuth'
 import { useSite } from '@/composables/useSite'
 import { useTheme } from '@/composables/useTheme'
 import { useToast } from '@/composables/useToast'
-import { useLiveUpdates } from '@/composables/useLiveUpdates'
+import { usePageActivity } from '@/composables/usePageActivity'
 
 const emit = defineEmits<{
   'toggle-mobile-nav': []
@@ -28,7 +28,6 @@ const showChangelog = computed(() => siteInfo.value?.show_changelog !== false)
 const notifications = ref<Notification[]>([])
 const unreadCount = ref(0)
 const notifLoading = ref(false)
-let pollTimer: ReturnType<typeof setInterval> | null = null
 
 async function refreshUnreadCount() {
   if (!isAuthenticated.value) {
@@ -39,7 +38,7 @@ async function refreshUnreadCount() {
     const res = await api.unreadNotificationCount()
     unreadCount.value = res.unread_count
   } catch {
-    /* ignore polling errors */
+    /* ignore page-refresh errors */
   }
 }
 
@@ -100,50 +99,20 @@ async function openNotification(n: Notification) {
   }
 }
 
-function startPolling() {
-  stopPolling()
-  if (!isAuthenticated.value) return
-  void refreshUnreadCount()
-  pollTimer = setInterval(() => {
-    void refreshUnreadCount()
-  }, 60000)
-}
-
-function stopPolling() {
-  if (pollTimer) {
-    clearInterval(pollTimer)
-    pollTimer = null
-  }
-}
-
 watch(isAuthenticated, (ok) => {
-  if (ok) startPolling()
+  if (ok) void refreshUnreadCount()
   else {
-    stopPolling()
     notifications.value = []
     unreadCount.value = 0
   }
 })
 
-useLiveUpdates((event) => {
-  if (!isAuthenticated.value) return
-  void refreshUnreadCount()
-  if (
-    event.type === 'task.created' ||
-    event.type === 'task.commented' ||
-    event.type === 'project.updated' ||
-    event.type === 'join.request'
-  ) {
-    void loadNotifications()
-  }
+usePageActivity(() => {
+  if (isAuthenticated.value) void refreshUnreadCount()
 })
 
 onMounted(() => {
-  if (isAuthenticated.value) startPolling()
-})
-
-onBeforeUnmount(() => {
-  stopPolling()
+  if (isAuthenticated.value) void refreshUnreadCount()
 })
 
 async function onLogout() {

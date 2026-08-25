@@ -13,7 +13,7 @@ import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { projectOptionLabel } from '@/utils/projectLabel'
 import { sprintLockedForUser, sprintOptionLabel } from '@/utils/sprintLabel'
-import { useLiveUpdates, type LiveEvent } from '@/composables/useLiveUpdates'
+import { useLiveUpdates, isOwnFocusedLiveEvent, type LiveEvent } from '@/composables/useLiveUpdates'
 import { assignableTags, archiveConfirmMessage, isArchivedTask, isProtectedTag } from '@/utils/tags'
 
 const {
@@ -455,6 +455,7 @@ function isFormDirty(): boolean {
 
 useLiveUpdates(async (event: LiveEvent) => {
   if (!open.value || !taskId.value) return
+  if (isOwnFocusedLiveEvent(event, user.value?.id)) return
   if (event.type === 'task.commented') {
     if (!event.task_id || event.task_id === taskId.value) {
       await discussionRef.value?.reload()
