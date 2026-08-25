@@ -84,6 +84,7 @@ func APIV1AdminSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 func apiV1GetAdminSettings(w http.ResponseWriter, r *http.Request) {
+	_ = r
 	s, err := storage.GetSiteSettings()
 	if err != nil || s == nil {
 		utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to load settings.")
