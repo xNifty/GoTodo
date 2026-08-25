@@ -203,6 +203,14 @@ func RunMigrations() error {
 		fmt.Printf("migration: MigrateTasksAddClaimedBy failed: %v\n", err)
 		errCount++
 	}
+	if err := CreateProjectSprintsTable(); err != nil {
+		fmt.Printf("migration: CreateProjectSprintsTable failed: %v\n", err)
+		errCount++
+	}
+	if err := MigrateTasksAddSprintID(); err != nil {
+		fmt.Printf("migration: MigrateTasksAddSprintID failed: %v\n", err)
+		errCount++
+	}
 	if err := CreateUserNotificationsTable(); err != nil {
 		fmt.Printf("migration: CreateUserNotificationsTable failed: %v\n", err)
 		errCount++

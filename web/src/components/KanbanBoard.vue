@@ -141,6 +141,15 @@
                   </span>
 
                   <span
+                    v-if="task.sprint_name"
+                    class="ordryn-badge text-nowrap"
+                    style="background: var(--ordryn-muted-bg); color: var(--ordryn-muted);"
+                    title="Sprint"
+                  >
+                    <i class="bi bi-flag me-1" />{{ task.sprint_name }}
+                  </span>
+
+                  <span
                     v-if="task.estimate_points != null"
                     class="ordryn-badge text-nowrap"
                     style="background: var(--ordryn-muted-bg); color: var(--ordryn-muted);"
@@ -217,10 +226,13 @@ const props = withDefaults(
     density?: ViewDensity
     /** Bump to reload column definitions (rename/add/delete status). */
     columnsRev?: number
+    /** Board sprint key: `backlog` or a sprint id string. */
+    sprintFilter?: string
   }>(),
   {
     density: 'comfortable',
     columnsRev: 0,
+    sprintFilter: '',
   },
 )
 
@@ -259,37 +271,44 @@ const parentTitleById = computed(() => {
   const titles = new Map<number, string>()
   for (const t of props.tasks) {
     if (!t.parent_id) titles.set(t.id, t.title)
+    if (t.parent_id && t.parent_title) titles.set(t.parent_id, t.parent_title)
+    for (const child of t.children || []) {
+      if (child.parent_id && child.parent_title) titles.set(child.parent_id, child.parent_title)
+    }
   }
   return titles
 })
 
+function matchesBoardSprint(task: Task): boolean {
+  const key = props.sprintFilter
+  if (!key) return true
+  const assigned = task.sprint_id && task.sprint_id > 0 ? task.sprint_id : 0
+  if (key === 'backlog') return assigned === 0
+  return assigned === parseInt(key, 10)
+}
+
 const boardTasks = computed(() => {
   const out: Task[] = []
   const seen = new Set<number>()
+  const take = (task: Task) => {
+    if (seen.has(task.id) || !matchesBoardSprint(task)) return
+    out.push(task)
+    seen.add(task.id)
+  }
   for (const t of props.tasks) {
     if (t.parent_id) {
-      if (!seen.has(t.id)) {
-        out.push(t)
-        seen.add(t.id)
-      }
+      take(t)
       continue
     }
-    if (!seen.has(t.id)) {
-      out.push(t)
-      seen.add(t.id)
-    }
-    for (const child of t.children || []) {
-      if (seen.has(child.id)) continue
-      out.push(child)
-      seen.add(child.id)
-    }
+    take(t)
+    for (const child of t.children || []) take(child)
   }
   return out
 })
 
 function parentTitleFor(task: Task): string {
   if (!task.parent_id) return ''
-  return parentTitleById.value.get(task.parent_id) || `Task #${task.parent_id}`
+  return parentTitleById.value.get(task.parent_id) || task.parent_title || `Task #${task.parent_id}`
 }
 
 function childCount(task: Task): number {

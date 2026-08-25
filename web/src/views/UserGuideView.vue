@@ -77,7 +77,9 @@ onUnmounted(() => {
           <li>
             Manage projects from
             <RouterLink to="/projects">Projects</RouterLink>
-            — create, rename, share, and invite collaborators.
+            — create, rename, share, and invite collaborators. Kanban projects can name sprints
+            with date ranges on the Sprints tab in project settings; ranges cannot overlap.
+            The board switcher filters tasks by sprint or backlog.
           </li>
           <li>
             Save the current filter set as a view so you can reopen it later from the sidebar or

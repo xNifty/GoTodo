@@ -22,6 +22,7 @@ type FilterContext struct {
 	Search             string
 	Page               int
 	WorkflowClaimScope string
+	Sprint             string
 }
 
 func firstNonEmpty(values ...string) string {
@@ -115,6 +116,7 @@ func filterContextFromRequest(r *http.Request) FilterContext {
 		Tag:                normalizeTagFilter(firstNonEmpty(r.URL.Query().Get("tag"), r.FormValue("tag"))),
 		Search:             strings.TrimSpace(firstNonEmpty(r.URL.Query().Get("search"), r.FormValue("search"))),
 		WorkflowClaimScope: normalizeWorkflowClaimScope(firstNonEmpty(r.URL.Query().Get("workflow_claim_scope"), r.FormValue("workflow_claim_scope"))),
+		Sprint:             firstNonEmpty(r.URL.Query().Get("sprint_id"), r.FormValue("sprint_id")),
 	}
 	if pageParam := firstNonEmpty(r.URL.Query().Get("page"), r.FormValue("page"), r.FormValue("currentPage")); pageParam != "" {
 		if page, err := strconv.Atoi(pageParam); err == nil && page > 0 {
@@ -132,6 +134,9 @@ func (fc FilterContext) ToListFilters() tasks.ListFilters {
 		CompletedFilter:    fc.Completed,
 		Sort:               fc.Sort,
 		WorkflowClaimScope: fc.WorkflowClaimScope,
+	}
+	if sid := parseSprintFilter(fc.Sprint); sid != nil {
+		lf.SprintFilter = sid
 	}
 	if fc.Priority != "" {
 		if p, err := strconv.Atoi(fc.Priority); err == nil {
@@ -164,6 +169,20 @@ func parseProjectFilter(projectParam string) *int {
 	}
 	if pid, err := strconv.Atoi(projectParam); err == nil {
 		return &pid
+	}
+	return nil
+}
+
+func parseSprintFilter(sprintParam string) *int {
+	if sprintParam == "" {
+		return nil
+	}
+	if sprintParam == "none" || sprintParam == "backlog" || sprintParam == "0" {
+		zero := 0
+		return &zero
+	}
+	if sid, err := strconv.Atoi(sprintParam); err == nil && sid > 0 {
+		return &sid
 	}
 	return nil
 }

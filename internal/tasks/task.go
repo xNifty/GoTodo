@@ -30,6 +30,7 @@ type Task struct {
 	Priority            int
 	Tags                []Tag
 	ParentID            int // 0 = root
+	ParentTitle         string
 	ChildCount          int
 	ChildrenCompleted   int
 	Children            []Task
@@ -40,6 +41,8 @@ type Task struct {
 	ProjectWorkflow     string
 	ClaimedBy           int
 	ClaimedByName       string
+	SprintID            int
+	SprintName          string
 	GitHubIssueNumber   int
 	GitHubIssueID       int64
 	GitHubIssueURL      string
