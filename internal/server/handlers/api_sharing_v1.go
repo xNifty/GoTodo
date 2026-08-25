@@ -579,6 +579,7 @@ func APIV1ShareLinksRouter(w http.ResponseWriter, r *http.Request) {
 }
 
 func apiV1ShareLinkView(w http.ResponseWriter, r *http.Request, token string) {
+	_ = r
 	link, err := storage.GetActiveShareLinkByToken(token)
 	if err != nil {
 		utils.APIJSONError(w, http.StatusNotFound, "not_found", "Share link not found.")
