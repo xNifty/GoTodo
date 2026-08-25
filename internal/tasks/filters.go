@@ -16,6 +16,8 @@ type ListFilters struct {
 	TagNameFilter      string
 	Sort               string
 	WorkflowClaimScope string // "mine" | "all" | ""
+	// SprintFilter: nil = no filter; &0 = backlog (no sprint); &n = sprint n.
+	SprintFilter *int
 }
 
 func (f ListFilters) projectCondition(tablePrefix string) string {
@@ -67,6 +69,30 @@ func (f ListFilters) priorityCondition(tablePrefix string) string {
 		return ""
 	}
 	return fmt.Sprintf(" AND (%spriority = %d)", prefix, *f.PriorityFilter)
+}
+
+func (f ListFilters) sprintCondition(tablePrefix string) string {
+	prefix := ""
+	if tablePrefix != "" {
+		prefix = tablePrefix + "."
+	}
+	if f.SprintFilter == nil {
+		return ""
+	}
+	if *f.SprintFilter == 0 {
+		return fmt.Sprintf(" AND (%ssprint_id IS NULL)", prefix)
+	}
+	return fmt.Sprintf(" AND (%ssprint_id = %d)", prefix, *f.SprintFilter)
+}
+
+func matchesSprintFilter(sprintID int, filter *int) bool {
+	if filter == nil {
+		return true
+	}
+	if *filter == 0 {
+		return sprintID == 0
+	}
+	return sprintID == *filter
 }
 
 func (f ListFilters) orderByClause(tablePrefix string) string {

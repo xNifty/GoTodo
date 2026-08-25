@@ -66,6 +66,8 @@ type TaskWorkflowFields struct {
 	ProjectWorkflow  string
 	ClaimedBy        int
 	ClaimedByName    string
+	SprintID         int
+	SprintName       string
 }
 
 // CreateProjectWorkflowTables creates statuses and time-entry tables.
@@ -333,7 +335,7 @@ func ClearProjectStatusesAndTaskFields(projectID int) error {
 	defer CloseDatabase(pool)
 
 	_, err = pool.Exec(context.Background(),
-		`UPDATE tasks SET status_id = NULL, estimate_points = NULL WHERE project_id = $1`, projectID)
+		`UPDATE tasks SET status_id = NULL, estimate_points = NULL, sprint_id = NULL WHERE project_id = $1`, projectID)
 	if err != nil {
 		return err
 	}
@@ -658,7 +660,7 @@ func ClearTaskWorkflowFields(taskID int) error {
 	}
 	defer CloseDatabase(pool)
 	_, err = pool.Exec(context.Background(),
-		`UPDATE tasks SET status_id = NULL, estimate_points = NULL, date_modified = NOW() AT TIME ZONE 'UTC' WHERE id = $1`,
+		`UPDATE tasks SET status_id = NULL, estimate_points = NULL, sprint_id = NULL, date_modified = NOW() AT TIME ZONE 'UTC' WHERE id = $1`,
 		taskID)
 	return err
 }
@@ -674,7 +676,7 @@ func ClearTaskWorkflowFieldsForTasks(taskIDs []int) error {
 	}
 	defer CloseDatabase(pool)
 	_, err = pool.Exec(context.Background(),
-		`UPDATE tasks SET status_id = NULL, estimate_points = NULL, date_modified = NOW() AT TIME ZONE 'UTC'
+		`UPDATE tasks SET status_id = NULL, estimate_points = NULL, sprint_id = NULL, date_modified = NOW() AT TIME ZONE 'UTC'
 		 WHERE id = ANY($1)`, taskIDs)
 	return err
 }
@@ -708,11 +710,13 @@ func GetWorkflowFieldsForTasks(taskIDs []int) (map[int]TaskWorkflowFields, error
 		`SELECT t.id, t.status_id, COALESCE(s.name, ''), t.estimate_points,
 		        COALESCE(p.workflow_mode, 'classic'),
 		        COALESCE((SELECT SUM(minutes) FROM task_time_entries e WHERE e.task_id = t.id), 0),
-		        t.claimed_by, COALESCE(cu.user_name, cu.email, '')
+		        t.claimed_by, COALESCE(cu.user_name, cu.email, ''),
+		        t.sprint_id, COALESCE(sp.name, '')
 		 FROM tasks t
 		 LEFT JOIN project_statuses s ON s.id = t.status_id
 		 LEFT JOIN projects p ON p.id = t.project_id
 		 LEFT JOIN users cu ON cu.id = t.claimed_by
+		 LEFT JOIN project_sprints sp ON sp.id = t.sprint_id
 		 WHERE t.id = ANY($1)`, taskIDs)
 	if err != nil {
 		return nil, err
@@ -728,7 +732,9 @@ func GetWorkflowFieldsForTasks(taskIDs []int) (map[int]TaskWorkflowFields, error
 		var spent int
 		var claimedBy sql.NullInt64
 		var claimedByName string
-		if err := rows.Scan(&id, &statusID, &statusName, &estimate, &mode, &spent, &claimedBy, &claimedByName); err != nil {
+		var sprintID sql.NullInt64
+		var sprintName string
+		if err := rows.Scan(&id, &statusID, &statusName, &estimate, &mode, &spent, &claimedBy, &claimedByName, &sprintID, &sprintName); err != nil {
 			return nil, err
 		}
 		f := TaskWorkflowFields{
@@ -736,6 +742,7 @@ func GetWorkflowFieldsForTasks(taskIDs []int) (map[int]TaskWorkflowFields, error
 			TimeSpentMinutes: spent,
 			ProjectWorkflow:  mode,
 			ClaimedByName:    claimedByName,
+			SprintName:       sprintName,
 		}
 		if statusID.Valid {
 			f.StatusID = int(statusID.Int64)
@@ -746,6 +753,9 @@ func GetWorkflowFieldsForTasks(taskIDs []int) (map[int]TaskWorkflowFields, error
 		}
 		if claimedBy.Valid {
 			f.ClaimedBy = int(claimedBy.Int64)
+		}
+		if sprintID.Valid {
+			f.SprintID = int(sprintID.Int64)
 		}
 		out[id] = f
 	}

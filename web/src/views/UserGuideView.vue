@@ -77,7 +77,11 @@ onUnmounted(() => {
           <li>
             Manage projects from
             <RouterLink to="/projects">Projects</RouterLink>
-            — create, rename, share, and invite collaborators.
+            — create, rename, share, and invite collaborators. Kanban projects can name sprints
+            with optional descriptions, date ranges, and a lock date on the Sprints tab
+            in project settings; ranges cannot overlap. After a sprint's lock date,
+            only the project owner can add tasks. The board switcher filters tasks by
+            sprint or backlog.
           </li>
           <li>
             Save the current filter set as a view so you can reopen it later from the sidebar or
@@ -113,6 +117,11 @@ onUnmounted(() => {
             leaves a tombstone (“Message deleted by user” or “Message deleted by project owner”). New
             comments show up live for anyone with the task open. The notification bell
             refreshes when you open it, change pages, or return to the tab.
+          </li>
+          <li>
+            Type <code>@</code> in a comment to mention a project member. Autocomplete lists matching
+            members of that project only (same prefix search as project invites). Mentioned members
+            get a notification; other members still see the usual new-comment notice.
           </li>
           <li>
             Paste <code>#123</code> in a comment to link another task you can access (including tasks

@@ -3,20 +3,19 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
+	"GoTodo/internal/domain"
 	"GoTodo/internal/server/utils"
-	"GoTodo/internal/storage"
 )
-
-const userSearchLimit = 10
 
 type apiUserSearchHitJSON struct {
 	UserName string `json:"user_name"`
 }
 
-// APIV1UsersSearch handles GET /api/v1/users/search?q=
+// APIV1UsersSearch handles GET /api/v1/users/search?q=&project_id=
 func APIV1UsersSearch(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		utils.APIJSONError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Method not allowed.")
@@ -28,6 +27,16 @@ func APIV1UsersSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	projectID := 0
+	if raw := strings.TrimSpace(r.URL.Query().Get("project_id")); raw != "" {
+		id, err := strconv.Atoi(raw)
+		if err != nil || id <= 0 {
+			utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid project id.")
+			return
+		}
+		projectID = id
+	}
+
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	if utf8.RuneCountInString(q) < 2 {
@@ -35,9 +44,9 @@ func APIV1UsersSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	names, err := storage.SearchUsersByUsernamePrefix(q, userID, userSearchLimit)
+	names, err := domain.SearchUsernames(r.Context(), userID, q, projectID)
 	if err != nil {
-		utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to search users.")
+		writeWorkflowDomainError(w, err)
 		return
 	}
 	out := make([]apiUserSearchHitJSON, 0, len(names))

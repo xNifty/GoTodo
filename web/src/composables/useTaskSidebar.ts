@@ -8,6 +8,7 @@ const defaultDueDate = ref('')
 const defaultProjectId = ref<number | string | null>(null)
 const defaultParentId = ref<number | null>(null)
 const defaultParentTitle = ref('')
+const defaultSprintId = ref<number | null | undefined>(undefined)
 const lastSavedTask = ref<Task | null>(null)
 
 export function useTaskSidebar() {
@@ -15,6 +16,7 @@ export function useTaskSidebar() {
     dueDate?: string,
     projectId?: number | string | null,
     parent?: { id: number; title?: string } | null,
+    sprintId?: number | null,
   ) {
     mode.value = 'add'
     taskId.value = null
@@ -26,6 +28,7 @@ export function useTaskSidebar() {
         : null
     defaultParentId.value = parent?.id ?? null
     defaultParentTitle.value = parent?.title?.trim() || ''
+    defaultSprintId.value = sprintId === undefined ? undefined : sprintId
     open.value = true
   }
 
@@ -36,6 +39,7 @@ export function useTaskSidebar() {
     defaultProjectId.value = null
     defaultParentId.value = null
     defaultParentTitle.value = ''
+    defaultSprintId.value = undefined
     open.value = true
   }
 
@@ -46,6 +50,7 @@ export function useTaskSidebar() {
     defaultProjectId.value = null
     defaultParentId.value = null
     defaultParentTitle.value = ''
+    defaultSprintId.value = undefined
     open.value = true
   }
 
@@ -68,6 +73,7 @@ export function useTaskSidebar() {
     defaultProjectId,
     defaultParentId,
     defaultParentTitle,
+    defaultSprintId,
     lastSavedTask,
     openAdd,
     openEdit,

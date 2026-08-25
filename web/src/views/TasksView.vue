@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { api } from '@/api/client'
-import type { Project, SavedView, Tag, Task } from '@/api/types'
+import type { Project, ProjectSprint, SavedView, Tag, Task } from '@/api/types'
 import { APIError } from '@/api/types'
 import ModernSidebar from '@/components/modern/ModernSidebar.vue'
 import ModernTaskFilterBar from '@/components/modern/ModernTaskFilterBar.vue'
@@ -23,6 +23,7 @@ import { useSidebarState } from '@/composables/useSidebarState'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useLiveUpdates, isOwnFocusedLiveEvent } from '@/composables/useLiveUpdates'
 import { projectOptionLabel } from '@/utils/projectLabel'
+import { sprintOptionLabel } from '@/utils/sprintLabel'
 import { uniqueTagsByName, isArchivedTask } from '@/utils/tags'
 
 const route = useRoute()
@@ -92,6 +93,9 @@ const {
 } = useTaskListFilters()
 const undoToken = ref<string | null>(null)
 const kanbanColumnsRev = ref(0)
+const boardSprints = ref<ProjectSprint[]>([])
+const boardSprintKey = ref('backlog')
+let sprintsLoadedForProject: number | null = null
 const selected = ref<number[]>([])
 const selectMode = ref(false)
 const favoriteListEl = ref<HTMLElement | null>(null)
@@ -234,7 +238,80 @@ function listApiParams(page: number, perPage: number) {
   if (onKanbanBoard && params.status === 'incomplete') {
     delete params.status
   }
+  if (onKanbanBoard) {
+    params.sprint_id = boardSprintKey.value === 'backlog' ? 'none' : boardSprintKey.value
+  }
   return params
+}
+
+function boardSprintStorageKey(projectId: number) {
+  return `gotodo.boardSprint.${projectId}`
+}
+
+function pickDefaultSprintKey(projectId: number, sprints: ProjectSprint[]): string {
+  try {
+    const stored = localStorage.getItem(boardSprintStorageKey(projectId))
+    if (stored === 'backlog') return 'backlog'
+    if (stored && sprints.some((s) => String(s.id) === stored)) return stored
+  } catch {
+    /* ignore */
+  }
+  const active = sprints.find((s) => s.is_active)
+  if (active) return String(active.id)
+  const today = new Date().toISOString().slice(0, 10)
+  const upcoming = sprints
+    .filter((s) => s.start_date >= today)
+    .sort((a, b) => a.start_date.localeCompare(b.start_date) || a.id - b.id)
+  if (upcoming[0]) return String(upcoming[0].id)
+  return 'backlog'
+}
+
+async function ensureBoardSprints() {
+  const p = activeProjectObj.value
+  if (!p || !showBoardView.value) {
+    boardSprints.value = []
+    sprintsLoadedForProject = null
+    return
+  }
+  if (sprintsLoadedForProject === p.id) return
+  try {
+    boardSprints.value = await api.listProjectSprints(p.id)
+  } catch {
+    boardSprints.value = []
+  }
+  boardSprintKey.value = pickDefaultSprintKey(p.id, boardSprints.value)
+  sprintsLoadedForProject = p.id
+}
+
+function persistBoardSprint(projectId: number, key: string) {
+  try {
+    localStorage.setItem(boardSprintStorageKey(projectId), key)
+  } catch {
+    /* ignore */
+  }
+}
+
+function onBoardSprintChange() {
+  const p = activeProjectObj.value
+  if (p) persistBoardSprint(p.id, boardSprintKey.value)
+  void reloadInitial()
+}
+
+const selectedBoardSprint = computed(() => {
+  if (boardSprintKey.value === 'backlog') return null
+  const id = parseInt(boardSprintKey.value, 10)
+  return boardSprints.value.find((s) => s.id === id) ?? null
+})
+
+function currentBoardSprintId(): number | null | undefined {
+  if (!showBoardView.value) return undefined
+  if (boardSprintKey.value === 'backlog') return null
+  const n = parseInt(boardSprintKey.value, 10)
+  return Number.isNaN(n) ? undefined : n
+}
+
+function openAddFromView() {
+  openAdd(undefined, filters.project, null, currentBoardSprintId())
 }
 
 /** Prefer board when entering a kanban project so unclaimed backlog is visible. */
@@ -293,8 +370,16 @@ function getNextWeekStr() {
   return d.toISOString().slice(0, 10)
 }
 
+function taskMatchesBoardSprint(task: Task): boolean {
+  if (!isKanbanProjectView.value || viewMode.value !== 'board') return true
+  const assigned = task.sprint_id && task.sprint_id > 0 ? task.sprint_id : 0
+  if (boardSprintKey.value === 'backlog') return assigned === 0
+  return assigned === parseInt(boardSprintKey.value, 10)
+}
+
 function taskMatchesCurrentFilters(task: Task): boolean {
   if (!taskMatchesStatusFilter(task)) return false
+  if (!taskMatchesBoardSprint(task)) return false
   if (filters.project === '0' && task.project_id != null) return false
   if (filters.project && filters.project !== '0') {
     const pid = parseInt(filters.project, 10)
@@ -419,13 +504,13 @@ function applyTaskUpdate(updated: Task) {
       refreshParentCounts(found.parent)
       return
     }
-    // Newly nested or moved under a parent already in the list
-    if (found && !found.parent) {
-      tasks.value = tasks.value.filter((t) => t.id !== updated.id)
-      total.value = Math.max(0, total.value - 1)
-    }
     const parent = tasks.value.find((t) => t.id === updated.parent_id)
     if (parent) {
+      // Newly nested or moved under a parent already in the list
+      if (found && !found.parent) {
+        tasks.value = tasks.value.filter((t) => t.id !== updated.id)
+        total.value = Math.max(0, total.value - 1)
+      }
       if (!parent.children) parent.children = []
       parent.children = [...parent.children.filter((c) => c.id !== updated.id), { ...updated, children: undefined }]
       refreshParentCounts(parent)
@@ -434,7 +519,7 @@ function applyTaskUpdate(updated: Task) {
     }
   }
 
-  if (!taskMatchesStatusFilter(updated)) {
+  if (!taskMatchesStatusFilter(updated) || !taskMatchesBoardSprint(updated)) {
     if (found) {
       removeTaskLocally(found.task)
     }
@@ -603,6 +688,8 @@ async function reloadInitial() {
     incompleteCount.value = 0
   }
   try {
+    await ensureBoardSprints()
+    if (generation !== reloadGeneration) return
     const perPage = user.value?.items_per_page || 50
     const list = await api.listTasks(listApiParams(1, perPage))
     if (generation !== reloadGeneration) return
@@ -993,6 +1080,7 @@ async function onProjectSettingsSaved() {
 }
 
 async function onProjectSettingsChanged() {
+  sprintsLoadedForProject = null
   await loadMeta()
   await reloadInitial()
   kanbanColumnsRev.value++
@@ -1106,7 +1194,7 @@ onMounted(async () => {
   registerTaskShortcuts({
     newTask: () => {
       if (isViewerProjectView.value) return
-      openAdd(undefined, filters.project)
+      openAddFromView()
     },
     focusSearch: focusSearchInput,
     getFocusableTaskIds,
@@ -1229,7 +1317,7 @@ onUnmounted(() => {
               v-if="!isViewerProjectView"
               type="button"
               class="btn btn-sm btn-success rounded-pill px-3 py-1 shadow-xs d-none d-md-flex align-items-center gap-1"
-              @click="openAdd(undefined, filters.project)"
+              @click="openAddFromView"
             >
               <i class="bi bi-plus-lg" />
               <span>Add Task</span>
@@ -1273,6 +1361,33 @@ onUnmounted(() => {
 
         <!-- Kanban board -->
         <div v-if="showBoardView" class="mb-3">
+          <div
+            class="d-flex flex-wrap align-items-center gap-2 mb-3 p-2 rounded-3 border shadow-xs"
+            style="background: var(--ordryn-card-bg); border-color: var(--ordryn-card-border) !important;"
+          >
+            <label class="small fw-bold mb-0" for="board-sprint">Sprint</label>
+            <select
+              id="board-sprint"
+              v-model="boardSprintKey"
+              class="form-select form-select-sm"
+              style="max-width: 28rem;"
+              @change="onBoardSprintChange"
+            >
+              <option value="backlog">Backlog</option>
+              <option v-for="s in boardSprints" :key="s.id" :value="String(s.id)">
+                {{ sprintOptionLabel(s, { activeSuffix: true, lockedSuffix: true }) }}
+              </option>
+            </select>
+            <span v-if="selectedBoardSprint" class="small text-muted">
+              <template v-if="selectedBoardSprint.description">{{ selectedBoardSprint.description }} · </template>
+              {{ selectedBoardSprint.start_date }} – {{ selectedBoardSprint.end_date }}
+              <template v-if="selectedBoardSprint.lock_date">
+                · {{ selectedBoardSprint.is_locked ? 'locked' : 'locks' }} {{ selectedBoardSprint.lock_date }}
+              </template>
+              · {{ selectedBoardSprint.task_count }} task{{ selectedBoardSprint.task_count === 1 ? '' : 's' }}
+            </span>
+            <span v-else class="small text-muted">Tasks not assigned to a sprint</span>
+          </div>
           <div v-if="loading && !tasks.length" class="text-center py-4 text-muted">
             <div class="spinner-border spinner-border-sm me-2" role="status" />Loading tasks…
           </div>
@@ -1284,6 +1399,7 @@ onUnmounted(() => {
             :role="activeProjectObj.role"
             :density="density"
             :columns-rev="kanbanColumnsRev"
+            :sprint-filter="boardSprintKey"
             @open-task="openTaskDetails"
             @changed="reloadInitial"
             @task-updated="applyTaskUpdate"
@@ -1607,7 +1723,7 @@ onUnmounted(() => {
             <i class="bi bi-clipboard-check display-4 text-muted opacity-50" />
             <h4 class="mt-3 fw-bold">No tasks yet</h4>
             <p class="text-muted">Get started by creating your first task.</p>
-            <button v-if="!isViewerProjectView" type="button" class="btn btn-success rounded-pill px-4" @click="openAdd(undefined, filters.project)">
+            <button v-if="!isViewerProjectView" type="button" class="btn btn-success rounded-pill px-4" @click="openAddFromView">
               <i class="bi bi-plus-lg me-1" /> Add Task
             </button>
           </div>
@@ -1717,7 +1833,7 @@ onUnmounted(() => {
         type="button"
         class="ordryn-mobile-fab d-md-none"
         aria-label="Add task"
-        @click="openAdd(undefined, filters.project)"
+        @click="openAddFromView"
       >
         <i class="bi bi-plus-lg" />
       </button>

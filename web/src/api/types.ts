@@ -70,6 +70,20 @@ export type ProjectStatus = {
   created_at: string
 }
 
+export type ProjectSprint = {
+  id: number
+  project_id: number
+  name: string
+  description?: string
+  start_date: string
+  end_date: string
+  lock_date?: string | null
+  is_active: boolean
+  is_locked: boolean
+  task_count: number
+  created_at: string
+}
+
 export type TaskTimeEntry = {
   id: number
   task_id: number
@@ -197,6 +211,9 @@ export type Task = {
   project_workflow?: WorkflowMode | string
   claimed_by?: number | null
   claimed_by_name?: string
+  sprint_id?: number | null
+  sprint_name?: string
+  parent_title?: string
   github?: TaskGitHubIssue | null
 }
 

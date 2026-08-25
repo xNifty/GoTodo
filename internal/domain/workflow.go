@@ -93,6 +93,9 @@ func disableKanban(projectID int) error {
 	if err := storage.ClearProjectStatusesAndTaskFields(projectID); err != nil {
 		return err
 	}
+	if err := storage.ClearProjectSprints(projectID); err != nil {
+		return err
+	}
 	return storage.SetProjectWorkflowMode(projectID, storage.WorkflowClassic)
 }
 

@@ -47,6 +47,9 @@ type apiTaskJSON struct {
 	ProjectWorkflow   string             `json:"project_workflow,omitempty"`
 	ClaimedBy         *int               `json:"claimed_by,omitempty"`
 	ClaimedByName     string             `json:"claimed_by_name,omitempty"`
+	SprintID          *int               `json:"sprint_id,omitempty"`
+	SprintName        string             `json:"sprint_name,omitempty"`
+	ParentTitle       string             `json:"parent_title,omitempty"`
 	GitHub            *apiTaskGitHubJSON `json:"github,omitempty"`
 }
 
@@ -72,24 +75,29 @@ type apiTaskCreateRequest struct {
 	TagIDs         []int  `json:"tag_ids"`
 	StatusID       *int   `json:"status_id"`
 	EstimatePoints *int   `json:"estimate_points"`
+	SprintID       *int   `json:"sprint_id"`
 }
 
 type apiTaskPatchRequest struct {
-	Title          *string      `json:"title"`
-	Description    *string      `json:"description"`
-	DueDate        *string      `json:"due_date"`
-	ProjectID      **int        `json:"project_id"`
-	ParentID       **int        `json:"parent_id"`
-	Priority       *int         `json:"priority"`
-	Completed      *bool        `json:"completed"`
-	Favorite       *bool        `json:"favorite"`
-	TagIDs         *[]int       `json:"tag_ids"`
-	ClearDue       *bool        `json:"clear_due_date"`
-	StatusID       **int        `json:"status_id"`
-	EstimatePoints *optionalInt `json:"estimate_points"`
+	Title          *string     `json:"title"`
+	Description    *string     `json:"description"`
+	DueDate        *string     `json:"due_date"`
+	ProjectID      **int       `json:"project_id"`
+	ParentID       **int       `json:"parent_id"`
+	Priority       *int        `json:"priority"`
+	Completed      *bool       `json:"completed"`
+	Favorite       *bool       `json:"favorite"`
+	TagIDs         *[]int      `json:"tag_ids"`
+	ClearDue       *bool       `json:"clear_due_date"`
+	StatusID       **int       `json:"status_id"`
+	EstimatePoints optionalInt `json:"estimate_points"`
+	SprintID       optionalInt `json:"sprint_id"`
 }
 
 // optionalInt distinguishes omitted / null / value for JSON patch fields.
+// It must be a non-pointer struct field: encoding/json sets pointer fields to
+// nil on JSON null without calling UnmarshalJSON, which would make null look
+// the same as an omitted field.
 type optionalInt struct {
 	Set   bool
 	Null  bool
@@ -103,6 +111,47 @@ func (o *optionalInt) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 	return json.Unmarshal(b, &o.Value)
+}
+
+func (o optionalInt) toPatchInt(zeroClears bool) **int {
+	if !o.Set {
+		return nil
+	}
+	if o.Null || (zeroClears && o.Value == 0) {
+		var clear *int
+		return &clear
+	}
+	v := o.Value
+	ptr := &v
+	return &ptr
+}
+
+// optionalString distinguishes omitted / null / value for JSON patch fields.
+type optionalString struct {
+	Set   bool
+	Null  bool
+	Value string
+}
+
+func (o *optionalString) UnmarshalJSON(b []byte) error {
+	o.Set = true
+	if string(b) == "null" {
+		o.Null = true
+		return nil
+	}
+	return json.Unmarshal(b, &o.Value)
+}
+
+func (o optionalString) toPatchString() *string {
+	if !o.Set {
+		return nil
+	}
+	if o.Null {
+		empty := ""
+		return &empty
+	}
+	v := o.Value
+	return &v
 }
 
 type apiTaskReorderRequest struct {
@@ -212,6 +261,8 @@ func taskToAPIJSON(t tasks.Task) apiTaskJSON {
 		TimeSpentMinutes:  t.TimeSpentMinutes,
 		ProjectWorkflow:   t.ProjectWorkflow,
 		ClaimedByName:     t.ClaimedByName,
+		SprintName:        t.SprintName,
+		ParentTitle:       t.ParentTitle,
 	}
 	if t.ParentID > 0 {
 		pid := t.ParentID
@@ -231,6 +282,10 @@ func taskToAPIJSON(t tasks.Task) apiTaskJSON {
 	if t.ClaimedBy > 0 {
 		cid := t.ClaimedBy
 		out.ClaimedBy = &cid
+	}
+	if t.SprintID > 0 {
+		sid := t.SprintID
+		out.SprintID = &sid
 	}
 	if t.GitHubIssueNumber > 0 || t.GitHubIssueURL != "" {
 		out.GitHub = &apiTaskGitHubJSON{
@@ -467,6 +522,7 @@ func apiV1CreateTask(w http.ResponseWriter, r *http.Request) {
 		TagIDs:         req.TagIDs,
 		StatusID:       req.StatusID,
 		EstimatePoints: req.EstimatePoints,
+		SprintID:       req.SprintID,
 	}
 	newID, err := domain.CreateTask(r.Context(), userID, in)
 	if err != nil {
@@ -475,7 +531,7 @@ func apiV1CreateTask(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if errors.Is(err, domain.ErrForbidden) {
-			utils.APIJSONError(w, http.StatusForbidden, "forbidden", "Forbidden.")
+			utils.APIJSONError(w, http.StatusForbidden, "forbidden", sharingClientMessage(err, "Forbidden."))
 			return
 		}
 		utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to create task.")
@@ -520,16 +576,8 @@ func apiV1PatchTask(w http.ResponseWriter, r *http.Request, taskID int) {
 	if req.ClearDue != nil && *req.ClearDue {
 		in.ClearDue = true
 	}
-	if req.EstimatePoints != nil && req.EstimatePoints.Set {
-		if req.EstimatePoints.Null {
-			var clear *int
-			in.EstimatePoints = &clear
-		} else {
-			v := req.EstimatePoints.Value
-			ptr := &v
-			in.EstimatePoints = &ptr
-		}
-	}
+	in.EstimatePoints = req.EstimatePoints.toPatchInt(false)
+	in.SprintID = req.SprintID.toPatchInt(true)
 
 	if _, err := domain.UpdateTask(r.Context(), userID, taskID, in); err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
@@ -541,7 +589,7 @@ func apiV1PatchTask(w http.ResponseWriter, r *http.Request, taskID int) {
 			return
 		}
 		if errors.Is(err, domain.ErrForbidden) {
-			utils.APIJSONError(w, http.StatusForbidden, "forbidden", "Forbidden.")
+			utils.APIJSONError(w, http.StatusForbidden, "forbidden", sharingClientMessage(err, "Forbidden."))
 			return
 		}
 		if errors.Is(err, domain.ErrConflict) {

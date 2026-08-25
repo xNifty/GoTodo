@@ -127,6 +127,11 @@ func formatEventLabel(eventType string, meta map[string]interface{}) string {
 			return "Status changed · " + name
 		}
 		return "Status changed"
+	case "sprint_changed":
+		if name, ok := meta["to"].(string); ok && name != "" {
+			return "Sprint · " + name
+		}
+		return "Sprint changed"
 	case "github_issue_created":
 		if n, ok := meta["issue_number"]; ok {
 			return fmt.Sprintf("GitHub issue created · #%v", n)

@@ -2,7 +2,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/api/client'
-import type { Project, ProjectStatus, Tag, Task, TaskEvent, TaskGitHubIssue, TaskTimeEntry } from '@/api/types'
+import type { Project, ProjectSprint, ProjectStatus, Tag, Task, TaskEvent, TaskGitHubIssue, TaskTimeEntry } from '@/api/types'
 import { APIError } from '@/api/types'
 import ParentTaskCombobox from '@/components/ParentTaskCombobox.vue'
 import DeleteTaskDialog from '@/components/DeleteTaskDialog.vue'
@@ -12,6 +12,7 @@ import { useTaskSidebar } from '@/composables/useTaskSidebar'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { projectOptionLabel } from '@/utils/projectLabel'
+import { sprintLockedForUser, sprintOptionLabel } from '@/utils/sprintLabel'
 import { useLiveUpdates, isOwnFocusedLiveEvent, type LiveEvent } from '@/composables/useLiveUpdates'
 import { assignableTags, archiveConfirmMessage, isArchivedTask, isProtectedTag } from '@/utils/tags'
 
@@ -23,6 +24,7 @@ const {
   defaultProjectId,
   defaultParentId,
   defaultParentTitle,
+  defaultSprintId,
   close,
   notifySaved,
   openEdit,
@@ -58,6 +60,7 @@ const eventsLoaded = ref(false)
 const eventsLoading = ref(false)
 const descriptionError = ref('')
 const statuses = ref<ProjectStatus[]>([])
+const sprints = ref<ProjectSprint[]>([])
 const timeEntries = ref<TaskTimeEntry[]>([])
 const timeSpentMinutes = ref(0)
 const newEntryMinutes = ref<number | ''>('')
@@ -79,6 +82,7 @@ const taskTags = ref<Tag[]>([])
 const newTags = ref('')
 const completed = ref(false)
 const statusId = ref<number | ''>('')
+const sprintId = ref<number | ''>('')
 const estimatePoints = ref<number | ''>('')
 const claimedBy = ref<number | null>(null)
 const claimedByName = ref('')
@@ -158,6 +162,33 @@ function taskInSelectedProject(t: Task): boolean {
   return t.project_id === Number(projectId.value)
 }
 
+function formSprintId(value: number | string | '' | null | undefined): number | '' {
+  if (value === '' || value == null) return ''
+  const n = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(n) || n <= 0) return ''
+  return n
+}
+
+function canAssignSprint(sprint: ProjectSprint | undefined): boolean {
+  if (!sprint) return false
+  return !sprintLockedForUser(sprint, selectedProject.value?.role)
+}
+
+function sprintSelectDisabled(sprint: ProjectSprint): boolean {
+  if (canAssignSprint(sprint)) return false
+  return formSprintId(sprintId.value) !== sprint.id
+}
+
+function sprintPayloadId(value: number | string | '' | null | undefined): number {
+  const id = formSprintId(value)
+  return id === '' ? 0 : id
+}
+
+function onSprintChange(event: Event) {
+  const target = event.target as HTMLSelectElement | null
+  sprintId.value = formSprintId(target?.value)
+}
+
 function stubParentTask(id: number, titleText: string, pid: number | ''): Task {
   return {
     id,
@@ -203,10 +234,12 @@ function resetForm() {
   events.value = []
   eventsLoaded.value = false
   statusId.value = ''
+  sprintId.value = ''
   estimatePoints.value = ''
   claimedBy.value = null
   claimedByName.value = ''
   statuses.value = []
+  sprints.value = []
   timeEntries.value = []
   timeSpentMinutes.value = 0
   newEntryMinutes.value = ''
@@ -257,6 +290,33 @@ async function loadParentCandidates(pid: number | '', keepParentId: number | nul
     }
   }
   rootTasks.value = loaded
+}
+
+async function loadSprintsForProject(pid: number | '') {
+  if (pid === '' || pid == null) {
+    sprints.value = []
+    return
+  }
+  const proj = projects.value.find((p) => p.id === Number(pid))
+  const kanban =
+    taskWorkflow.value === 'kanban' || (proj?.workflow_mode || 'classic') === 'kanban'
+  if (!kanban) {
+    sprints.value = []
+    return
+  }
+  try {
+    sprints.value = await api.listProjectSprints(Number(pid))
+    if (mode.value === 'add' && sprintId.value === '' && defaultSprintId.value != null) {
+      if (defaultSprintId.value > 0) {
+        const target = sprints.value.find((s) => s.id === defaultSprintId.value)
+        if (canAssignSprint(target)) {
+          sprintId.value = defaultSprintId.value
+        }
+      }
+    }
+  } catch {
+    sprints.value = []
+  }
 }
 
 async function loadStatusesForProject(pid: number | '') {
@@ -342,6 +402,7 @@ async function loadTask(id: number) {
   events.value = []
   eventsLoaded.value = false
   statusId.value = task.status_id ?? ''
+  sprintId.value = formSprintId(task.sprint_id)
   estimatePoints.value = task.estimate_points ?? ''
   claimedBy.value = task.claimed_by ?? null
   claimedByName.value = task.claimed_by_name || ''
@@ -350,6 +411,7 @@ async function loadTask(id: number) {
   githubIssue.value = task.github ?? null
   githubIssueRef.value = ''
   await loadStatusesForProject(projectId.value)
+  await loadSprintsForProject(projectId.value)
   await loadTagsForProject(projectId.value)
   await refreshProjectGitHub(projectId.value)
   if (taskWorkflow.value === 'kanban' || isKanbanTask.value) {
@@ -372,6 +434,7 @@ function isFormDirty(): boolean {
   const parent = t.parent_id ?? ''
   const due = t.due_date || ''
   const status = t.status_id ?? ''
+  const sprint = formSprintId(t.sprint_id)
   const estimate = t.estimate_points ?? ''
   const tagIds = (t.tags || []).map((x) => x.id)
   return (
@@ -383,6 +446,7 @@ function isFormDirty(): boolean {
     dueDate.value !== due ||
     completed.value !== t.completed ||
     statusId.value !== status ||
+    formSprintId(sprintId.value) !== sprint ||
     estimatePoints.value !== estimate ||
     newTags.value.trim() !== '' ||
     !sameIdSet(selectedTagIds.value, tagIds)
@@ -403,6 +467,7 @@ useLiveUpdates(async (event: LiveEvent) => {
       await loadMeta()
       await loadTagsForProject(projectId.value)
       await loadStatusesForProject(projectId.value)
+      await loadSprintsForProject(projectId.value)
     }
     return
   }
@@ -487,6 +552,7 @@ async function save(keepOpen = false) {
         ...(isKanbanTask.value && statusId.value !== ''
           ? { status_id: Number(statusId.value) }
           : {}),
+        ...(isKanbanTask.value ? { sprint_id: sprintPayloadId(sprintId.value) } : {}),
         ...(isKanbanTask.value && estimatePoints.value !== ''
           ? { estimate_points: Number(estimatePoints.value) }
           : {}),
@@ -524,6 +590,7 @@ async function save(keepOpen = false) {
     else payload.clear_due_date = true
     if (isKanbanTask.value) {
       if (statusId.value !== '') payload.status_id = Number(statusId.value)
+      payload.sprint_id = sprintPayloadId(sprintId.value)
       payload.estimate_points =
         estimatePoints.value === '' ? null : Number(estimatePoints.value)
     }
@@ -588,10 +655,15 @@ async function onProjectChange() {
       .map((t) => t.name.toLowerCase()),
   )
   taskWorkflow.value = ''
+  await loadStatusesForProject(projectId.value)
+  await loadSprintsForProject(projectId.value)
   if (statusId.value !== '' && !statuses.value.some((s) => s.id === statusId.value)) {
     statusId.value = ''
   }
-  await loadStatusesForProject(projectId.value)
+  const selectedSprint = formSprintId(sprintId.value)
+  if (selectedSprint !== '' && !sprints.value.some((s) => s.id === selectedSprint)) {
+    sprintId.value = ''
+  }
   await refreshProjectGitHub(projectId.value)
   await loadTagsForProject(projectId.value)
   selectedTagIds.value = allTags.value.filter((t) => names.has(t.name.toLowerCase())).map((t) => t.id)
@@ -647,6 +719,7 @@ watch(
           await loadParentCandidates(projectId.value)
         }
         await loadStatusesForProject(projectId.value)
+        await loadSprintsForProject(projectId.value)
         await loadTagsForProject(projectId.value)
         await refreshProjectGitHub(projectId.value)
       }
@@ -679,6 +752,13 @@ async function onParentChange() {
   else projectId.value = ''
   taskWorkflow.value = p?.project_workflow || ''
   await loadStatusesForProject(projectId.value)
+  await loadSprintsForProject(projectId.value)
+  if (p?.sprint_id) {
+    const inherited = sprints.value.find((s) => s.id === p.sprint_id)
+    if (canAssignSprint(inherited)) {
+      sprintId.value = formSprintId(p.sprint_id)
+    }
+  }
   await refreshProjectGitHub(projectId.value)
 }
 
@@ -1117,6 +1197,26 @@ async function removeTimeEntry(entryId: number) {
             </option>
           </select>
         </div>
+        <div v-if="isKanbanTask" class="form-group mt-2 kanban-order-sprint">
+          <label for="sprint_id">Sprint:</label>
+          <select
+            id="sprint_id"
+            class="form-select"
+            :disabled="readOnly"
+            :value="sprintId === '' ? '' : String(sprintId)"
+            @change="onSprintChange"
+          >
+            <option value="">Backlog</option>
+            <option
+              v-for="s in sprints"
+              :key="s.id"
+              :value="String(s.id)"
+              :disabled="sprintSelectDisabled(s)"
+            >
+              {{ sprintOptionLabel(s, { activeSuffix: true, lockedSuffix: true }) }}
+            </option>
+          </select>
+        </div>
         <div v-if="isKanbanTask && (mode === 'edit' || mode === 'view')" class="form-group mt-2 kanban-order-claim">
           <label class="d-block">Claimed by</label>
           <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -1358,6 +1458,7 @@ async function removeTimeEntry(entryId: number) {
           v-if="showDiscussion && taskId"
           ref="discussionRef"
           :task-id="taskId"
+          :project-id="currentTask?.project_id ?? null"
           :current-user-id="user?.id ?? null"
           :is-owner="discussionIsOwner"
           :fill-height="isKanbanTask"
@@ -1587,26 +1688,28 @@ textarea.task-description-input {
 
 .kanban-task-aside .kanban-order-status,
 .kanban-task-aside :deep(.kanban-order-status) { order: 1; }
+.kanban-task-aside .kanban-order-sprint,
+.kanban-task-aside :deep(.kanban-order-sprint) { order: 2; }
 .kanban-task-aside .kanban-order-claim,
-.kanban-task-aside :deep(.kanban-order-claim) { order: 2; }
+.kanban-task-aside :deep(.kanban-order-claim) { order: 3; }
 .kanban-task-aside .kanban-order-project,
-.kanban-task-aside :deep(.kanban-order-project) { order: 3; }
+.kanban-task-aside :deep(.kanban-order-project) { order: 4; }
 .kanban-task-aside .kanban-order-parent,
-.kanban-task-aside :deep(.kanban-order-parent) { order: 4; }
+.kanban-task-aside :deep(.kanban-order-parent) { order: 5; }
 .kanban-task-aside .kanban-order-related,
-.kanban-task-aside :deep(.kanban-order-related) { order: 5; }
+.kanban-task-aside :deep(.kanban-order-related) { order: 6; }
 .kanban-task-aside .kanban-order-priority,
-.kanban-task-aside :deep(.kanban-order-priority) { order: 6; }
+.kanban-task-aside :deep(.kanban-order-priority) { order: 7; }
 .kanban-task-aside .kanban-order-estimate,
-.kanban-task-aside :deep(.kanban-order-estimate) { order: 7; }
+.kanban-task-aside :deep(.kanban-order-estimate) { order: 8; }
 .kanban-task-aside .kanban-order-due,
-.kanban-task-aside :deep(.kanban-order-due) { order: 8; }
+.kanban-task-aside :deep(.kanban-order-due) { order: 9; }
 .kanban-task-aside .kanban-order-tags,
-.kanban-task-aside :deep(.kanban-order-tags) { order: 9; }
+.kanban-task-aside :deep(.kanban-order-tags) { order: 10; }
 .kanban-task-aside .kanban-order-github,
-.kanban-task-aside :deep(.kanban-order-github) { order: 10; }
+.kanban-task-aside :deep(.kanban-order-github) { order: 11; }
 .kanban-task-aside .kanban-order-time,
-.kanban-task-aside :deep(.kanban-order-time) { order: 11; }
+.kanban-task-aside :deep(.kanban-order-time) { order: 12; }
 
 .kanban-title-group {
   margin-bottom: 0.75rem;

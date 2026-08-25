@@ -94,7 +94,7 @@ func writeWorkflowDomainError(w http.ResponseWriter, err error) {
 	case errors.Is(err, domain.ErrNotFound):
 		utils.APIJSONError(w, http.StatusNotFound, "not_found", "Not found.")
 	case errors.Is(err, domain.ErrForbidden):
-		utils.APIJSONError(w, http.StatusForbidden, "forbidden", "Forbidden.")
+		utils.APIJSONError(w, http.StatusForbidden, "forbidden", sharingClientMessage(err, "Forbidden."))
 	case errors.Is(err, domain.ErrConflict):
 		utils.APIJSONError(w, http.StatusConflict, "conflict", err.Error())
 	case errors.Is(err, domain.ErrValidation):
@@ -339,4 +339,164 @@ func handleTaskTimeEntries(w http.ResponseWriter, r *http.Request, taskID int, r
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+type apiProjectSprintJSON struct {
+	ID          int     `json:"id"`
+	ProjectID   int     `json:"project_id"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	StartDate   string  `json:"start_date"`
+	EndDate     string  `json:"end_date"`
+	LockDate    *string `json:"lock_date"`
+	IsActive    bool    `json:"is_active"`
+	IsLocked    bool    `json:"is_locked"`
+	TaskCount   int     `json:"task_count"`
+	CreatedAt   string  `json:"created_at"`
+}
+
+type apiSprintCreateRequest struct {
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	StartDate   string  `json:"start_date"`
+	EndDate     string  `json:"end_date"`
+	LockDate    *string `json:"lock_date"`
+}
+
+type apiSprintPatchRequest struct {
+	Name        *string        `json:"name"`
+	Description *string        `json:"description"`
+	StartDate   *string        `json:"start_date"`
+	EndDate     *string        `json:"end_date"`
+	LockDate    optionalString `json:"lock_date"`
+}
+
+type apiSprintDeleteRequest struct {
+	MoveToSprintID *int `json:"move_to_sprint_id"`
+}
+
+func sprintToAPIJSON(s storage.ProjectSprint) apiProjectSprintJSON {
+	now := time.Now()
+	var lockDate *string
+	if s.LockDate != nil {
+		d := storage.FormatSprintDate(*s.LockDate)
+		lockDate = &d
+	}
+	return apiProjectSprintJSON{
+		ID:          s.ID,
+		ProjectID:   s.ProjectID,
+		Name:        s.Name,
+		Description: s.Description,
+		StartDate:   storage.FormatSprintDate(s.StartDate),
+		EndDate:     storage.FormatSprintDate(s.EndDate),
+		LockDate:    lockDate,
+		IsActive:    storage.SprintIsActive(s.StartDate, s.EndDate, now),
+		IsLocked:    storage.SprintIsLocked(s.LockDate, now),
+		TaskCount:   s.TaskCount,
+		CreatedAt:   s.CreatedAt.UTC().Format(time.RFC3339),
+	}
+}
+
+// handleProjectSprintsResource routes /projects/{id}/sprints...
+func handleProjectSprintsResource(w http.ResponseWriter, r *http.Request, projectID int, rest []string) {
+	userID, ok := apiUserFromRequest(r)
+	if !ok {
+		utils.APIJSONError(w, http.StatusUnauthorized, "unauthorized", "Not authenticated.")
+		return
+	}
+
+	if len(rest) == 0 {
+		switch r.Method {
+		case http.MethodGet:
+			sprints, err := domain.ListProjectSprintsForUser(r.Context(), userID, projectID)
+			if err != nil {
+				writeWorkflowDomainError(w, err)
+				return
+			}
+			out := make([]apiProjectSprintJSON, 0, len(sprints))
+			for _, s := range sprints {
+				out = append(out, sprintToAPIJSON(s))
+			}
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			json.NewEncoder(w).Encode(out)
+		case http.MethodPost:
+			var req apiSprintCreateRequest
+			if err := decodeJSONBody(r, &req); err != nil {
+				utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid JSON body.")
+				return
+			}
+			lockDate := ""
+			if req.LockDate != nil {
+				lockDate = *req.LockDate
+			}
+			s, err := domain.CreateProjectSprintForUser(r.Context(), userID, projectID, domain.CreateProjectSprintInput{
+				Name:        req.Name,
+				Description: req.Description,
+				StartDate:   req.StartDate,
+				EndDate:     req.EndDate,
+				LockDate:    lockDate,
+			})
+			if err != nil {
+				writeWorkflowDomainError(w, err)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.WriteHeader(http.StatusCreated)
+			json.NewEncoder(w).Encode(sprintToAPIJSON(*s))
+		default:
+			utils.APIJSONError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Method not allowed.")
+		}
+		return
+	}
+
+	sprintID, err := strconv.Atoi(rest[0])
+	if err != nil || sprintID <= 0 || len(rest) != 1 {
+		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid sprint id.")
+		return
+	}
+
+	switch r.Method {
+	case http.MethodPatch:
+		var req apiSprintPatchRequest
+		if err := decodeJSONBody(r, &req); err != nil {
+			utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid JSON body.")
+			return
+		}
+		s, err := domain.UpdateProjectSprintForUser(r.Context(), userID, projectID, sprintID, domain.UpdateProjectSprintInput{
+			Name:        req.Name,
+			Description: req.Description,
+			StartDate:   req.StartDate,
+			EndDate:     req.EndDate,
+			LockDate:    req.LockDate.toPatchString(),
+		})
+		if err != nil {
+			writeWorkflowDomainError(w, err)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		json.NewEncoder(w).Encode(sprintToAPIJSON(*s))
+	case http.MethodDelete:
+		var moveTo *int
+		if r.ContentLength != 0 {
+			var req apiSprintDeleteRequest
+			if err := decodeJSONBody(r, &req); err == nil {
+				moveTo = req.MoveToSprintID
+			}
+		}
+		if raw := strings.TrimSpace(r.URL.Query().Get("move_to_sprint_id")); raw != "" {
+			v, err := strconv.Atoi(raw)
+			if err != nil || v < 0 {
+				utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid move_to_sprint_id.")
+				return
+			}
+			moveTo = &v
+		}
+		if err := domain.DeleteProjectSprintForUser(r.Context(), userID, projectID, sprintID, moveTo); err != nil {
+			writeWorkflowDomainError(w, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	default:
+		utils.APIJSONError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Method not allowed.")
+	}
 }
