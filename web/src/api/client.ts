@@ -20,6 +20,7 @@ import type {
   ProjectInvite,
   ProjectMember,
   ProjectStatus,
+  ProjectSprint,
   SavedView,
   SavedViewFilter,
   ShareLink,
@@ -292,6 +293,7 @@ export const api = {
     tag_ids?: number[]
     status_id?: number | null
     estimate_points?: number | null
+    sprint_id?: number | null
   }) {
     return request<Task>('/api/v1/tasks', {
       method: 'POST',
@@ -314,6 +316,7 @@ export const api = {
       tag_ids: number[]
       status_id: number | null
       estimate_points: number | null
+      sprint_id: number | null
     }>,
   ) {
     return request<Task>(`/api/v1/tasks/${id}`, {
@@ -509,6 +512,41 @@ export const api = {
     return request<{ ok: boolean }>(`/api/v1/projects/${projectId}/statuses/reorder`, {
       method: 'POST',
       body: JSON.stringify({ status_ids: statusIds }),
+    })
+  },
+
+  listProjectSprints(projectId: number) {
+    return request<ProjectSprint[]>(`/api/v1/projects/${projectId}/sprints`)
+  },
+
+  createProjectSprint(
+    projectId: number,
+    payload: { name: string; start_date: string; end_date: string },
+  ) {
+    return request<ProjectSprint>(`/api/v1/projects/${projectId}/sprints`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  updateProjectSprint(
+    projectId: number,
+    sprintId: number,
+    payload: Partial<{ name: string; start_date: string; end_date: string }>,
+  ) {
+    return request<ProjectSprint>(`/api/v1/projects/${projectId}/sprints/${sprintId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  deleteProjectSprint(projectId: number, sprintId: number, moveToSprintId?: number) {
+    const qs =
+      moveToSprintId != null
+        ? `?move_to_sprint_id=${encodeURIComponent(String(moveToSprintId))}`
+        : ''
+    return request<void>(`/api/v1/projects/${projectId}/sprints/${sprintId}${qs}`, {
+      method: 'DELETE',
     })
   },
 

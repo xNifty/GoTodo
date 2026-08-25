@@ -32,6 +32,7 @@ type CreateTaskInput struct {
 	TagIDs         []int
 	StatusID       *int
 	EstimatePoints *int
+	SprintID       *int
 }
 
 // UpdateTaskInput is a partial update. Nil pointer fields are left unchanged.
@@ -52,6 +53,8 @@ type UpdateTaskInput struct {
 	StatusID **int
 	// EstimatePoints: nil = leave; non-nil with *nil = clear; non-nil with value = set.
 	EstimatePoints **int
+	// SprintID: nil = leave; non-nil with *nil or 0 = clear; non-nil with id = set.
+	SprintID **int
 }
 
 // UpdateResult summarizes what changed for audit logging in handlers.
@@ -202,8 +205,8 @@ func applyCreateWorkflow(taskID int, projectArg interface{}, in CreateTaskInput)
 		projectID = int(v)
 	}
 	if projectID <= 0 {
-		if in.StatusID != nil || in.EstimatePoints != nil {
-			return fmt.Errorf("%w: status and estimates require a kanban project", ErrValidation)
+		if in.StatusID != nil || in.EstimatePoints != nil || in.SprintID != nil {
+			return fmt.Errorf("%w: status, estimates, and sprints require a kanban project", ErrValidation)
 		}
 		return nil
 	}
@@ -212,8 +215,8 @@ func applyCreateWorkflow(taskID int, projectArg interface{}, in CreateTaskInput)
 		return err
 	}
 	if mode != storage.WorkflowKanban {
-		if in.StatusID != nil || in.EstimatePoints != nil {
-			return fmt.Errorf("%w: status and estimates require a kanban project", ErrValidation)
+		if in.StatusID != nil || in.EstimatePoints != nil || in.SprintID != nil {
+			return fmt.Errorf("%w: status, estimates, and sprints require a kanban project", ErrValidation)
 		}
 		return nil
 	}
@@ -229,7 +232,18 @@ func applyCreateWorkflow(taskID int, projectArg interface{}, in CreateTaskInput)
 		}
 	}
 	if in.EstimatePoints != nil {
-		return storage.SetTaskEstimatePoints(taskID, in.EstimatePoints)
+		if err := storage.SetTaskEstimatePoints(taskID, in.EstimatePoints); err != nil {
+			return err
+		}
+	}
+	sprintID := in.SprintID
+	if sprintID == nil && in.ParentID != nil && *in.ParentID > 0 {
+		if parentSprint, err := storage.GetTaskSprintID(*in.ParentID); err == nil && parentSprint > 0 {
+			sprintID = &parentSprint
+		}
+	}
+	if sprintID != nil {
+		return applyTaskSprint(taskID, projectID, sprintID)
 	}
 	return nil
 }
@@ -291,11 +305,12 @@ func UpdateTask(ctx context.Context, userID, taskID int, in UpdateTaskInput) (*U
 	var priority int
 	var projectID, parentID, statusID sql.NullInt64
 	var estimatePoints sql.NullInt64
+	var sprintID sql.NullInt64
 	err = pool.QueryRow(ctx,
 		`SELECT title, description, COALESCE(CAST(due_date AS TEXT), ''), completed,
-		 COALESCE(priority,0), COALESCE(is_favorite,false), project_id, parent_id, status_id, estimate_points
+		 COALESCE(priority,0), COALESCE(is_favorite,false), project_id, parent_id, status_id, estimate_points, sprint_id
 		 FROM tasks WHERE id = $1`,
-		taskID).Scan(&title, &description, &dueDate, &completed, &priority, &favorite, &projectID, &parentID, &statusID, &estimatePoints)
+		taskID).Scan(&title, &description, &dueDate, &completed, &priority, &favorite, &projectID, &parentID, &statusID, &estimatePoints, &sprintID)
 	if err != nil {
 		return nil, err
 	}
@@ -518,6 +533,28 @@ func UpdateTask(ctx context.Context, userID, taskID int, in UpdateTaskInput) (*U
 		}
 	}
 
+	oldSprintID := 0
+	if sprintID.Valid {
+		oldSprintID = int(sprintID.Int64)
+	}
+	newSprintID := oldSprintID
+	if in.SprintID != nil {
+		if *in.SprintID == nil || **in.SprintID == 0 {
+			if err := applyTaskSprint(taskID, effectiveProjectID, nil); err != nil {
+				return nil, err
+			}
+			newSprintID = 0
+		} else {
+			sid := **in.SprintID
+			if err := applyTaskSprint(taskID, effectiveProjectID, &sid); err != nil {
+				return nil, err
+			}
+			newSprintID = sid
+		}
+	} else if projectChanged {
+		newSprintID = 0
+	}
+
 	if in.TagIDs != nil {
 		if err := storage.SetTaskTags(taskID, userID, *in.TagIDs); err != nil {
 			return nil, fmt.Errorf("%w: %s", ErrValidation, err.Error())
@@ -537,6 +574,9 @@ func UpdateTask(ctx context.Context, userID, taskID int, in UpdateTaskInput) (*U
 		if oldCompleted == completed {
 			go SyncGitHubIssueFromOrdrynState(context.Background(), userID, taskID, completed)
 		}
+	}
+	if newSprintID != oldSprintID {
+		_ = storage.LogTaskEvent(taskID, userID, "sprint_changed", sprintChangeMetadata(effectiveProjectID, oldSprintID, newSprintID))
 	}
 
 	result.NewPriority = priority
@@ -564,6 +604,27 @@ func statusChangeMetadata(projectID, oldStatusID, newStatusID int) map[string]in
 			meta["from"] = st.Name
 			meta["from_id"] = st.ID
 		}
+	}
+	return meta
+}
+
+func sprintChangeMetadata(projectID, oldSprintID, newSprintID int) map[string]interface{} {
+	meta := map[string]interface{}{}
+	if newSprintID > 0 {
+		if s, err := storage.GetProjectSprint(projectID, newSprintID); err == nil && s != nil {
+			meta["to"] = s.Name
+			meta["to_id"] = s.ID
+		}
+	} else {
+		meta["to"] = "Backlog"
+	}
+	if oldSprintID > 0 {
+		if s, err := storage.GetProjectSprint(projectID, oldSprintID); err == nil && s != nil {
+			meta["from"] = s.Name
+			meta["from_id"] = s.ID
+		}
+	} else {
+		meta["from"] = "Backlog"
 	}
 	return meta
 }

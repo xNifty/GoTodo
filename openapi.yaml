@@ -1015,6 +1015,13 @@ paths:
           description: >
             When mine, hide unclaimed kanban-project tasks (classic tasks unchanged).
             Use all for the kanban board backlog. Default is no claim filter when omitted.
+        - name: sprint_id
+          in: query
+          schema:
+            type: string
+          description: >
+            Filter kanban tasks by sprint id. Use none, backlog, or 0 for unassigned
+            (backlog) tasks. Omitted means no sprint filter.
       responses:
         "200":
           description: Paginated task list
@@ -1527,6 +1534,118 @@ paths:
           schema:
             type: integer
           description: Required when tasks remain in the column
+      responses:
+        "204":
+          description: Deleted
+
+  /api/v1/projects/{id}/sprints:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      tags: [Projects]
+      summary: List sprints for a kanban project
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Sprints (empty when project is classic)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProjectSprint"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      tags: [Projects]
+      summary: Create a sprint (owner, kanban only, max 50)
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, start_date, end_date]
+              properties:
+                name:
+                  type: string
+                  maxLength: 60
+                start_date:
+                  type: string
+                  format: date
+                  description: Inclusive start (YYYY-MM-DD). Must not overlap another sprint in this project.
+                end_date:
+                  type: string
+                  format: date
+                  description: Inclusive end (YYYY-MM-DD). Adjacent ranges (next day after another sprint ends) are allowed.
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectSprint"
+        "400":
+          description: Invalid dates, inverted range, or overlap with another sprint
+        "409":
+          description: Sprint limit or name conflict
+
+  /api/v1/projects/{id}/sprints/{sprintId}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+      - name: sprintId
+        in: path
+        required: true
+        schema:
+          type: integer
+    patch:
+      tags: [Projects]
+      summary: Update a sprint (owner)
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 60
+                start_date:
+                  type: string
+                  format: date
+                  description: Inclusive start (YYYY-MM-DD). Must not overlap another sprint in this project.
+                end_date:
+                  type: string
+                  format: date
+                  description: Inclusive end (YYYY-MM-DD). Adjacent ranges are allowed.
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectSprint"
+    delete:
+      tags: [Projects]
+      summary: Delete a sprint (owner). Tasks go to backlog unless moved.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - name: move_to_sprint_id
+          in: query
+          schema:
+            type: integer
+          description: Optional destination sprint; 0 or omit leaves tasks in the backlog
       responses:
         "204":
           description: Deleted
@@ -3182,6 +3301,31 @@ components:
           type: string
           format: date-time
 
+    ProjectSprint:
+      type: object
+      properties:
+        id:
+          type: integer
+        project_id:
+          type: integer
+        name:
+          type: string
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+          description: Inclusive range; sprints in a project must not overlap
+        is_active:
+          type: boolean
+          description: True when today's UTC date falls in start_date..end_date inclusive
+        task_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
     TaskTimeEntry:
       type: object
       properties:
@@ -3477,6 +3621,15 @@ components:
         claimed_by_name:
           type: string
           description: Display name of the claimer
+        sprint_id:
+          type: integer
+          nullable: true
+          description: Kanban sprint assignment; null when the task is in the backlog
+        sprint_name:
+          type: string
+        parent_title:
+          type: string
+          description: Title of the parent task when this item is a subtask
         github:
           $ref: "#/components/schemas/TaskGitHubIssue"
 
@@ -3626,6 +3779,16 @@ components:
           type: array
           items:
             type: integer
+        status_id:
+          type: integer
+          nullable: true
+        estimate_points:
+          type: integer
+          nullable: true
+        sprint_id:
+          type: integer
+          nullable: true
+          description: Assign the task to a sprint in its kanban project; 0 or omit leaves it in the backlog
 
     TaskPatch:
       type: object
@@ -3655,6 +3818,16 @@ components:
           type: array
           items:
             type: integer
+        status_id:
+          type: integer
+          nullable: true
+        estimate_points:
+          type: integer
+          nullable: true
+        sprint_id:
+          type: integer
+          nullable: true
+          description: Set a sprint in the task's kanban project. null or 0 moves the task to the backlog; omit to leave the assignment unchanged.
 
     TaskReorder:
       type: object
