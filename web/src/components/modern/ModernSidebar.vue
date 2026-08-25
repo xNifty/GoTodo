@@ -3,7 +3,7 @@ import { computed, inject, nextTick, onBeforeUnmount, ref, watch, type Ref } fro
 import { useRoute, RouterLink } from 'vue-router'
 import Sortable from 'sortablejs'
 import type { Project, SavedView } from '@/api/types'
-import { projectOptionLabel } from '@/utils/projectLabel'
+import { projectOptionLabel, isArchivedProject, isProjectOwner } from '@/utils/projectLabel'
 
 const props = defineProps<{
   collapsed: boolean
@@ -32,18 +32,20 @@ const pendingInviteCount = inject<Ref<number>>('pendingInviteCount', ref(0))
 
 const projectsCollapsed = ref(false)
 const viewsCollapsed = ref(false)
+const archivedCollapsed = ref(true)
 const ownedListEl = ref<HTMLElement | null>(null)
 let sortable: Sortable | null = null
 
 const ownedProjects = computed(() =>
-  props.projects.filter((p) => !p.role || p.role === 'owner'),
+  props.projects.filter((p) => isProjectOwner(p) && !isArchivedProject(p)),
 )
 const sharedProjects = computed(() =>
-  props.projects.filter((p) => p.role && p.role !== 'owner'),
+  props.projects.filter((p) => !isProjectOwner(p) && !isArchivedProject(p)),
 )
+const archivedProjectList = computed(() => props.projects.filter(isArchivedProject))
 
 function isOwner(proj: Project) {
-  return !proj.role || proj.role === 'owner'
+  return isProjectOwner(proj)
 }
 
 function destroySortable() {
@@ -289,6 +291,50 @@ onBeforeUnmount(() => {
           <i class="bi bi-plus-lg" />
           <span class="sidebar-text">Project</span>
         </button>
+      </li>
+    </ul>
+
+    <div
+      v-if="!projectsCollapsed && archivedProjectList.length"
+      class="sidebar-section-header d-flex align-items-center justify-content-between"
+    >
+      <span class="sidebar-section-link sidebar-text fw-bold text-uppercase">Archived</span>
+      <button
+        type="button"
+        class="btn btn-sm text-muted p-0 border-0 sidebar-text me-1"
+        :title="archivedCollapsed ? 'Expand archived' : 'Collapse archived'"
+        @click="archivedCollapsed = !archivedCollapsed"
+      >
+        <i :class="archivedCollapsed ? 'bi bi-chevron-down' : 'bi bi-chevron-up'" style="font-size: 0.8rem;" />
+      </button>
+    </div>
+    <ul v-if="!projectsCollapsed && !archivedCollapsed && archivedProjectList.length" class="sidebar-nav-list">
+      <li
+        v-for="proj in archivedProjectList"
+        :key="proj.id"
+        class="sidebar-nav-item position-relative"
+      >
+        <div class="d-flex align-items-center justify-content-between w-100">
+          <a
+            href="#"
+            class="sidebar-nav-link flex-grow-1 min-w-0"
+            :class="{ active: activeProject === String(proj.id) }"
+            :data-tooltip="proj.description ? `${projectOptionLabel(proj)} — ${proj.description}` : projectOptionLabel(proj)"
+            :title="proj.description ? `${projectOptionLabel(proj)} — ${proj.description}` : projectOptionLabel(proj)"
+            @click.prevent="emit('select-project', String(proj.id)); emit('close-mobile')"
+          >
+            <i class="bi bi-archive" />
+            <span class="sidebar-text text-truncate">{{ projectOptionLabel(proj) }}</span>
+          </a>
+          <button
+            type="button"
+            class="btn btn-sm text-muted p-0 border-0 hover-reveal d-none d-md-inline-block me-2"
+            title="Project settings"
+            @click.stop="emit('edit-project', proj)"
+          >
+            <i class="bi bi-pencil" style="font-size: 0.85rem;" />
+          </button>
+        </div>
       </li>
     </ul>
 

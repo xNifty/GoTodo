@@ -108,6 +108,8 @@ onUnmounted(() => {
                             <tr><td><span class="badge bg-success">GET</span></td><td><a href="#projects"><code>/api/v1/projects</code></a></td><td>List projects</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#projects"><code>/api/v1/projects</code></a></td><td>Create a project</td></tr>
                             <tr><td><span class="badge bg-warning text-dark">PATCH</span></td><td><a href="#projects"><code>/api/v1/projects/{id}</code></a></td><td>Rename a project</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#projects"><code>/api/v1/projects/{id}/archive</code></a></td><td>Archive a project (owner only)</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#projects"><code>/api/v1/projects/{id}/restore</code></a></td><td>Restore an archived project (owner only)</td></tr>
                             <tr><td><span class="badge bg-danger">DELETE</span></td><td><a href="#projects"><code>/api/v1/projects/{id}</code></a></td><td>Delete a project</td></tr>
                             <tr><td><span class="badge bg-success">GET</span></td><td><a href="#tags"><code>/api/v1/tags</code></a></td><td>List tags</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#tags"><code>/api/v1/tags</code></a></td><td>Create a tag</td></tr>
@@ -527,8 +529,8 @@ Content-Type: application/json
                     <p><span class="badge bg-success">GET</span> <code>/api/v1/projects</code></p>
                     <p>Returns a JSON array of project objects:</p>
                     <pre class="api-docs-pre"><code>[
-  { "id": 1, "name": "Work" },
-  { "id": 2, "name": "Personal" }
+  { "id": 1, "name": "Work", "archived": false },
+  { "id": 2, "name": "Personal", "archived": false }
 ]</code></pre>
 
                     <h3 class="h5 mt-3">Create project</h3>
@@ -553,6 +555,23 @@ Content-Type: application/json
                     <p class="text-muted small">
                         Use project IDs when creating or updating tasks.
                     </p>
+
+                    <h3 class="h5 mt-3">Archive project</h3>
+                    <p><span class="badge bg-primary">POST</span> <code>/api/v1/projects/{id}/archive</code></p>
+                    <p>
+                        Owner only. Marks the project archived, moves it into the Archived section,
+                        and applies the protected <code>archived</code> tag to its tasks.
+                        Creating or moving tasks into the project then returns <code>409 conflict</code>.
+                    </p>
+                    <p>Returns the updated project object with <code>archived: true</code>.</p>
+
+                    <h3 class="h5 mt-3">Restore project</h3>
+                    <p><span class="badge bg-primary">POST</span> <code>/api/v1/projects/{id}/restore</code></p>
+                    <p>
+                        Owner only. Returns the project to active lists, removes the protected
+                        <code>archived</code> tag from its tasks, and allows new tasks again.
+                    </p>
+                    <p>Returns the updated project object with <code>archived: false</code>.</p>
 
                     <h2 id="tags" class="h4 mt-4">Tags</h2>
                     <p>

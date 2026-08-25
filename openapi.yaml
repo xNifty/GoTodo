@@ -1252,7 +1252,7 @@ paths:
         - BearerAuth: []
       responses:
         "200":
-          description: Projects (owned first by position, then shared by name)
+          description: Projects (active owned first by position, then shared, then archived)
           content:
             application/json:
               schema:
@@ -1300,7 +1300,7 @@ paths:
                   type: array
                   items:
                     type: integer
-                  description: Full ordered list of project IDs owned by the caller
+                  description: Full ordered list of active (non-archived) project IDs owned by the caller
       responses:
         "200":
           description: Reordered
@@ -1363,6 +1363,54 @@ paths:
       responses:
         "204":
           description: Deleted
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/projects/{id}/archive:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      tags: [Projects]
+      summary: Archive a project (owner only)
+      description: >
+        Moves the project out of active lists, applies the protected archived tag to
+        its tasks, and prevents new tasks from being added. Existing tasks remain.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Archived
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/projects/{id}/restore:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      tags: [Projects]
+      summary: Restore an archived project (owner only)
+      description: >
+        Returns the project to active lists, removes the protected archived tag from
+        its tasks, and allows new tasks again.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Restored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
@@ -3288,6 +3336,9 @@ components:
           type: string
           enum: [classic, kanban]
           description: Opt-in board workflow; classic keeps boolean completed only
+        archived:
+          type: boolean
+          description: When true, the project is in the Archived section and cannot accept new tasks
         role:
           type: string
           enum: [owner, editor, viewer]

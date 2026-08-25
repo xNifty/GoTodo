@@ -56,6 +56,10 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "projects: %v\n", err)
 		os.Exit(1)
 	}
+	if err := storage.MigrateProjectsAddArchived(); err != nil {
+		fmt.Fprintf(os.Stderr, "projects archived: %v\n", err)
+		os.Exit(1)
+	}
 	if err := storage.MigrateProjectsAddWorkflowMode(); err != nil {
 		fmt.Fprintf(os.Stderr, "workflow mode: %v\n", err)
 		os.Exit(1)

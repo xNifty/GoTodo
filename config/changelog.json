@@ -1,5 +1,16 @@
 [
   {
+    "version": "3.0.0",
+    "date": "2026-08-25",
+    "title": "Archive projects",
+    "notes": [
+      "Project owners can archive a project so it moves into an Archived section instead of cluttering active lists",
+      "Archiving a project automatically applies the protected archived tag to its tasks",
+      "Archived projects cannot accept new tasks (including subtasks and moves); restore them to add work again",
+      "Only the project owner can archive or restore a project"
+    ]
+  },
+  {
     "version": "2.5.0",
     "date": "2026-08-25",
     "title": "Mention teammates in task discussions",

@@ -11,7 +11,7 @@ import { useAuth } from '@/composables/useAuth'
 import { useTaskSidebar } from '@/composables/useTaskSidebar'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
-import { projectOptionLabel } from '@/utils/projectLabel'
+import { projectOptionLabel, isArchivedProject } from '@/utils/projectLabel'
 import { sprintLockedForUser, sprintOptionLabel } from '@/utils/sprintLabel'
 import { useLiveUpdates, isOwnFocusedLiveEvent, type LiveEvent } from '@/composables/useLiveUpdates'
 import { assignableTags, archiveConfirmMessage, isArchivedTask, isProtectedTag } from '@/utils/tags'
@@ -96,6 +96,9 @@ const selectedProject = computed(() => {
   if (projectId.value === '') return null
   return projects.value.find((p) => p.id === Number(projectId.value)) ?? null
 })
+const assignableProjects = computed(() =>
+  projects.value.filter((p) => !isArchivedProject(p) || p.id === Number(projectId.value)),
+)
 /** Viewers may open via edit entry points; treat their project role as read-only. */
 const readOnly = computed(() => {
   if (mode.value === 'view') return true
@@ -503,7 +506,7 @@ async function resolveTagIds(): Promise<number[]> {
     .map((s) => s.trim())
     .filter(Boolean)
   for (const name of parts) {
-    if (name.toLowerCase() === 'removed') continue
+    if (name.toLowerCase() === 'removed' || name.toLowerCase() === 'archived') continue
     const existing = allTags.value.find((t) => t.name.toLowerCase() === name.toLowerCase())
     if (existing) {
       if (!isProtectedTag(existing)) ids.add(existing.id)
@@ -533,6 +536,10 @@ async function save(keepOpen = false) {
   if (readOnly.value) return
   if (!title.value.trim()) return
   if (!validateDescription()) return
+  if (mode.value === 'add' && selectedProject.value && isArchivedProject(selectedProject.value)) {
+    toast.push('Cannot add tasks to an archived project', 'error')
+    return
+  }
   saving.value = true
   try {
     const tagIds = await resolveTagIds()
@@ -1187,8 +1194,11 @@ async function removeTimeEntry(entryId: number) {
             @change="onProjectChange"
           >
             <option value="">No project</option>
-            <option v-for="p in projects" :key="p.id" :value="p.id">{{ projectOptionLabel(p) }}</option>
+            <option v-for="p in assignableProjects" :key="p.id" :value="p.id" :disabled="isArchivedProject(p)">{{ projectOptionLabel(p) }}</option>
           </select>
+          <small v-if="mode === 'add' && selectedProject && isArchivedProject(selectedProject)" class="text-warning">
+            This project is archived, so new tasks cannot be added.
+          </small>
         </div>
         <div v-if="isKanbanTask" class="form-group mt-2 kanban-order-status">
           <label for="status_id">Status:</label>

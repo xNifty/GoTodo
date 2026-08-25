@@ -97,7 +97,7 @@ func UpdateProject(ctx context.Context, userID, projectID int, name, description
 	return storage.GetProjectByID(projectID, proj.OwnerUserID)
 }
 
-// ReorderProjectsForUser sets the display order of all owned projects.
+// ReorderProjectsForUser sets the display order of active (non-archived) owned projects.
 func ReorderProjectsForUser(ctx context.Context, userID int, orderedIDs []int) error {
 	_ = ctx
 	if len(orderedIDs) == 0 {
@@ -123,6 +123,54 @@ func DeleteProject(ctx context.Context, userID, projectID int) error {
 	return storage.DeleteProject(projectID, proj.OwnerUserID)
 }
 
+// ArchiveProject marks a project archived (owner only), tags its tasks, and blocks new work.
+func ArchiveProject(ctx context.Context, userID, projectID int) (*storage.Project, error) {
+	_ = ctx
+	proj, err := storage.GetAccessibleProjectByID(projectID, userID)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+	if !storage.RoleCanManage(proj.Role) {
+		return nil, ErrForbidden
+	}
+	if proj.Archived {
+		return storage.GetProjectByID(projectID, proj.OwnerUserID)
+	}
+	if err := storage.SetProjectArchived(projectID, proj.OwnerUserID, true); err != nil {
+		return nil, err
+	}
+	if err := storage.ApplyArchivedTagToProjectTasks(projectID, proj.OwnerUserID); err != nil {
+		return nil, err
+	}
+	_ = storage.LogProjectEvent(projectID, userID, "archived", nil)
+	live.AfterProjectChange(userID, projectID, live.TypeProjectUpdated)
+	return storage.GetProjectByID(projectID, proj.OwnerUserID)
+}
+
+// RestoreProject unarchives a project (owner only) and clears the archived tag from its tasks.
+func RestoreProject(ctx context.Context, userID, projectID int) (*storage.Project, error) {
+	_ = ctx
+	proj, err := storage.GetAccessibleProjectByID(projectID, userID)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+	if !storage.RoleCanManage(proj.Role) {
+		return nil, ErrForbidden
+	}
+	if !proj.Archived {
+		return storage.GetProjectByID(projectID, proj.OwnerUserID)
+	}
+	if err := storage.SetProjectArchived(projectID, proj.OwnerUserID, false); err != nil {
+		return nil, err
+	}
+	if err := storage.ClearArchivedTagFromProjectTasks(projectID, proj.OwnerUserID); err != nil {
+		return nil, err
+	}
+	_ = storage.LogProjectEvent(projectID, userID, "restored", nil)
+	live.AfterProjectChange(userID, projectID, live.TypeProjectUpdated)
+	return storage.GetProjectByID(projectID, proj.OwnerUserID)
+}
+
 // RequireProjectWriteAccess ensures the user can create/edit tasks in the project.
 func RequireProjectWriteAccess(projectID, userID int) error {
 	if projectID <= 0 {
@@ -134,6 +182,21 @@ func RequireProjectWriteAccess(projectID, userID int) error {
 	}
 	if !storage.RoleCanWrite(proj.Role) {
 		return ErrForbidden
+	}
+	return nil
+}
+
+// RequireProjectAcceptsNewTasks ensures the user can add a task to the project.
+func RequireProjectAcceptsNewTasks(projectID, userID int) error {
+	if err := RequireProjectWriteAccess(projectID, userID); err != nil {
+		return err
+	}
+	proj, err := storage.GetAccessibleProjectByID(projectID, userID)
+	if err != nil {
+		return fmt.Errorf("%w: invalid project_id", ErrValidation)
+	}
+	if proj.Archived {
+		return fmt.Errorf("%w: cannot add tasks to an archived project", ErrConflict)
 	}
 	return nil
 }

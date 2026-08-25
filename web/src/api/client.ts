@@ -473,6 +473,14 @@ export const api = {
     })
   },
 
+  archiveProject(id: number) {
+    return request<Project>(`/api/v1/projects/${id}/archive`, { method: 'POST' })
+  },
+
+  restoreProject(id: number) {
+    return request<Project>(`/api/v1/projects/${id}/restore`, { method: 'POST' })
+  },
+
   listProjectStatuses(projectId: number) {
     return request<ProjectStatus[]>(`/api/v1/projects/${projectId}/statuses`)
   },

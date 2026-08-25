@@ -213,6 +213,7 @@ func CreateProjectsTable() error {
 		"description TEXT NOT NULL DEFAULT ''",
 		"workflow_mode VARCHAR(16) NOT NULL DEFAULT 'classic'",
 		"position INTEGER NOT NULL DEFAULT 0",
+		"archived BOOLEAN NOT NULL DEFAULT false",
 		"created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
 		"updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
 	}
@@ -257,6 +258,23 @@ func MigrateProjectsAddDescriptionAndPosition() error {
 		  )`)
 	if err != nil {
 		return fmt.Errorf("failed to backfill project positions: %v", err)
+	}
+	return nil
+}
+
+// MigrateProjectsAddArchived adds the archived flag used to hide completed projects
+// from active lists without deleting them.
+func MigrateProjectsAddArchived() error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return err
+	}
+	defer CloseDatabase(pool)
+
+	_, err = pool.Exec(context.Background(),
+		`ALTER TABLE projects ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT false`)
+	if err != nil {
+		return fmt.Errorf("failed to add projects.archived: %v", err)
 	}
 	return nil
 }

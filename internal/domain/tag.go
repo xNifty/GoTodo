@@ -55,7 +55,7 @@ func CreateTag(ctx context.Context, userID int, name string, projectID *int) (*s
 	if err != nil {
 		return nil, err
 	}
-	if storage.IsRemovedTagName(name) {
+	if storage.IsSystemTagName(name) {
 		return nil, fmt.Errorf("%w: tag name is reserved", ErrValidation)
 	}
 	projectID = normalizeProjectIDArg(projectID)
@@ -87,10 +87,10 @@ func RenameTag(ctx context.Context, userID, tagID int, name string) (*storage.Ta
 		}
 		return nil, ErrNotFound
 	}
-	if tag.Protected || storage.IsRemovedTagName(tag.Name) {
+	if tag.Protected || storage.IsSystemTagName(tag.Name) {
 		return nil, fmt.Errorf("%w: cannot rename a protected tag", ErrValidation)
 	}
-	if storage.IsRemovedTagName(name) {
+	if storage.IsSystemTagName(name) {
 		return nil, fmt.Errorf("%w: tag name is reserved", ErrValidation)
 	}
 	if err := storage.UpdateTag(tagID, name); err != nil {
@@ -120,7 +120,7 @@ func DeleteTag(ctx context.Context, userID, tagID int) error {
 		}
 		return ErrNotFound
 	}
-	if tag.Protected || storage.IsRemovedTagName(tag.Name) {
+	if tag.Protected || storage.IsSystemTagName(tag.Name) {
 		return fmt.Errorf("%w: cannot delete a protected tag", ErrValidation)
 	}
 	return storage.DeleteTag(tagID)

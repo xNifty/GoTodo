@@ -144,9 +144,12 @@ func CreateTask(ctx context.Context, userID int, in CreateTaskInput) (int, error
 	}
 
 	if in.ProjectID != nil && *in.ProjectID > 0 {
-		if err := RequireProjectWriteAccess(*in.ProjectID, userID); err != nil {
+		if err := RequireProjectAcceptsNewTasks(*in.ProjectID, userID); err != nil {
 			if err == ErrForbidden {
 				return 0, ErrForbidden
+			}
+			if errors.Is(err, ErrConflict) {
+				return 0, err
 			}
 			return 0, fmt.Errorf("%w: invalid project_id", ErrValidation)
 		}
@@ -277,6 +280,11 @@ func requireWritableRootParent(ctx context.Context, pool interface {
 	if parentParent.Valid {
 		return sql.NullInt64{}, fmt.Errorf("%w: cannot nest under a subtask", ErrValidation)
 	}
+	if projectID.Valid && projectID.Int64 > 0 {
+		if err := RequireProjectAcceptsNewTasks(int(projectID.Int64), userID); err != nil {
+			return sql.NullInt64{}, err
+		}
+	}
 	return projectID, nil
 }
 
@@ -392,9 +400,12 @@ func UpdateTask(ctx context.Context, userID, taskID int, in UpdateTaskInput) (*U
 		if *in.ProjectID == nil || **in.ProjectID == 0 {
 			newProjectID = sql.NullInt64{Valid: false}
 		} else {
-			if err := RequireProjectWriteAccess(**in.ProjectID, userID); err != nil {
+			if err := RequireProjectAcceptsNewTasks(**in.ProjectID, userID); err != nil {
 				if err == ErrForbidden {
 					return nil, ErrForbidden
+				}
+				if errors.Is(err, ErrConflict) {
+					return nil, err
 				}
 				return nil, fmt.Errorf("%w: invalid project_id", ErrValidation)
 			}

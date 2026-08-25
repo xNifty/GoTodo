@@ -489,7 +489,7 @@ func importTasksFromCSV(userID int, cols importColumnMap, rows [][]string) (impo
 			pid, ok := projectCache[projectName]
 			if !ok {
 				var foundID int
-				err := tx.QueryRow(ctx, "SELECT id FROM projects WHERE user_id = $1 AND LOWER(name) = LOWER($2)", userID, projectName).Scan(&foundID)
+				err := tx.QueryRow(ctx, `SELECT id FROM projects WHERE user_id = $1 AND LOWER(name) = LOWER($2) AND COALESCE(archived, false) = false ORDER BY id ASC LIMIT 1`, userID, projectName).Scan(&foundID)
 				if err != nil {
 					err = tx.QueryRow(ctx, "INSERT INTO projects (user_id, name) VALUES ($1, $2) RETURNING id", userID, projectName).Scan(&foundID)
 					if err != nil {

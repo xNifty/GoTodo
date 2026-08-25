@@ -173,6 +173,7 @@ type apiProjectJSON struct {
 	Name          string `json:"name"`
 	Description   string `json:"description,omitempty"`
 	WorkflowMode  string `json:"workflow_mode,omitempty"`
+	Archived      bool   `json:"archived"`
 	Role          string `json:"role,omitempty"`
 	OwnerEmail    string `json:"owner_email,omitempty"`
 	OwnerUserName string `json:"owner_user_name,omitempty"`
@@ -532,6 +533,10 @@ func apiV1CreateTask(w http.ResponseWriter, r *http.Request) {
 		}
 		if errors.Is(err, domain.ErrForbidden) {
 			utils.APIJSONError(w, http.StatusForbidden, "forbidden", sharingClientMessage(err, "Forbidden."))
+			return
+		}
+		if errors.Is(err, domain.ErrConflict) {
+			utils.APIJSONError(w, http.StatusConflict, "conflict", sharingClientMessage(err, "Conflict."))
 			return
 		}
 		utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to create task.")
