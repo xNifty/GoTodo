@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"GoTodo/internal/crypto/secret"
+	"GoTodo/internal/mailer"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -46,6 +47,22 @@ type SiteSettings struct {
 
 	GitHubOAuthClientID        string
 	GitHubOAuthClientSecretEnc string
+}
+
+// MailerConfig maps email-related site settings into a mailer.Config.
+func (s SiteSettings) MailerConfig() mailer.Config {
+	return mailer.Config{
+		Provider:         s.EmailProvider,
+		FromAddress:      s.EmailFromAddress,
+		FromName:         s.EmailFromName,
+		MailgunDomain:    s.EmailMailgunDomain,
+		MailgunAPIKeyEnc: s.EmailMailgunAPIKeyEnc,
+		SMTPHost:         s.EmailSMTPHost,
+		SMTPPort:         s.EmailSMTPPort,
+		SMTPUsername:     s.EmailSMTPUsername,
+		SMTPPasswordEnc:  s.EmailSMTPPasswordEnc,
+		SMTPTLS:          s.EmailSMTPTLS,
+	}
 }
 
 // CreateSiteSettingsTable ensures the site_settings table exists.

@@ -64,7 +64,7 @@ func CreateInvite(email string) (*Invite, error) {
 	if err == nil {
 		return nil, fmt.Errorf("invite already exists for email")
 	}
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+	if !errors.Is(err, pgx.ErrNoRows) {
 		return nil, err
 	}
 

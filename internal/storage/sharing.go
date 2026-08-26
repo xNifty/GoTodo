@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"GoTodo/internal/mailer"
 	"context"
 	"crypto/rand"
 	"database/sql"
@@ -486,6 +487,13 @@ func CreateProjectInvite(projectID int, email, role string, invitedBy int, expir
 	if err != nil {
 		return nil, err
 	}
+	if settings, err := GetSiteSettings(); err == nil && settings != nil {
+		subject := "Project Invite"
+		body := fmt.Sprintf("You have been invited to join project %d.", inv.ProjectID)
+		if err := mailer.SendEmail(settings.MailerConfig(), subject, body, inv.Email); err != nil {
+			fmt.Printf("Warning: Failed to send project invite email to %s: %v\n", inv.Email, err)
+		}
+	}
 	return &inv, nil
 }
 
@@ -630,7 +638,7 @@ func AcceptProjectInvite(inviteID, userID int, userEmail string) error {
 	if time.Now().After(inv.ExpiresAt) {
 		return fmt.Errorf("invite expired")
 	}
-	if strings.ToLower(inv.Email) != strings.ToLower(strings.TrimSpace(userEmail)) {
+	if !strings.EqualFold(inv.Email, strings.TrimSpace(userEmail)) {
 		return fmt.Errorf("invite email mismatch")
 	}
 
