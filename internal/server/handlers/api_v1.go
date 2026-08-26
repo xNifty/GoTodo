@@ -45,7 +45,7 @@ type apiTaskJSON struct {
 	EstimatePoints    *int               `json:"estimate_points,omitempty"`
 	TimeSpentMinutes  int                `json:"time_spent_minutes,omitempty"`
 	ProjectWorkflow   string             `json:"project_workflow,omitempty"`
-	ClaimedBy         *int               `json:"claimed_by,omitempty"`
+	ClaimedBy         *int               `json:"claimed_by"`
 	ClaimedByName     string             `json:"claimed_by_name,omitempty"`
 	SprintID          *int               `json:"sprint_id,omitempty"`
 	SprintName        string             `json:"sprint_name,omitempty"`
