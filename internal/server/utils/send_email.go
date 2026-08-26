@@ -21,5 +21,5 @@ func SendEmail(subject, message, toEmail string) error {
 	if err != nil || settings == nil {
 		return fmt.Errorf("email not configured")
 	}
-	return mailer.SendEmail(settings.MailerConfig(), subject, message, toEmail)
+	return mailer.SendEmail(settings.Email, subject, message, toEmail)
 }

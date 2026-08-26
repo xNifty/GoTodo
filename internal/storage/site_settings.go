@@ -34,35 +34,10 @@ type SiteSettings struct {
 	GlobalAnnouncementText   string
 	EnableAPI                bool
 
-	EmailProvider         string
-	EmailFromAddress      string
-	EmailFromName         string
-	EmailMailgunDomain    string
-	EmailMailgunAPIKeyEnc string
-	EmailSMTPHost         string
-	EmailSMTPPort         int
-	EmailSMTPUsername     string
-	EmailSMTPPasswordEnc  string
-	EmailSMTPTLS          bool
+	Email mailer.Config
 
 	GitHubOAuthClientID        string
 	GitHubOAuthClientSecretEnc string
-}
-
-// MailerConfig maps email-related site settings into a mailer.Config.
-func (s SiteSettings) MailerConfig() mailer.Config {
-	return mailer.Config{
-		Provider:         s.EmailProvider,
-		FromAddress:      s.EmailFromAddress,
-		FromName:         s.EmailFromName,
-		MailgunDomain:    s.EmailMailgunDomain,
-		MailgunAPIKeyEnc: s.EmailMailgunAPIKeyEnc,
-		SMTPHost:         s.EmailSMTPHost,
-		SMTPPort:         s.EmailSMTPPort,
-		SMTPUsername:     s.EmailSMTPUsername,
-		SMTPPasswordEnc:  s.EmailSMTPPasswordEnc,
-		SMTPTLS:          s.EmailSMTPTLS,
-	}
 }
 
 // CreateSiteSettingsTable ensures the site_settings table exists.
@@ -133,10 +108,10 @@ func GetSiteSettings() (*SiteSettings, error) {
 		&s.SiteName, &s.DefaultTimezone, &s.ShowChangelog, &s.SiteVersion,
 		&s.EnableRegistration, &s.InviteOnly, &s.EnableJoinRequests, &s.MetaDescription,
 		&s.EnableGlobalAnnouncement, &s.GlobalAnnouncementText, &s.EnableAPI,
-		&s.EmailProvider, &s.EmailFromAddress, &s.EmailFromName,
-		&s.EmailMailgunDomain, &s.EmailMailgunAPIKeyEnc,
-		&s.EmailSMTPHost, &s.EmailSMTPPort, &s.EmailSMTPUsername,
-		&s.EmailSMTPPasswordEnc, &s.EmailSMTPTLS,
+		&s.Email.Provider, &s.Email.FromAddress, &s.Email.FromName,
+		&s.Email.MailgunDomain, &s.Email.MailgunAPIKeyEnc,
+		&s.Email.SMTPHost, &s.Email.SMTPPort, &s.Email.SMTPUsername,
+		&s.Email.SMTPPasswordEnc, &s.Email.SMTPTLS,
 		&s.GitHubOAuthClientID, &s.GitHubOAuthClientSecretEnc,
 	); err != nil {
 		return nil, err
@@ -152,8 +127,8 @@ func UpsertSiteSettings(s SiteSettings) error {
 	}
 	defer CloseDatabase(pool)
 
-	if s.EmailSMTPPort <= 0 {
-		s.EmailSMTPPort = 587
+	if s.Email.SMTPPort <= 0 {
+		s.Email.SMTPPort = 587
 	}
 
 	_, err = pool.Exec(context.Background(), `
@@ -195,10 +170,10 @@ func UpsertSiteSettings(s SiteSettings) error {
     `, s.SiteName, s.DefaultTimezone, s.ShowChangelog, s.SiteVersion,
 		s.EnableRegistration, s.InviteOnly, s.EnableJoinRequests, s.MetaDescription,
 		s.EnableGlobalAnnouncement, s.GlobalAnnouncementText, s.EnableAPI,
-		s.EmailProvider, s.EmailFromAddress, s.EmailFromName,
-		s.EmailMailgunDomain, s.EmailMailgunAPIKeyEnc,
-		s.EmailSMTPHost, s.EmailSMTPPort, s.EmailSMTPUsername,
-		s.EmailSMTPPasswordEnc, s.EmailSMTPTLS,
+		s.Email.Provider, s.Email.FromAddress, s.Email.FromName,
+		s.Email.MailgunDomain, s.Email.MailgunAPIKeyEnc,
+		s.Email.SMTPHost, s.Email.SMTPPort, s.Email.SMTPUsername,
+		s.Email.SMTPPasswordEnc, s.Email.SMTPTLS,
 		s.GitHubOAuthClientID, s.GitHubOAuthClientSecretEnc)
 	if err != nil {
 		return fmt.Errorf("failed to upsert site_settings: %v", err)
@@ -350,17 +325,19 @@ func MaybeImportEmailSettingsFromEnv() error {
 			ShowChangelog:      true,
 			EnableRegistration: true,
 			InviteOnly:         true,
-			EmailSMTPPort:      587,
-			EmailSMTPTLS:       true,
+			Email: mailer.Config{
+				SMTPPort: 587,
+				SMTPTLS:  true,
+			},
 		}
 	}
 	if current == nil {
 		return nil
 	}
-	if strings.TrimSpace(current.EmailProvider) != "" && strings.TrimSpace(current.EmailProvider) != "none" {
+	if strings.TrimSpace(current.Email.Provider) != "" && strings.TrimSpace(current.Email.Provider) != "none" {
 		return nil
 	}
-	if current.EmailMailgunAPIKeyEnc != "" {
+	if current.Email.MailgunAPIKeyEnc != "" {
 		return nil
 	}
 
@@ -371,16 +348,16 @@ func MaybeImportEmailSettingsFromEnv() error {
 
 	from := strings.TrimSpace(os.Getenv("FROM_EMAIL"))
 	if from == "" {
-		from = current.EmailFromAddress
+		from = current.Email.FromAddress
 	}
 
 	next := *current
-	next.EmailProvider = EmailProviderMailgun
-	next.EmailMailgunDomain = domain
-	next.EmailMailgunAPIKeyEnc = enc
-	next.EmailFromAddress = from
-	if next.EmailSMTPPort <= 0 {
-		next.EmailSMTPPort = 587
+	next.Email.Provider = EmailProviderMailgun
+	next.Email.MailgunDomain = domain
+	next.Email.MailgunAPIKeyEnc = enc
+	next.Email.FromAddress = from
+	if next.Email.SMTPPort <= 0 {
+		next.Email.SMTPPort = 587
 	}
 	if err := UpsertSiteSettings(next); err != nil {
 		return err
