@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"GoTodo/internal/mailer"
 	"GoTodo/internal/server/utils"
 	"GoTodo/internal/storage"
 
@@ -14,8 +15,8 @@ import (
 )
 
 type forgotPasswordRequest struct {
-	Email         string `json:"email"`
-	ConfirmEmail  string `json:"confirm_email"`
+	Email        string `json:"email"`
+	ConfirmEmail string `json:"confirm_email"`
 }
 
 type resetPasswordRequest struct {
@@ -57,7 +58,8 @@ func APIV1ForgotPassword(w http.ResponseWriter, r *http.Request) {
 				fmt.Sprintf("/reset-password?token=%s&id=%s", resetToken.Token, resetToken.ID))
 
 			siteName := "GoTodo"
-			if settings, err := storage.GetSiteSettings(); err == nil && settings != nil && settings.SiteName != "" {
+			settings, err := storage.GetSiteSettings()
+			if err == nil && settings != nil && settings.SiteName != "" {
 				siteName = settings.SiteName
 			}
 
@@ -73,7 +75,7 @@ This link will expire in 15 minutes.
 If you did not request this password reset, please ignore this email.
 `, resetLink)
 
-			_ = utils.SendEmail(subject, body, email)
+			_ = mailer.SendEmail(settings.Email, subject, body, email)
 		}
 	}
 
@@ -162,7 +164,8 @@ func apiV1ResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	siteName := "GoTodo"
-	if settings, err := storage.GetSiteSettings(); err == nil && settings != nil && settings.SiteName != "" {
+	settings, err := storage.GetSiteSettings()
+	if err == nil && settings != nil && settings.SiteName != "" {
 		siteName = settings.SiteName
 	}
 	subject := fmt.Sprintf("%s - Password Changed", siteName)
@@ -172,7 +175,7 @@ Your password has been changed for %s.
 
 If you did not request this, please reach out to support.
 `, siteName)
-	_ = utils.SendEmail(subject, body, reset.Email)
+	_ = mailer.SendEmail(settings.Email, subject, body, reset.Email)
 	_ = storage.DeleteResetToken(id, token)
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
