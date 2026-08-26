@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 
+	"GoTodo/internal/mailer"
 	"GoTodo/internal/server/utils"
 	"GoTodo/internal/storage"
 )
@@ -22,7 +23,8 @@ func siteInviteRegisterURL(r *http.Request, email, token string) string {
 // Send failures are ignored so the invite row still exists if mail is unconfigured.
 func emailSiteInvite(r *http.Request, email, token string) {
 	siteName := "GoTodo"
-	if settings, err := storage.GetSiteSettings(); err == nil && settings != nil && strings.TrimSpace(settings.SiteName) != "" {
+	settings, err := storage.GetSiteSettings()
+	if err == nil && settings != nil && strings.TrimSpace(settings.SiteName) != "" {
 		siteName = settings.SiteName
 	}
 	registerURL := siteInviteRegisterURL(r, email, token)
@@ -38,5 +40,5 @@ If the link does not work, enter your email and the following invite token on th
 
 If you did not expect this invitation, you can ignore this email.
 `, siteName, registerURL, token)
-	_ = utils.SendEmail(subject, body, email)
+	_ = mailer.SendEmail(settings.Email, subject, body, email)
 }
