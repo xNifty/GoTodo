@@ -4,11 +4,13 @@ import { api } from '@/api/client'
 import type { Project } from '@/api/types'
 import { APIError } from '@/api/types'
 import { useToast } from '@/composables/useToast'
+import { useConfirm } from '@/composables/useConfirm'
 import ProjectSharePanel from '@/components/ProjectSharePanel.vue'
 import ProjectWorkflowPanel from '@/components/ProjectWorkflowPanel.vue'
 import ProjectSprintsPanel from '@/components/ProjectSprintsPanel.vue'
 import ProjectGitHubPanel from '@/components/ProjectGitHubPanel.vue'
 import ProjectTagsPanel from '@/components/ProjectTagsPanel.vue'
+import { isArchivedProject } from '@/utils/projectLabel'
 
 type SettingsTab = 'details' | 'board' | 'sprints' | 'tags' | 'github' | 'sharing'
 
@@ -25,9 +27,11 @@ const emit = defineEmits<{
 }>()
 
 const toast = useToast()
+const { askConfirm } = useConfirm()
 const name = ref('')
 const description = ref('')
 const saving = ref(false)
+const archiving = ref(false)
 const tab = ref<SettingsTab>('details')
 const isOwner = computed(() => (props.project?.role || 'owner') === 'owner')
 const isKanban = computed(() => (props.project?.workflow_mode || 'classic') === 'kanban')
@@ -97,6 +101,34 @@ function onPanelChanged() {
 
 function onColumnsChanged() {
   emit('columns-changed')
+}
+
+async function archiveOrRestore() {
+  if (!props.project || !isOwner.value) return
+  const archived = isArchivedProject(props.project)
+  if (!archived) {
+    const ok = await askConfirm({
+      title: 'Archive project?',
+      message: `Archive “${props.project.name}”? It will move to the Archived section, its tasks will be tagged archived, and new tasks cannot be added until you restore it.`,
+      confirmLabel: 'Archive',
+    })
+    if (!ok) return
+  }
+  archiving.value = true
+  try {
+    if (archived) {
+      await api.restoreProject(props.project.id)
+      toast.push('Project restored', 'success')
+    } else {
+      await api.archiveProject(props.project.id)
+      toast.push('Project archived', 'info')
+    }
+    emit('saved')
+  } catch (err) {
+    toast.push(err instanceof APIError ? err.message : 'Could not update archive state', 'error')
+  } finally {
+    archiving.value = false
+  }
 }
 </script>
 
@@ -168,7 +200,17 @@ function onColumnsChanged() {
               </div>
             </div>
 
-            <div v-if="isOwner" class="d-flex justify-content-end">
+            <div v-if="isOwner" class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                class="btn btn-sm"
+                :class="isArchivedProject(project) ? 'btn-outline-primary' : 'btn-outline-secondary'"
+                :disabled="archiving"
+                @click="archiveOrRestore"
+              >
+                <i :class="isArchivedProject(project) ? 'bi bi-arrow-counterclockwise' : 'bi bi-archive'" class="me-1" />
+                {{ isArchivedProject(project) ? 'Restore project' : 'Archive project' }}
+              </button>
               <button
                 type="button"
                 class="btn btn-sm btn-primary px-3"
@@ -178,6 +220,9 @@ function onColumnsChanged() {
                 Save details
               </button>
             </div>
+            <p v-if="isArchivedProject(project)" class="small text-muted mt-2 mb-0">
+              This project is archived. Existing tasks stay, but new tasks cannot be added until it is restored.
+            </p>
           </div>
 
           <ProjectWorkflowPanel

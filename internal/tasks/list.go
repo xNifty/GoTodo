@@ -331,7 +331,7 @@ func isRemovedTagFilter(filters ListFilters) bool {
 		return false
 	}
 	tag, err := storage.GetTag(*filters.TagFilter)
-	return err == nil && (tag.Protected || storage.IsRemovedTagName(tag.Name))
+	return err == nil && tag != nil && storage.IsRemovedTagName(tag.Name)
 }
 
 func appendArchivedExclusion(where string, filters ListFilters, tablePrefix string) string {

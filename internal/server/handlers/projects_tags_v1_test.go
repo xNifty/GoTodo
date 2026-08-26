@@ -132,6 +132,35 @@ func TestAPIV1ProjectsMethodNotAllowed(t *testing.T) {
 	}
 }
 
+func TestAPIV1ProjectsArchiveMethodNotAllowed(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/projects/1/archive", nil)
+	req = utils.SetAPIUserID(req, 1)
+	rec := httptest.NewRecorder()
+	APIV1ProjectsRouter(rec, req)
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+	}
+}
+
+func TestAPIV1ProjectsRestoreMethodNotAllowed(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/projects/1/restore", nil)
+	req = utils.SetAPIUserID(req, 1)
+	rec := httptest.NewRecorder()
+	APIV1ProjectsRouter(rec, req)
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+	}
+}
+
+func TestAPIV1ProjectsArchiveUnauthorized(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/projects/1/archive", nil)
+	rec := httptest.NewRecorder()
+	APIV1ProjectsRouter(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+}
+
 func TestAPIV1TagsPatchValidation(t *testing.T) {
 	tests := []struct {
 		name string

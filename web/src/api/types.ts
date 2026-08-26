@@ -53,6 +53,7 @@ export type Project = {
   name: string
   description?: string
   workflow_mode?: WorkflowMode
+  archived?: boolean
   role?: 'owner' | 'editor' | 'viewer'
   owner_email?: string
   owner_user_name?: string

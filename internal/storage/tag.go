@@ -16,7 +16,11 @@ const MaxTagsPerTask = 5
 // RemovedTagName is the reserved, protected archive tag. One exists per namespace.
 const RemovedTagName = "removed"
 
+// ArchivedTagName is the reserved, protected tag applied to tasks when a project is archived.
+const ArchivedTagName = "archived"
+
 const removedTagColor = "#6c757d"
+const archivedTagColor = "#6c757d"
 
 const tagSelectCols = `id, user_id, project_id, name, COALESCE(color, '#6c757d'), COALESCE(protected, false)`
 
@@ -33,6 +37,16 @@ type Tag struct {
 // IsRemovedTagName reports whether name is the reserved archive tag (case-insensitive).
 func IsRemovedTagName(name string) bool {
 	return strings.EqualFold(strings.TrimSpace(name), RemovedTagName)
+}
+
+// IsArchivedTagName reports whether name is the reserved project-archive tag (case-insensitive).
+func IsArchivedTagName(name string) bool {
+	return strings.EqualFold(strings.TrimSpace(name), ArchivedTagName)
+}
+
+// IsSystemTagName reports whether name is a reserved protected tag.
+func IsSystemTagName(name string) bool {
+	return IsRemovedTagName(name) || IsArchivedTagName(name)
 }
 
 var tagPalette = []string{
@@ -693,11 +707,11 @@ func GetOrCreateTagByName(userID int, projectID *int, name string) (*Tag, error)
 	if len(name) > 50 {
 		return nil, fmt.Errorf("tag name must be 50 characters or less")
 	}
-	if IsRemovedTagName(name) {
+	if IsSystemTagName(name) {
 		return nil, fmt.Errorf("tag name is reserved")
 	}
 	if existing, err := FindTagByName(userID, projectID, name); err == nil {
-		if existing.Protected || IsRemovedTagName(existing.Name) {
+		if existing.Protected || IsSystemTagName(existing.Name) {
 			return nil, fmt.Errorf("tag name is reserved")
 		}
 		return existing, nil
@@ -721,7 +735,7 @@ func GetOrCreateTagByName(userID int, projectID *int, name string) (*Tag, error)
 	}
 	if err != nil {
 		if existing, findErr := FindTagByName(userID, projectID, name); findErr == nil {
-			if existing.Protected || IsRemovedTagName(existing.Name) {
+			if existing.Protected || IsSystemTagName(existing.Name) {
 				return nil, fmt.Errorf("tag name is reserved")
 			}
 			return existing, nil
@@ -745,7 +759,7 @@ func DeleteTag(id int) error {
 	if err != nil {
 		return err
 	}
-	if existing.Protected || IsRemovedTagName(existing.Name) {
+	if existing.Protected || IsSystemTagName(existing.Name) {
 		return fmt.Errorf("cannot delete a protected tag")
 	}
 
@@ -773,10 +787,10 @@ func UpdateTag(id int, name string) error {
 	if err != nil {
 		return err
 	}
-	if existing.Protected || IsRemovedTagName(existing.Name) {
+	if existing.Protected || IsSystemTagName(existing.Name) {
 		return fmt.Errorf("cannot rename a protected tag")
 	}
-	if IsRemovedTagName(name) {
+	if IsSystemTagName(name) {
 		return fmt.Errorf("tag name is reserved")
 	}
 
@@ -859,7 +873,7 @@ func SetTaskTags(taskID, userID int, tagIDs []int) error {
 		if err != nil {
 			return fmt.Errorf("invalid tag selection")
 		}
-		if tag.Protected || IsRemovedTagName(tag.Name) {
+		if tag.Protected || IsSystemTagName(tag.Name) {
 			return fmt.Errorf("cannot assign a protected tag")
 		}
 		userTagIDs = append(userTagIDs, tagID)
@@ -931,12 +945,14 @@ func RemapTaskTagsForProjectChange(taskID, userID int, newProjectID *int) error 
 	for _, t := range dest {
 		byName[strings.ToLower(t.Name)] = t.ID
 	}
-	wasArchived := false
+	wasRemoved := false
 	var ids []int
 	seen := make(map[int]bool)
 	for _, t := range existing {
-		if t.Protected || IsRemovedTagName(t.Name) {
-			wasArchived = true
+		if t.Protected || IsSystemTagName(t.Name) {
+			if IsRemovedTagName(t.Name) {
+				wasRemoved = true
+			}
 			continue
 		}
 		id, ok := byName[strings.ToLower(t.Name)]
@@ -949,7 +965,7 @@ func RemapTaskTagsForProjectChange(taskID, userID int, newProjectID *int) error 
 	if err := SetTaskTags(taskID, userID, ids); err != nil {
 		return err
 	}
-	if wasArchived {
+	if wasRemoved {
 		return ApplyRemovedTag(taskID, userID)
 	}
 	return nil
@@ -1038,7 +1054,7 @@ func ResolveTaskTagIDs(userID int, projectID *int, tagIDStrs []string, newTagsCS
 			continue
 		}
 		tag, err := GetTag(id)
-		if err != nil || tag.Protected || IsRemovedTagName(tag.Name) {
+		if err != nil || tag.Protected || IsSystemTagName(tag.Name) {
 			continue
 		}
 		seen[id] = true
@@ -1047,7 +1063,7 @@ func ResolveTaskTagIDs(userID int, projectID *int, tagIDStrs []string, newTagsCS
 
 	for _, part := range strings.Split(newTagsCSV, ",") {
 		name := strings.TrimSpace(part)
-		if name == "" || IsRemovedTagName(name) {
+		if name == "" || IsSystemTagName(name) {
 			continue
 		}
 		t, err := GetOrCreateTagByName(userID, projectID, name)
@@ -1137,6 +1153,127 @@ func ApplyRemovedTag(taskID, userID int) error {
 	return nil
 }
 
+// EnsureArchivedTag returns the protected "archived" tag for a namespace, creating or converting it.
+func EnsureArchivedTag(userID int, projectID *int) (*Tag, error) {
+	if existing, err := FindTagByName(userID, projectID, ArchivedTagName); err == nil {
+		if !existing.Protected {
+			pool, err := OpenDatabase()
+			if err != nil {
+				return nil, err
+			}
+			defer CloseDatabase(pool)
+			_, err = pool.Exec(context.Background(),
+				`UPDATE tags SET protected = true, name = $1, color = COALESCE(NULLIF(color, ''), $2) WHERE id = $3`,
+				ArchivedTagName, archivedTagColor, existing.ID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to protect archived tag: %v", err)
+			}
+			existing.Protected = true
+			existing.Name = ArchivedTagName
+		}
+		return existing, nil
+	}
+
+	pool, err := OpenDatabase()
+	if err != nil {
+		return nil, err
+	}
+	defer CloseDatabase(pool)
+
+	var t Tag
+	if projectID == nil || *projectID <= 0 {
+		t, err = scanTag(pool.QueryRow(context.Background(),
+			`INSERT INTO tags (user_id, name, color, protected) VALUES ($1, $2, $3, true)
+			 RETURNING `+tagSelectCols, userID, ArchivedTagName, archivedTagColor))
+	} else {
+		t, err = scanTag(pool.QueryRow(context.Background(),
+			`INSERT INTO tags (user_id, project_id, name, color, protected) VALUES ($1, $2, $3, $4, true)
+			 RETURNING `+tagSelectCols, userID, *projectID, ArchivedTagName, archivedTagColor))
+	}
+	if err != nil {
+		if existing, findErr := FindTagByName(userID, projectID, ArchivedTagName); findErr == nil {
+			return existing, nil
+		}
+		return nil, fmt.Errorf("failed to create archived tag: %v", err)
+	}
+	return &t, nil
+}
+
+// ApplyArchivedTag attaches the namespace's protected archived tag to a task.
+func ApplyArchivedTag(taskID, userID int) error {
+	ns, err := taskTagNamespace(taskID)
+	if err != nil {
+		return err
+	}
+	tag, err := EnsureArchivedTag(userID, ns)
+	if err != nil {
+		return err
+	}
+	pool, err := OpenDatabase()
+	if err != nil {
+		return err
+	}
+	defer CloseDatabase(pool)
+	_, err = pool.Exec(context.Background(),
+		`INSERT INTO task_tags (task_id, tag_id) VALUES ($1, $2)
+		 ON CONFLICT (task_id, tag_id) DO NOTHING`, taskID, tag.ID)
+	if err != nil {
+		return fmt.Errorf("failed to tag archived task: %v", err)
+	}
+	return nil
+}
+
+// ApplyArchivedTagToProjectTasks tags every task in the project with the protected archived tag.
+func ApplyArchivedTagToProjectTasks(projectID, userID int) error {
+	if projectID <= 0 {
+		return fmt.Errorf("invalid project_id")
+	}
+	pid := projectID
+	tag, err := EnsureArchivedTag(userID, &pid)
+	if err != nil {
+		return err
+	}
+	pool, err := OpenDatabase()
+	if err != nil {
+		return err
+	}
+	defer CloseDatabase(pool)
+	_, err = pool.Exec(context.Background(),
+		`INSERT INTO task_tags (task_id, tag_id)
+		 SELECT t.id, $1 FROM tasks t WHERE t.project_id = $2
+		 ON CONFLICT (task_id, tag_id) DO NOTHING`, tag.ID, projectID)
+	if err != nil {
+		return fmt.Errorf("failed to tag archived project tasks: %v", err)
+	}
+	return nil
+}
+
+// ClearArchivedTagFromProjectTasks removes the protected archived tag from every task in the project.
+func ClearArchivedTagFromProjectTasks(projectID, userID int) error {
+	if projectID <= 0 {
+		return nil
+	}
+	pid := projectID
+	tag, err := FindTagByName(userID, &pid, ArchivedTagName)
+	if err != nil {
+		return nil
+	}
+	pool, err := OpenDatabase()
+	if err != nil {
+		return err
+	}
+	defer CloseDatabase(pool)
+	_, err = pool.Exec(context.Background(),
+		`DELETE FROM task_tags tt
+		 USING tasks t
+		 WHERE tt.task_id = t.id AND tt.tag_id = $1 AND t.project_id = $2`,
+		tag.ID, projectID)
+	if err != nil {
+		return fmt.Errorf("failed to clear archived project tags: %v", err)
+	}
+	return nil
+}
+
 // ClearRemovedTag restores a task by removing the protected removed tag.
 func ClearRemovedTag(taskID, userID int) error {
 	ns, err := taskTagNamespace(taskID)
@@ -1167,7 +1304,7 @@ func TaskHasRemovedTag(taskID int) (bool, error) {
 		return false, err
 	}
 	for _, t := range tags {
-		if t.Protected || IsRemovedTagName(t.Name) {
+		if IsRemovedTagName(t.Name) {
 			return true, nil
 		}
 	}

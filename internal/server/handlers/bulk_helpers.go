@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -237,7 +238,10 @@ func bulkMoveProject(ctx context.Context, db *pgxpool.Pool, ids []int, userID in
 	if err != nil {
 		return fmt.Errorf("invalid project")
 	}
-	if err := domain.RequireProjectWriteAccess(pid, userID); err != nil {
+	if err := domain.RequireProjectAcceptsNewTasks(pid, userID); err != nil {
+		if errors.Is(err, domain.ErrConflict) {
+			return err
+		}
 		return fmt.Errorf("invalid project selection")
 	}
 	for _, id := range ids {
@@ -263,7 +267,7 @@ func bulkAddTag(ctx context.Context, db *pgxpool.Pool, ids []int, userID, tagID 
 	if err != nil || !ok {
 		return fmt.Errorf("invalid tag")
 	}
-	if src.Protected || storage.IsRemovedTagName(src.Name) {
+	if src.Protected || storage.IsSystemTagName(src.Name) {
 		return fmt.Errorf("cannot assign a protected tag")
 	}
 	for _, taskID := range ids {

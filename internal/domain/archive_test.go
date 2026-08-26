@@ -280,7 +280,7 @@ func containsTaskID(list []tasks.Task, id int) bool {
 
 func taskHasRemoved(tags []storage.Tag) bool {
 	for _, tg := range tags {
-		if tg.Protected || storage.IsRemovedTagName(tg.Name) {
+		if storage.IsRemovedTagName(tg.Name) {
 			return true
 		}
 	}

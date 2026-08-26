@@ -114,6 +114,7 @@ func projectToAPIJSON(p *storage.ProjectWithAccess) apiProjectJSON {
 		Name:          p.Name,
 		Description:   p.Description,
 		WorkflowMode:  mode,
+		Archived:      p.Archived,
 		Role:          p.Role,
 		OwnerEmail:    p.OwnerEmail,
 		OwnerUserName: p.OwnerUserName,
@@ -131,6 +132,7 @@ func projectStorageToAPIJSON(p *storage.Project, role string) apiProjectJSON {
 		Name:         p.Name,
 		Description:  p.Description,
 		WorkflowMode: mode,
+		Archived:     p.Archived,
 		Role:         role,
 		OwnerUserID:  p.UserID,
 	}

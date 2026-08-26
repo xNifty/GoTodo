@@ -107,6 +107,15 @@
                         Board
                       </button>
                       <button
+                        class="btn btn-sm btn-outline-secondary"
+                        type="button"
+                        title="Archive project"
+                        aria-label="Archive project"
+                        @click="archiveProject(p)"
+                      >
+                        <i class="bi bi-archive" />
+                      </button>
+                      <button
                         class="btn btn-sm btn-danger"
                         type="button"
                         aria-label="Delete project"
@@ -173,6 +182,79 @@
               </table>
             </div>
             <p v-else class="text-muted mb-0">No shared projects yet.</p>
+          </div>
+        </div>
+
+        <div v-if="archivedProjectList.length" class="card mt-4">
+          <div class="card-header">
+            <h3 class="mb-0 h5">Archived</h3>
+          </div>
+          <div class="card-body">
+            <p class="text-muted">
+              Archived projects are hidden from the main list and cannot accept new tasks. Restore a
+              project to use it again.
+            </p>
+            <div class="table-responsive">
+              <table class="table table-striped">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Role</th>
+                    <th style="width: 220px">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="p in archivedProjectList" :key="p.id">
+                    <td>
+                      <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <span class="fw-semibold">{{ p.name }}</span>
+                        <span class="badge text-bg-secondary">archived</span>
+                      </div>
+                      <div v-if="p.description" class="small text-muted mt-1">{{ p.description }}</div>
+                    </td>
+                    <td><span class="badge text-bg-secondary">{{ p.role || 'owner' }}</span></td>
+                    <td>
+                      <div class="d-flex flex-wrap gap-1">
+                        <button
+                          class="btn btn-sm btn-outline-secondary"
+                          type="button"
+                          title="Project settings"
+                          aria-label="Project settings"
+                          @click="openEditProject(p)"
+                        >
+                          <i class="bi bi-gear" />
+                        </button>
+                        <button
+                          v-if="isProjectOwner(p)"
+                          class="btn btn-sm btn-outline-primary"
+                          type="button"
+                          @click="restoreProject(p)"
+                        >
+                          Restore
+                        </button>
+                        <button
+                          v-if="isProjectOwner(p)"
+                          class="btn btn-sm btn-danger"
+                          type="button"
+                          aria-label="Delete project"
+                          @click="removeProject(p)"
+                        >
+                          <i class="bi bi-trash" />
+                        </button>
+                        <button
+                          v-else
+                          class="btn btn-sm btn-outline-secondary"
+                          type="button"
+                          @click="leaveProject(p)"
+                        >
+                          Leave
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -246,6 +328,7 @@ import { useConfirm } from '@/composables/useConfirm'
 import ProjectSharePanel from '@/components/ProjectSharePanel.vue'
 import ProjectWorkflowPanel from '@/components/ProjectWorkflowPanel.vue'
 import ProjectSettingsModal from '@/components/ProjectSettingsModal.vue'
+import { isArchivedProject, isProjectOwner } from '@/utils/projectLabel'
 
 const projects = ref<Project[]>([])
 const pendingInvites = ref<ProjectInvite[]>([])
@@ -261,8 +344,13 @@ const toast = useToast()
 const auth = useAuth()
 const { askConfirm } = useConfirm()
 
-const ownedProjects = computed(() => projects.value.filter((p) => (p.role || 'owner') === 'owner'))
-const sharedProjects = computed(() => projects.value.filter((p) => p.role && p.role !== 'owner'))
+const ownedProjects = computed(() =>
+  projects.value.filter((p) => isProjectOwner(p) && !isArchivedProject(p)),
+)
+const sharedProjects = computed(() =>
+  projects.value.filter((p) => !isProjectOwner(p) && !isArchivedProject(p)),
+)
+const archivedProjectList = computed(() => projects.value.filter(isArchivedProject))
 
 function destroySortable() {
   sortable?.destroy()
@@ -285,10 +373,10 @@ async function persistOwnedOrder(orderedIds: number[]) {
   }
   const previous = [...projects.value]
   const owned = ownedProjects.value
-  const shared = sharedProjects.value
+  const rest = projects.value.filter((p) => !owned.some((o) => o.id === p.id))
   const byId = new Map(owned.map((p) => [p.id, p]))
   const nextOwned = orderedIds.map((id) => byId.get(id)!).filter(Boolean)
-  projects.value = [...nextOwned, ...shared]
+  projects.value = [...nextOwned, ...rest]
   try {
     await api.reorderProjects(orderedIds)
   } catch (err) {
@@ -364,6 +452,34 @@ function closeEditProject() {
 
 async function onProjectSettingsSaved() {
   await load()
+}
+
+async function archiveProject(p: Project) {
+  const ok = await askConfirm({
+    title: 'Archive project?',
+    message: `Archive “${p.name}”? It will move to the Archived section, its tasks will be tagged archived, and new tasks cannot be added until you restore it.`,
+    confirmLabel: 'Archive',
+  })
+  if (!ok) return
+  try {
+    await api.archiveProject(p.id)
+    if (sharePanelId.value === p.id) sharePanelId.value = null
+    if (boardPanelId.value === p.id) boardPanelId.value = null
+    toast.push('Project archived', 'info')
+    await load()
+  } catch (err) {
+    toast.push(err instanceof APIError ? err.message : 'Archive failed', 'error')
+  }
+}
+
+async function restoreProject(p: Project) {
+  try {
+    await api.restoreProject(p.id)
+    toast.push('Project restored', 'success')
+    await load()
+  } catch (err) {
+    toast.push(err instanceof APIError ? err.message : 'Restore failed', 'error')
+  }
 }
 
 async function removeProject(p: Project) {

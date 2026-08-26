@@ -14,11 +14,12 @@ export function uniqueTagsByName(tags: Tag[]): Tag[] {
 }
 
 export function isProtectedTag(tag: Tag): boolean {
-  return !!tag.protected || tag.name.toLowerCase() === 'removed'
+  const name = tag.name.toLowerCase()
+  return !!tag.protected || name === 'removed' || name === 'archived'
 }
 
 export function isArchivedTask(task?: { tags?: Tag[] } | null): boolean {
-  return (task?.tags || []).some(isProtectedTag)
+  return (task?.tags || []).some((tag) => tag.name.toLowerCase() === 'removed')
 }
 
 export function assignableTags(tags: Tag[]): Tag[] {
