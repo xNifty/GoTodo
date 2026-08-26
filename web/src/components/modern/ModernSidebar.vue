@@ -3,7 +3,7 @@ import { computed, inject, nextTick, onBeforeUnmount, ref, watch, type Ref } fro
 import { useRoute, RouterLink } from 'vue-router'
 import Sortable from 'sortablejs'
 import type { Project, SavedView } from '@/api/types'
-import { projectOptionLabel, isArchivedProject, isProjectOwner } from '@/utils/projectLabel'
+import { projectNavLabel, projectOptionLabel, isArchivedProject, isProjectOwner } from '@/utils/projectLabel'
 
 const props = defineProps<{
   collapsed: boolean
@@ -215,7 +215,7 @@ onBeforeUnmount(() => {
         class="sidebar-nav-item position-relative project-reorder-item"
         :data-project-id="proj.id"
       >
-        <div class="d-flex align-items-center justify-content-between w-100">
+        <div class="d-flex align-items-center justify-content-between w-100 min-w-0">
           <span
             class="project-drag-handle text-muted d-none d-md-inline-flex me-1 hover-reveal"
             title="Drag to reorder"
@@ -233,13 +233,13 @@ onBeforeUnmount(() => {
             @click.prevent="emit('select-project', String(proj.id)); emit('close-mobile')"
           >
             <i class="bi bi-folder2-open" />
-            <span class="sidebar-text text-truncate">{{ projectOptionLabel(proj) }}</span>
+            <span class="sidebar-text text-truncate">{{ projectNavLabel(proj) }}</span>
           </a>
 
           <button
             v-if="isOwner(proj)"
             type="button"
-            class="btn btn-sm text-muted p-0 border-0 hover-reveal d-none d-md-inline-block me-2"
+            class="btn btn-sm text-muted p-0 border-0 hover-reveal d-none d-md-inline-block flex-shrink-0 me-2"
             title="Edit project"
             @click.stop="emit('edit-project', proj)"
           >
@@ -256,7 +256,7 @@ onBeforeUnmount(() => {
         :key="proj.id"
         class="sidebar-nav-item position-relative"
       >
-        <div class="d-flex align-items-center justify-content-between w-100">
+        <div class="d-flex align-items-center justify-content-between w-100 min-w-0">
           <a
             href="#"
             class="sidebar-nav-link flex-grow-1 min-w-0"
@@ -266,12 +266,12 @@ onBeforeUnmount(() => {
             @click.prevent="emit('select-project', String(proj.id)); emit('close-mobile')"
           >
             <i class="bi bi-folder2-open" />
-            <span class="sidebar-text text-truncate">{{ projectOptionLabel(proj) }}</span>
+            <span class="sidebar-text text-truncate">{{ projectNavLabel(proj) }}</span>
           </a>
 
           <button
             type="button"
-            class="btn btn-sm text-muted p-0 border-0 hover-reveal d-none d-md-inline-block me-2"
+            class="btn btn-sm text-muted p-0 border-0 hover-reveal d-none d-md-inline-block flex-shrink-0 me-2"
             title="Project settings"
             @click.stop="emit('edit-project', proj)"
           >
@@ -314,7 +314,7 @@ onBeforeUnmount(() => {
         :key="proj.id"
         class="sidebar-nav-item position-relative"
       >
-        <div class="d-flex align-items-center justify-content-between w-100">
+        <div class="d-flex align-items-center justify-content-between w-100 min-w-0">
           <a
             href="#"
             class="sidebar-nav-link flex-grow-1 min-w-0"
@@ -324,11 +324,11 @@ onBeforeUnmount(() => {
             @click.prevent="emit('select-project', String(proj.id)); emit('close-mobile')"
           >
             <i class="bi bi-archive" />
-            <span class="sidebar-text text-truncate">{{ projectOptionLabel(proj) }}</span>
+            <span class="sidebar-text text-truncate">{{ projectNavLabel(proj) }}</span>
           </a>
           <button
             type="button"
-            class="btn btn-sm text-muted p-0 border-0 hover-reveal d-none d-md-inline-block me-2"
+            class="btn btn-sm text-muted p-0 border-0 hover-reveal d-none d-md-inline-block flex-shrink-0 me-2"
             title="Project settings"
             @click.stop="emit('edit-project', proj)"
           >
