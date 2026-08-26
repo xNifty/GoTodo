@@ -6,7 +6,7 @@ import type { Project, SavedView } from '@/api/types'
 import { useAuth } from '@/composables/useAuth'
 import { useSite } from '@/composables/useSite'
 import { useToast } from '@/composables/useToast'
-import { projectOptionLabel, isArchivedProject, isProjectOwner } from '@/utils/projectLabel'
+import { projectNavLabel, isArchivedProject, isProjectOwner } from '@/utils/projectLabel'
 
 const props = defineProps<{
   open: boolean
@@ -252,7 +252,7 @@ watch(isAuthenticated, (ok) => {
                 @click.prevent="selectProject(String(proj.id))"
               >
                 <i class="bi bi-folder2-open" />
-                <span class="text-truncate">{{ projectOptionLabel(proj) }}</span>
+                <span class="text-truncate">{{ projectNavLabel(proj) }}</span>
               </a>
             </li>
             <li v-for="proj in sharedProjects" :key="proj.id" class="sidebar-nav-item">
@@ -263,7 +263,7 @@ watch(isAuthenticated, (ok) => {
                 @click.prevent="selectProject(String(proj.id))"
               >
                 <i class="bi bi-folder2" />
-                <span class="text-truncate">{{ projectOptionLabel(proj) }}</span>
+                <span class="text-truncate">{{ projectNavLabel(proj) }}</span>
               </a>
             </li>
             <li v-if="archivedProjectList.length" class="sidebar-nav-item">
@@ -289,7 +289,7 @@ watch(isAuthenticated, (ok) => {
                 @click.prevent="selectProject(String(proj.id))"
               >
                 <i class="bi bi-archive" />
-                <span class="text-truncate">{{ projectOptionLabel(proj) }}</span>
+                <span class="text-truncate">{{ projectNavLabel(proj) }}</span>
               </a>
             </li>
             <li class="sidebar-nav-item">

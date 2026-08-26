@@ -262,12 +262,23 @@ body {
 
 .sidebar-nav-item {
   margin-bottom: 0.35rem;
+  min-width: 0;
+}
+
+.sidebar-nav-item > .d-flex {
+  min-width: 0;
+}
+
+.sidebar-nav-item .project-drag-handle,
+.sidebar-nav-item .hover-reveal {
+  flex-shrink: 0;
 }
 
 .sidebar-nav-link {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  min-width: 0;
   padding: 0.55rem 0.75rem;
   color: var(--ordryn-sidebar-text);
   text-decoration: none;
@@ -275,6 +286,18 @@ body {
   font-weight: 500;
   font-size: 0.95rem;
   transition: background-color 0.15s ease;
+}
+
+.sidebar-nav-link > i {
+  flex-shrink: 0;
+}
+
+.sidebar-nav-link > span:not(.badge) {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sidebar-nav-link:hover,
