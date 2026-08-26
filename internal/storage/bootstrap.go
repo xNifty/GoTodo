@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"GoTodo/internal/mailer"
 	"context"
 	"errors"
 	"fmt"
@@ -125,8 +126,10 @@ func EnsureEnableAPI() error {
 			EnableRegistration: true,
 			InviteOnly:         true,
 			EnableAPI:          true,
-			EmailSMTPPort:      587,
-			EmailSMTPTLS:      true,
+			Email: mailer.Config{
+				SMTPPort: 587,
+				SMTPTLS:  true,
+			},
 		}
 	} else {
 		s.EnableAPI = true
