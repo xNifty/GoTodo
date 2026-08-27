@@ -17,7 +17,7 @@ const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'S
 const router = useRouter()
 const route = useRoute()
 const { user } = useAuth()
-const { openAdd, openEdit, lastSavedTask } = useTaskSidebar()
+const { openAdd, openEdit, lastSavedTask, lastDeletedTask } = useTaskSidebar()
 const { push } = useToast()
 const { sidebarCollapsed, toggleSidebar } = useSidebarState()
 
@@ -113,6 +113,12 @@ onMounted(() => {
 })
 
 watch(lastSavedTask, () => {
+  if (month.value) void loadMonth(month.value)
+})
+
+watch(lastDeletedTask, (payload) => {
+  if (!payload) return
+  lastDeletedTask.value = null
   if (month.value) void loadMonth(month.value)
 })
 

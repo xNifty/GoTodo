@@ -28,7 +28,7 @@ import { uniqueTagsByName, isArchivedTask } from '@/utils/tags'
 
 const route = useRoute()
 const router = useRouter()
-const { openAdd, openEdit, openView, lastSavedTask } = useTaskSidebar()
+const { openAdd, openEdit, openView, lastSavedTask, lastDeletedTask } = useTaskSidebar()
 const { density } = useViewDensity()
 const { sidebarCollapsed, toggleSidebar } = useSidebarState()
 const {
@@ -770,6 +770,22 @@ watch(lastSavedTask, async (task) => {
     applyTaskUpdate(task)
   } else {
     registerTaskAdded(task)
+  }
+  await nextTick()
+  refreshSortable()
+})
+
+watch(lastDeletedTask, async (payload) => {
+  if (!payload) return
+  lastDeletedTask.value = null
+  const found = findTaskInTree(payload.id)
+  if (payload.mode === 'reparent') {
+    if (found) {
+      removeTaskLocally({ ...found.task, children: [], child_count: 0 })
+    }
+    await reloadInitial()
+  } else if (found) {
+    removeTaskLocally(found.task)
   }
   await nextTick()
   refreshSortable()
