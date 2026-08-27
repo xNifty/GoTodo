@@ -22,7 +22,7 @@ const dueThisWeekTasks = ref<Task[]>([])
 const doneThisWeekTasks = ref<Task[]>([])
 const completing = ref<Record<number, boolean>>({})
 const { sidebarCollapsed, toggleSidebar } = useSidebarState()
-const { openEdit, lastSavedTask } = useTaskSidebar()
+const { openEdit, lastSavedTask, lastDeletedTask } = useTaskSidebar()
 const { user } = useAuth()
 const overdueCount = inject<Ref<number>>('overdueCount')
 const loading = ref(true)
@@ -129,6 +129,14 @@ onMounted(async () => {
 })
 
 watch(lastSavedTask, () => {
+  void refreshDashboard().catch(() => {
+    /* keep current view if refresh fails */
+  })
+})
+
+watch(lastDeletedTask, (payload) => {
+  if (!payload) return
+  lastDeletedTask.value = null
   void refreshDashboard().catch(() => {
     /* keep current view if refresh fails */
   })
