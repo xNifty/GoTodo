@@ -495,6 +495,17 @@ function adjustCompletionCounts(wasCompleted: boolean, isCompleted: boolean) {
   }
 }
 
+/** Nested children spread onto the existing row; omitted JSON nulls must not keep old values. */
+function mergeNestedChild(existing: Task, updated: Task): Task {
+  return {
+    ...existing,
+    ...updated,
+    claimed_by: updated.claimed_by ?? null,
+    claimed_by_name: updated.claimed_by_name || '',
+    children: undefined,
+  }
+}
+
 function applyTaskUpdate(updated: Task) {
   const found = findTaskInTree(updated.id)
   const previous = found?.task ?? null
@@ -503,7 +514,7 @@ function applyTaskUpdate(updated: Task) {
     if (found?.parent) {
       adjustCompletionCounts(previous!.completed, updated.completed)
       found.parent.children = (found.parent.children || []).map((c) =>
-        c.id === updated.id ? { ...c, ...updated, children: undefined } : c,
+        c.id === updated.id ? mergeNestedChild(c, updated) : c,
       )
       refreshParentCounts(found.parent)
       return
