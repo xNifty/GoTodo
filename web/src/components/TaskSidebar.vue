@@ -27,6 +27,7 @@ const {
   defaultSprintId,
   close,
   notifySaved,
+  notifyDeleted,
   openEdit,
   openView,
 } = useTaskSidebar()
@@ -904,11 +905,12 @@ async function deleteCurrentTask() {
 
 async function runSidebarDelete(opts: { mode: 'cascade' | 'reparent'; new_parent_id?: number | null }) {
   if (!taskId.value) return
+  const deletedId = taskId.value
   try {
-    await api.deleteTask(taskId.value, opts)
+    await api.deleteTask(deletedId, opts)
     toast.push('Task deleted', 'info')
     deleteDialogOpen.value = false
-    close()
+    notifyDeleted(deletedId, opts.mode)
   } catch (err) {
     toast.push(err instanceof APIError ? err.message : 'Delete failed', 'error')
   }

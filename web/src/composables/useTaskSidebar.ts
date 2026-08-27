@@ -10,6 +10,7 @@ const defaultParentId = ref<number | null>(null)
 const defaultParentTitle = ref('')
 const defaultSprintId = ref<number | null | undefined>(undefined)
 const lastSavedTask = ref<Task | null>(null)
+const lastDeletedTask = ref<{ id: number; mode: 'cascade' | 'reparent' } | null>(null)
 
 export function useTaskSidebar() {
   function openAdd(
@@ -65,6 +66,11 @@ export function useTaskSidebar() {
     }
   }
 
+  function notifyDeleted(id: number, deleteMode: 'cascade' | 'reparent' = 'cascade') {
+    lastDeletedTask.value = { id, mode: deleteMode }
+    close()
+  }
+
   return {
     open,
     mode,
@@ -75,10 +81,12 @@ export function useTaskSidebar() {
     defaultParentTitle,
     defaultSprintId,
     lastSavedTask,
+    lastDeletedTask,
     openAdd,
     openEdit,
     openView,
     close,
     notifySaved,
+    notifyDeleted,
   }
 }
