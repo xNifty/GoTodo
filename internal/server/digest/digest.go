@@ -1,7 +1,7 @@
 package digest
 
 import (
-	"GoTodo/internal/server/utils"
+	"GoTodo/internal/mailer"
 	"GoTodo/internal/storage"
 	"GoTodo/internal/tasks"
 	"context"
@@ -87,7 +87,8 @@ func sendUserDigest(userID int, email, timezone string) error {
 	}
 
 	siteName := "GoTodo"
-	if settings, err := storage.GetSiteSettings(); err == nil && settings != nil && settings.SiteName != "" {
+	settings, err := storage.GetSiteSettings()
+	if err == nil && settings != nil && settings.SiteName != "" {
 		siteName = settings.SiteName
 	}
 
@@ -104,5 +105,5 @@ func sendUserDigest(userID int, email, timezone string) error {
 	body += "\nLog in to manage your tasks.\n"
 
 	subject := fmt.Sprintf("%s — Daily task digest", siteName)
-	return utils.SendEmail(subject, body, email)
+	return mailer.SendEmail(settings.Email, subject, body, email)
 }

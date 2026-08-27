@@ -136,54 +136,54 @@ func apiV1PatchAdminSettings(w http.ResponseWriter, r *http.Request) {
 		next.EnableAPI = *req.EnableAPI
 	}
 	if req.EmailProvider != nil {
-		next.EmailProvider = normalizeEmailProvider(*req.EmailProvider)
+		next.Email.Provider = normalizeEmailProvider(*req.EmailProvider)
 	}
 	if req.EmailFromAddress != nil {
-		next.EmailFromAddress = strings.TrimSpace(*req.EmailFromAddress)
+		next.Email.FromAddress = strings.TrimSpace(*req.EmailFromAddress)
 	}
 	if req.EmailFromName != nil {
-		next.EmailFromName = strings.TrimSpace(*req.EmailFromName)
+		next.Email.FromName = strings.TrimSpace(*req.EmailFromName)
 	}
 	if req.EmailMailgunDomain != nil {
-		next.EmailMailgunDomain = strings.TrimSpace(*req.EmailMailgunDomain)
+		next.Email.MailgunDomain = strings.TrimSpace(*req.EmailMailgunDomain)
 	}
 	if req.EmailMailgunAPIKey != nil {
 		key := *req.EmailMailgunAPIKey
 		if key == "" {
-			next.EmailMailgunAPIKeyEnc = ""
+			next.Email.MailgunAPIKeyEnc = ""
 		} else {
 			enc, err := secret.Encrypt(key)
 			if err != nil {
 				utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to encrypt mailgun API key.")
 				return
 			}
-			next.EmailMailgunAPIKeyEnc = enc
+			next.Email.MailgunAPIKeyEnc = enc
 		}
 	}
 	if req.EmailSMTPHost != nil {
-		next.EmailSMTPHost = strings.TrimSpace(*req.EmailSMTPHost)
+		next.Email.SMTPHost = strings.TrimSpace(*req.EmailSMTPHost)
 	}
 	if req.EmailSMTPPort != nil {
-		next.EmailSMTPPort = *req.EmailSMTPPort
+		next.Email.SMTPPort = *req.EmailSMTPPort
 	}
 	if req.EmailSMTPUsername != nil {
-		next.EmailSMTPUsername = strings.TrimSpace(*req.EmailSMTPUsername)
+		next.Email.SMTPUsername = strings.TrimSpace(*req.EmailSMTPUsername)
 	}
 	if req.EmailSMTPPassword != nil {
 		pass := *req.EmailSMTPPassword
 		if pass == "" {
-			next.EmailSMTPPasswordEnc = ""
+			next.Email.SMTPPasswordEnc = ""
 		} else {
 			enc, err := secret.Encrypt(pass)
 			if err != nil {
 				utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to encrypt SMTP password.")
 				return
 			}
-			next.EmailSMTPPasswordEnc = enc
+			next.Email.SMTPPasswordEnc = enc
 		}
 	}
 	if req.EmailSMTPTLS != nil {
-		next.EmailSMTPTLS = *req.EmailSMTPTLS
+		next.Email.SMTPTLS = *req.EmailSMTPTLS
 	}
 	if req.GitHubOAuthClientID != nil {
 		next.GitHubOAuthClientID = strings.TrimSpace(*req.GitHubOAuthClientID)
@@ -249,35 +249,35 @@ func normalizeEmailProvider(p string) string {
 }
 
 func validateEmailSettings(s *storage.SiteSettings) string {
-	provider := normalizeEmailProvider(s.EmailProvider)
-	s.EmailProvider = provider
+	provider := normalizeEmailProvider(s.Email.Provider)
+	s.Email.Provider = provider
 	switch provider {
 	case storage.EmailProviderNone:
 		return ""
 	case storage.EmailProviderMailgun:
-		if s.EmailFromAddress == "" {
+		if s.Email.FromAddress == "" {
 			return "email_from_address is required for Mailgun."
 		}
-		if s.EmailMailgunDomain == "" {
+		if s.Email.MailgunDomain == "" {
 			return "email_mailgun_domain is required for Mailgun."
 		}
-		if s.EmailMailgunAPIKeyEnc == "" {
+		if s.Email.MailgunAPIKeyEnc == "" {
 			return "email_mailgun_api_key is required for Mailgun."
 		}
 	case storage.EmailProviderSMTP:
-		if s.EmailFromAddress == "" {
+		if s.Email.FromAddress == "" {
 			return "email_from_address is required for SMTP."
 		}
-		if s.EmailSMTPHost == "" {
+		if s.Email.SMTPHost == "" {
 			return "email_smtp_host is required for SMTP."
 		}
-		if s.EmailSMTPPort <= 0 {
+		if s.Email.SMTPPort <= 0 {
 			return "email_smtp_port must be a positive integer."
 		}
-		if s.EmailSMTPUsername == "" {
+		if s.Email.SMTPUsername == "" {
 			return "email_smtp_username is required for SMTP."
 		}
-		if s.EmailSMTPPasswordEnc == "" {
+		if s.Email.SMTPPasswordEnc == "" {
 			return "email_smtp_password is required for SMTP."
 		}
 	default:
@@ -300,16 +300,16 @@ func writeAdminSettings(w http.ResponseWriter, s *storage.SiteSettings) {
 		EnableGlobalAnnouncement:   s.EnableGlobalAnnouncement,
 		GlobalAnnouncementText:     s.GlobalAnnouncementText,
 		EnableAPI:                  s.EnableAPI,
-		EmailProvider:              s.EmailProvider,
-		EmailFromAddress:           s.EmailFromAddress,
-		EmailFromName:              s.EmailFromName,
-		EmailMailgunDomain:         s.EmailMailgunDomain,
-		EmailMailgunAPIKeySet:      s.EmailMailgunAPIKeyEnc != "",
-		EmailSMTPHost:              s.EmailSMTPHost,
-		EmailSMTPPort:              s.EmailSMTPPort,
-		EmailSMTPUsername:          s.EmailSMTPUsername,
-		EmailSMTPPasswordSet:       s.EmailSMTPPasswordEnc != "",
-		EmailSMTPTLS:               s.EmailSMTPTLS,
+		EmailProvider:              s.Email.Provider,
+		EmailFromAddress:           s.Email.FromAddress,
+		EmailFromName:              s.Email.FromName,
+		EmailMailgunDomain:         s.Email.MailgunDomain,
+		EmailMailgunAPIKeySet:      s.Email.MailgunAPIKeyEnc != "",
+		EmailSMTPHost:              s.Email.SMTPHost,
+		EmailSMTPPort:              s.Email.SMTPPort,
+		EmailSMTPUsername:          s.Email.SMTPUsername,
+		EmailSMTPPasswordSet:       s.Email.SMTPPasswordEnc != "",
+		EmailSMTPTLS:               s.Email.SMTPTLS,
 		GitHubOAuthClientID:        s.GitHubOAuthClientID,
 		GitHubOAuthClientSecretSet: s.GitHubOAuthClientSecretEnc != "",
 		GitHubOAuthConfigured:      strings.TrimSpace(s.GitHubOAuthClientID) != "" && s.GitHubOAuthClientSecretEnc != "",

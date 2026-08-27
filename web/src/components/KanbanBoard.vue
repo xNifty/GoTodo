@@ -458,9 +458,9 @@ async function onCardDrop(evt: Sortable.SortableEvent) {
   emit('board-reorder', { statusId, taskIds: orderedIds })
 
   try {
+    const current = !Number.isNaN(taskId) ? boardTasks.value.find((t) => t.id === taskId) : undefined
     if (statusChanged) {
       const col = statuses.value.find((s) => s.id === statusId)
-      const current = boardTasks.value.find((t) => t.id === taskId)
       if (current && col) {
         emit('task-updated', {
           ...current,
@@ -468,6 +468,10 @@ async function onCardDrop(evt: Sortable.SortableEvent) {
           status_name: col.name,
           completed: col.is_done,
         })
+      }
+      // Reorder is root-only; persist subtask column moves via PATCH.
+      if (current?.parent_id) {
+        await api.patchTask(taskId, { status_id: statusId })
       }
     }
     if (rootIds.length) {

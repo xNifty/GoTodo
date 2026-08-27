@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"GoTodo/internal/domain"
+	"GoTodo/internal/mailer"
 	"GoTodo/internal/server/utils"
 	"GoTodo/internal/sessionstore"
 	"GoTodo/internal/storage"
@@ -178,7 +179,8 @@ func APIV1ChangePassword(w http.ResponseWriter, r *http.Request) {
 	profile, err := storage.GetUserProfileByID(userID)
 	if err == nil && profile != nil {
 		siteName := "GoTodo"
-		if settings, serr := storage.GetSiteSettings(); serr == nil && settings != nil && settings.SiteName != "" {
+		settings, serr := storage.GetSiteSettings()
+		if serr == nil && settings != nil && settings.SiteName != "" {
 			siteName = settings.SiteName
 		}
 		subject := fmt.Sprintf("%s - Password Changed", siteName)
@@ -190,7 +192,7 @@ If you did not request this, please reach out to support.
 
 This email cannot receive replies. Please do not reply to this email.
 `, siteName)
-		if err := utils.SendEmail(subject, body, profile.Email); err != nil {
+		if err := mailer.SendEmail(settings.Email, subject, body, profile.Email); err != nil {
 			fmt.Printf("Warning: Failed to send password changed email to %s: %v\n", profile.Email, err)
 		}
 	}

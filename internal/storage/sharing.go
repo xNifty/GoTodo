@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"GoTodo/internal/mailer"
 	"context"
 	"crypto/rand"
 	"database/sql"
@@ -477,14 +478,28 @@ func CreateProjectInvite(projectID int, email, role string, invitedBy int, expir
 
 	var inv ProjectInvite
 	err = pool.QueryRow(context.Background(), `
-		INSERT INTO project_invites (project_id, email, role, token, invited_by, expires_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		RETURNING id, project_id, email, role, token, invited_by, expires_at, accepted_at, created_at`,
-		projectID, email, role, token, invitedBy, expiresAt).Scan(
+		WITH ins AS (
+			INSERT INTO project_invites (project_id, email, role, token, invited_by, expires_at)
+			VALUES ($1, $2, $3, $4, $5, $6)
+			RETURNING id, project_id, email, role, token, invited_by, expires_at, accepted_at, created_at
+		)
+		SELECT ins.id, ins.project_id, ins.email, ins.role, ins.token, ins.invited_by,
+		       ins.expires_at, ins.accepted_at, ins.created_at,
+		       COALESCE(p.name, ''), COALESCE(u.user_name, '')
+		FROM ins
+		LEFT JOIN projects p ON p.id = ins.project_id
+		LEFT JOIN users u ON u.id = ins.invited_by`, projectID, email, role, token, invitedBy, expiresAt).Scan(
 		&inv.ID, &inv.ProjectID, &inv.Email, &inv.Role, &inv.Token, &inv.InvitedBy,
-		&inv.ExpiresAt, &inv.AcceptedAt, &inv.CreatedAt)
+		&inv.ExpiresAt, &inv.AcceptedAt, &inv.CreatedAt, &inv.ProjectName, &inv.InviterUserName)
 	if err != nil {
 		return nil, err
+	}
+	if settings, err := GetSiteSettings(); err == nil && settings != nil {
+		subject := "Project Invite"
+		body := fmt.Sprintf("You have been invited to join project %s by %s.", inv.ProjectName, inv.InviterUserName)
+		if err := mailer.SendEmail(settings.Email, subject, body, inv.Email); err != nil {
+			fmt.Printf("Warning: Failed to send project invite email to %s: %v\n", inv.Email, err)
+		}
 	}
 	return &inv, nil
 }
@@ -630,7 +645,7 @@ func AcceptProjectInvite(inviteID, userID int, userEmail string) error {
 	if time.Now().After(inv.ExpiresAt) {
 		return fmt.Errorf("invite expired")
 	}
-	if strings.ToLower(inv.Email) != strings.ToLower(strings.TrimSpace(userEmail)) {
+	if !strings.EqualFold(inv.Email, strings.TrimSpace(userEmail)) {
 		return fmt.Errorf("invite email mismatch")
 	}
 

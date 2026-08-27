@@ -630,6 +630,71 @@ func TestReorderMovesTaskIntoKanbanColumn(t *testing.T) {
 	}
 }
 
+func TestSubtaskKanbanColumnMoveUsesUpdateNotReorder(t *testing.T) {
+	ctx := context.Background()
+	proj, err := CreateProject(ctx, 1, "Subtask Column Board", "")
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	if _, err := SetProjectWorkflowMode(ctx, 1, proj.ID, storage.WorkflowKanban); err != nil {
+		t.Fatalf("enable kanban: %v", err)
+	}
+	statuses, err := ListProjectStatusesForUser(ctx, 1, proj.ID)
+	if err != nil {
+		t.Fatalf("list statuses: %v", err)
+	}
+	var doneID int
+	for _, s := range statuses {
+		if s.Name == "Done" {
+			doneID = s.ID
+			break
+		}
+	}
+	if doneID == 0 {
+		t.Fatalf("missing Done status: %+v", statuses)
+	}
+
+	pid := proj.ID
+	parentID, err := CreateTask(ctx, 1, CreateTaskInput{Title: "Parent", ProjectID: &pid})
+	if err != nil {
+		t.Fatalf("create parent: %v", err)
+	}
+	childID, err := CreateTask(ctx, 1, CreateTaskInput{Title: "Child", ParentID: &parentID})
+	if err != nil {
+		t.Fatalf("create child: %v", err)
+	}
+
+	if err := ReorderTasks(ctx, 1, []int{childID}, false, &pid, nil, &doneID); err == nil {
+		t.Fatal("expected reorder of subtask to fail")
+	} else if !errors.Is(err, ErrValidation) {
+		t.Fatalf("reorder subtask: err=%v want validation", err)
+	}
+
+	statusPtr := &doneID
+	if _, err := UpdateTask(ctx, 1, childID, UpdateTaskInput{StatusID: &statusPtr}); err != nil {
+		t.Fatalf("update subtask status: %v", err)
+	}
+
+	pool, err := storage.OpenDatabase()
+	if err != nil {
+		t.Fatalf("db: %v", err)
+	}
+	defer storage.CloseDatabase(pool)
+	var statusID int
+	var completed bool
+	if err := pool.QueryRow(ctx,
+		`SELECT status_id, COALESCE(completed,false) FROM tasks WHERE id = $1`, childID,
+	).Scan(&statusID, &completed); err != nil {
+		t.Fatalf("load subtask: %v", err)
+	}
+	if statusID != doneID {
+		t.Fatalf("status_id=%d want %d (Done)", statusID, doneID)
+	}
+	if !completed {
+		t.Fatal("expected completed=true after subtask move to Done")
+	}
+}
+
 func TestReorderLogsEventWithoutStatusFilter(t *testing.T) {
 	ctx := context.Background()
 	proj, err := CreateProject(ctx, 1, "List Reorder", "")

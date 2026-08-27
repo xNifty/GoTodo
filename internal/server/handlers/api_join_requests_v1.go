@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"GoTodo/internal/domain"
+	"GoTodo/internal/mailer"
 	"GoTodo/internal/server/utils"
 	"GoTodo/internal/storage"
 )
@@ -116,6 +117,10 @@ func APIV1JoinRequestsCreate(w http.ResponseWriter, r *http.Request) {
 
 func notifyAdminsOfJoinRequest(r *http.Request, siteName, email, message string) {
 	domain.NotifyAdminsOfJoinRequest(email, message)
+	settings, err := storage.GetSiteSettings()
+	if err != nil || settings == nil {
+		return
+	}
 	if strings.TrimSpace(siteName) == "" {
 		siteName = "GoTodo"
 	}
@@ -131,7 +136,7 @@ func notifyAdminsOfJoinRequest(r *http.Request, siteName, email, message string)
 	body += "Review join requests in Admin:\n" + adminURL + "\n"
 	subject := fmt.Sprintf("%s - New join request", siteName)
 	for _, to := range admins {
-		_ = utils.SendEmail(subject, body, to)
+		_ = mailer.SendEmail(settings.Email, subject, body, to)
 	}
 }
 
@@ -218,4 +223,3 @@ func writeJoinRequestReviewError(w http.ResponseWriter, err error) {
 		utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to update join request.")
 	}
 }
-

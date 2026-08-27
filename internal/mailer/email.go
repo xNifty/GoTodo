@@ -1,4 +1,4 @@
-package utils
+package mailer
 
 import (
 	"context"
@@ -10,34 +10,46 @@ import (
 	"time"
 
 	"GoTodo/internal/crypto/secret"
-	"GoTodo/internal/storage"
 
 	"github.com/mailgun/mailgun-go/v5"
 )
 
-// SendEmail sends an email using the admin-configured provider (Mailgun or SMTP).
-func SendEmail(subject, message, toEmail string) error {
-	settings, err := storage.GetSiteSettings()
-	if err != nil || settings == nil {
-		return fmt.Errorf("email not configured")
-	}
+const (
+	ProviderMailgun = "mailgun"
+	ProviderSMTP    = "smtp"
+)
 
-	provider := strings.ToLower(strings.TrimSpace(settings.EmailProvider))
+type Config struct {
+	Provider         string
+	FromAddress      string
+	FromName         string
+	MailgunDomain    string
+	MailgunAPIKeyEnc string
+	SMTPHost         string
+	SMTPPort         int
+	SMTPUsername     string
+	SMTPPasswordEnc  string
+	SMTPTLS          bool
+}
+
+// SendEmail sends an email using the given provider config (Mailgun or SMTP).
+func SendEmail(cfg Config, subject, message, toEmail string) error {
+	provider := strings.ToLower(strings.TrimSpace(cfg.Provider))
 	if provider == "" || provider == "none" {
 		return fmt.Errorf("email not configured")
 	}
 
-	fromAddr := strings.TrimSpace(settings.EmailFromAddress)
+	fromAddr := strings.TrimSpace(cfg.FromAddress)
 	if fromAddr == "" {
 		return fmt.Errorf("email from address not configured")
 	}
-	from := formatFrom(settings.EmailFromName, fromAddr)
+	from := formatFrom(cfg.FromName, fromAddr)
 
 	switch provider {
-	case storage.EmailProviderMailgun:
-		return sendViaMailgun(settings, subject, message, toEmail, from, fromAddr)
-	case storage.EmailProviderSMTP:
-		return sendViaSMTP(settings, subject, message, toEmail, from, fromAddr)
+	case ProviderMailgun:
+		return sendViaMailgun(cfg, subject, message, toEmail, from, fromAddr)
+	case ProviderSMTP:
+		return sendViaSMTP(cfg, subject, message, toEmail, from, fromAddr)
 	default:
 		return fmt.Errorf("unsupported email provider %q", provider)
 	}
@@ -51,12 +63,12 @@ func formatFrom(name, address string) string {
 	return fmt.Sprintf("%s <%s>", name, address)
 }
 
-func sendViaMailgun(settings *storage.SiteSettings, subject, message, toEmail, from, fromAddr string) error {
-	domain := strings.TrimSpace(settings.EmailMailgunDomain)
-	if domain == "" || settings.EmailMailgunAPIKeyEnc == "" {
+func sendViaMailgun(cfg Config, subject, message, toEmail, from, fromAddr string) error {
+	domain := strings.TrimSpace(cfg.MailgunDomain)
+	if domain == "" || cfg.MailgunAPIKeyEnc == "" {
 		return fmt.Errorf("mailgun credentials not configured")
 	}
-	apiKey, err := secret.Decrypt(settings.EmailMailgunAPIKeyEnc)
+	apiKey, err := secret.Decrypt(cfg.MailgunAPIKeyEnc)
 	if err != nil {
 		return fmt.Errorf("decrypt mailgun api key: %w", err)
 	}
@@ -77,14 +89,14 @@ func sendViaMailgun(settings *storage.SiteSettings, subject, message, toEmail, f
 	return nil
 }
 
-func sendViaSMTP(settings *storage.SiteSettings, subject, message, toEmail, from, fromAddr string) error {
-	host := strings.TrimSpace(settings.EmailSMTPHost)
-	port := settings.EmailSMTPPort
-	username := strings.TrimSpace(settings.EmailSMTPUsername)
-	if host == "" || port <= 0 || username == "" || settings.EmailSMTPPasswordEnc == "" {
+func sendViaSMTP(cfg Config, subject, message, toEmail, from, fromAddr string) error {
+	host := strings.TrimSpace(cfg.SMTPHost)
+	port := cfg.SMTPPort
+	username := strings.TrimSpace(cfg.SMTPUsername)
+	if host == "" || port <= 0 || username == "" || cfg.SMTPPasswordEnc == "" {
 		return fmt.Errorf("smtp credentials not configured")
 	}
-	password, err := secret.Decrypt(settings.EmailSMTPPasswordEnc)
+	password, err := secret.Decrypt(cfg.SMTPPasswordEnc)
 	if err != nil {
 		return fmt.Errorf("decrypt smtp password: %w", err)
 	}
@@ -107,7 +119,7 @@ func sendViaSMTP(settings *storage.SiteSettings, subject, message, toEmail, from
 	if port == 465 {
 		return sendSMTPWithTLS(addr, host, auth, fromAddr, []string{toEmail}, []byte(msg))
 	}
-	if settings.EmailSMTPTLS {
+	if cfg.SMTPTLS {
 		return sendSMTPWithStartTLS(addr, host, auth, fromAddr, []string{toEmail}, []byte(msg))
 	}
 	if err := smtp.SendMail(addr, auth, fromAddr, []string{toEmail}, []byte(msg)); err != nil {
