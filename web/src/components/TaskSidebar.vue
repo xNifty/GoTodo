@@ -592,7 +592,8 @@ async function save(keepOpen = false) {
       parent_id: isSubtask.value ? Number(parentId.value) : 0,
     }
     if (!isSubtask.value) {
-      payload.project_id = projectId.value === '' ? null : Number(projectId.value)
+      // 0 clears project (inbox); same convention as parent_id.
+      payload.project_id = projectId.value === '' ? 0 : Number(projectId.value)
     }
     if (dueDate.value) payload.due_date = dueDate.value
     else payload.clear_due_date = true

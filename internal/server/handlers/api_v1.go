@@ -82,7 +82,7 @@ type apiTaskPatchRequest struct {
 	Title          *string     `json:"title"`
 	Description    *string     `json:"description"`
 	DueDate        *string     `json:"due_date"`
-	ProjectID      **int       `json:"project_id"`
+	ProjectID      optionalInt `json:"project_id"`
 	ParentID       **int       `json:"parent_id"`
 	Priority       *int        `json:"priority"`
 	Completed      *bool       `json:"completed"`
@@ -575,13 +575,13 @@ func apiV1PatchTask(w http.ResponseWriter, r *http.Request, taskID int) {
 		Completed:   req.Completed,
 		Favorite:    req.Favorite,
 		TagIDs:      req.TagIDs,
-		ProjectID:   req.ProjectID,
 		ParentID:    req.ParentID,
 		StatusID:    req.StatusID,
 	}
 	if req.ClearDue != nil && *req.ClearDue {
 		in.ClearDue = true
 	}
+	in.ProjectID = req.ProjectID.toPatchInt(true)
 	in.EstimatePoints = req.EstimatePoints.toPatchInt(false)
 	in.SprintID = req.SprintID.toPatchInt(true)
 

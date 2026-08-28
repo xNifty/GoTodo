@@ -62,6 +62,63 @@ func TestAPITaskPatchSprintIDJSON(t *testing.T) {
 	})
 }
 
+func TestAPITaskPatchProjectIDJSON(t *testing.T) {
+	t.Run("omitted leaves unchanged", func(t *testing.T) {
+		var req apiTaskPatchRequest
+		if err := json.Unmarshal([]byte(`{"title":"Keep project"}`), &req); err != nil {
+			t.Fatal(err)
+		}
+		if req.ProjectID.Set {
+			t.Fatal("omitted project_id should not be set")
+		}
+		if got := req.ProjectID.toPatchInt(true); got != nil {
+			t.Fatalf("omitted project_id patch=%#v, want nil", got)
+		}
+	})
+
+	t.Run("null clears project", func(t *testing.T) {
+		var req apiTaskPatchRequest
+		if err := json.Unmarshal([]byte(`{"project_id":null}`), &req); err != nil {
+			t.Fatal(err)
+		}
+		if !req.ProjectID.Set || !req.ProjectID.Null {
+			t.Fatalf("null project_id: set=%v null=%v", req.ProjectID.Set, req.ProjectID.Null)
+		}
+		got := req.ProjectID.toPatchInt(true)
+		if got == nil || *got != nil {
+			t.Fatalf("null project_id patch=%#v, want explicit clear", got)
+		}
+	})
+
+	t.Run("zero clears project", func(t *testing.T) {
+		var req apiTaskPatchRequest
+		if err := json.Unmarshal([]byte(`{"project_id":0}`), &req); err != nil {
+			t.Fatal(err)
+		}
+		if !req.ProjectID.Set || req.ProjectID.Null || req.ProjectID.Value != 0 {
+			t.Fatalf("zero project_id: %+v", req.ProjectID)
+		}
+		got := req.ProjectID.toPatchInt(true)
+		if got == nil || *got != nil {
+			t.Fatalf("zero project_id patch=%#v, want explicit clear", got)
+		}
+	})
+
+	t.Run("value assigns project", func(t *testing.T) {
+		var req apiTaskPatchRequest
+		if err := json.Unmarshal([]byte(`{"project_id":7}`), &req); err != nil {
+			t.Fatal(err)
+		}
+		if !req.ProjectID.Set || req.ProjectID.Null || req.ProjectID.Value != 7 {
+			t.Fatalf("value project_id: %+v", req.ProjectID)
+		}
+		got := req.ProjectID.toPatchInt(true)
+		if got == nil || *got == nil || **got != 7 {
+			t.Fatalf("value project_id patch=%#v, want 7", got)
+		}
+	})
+}
+
 func TestAPITaskPatchEstimatePointsJSONNullClears(t *testing.T) {
 	var req apiTaskPatchRequest
 	if err := json.Unmarshal([]byte(`{"estimate_points":null}`), &req); err != nil {
