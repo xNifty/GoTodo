@@ -449,6 +449,10 @@ async function onCardDrop(evt: Sortable.SortableEvent) {
   const fromStatusId = parseInt(from.dataset.statusId || '', 10)
   const orderedIds = collectIds(to)
   const statusChanged = !Number.isNaN(taskId) && fromStatusId !== statusId
+
+  const current = !Number.isNaN(taskId) ? boardTasks.value.find((t) => t.id === taskId) : undefined
+  const reorderFavorite = current?.favorite ?? false
+
   const rootIds = orderedIds.filter((id) => {
     const t = boardTasks.value.find((task) => task.id === id)
     return !!t && !t.parent_id
@@ -477,7 +481,7 @@ async function onCardDrop(evt: Sortable.SortableEvent) {
     if (rootIds.length) {
       await api.reorderTasks({
         task_ids: rootIds,
-        favorite: false,
+        favorite: reorderFavorite,
         status_id: statusId,
         project: String(props.projectId),
       })
