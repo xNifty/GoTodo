@@ -86,6 +86,12 @@ onUnmounted(() => {
             sprint or backlog.
           </li>
           <li>
+            Create and edit tags in project settings. Owners and editors can rename a tag and pick
+            its color; chips on lists, boards, and the task sidebar use that color. Personal (inbox)
+            tags are managed on your profile. System tags such as <strong>removed</strong> and
+            <strong>archived</strong> cannot be edited.
+          </li>
+          <li>
             Save the current filter set as a view so you can reopen it later from the sidebar or
             <RouterLink to="/views">Views</RouterLink>.
           </li>

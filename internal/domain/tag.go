@@ -11,6 +11,12 @@ import (
 // MaxTagNameLength is the maximum length of a tag name.
 const MaxTagNameLength = 50
 
+// MaxTagColorLength is the maximum length of a tag color value.
+const MaxTagColorLength = 20
+
+// DefaultTagColor is used when a tag color is cleared.
+const DefaultTagColor = "#6c757d"
+
 func normalizeTagName(name string) (string, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -20,6 +26,17 @@ func normalizeTagName(name string) (string, error) {
 		return "", fmt.Errorf("%w: tag name must be %d characters or less", ErrValidation, MaxTagNameLength)
 	}
 	return name, nil
+}
+
+func normalizeTagColor(color string) (string, error) {
+	color = strings.TrimSpace(color)
+	if color == "" {
+		return DefaultTagColor, nil
+	}
+	if len(color) > MaxTagColorLength {
+		return "", fmt.Errorf("%w: tag color must be %d characters or less", ErrValidation, MaxTagColorLength)
+	}
+	return color, nil
 }
 
 func normalizeProjectIDArg(projectID *int) *int {
@@ -69,12 +86,28 @@ func CreateTag(ctx context.Context, userID int, name string, projectID *int) (*s
 	return storage.GetOrCreateTagByName(userID, projectID, name)
 }
 
-// RenameTag updates a tag name and returns the updated tag.
-func RenameTag(ctx context.Context, userID, tagID int, name string) (*storage.Tag, error) {
+// UpdateTag updates a tag's name and/or color and returns the updated tag.
+// Omitted fields keep their current values.
+func UpdateTag(ctx context.Context, userID, tagID int, name, color *string) (*storage.Tag, error) {
 	_ = ctx
-	name, err := normalizeTagName(name)
-	if err != nil {
-		return nil, err
+	if name == nil && color == nil {
+		return nil, fmt.Errorf("%w: name or color is required", ErrValidation)
+	}
+	var nextName string
+	if name != nil {
+		var err error
+		nextName, err = normalizeTagName(*name)
+		if err != nil {
+			return nil, err
+		}
+	}
+	var nextColor string
+	if color != nil {
+		var err error
+		nextColor, err = normalizeTagColor(*color)
+		if err != nil {
+			return nil, err
+		}
 	}
 	tag, err := storage.GetTag(tagID)
 	if err != nil {
@@ -88,12 +121,17 @@ func RenameTag(ctx context.Context, userID, tagID int, name string) (*storage.Ta
 		return nil, ErrNotFound
 	}
 	if tag.Protected || storage.IsSystemTagName(tag.Name) {
-		return nil, fmt.Errorf("%w: cannot rename a protected tag", ErrValidation)
+		return nil, fmt.Errorf("%w: cannot update a protected tag", ErrValidation)
 	}
-	if storage.IsSystemTagName(name) {
+	if name == nil {
+		nextName = tag.Name
+	} else if storage.IsSystemTagName(nextName) {
 		return nil, fmt.Errorf("%w: tag name is reserved", ErrValidation)
 	}
-	if err := storage.UpdateTag(tagID, name); err != nil {
+	if color == nil {
+		nextColor = tag.Color
+	}
+	if err := storage.UpdateTag(tagID, nextName, nextColor); err != nil {
 		msg := err.Error()
 		if strings.Contains(msg, "already exists") || strings.Contains(msg, "required") || strings.Contains(msg, "characters or less") {
 			return nil, fmt.Errorf("%w: %s", ErrValidation, msg)
@@ -104,6 +142,11 @@ func RenameTag(ctx context.Context, userID, tagID int, name string) (*storage.Ta
 		return nil, err
 	}
 	return storage.GetTag(tagID)
+}
+
+// RenameTag updates a tag name and returns the updated tag.
+func RenameTag(ctx context.Context, userID, tagID int, name string) (*storage.Tag, error) {
+	return UpdateTag(ctx, userID, tagID, &name, nil)
 }
 
 // DeleteTag removes a tag the user is allowed to manage.

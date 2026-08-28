@@ -167,7 +167,9 @@ func TestAPIV1TagsPatchValidation(t *testing.T) {
 		body string
 	}{
 		{name: "empty name", body: `{"name":""}`},
-		{name: "too long", body: `{"name":"` + strings.Repeat("t", 51) + `"}`},
+		{name: "too long name", body: `{"name":"` + strings.Repeat("t", 51) + `"}`},
+		{name: "too long color", body: `{"color":"` + strings.Repeat("c", 21) + `"}`},
+		{name: "empty json object", body: `{}`},
 		{name: "invalid json", body: `{`},
 	}
 	for _, tt := range tests {

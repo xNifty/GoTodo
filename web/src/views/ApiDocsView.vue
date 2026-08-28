@@ -113,7 +113,7 @@ onUnmounted(() => {
                             <tr><td><span class="badge bg-danger">DELETE</span></td><td><a href="#projects"><code>/api/v1/projects/{id}</code></a></td><td>Delete a project</td></tr>
                             <tr><td><span class="badge bg-success">GET</span></td><td><a href="#tags"><code>/api/v1/tags</code></a></td><td>List tags</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#tags"><code>/api/v1/tags</code></a></td><td>Create a tag</td></tr>
-                            <tr><td><span class="badge bg-warning text-dark">PATCH</span></td><td><a href="#tags"><code>/api/v1/tags/{id}</code></a></td><td>Rename a tag</td></tr>
+                            <tr><td><span class="badge bg-warning text-dark">PATCH</span></td><td><a href="#tags"><code>/api/v1/tags/{id}</code></a></td><td>Update a tag (name and/or color)</td></tr>
                             <tr><td><span class="badge bg-danger">DELETE</span></td><td><a href="#tags"><code>/api/v1/tags/{id}</code></a></td><td>Delete a tag</td></tr>
                         </tbody>
                     </table>
@@ -576,7 +576,7 @@ Content-Type: application/json
                     <h2 id="tags" class="h4 mt-4">Tags</h2>
                     <p>
                         Tags are either personal (inbox tasks) or scoped to a project.
-                        Project tags are shared with members; only the project owner or editors can create, rename, or delete them.
+                        Project tags are shared with members; only the project owner or editors can create, update, or delete them.
                     </p>
 
                     <h3 class="h5 mt-3">List tags</h3>
@@ -605,13 +605,18 @@ Content-Type: application/json
                         Creating a project tag requires owner or editor access (<code>403</code> otherwise).
                     </p>
 
-                    <h3 class="h5 mt-3">Rename tag</h3>
+                    <h3 class="h5 mt-3">Update tag</h3>
                     <p><span class="badge bg-warning text-dark">PATCH</span> <code>/api/v1/tags/{id}</code></p>
-                    <p>JSON body:</p>
+                    <p>JSON body (at least one field required; omit a field to leave it unchanged):</p>
                     <pre class="api-docs-pre"><code>{
-  "name": "renamed"
+  "name": "renamed",   // optional, max 50 characters
+  "color": "#dc3545"   // optional, max 20 characters (CSS color)
 }</code></pre>
-                    <p>Returns the updated tag object. Duplicate names in the same namespace return <code>400 invalid_request</code>. Viewers receive <code>403</code>.</p>
+                    <p>
+                        Returns the updated tag object. Duplicate names in the same namespace return
+                        <code>400 invalid_request</code>. Viewers receive <code>403</code>.
+                        Protected system tags cannot be renamed or recolored.
+                    </p>
 
                     <h3 class="h5 mt-3">Delete tag</h3>
                     <p><span class="badge bg-danger">DELETE</span> <code>/api/v1/tags/{id}</code></p>
