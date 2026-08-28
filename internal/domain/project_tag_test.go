@@ -67,3 +67,21 @@ func TestRenameTagValidation(t *testing.T) {
 		t.Fatalf("empty name: err=%v", err)
 	}
 }
+
+func TestUpdateTagValidation(t *testing.T) {
+	ctx := context.Background()
+	empty := ""
+	_, err := UpdateTag(ctx, 1, 1, &empty, nil)
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("empty name: err=%v", err)
+	}
+	longColor := strings.Repeat("c", MaxTagColorLength+1)
+	_, err = UpdateTag(ctx, 1, 1, nil, &longColor)
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("long color: err=%v", err)
+	}
+	_, err = UpdateTag(ctx, 1, 1, nil, nil)
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("missing fields: err=%v", err)
+	}
+}

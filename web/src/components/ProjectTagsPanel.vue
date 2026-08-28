@@ -21,6 +21,7 @@ const tags = ref<Tag[]>([])
 const tagName = ref('')
 const renameTagId = ref<number | null>(null)
 const renameTagValue = ref('')
+const renameTagColor = ref('#6c757d')
 const loading = ref(false)
 
 const canManage = computed(() => {
@@ -63,14 +64,19 @@ async function createTag() {
 function beginRenameTag(tag: Tag) {
   renameTagId.value = tag.id
   renameTagValue.value = tag.name
+  renameTagColor.value = tag.color || '#6c757d'
 }
 
 async function saveRenameTag() {
   if (renameTagId.value == null || !renameTagValue.value.trim()) return
   try {
-    await api.renameTag(renameTagId.value, renameTagValue.value.trim())
+    await api.updateTag(renameTagId.value, {
+      name: renameTagValue.value.trim(),
+      color: renameTagColor.value
+    })
+
     renameTagId.value = null
-    toast.push('Tag renamed', 'success')
+    toast.push('Tag updated', 'success')
     await load()
     emit('changed')
   } catch (err) {
@@ -101,7 +107,7 @@ async function removeTag(tag: Tag) {
   <div>
     <h4 class="h6 mb-2">Tags</h4>
     <p class="small text-muted mb-3">
-      Tags on this project are shared with members. Owners and editors can add or delete them.
+      Tags on this project are shared with members. Owners and editors can add, edit the name or color, or delete them.
     </p>
     <form v-if="canManage" class="row g-2 mb-3" @submit.prevent="createTag">
       <div class="col-sm-8">
@@ -117,6 +123,7 @@ async function removeTag(tag: Tag) {
         <div class="d-flex flex-wrap gap-2 align-items-center">
           <template v-if="renameTagId === tag.id">
             <input v-model="renameTagValue" type="text" class="form-control form-control-sm" maxlength="50" />
+            <input v-model="renameTagColor" type="color" class="form-control form-control-sm form-control-color" title="Choose tag color" />
             <button type="button" class="btn btn-sm btn-primary" @click="saveRenameTag">Save</button>
             <button type="button" class="btn btn-sm btn-secondary" @click="renameTagId = null">Cancel</button>
           </template>
@@ -130,7 +137,7 @@ async function removeTag(tag: Tag) {
               class="btn btn-sm btn-outline-secondary"
               @click="beginRenameTag(tag)"
             >
-              Rename
+              Edit
             </button>
             <button
               v-if="canManage && !isProtectedTag(tag)"

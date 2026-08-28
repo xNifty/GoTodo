@@ -377,6 +377,56 @@ func TestTagShareLinksRejected(t *testing.T) {
 	}
 }
 
+func TestUpdateTagRecolorPreservesNameAndRenamePreservesColor(t *testing.T) {
+	ctx := context.Background()
+	proj, err := CreateProject(ctx, 1, "Tag Recolor Proj", "")
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	pid := proj.ID
+	tag, err := CreateTag(ctx, 1, "paintable", &pid)
+	if err != nil {
+		t.Fatalf("create tag: %v", err)
+	}
+	if tag.Color == "" {
+		t.Fatal("expected created tag to have a color")
+	}
+
+	newColor := "#dc3545"
+	if strings.EqualFold(tag.Color, newColor) {
+		newColor = "#0d6efd"
+	}
+	recolored, err := UpdateTag(ctx, 1, tag.ID, nil, &newColor)
+	if err != nil {
+		t.Fatalf("recolor: %v", err)
+	}
+	if recolored.Name != tag.Name {
+		t.Fatalf("recolor changed name: got %q want %q", recolored.Name, tag.Name)
+	}
+	if !strings.EqualFold(recolored.Color, newColor) {
+		t.Fatalf("color=%q want %q", recolored.Color, newColor)
+	}
+
+	renamed, err := RenameTag(ctx, 1, tag.ID, "painted")
+	if err != nil {
+		t.Fatalf("rename: %v", err)
+	}
+	if renamed.Name != "painted" {
+		t.Fatalf("name=%q want painted", renamed.Name)
+	}
+	if !strings.EqualFold(renamed.Color, newColor) {
+		t.Fatalf("rename wiped color: got %q want %q", renamed.Color, newColor)
+	}
+
+	if err := storage.UpsertProjectMember(pid, 3, storage.RoleViewer); err != nil {
+		t.Fatalf("add viewer: %v", err)
+	}
+	_, err = UpdateTag(ctx, 3, tag.ID, nil, &newColor)
+	if !errors.Is(err, ErrForbidden) {
+		t.Fatalf("viewer recolor: err=%v want forbidden", err)
+	}
+}
+
 func containsTagID(tags []storage.Tag, id int) bool {
 	for _, tg := range tags {
 		if tg.ID == id {

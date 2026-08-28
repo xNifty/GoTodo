@@ -566,7 +566,7 @@ func UserCanAccessTag(userID int, tag Tag) (bool, error) {
 	return true, nil
 }
 
-// UserCanManageTag reports whether the user can create/rename/delete the tag.
+// UserCanManageTag reports whether the user can create/update/delete the tag.
 func UserCanManageTag(userID int, tag Tag) (bool, error) {
 	if tag.ProjectID == nil {
 		return tag.UserID == userID, nil
@@ -773,8 +773,8 @@ func DeleteTag(id int) error {
 	return nil
 }
 
-// UpdateTag renames a tag.
-func UpdateTag(id int, name string) error {
+// UpdateTag updates a tag's name and color.
+func UpdateTag(id int, name string, color string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return fmt.Errorf("tag name is required")
@@ -782,13 +782,17 @@ func UpdateTag(id int, name string) error {
 	if len(name) > 50 {
 		return fmt.Errorf("tag name must be 50 characters or less")
 	}
+	color = strings.TrimSpace(color)
+	if len(color) > 20 {
+		return fmt.Errorf("tag color must be 20 characters or less")
+	}
 
 	existing, err := GetTag(id)
 	if err != nil {
 		return err
 	}
 	if existing.Protected || IsSystemTagName(existing.Name) {
-		return fmt.Errorf("cannot rename a protected tag")
+		return fmt.Errorf("cannot update a protected tag")
 	}
 	if IsSystemTagName(name) {
 		return fmt.Errorf("tag name is reserved")
@@ -820,7 +824,7 @@ func UpdateTag(id int, name string) error {
 		return fmt.Errorf("a tag with that name already exists")
 	}
 
-	tag, err := pool.Exec(context.Background(), "UPDATE tags SET name = $1 WHERE id = $2", name, id)
+	tag, err := pool.Exec(context.Background(), "UPDATE tags SET name = $1, color = $2 WHERE id = $3", name, color, id)
 	if err != nil {
 		return fmt.Errorf("failed to update tag: %v", err)
 	}
