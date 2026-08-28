@@ -186,7 +186,8 @@ type apiTagCreateRequest struct {
 }
 
 type apiTagPatchRequest struct {
-	Name string `json:"name"`
+	Name  *string `json:"name"`
+	Color *string `json:"color"`
 }
 
 type apiProjectCreateRequest struct {
@@ -1252,7 +1253,11 @@ func apiV1PatchTag(w http.ResponseWriter, r *http.Request, tagID int) {
 		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid JSON body.")
 		return
 	}
-	tag, err := domain.RenameTag(r.Context(), userID, tagID, req.Name)
+	if req.Name == nil && req.Color == nil {
+		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "name or color is required.")
+		return
+	}
+	tag, err := domain.UpdateTag(r.Context(), userID, tagID, req.Name, req.Color)
 	if err != nil {
 		if errors.Is(err, domain.ErrValidation) {
 			utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", err.Error())

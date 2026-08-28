@@ -2408,7 +2408,10 @@ paths:
       - $ref: "#/components/parameters/ID"
     patch:
       tags: [Tags]
-      summary: Rename a tag
+      summary: Update a tag
+      description: >
+        Change a tag's name and/or color. Omit a field to leave it unchanged.
+        Protected system tags cannot be updated.
       security:
         - SessionCookie: []
         - BearerAuth: []
@@ -2417,7 +2420,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/NameBody"
+              $ref: "#/components/schemas/TagPatch"
       responses:
         "200":
           description: Updated
@@ -2425,6 +2428,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Tag"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
         "403":
@@ -2441,7 +2446,7 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
         "403":
-          $ref: "#/components/responses/Forbidden
+          $ref: "#/components/responses/Forbidden"
 
   /api/v1/saved-views:
     get:
@@ -3304,10 +3309,15 @@ components:
           type: string
         color:
           type: string
+          maxLength: 20
+          description: CSS color used for chips and board labels (for example #0d6efd)
         project_id:
           type: integer
           nullable: true
           description: Null for personal (inbox) tags
+        protected:
+          type: boolean
+          description: True for system tags such as removed and archived
 
     TagCreateBody:
       type: object
@@ -3320,6 +3330,18 @@ components:
           type: integer
           nullable: true
           description: Omit, null, or 0 for a personal tag; a project id for a project tag
+
+    TagPatch:
+      type: object
+      description: At least one of name or color is required.
+      properties:
+        name:
+          type: string
+          maxLength: 50
+        color:
+          type: string
+          maxLength: 20
+          description: CSS color (for example #dc3545). Omit to keep the current color.
 
     Project:
       type: object

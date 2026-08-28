@@ -39,6 +39,10 @@ func TestRemovedTagIsProtected(t *testing.T) {
 	if _, err := RenameTag(ctx, 1, removed.ID, "gone"); !errors.Is(err, ErrValidation) {
 		t.Fatalf("rename protected: err=%v want validation", err)
 	}
+	color := "#dc3545"
+	if _, err := UpdateTag(ctx, 1, removed.ID, nil, &color); !errors.Is(err, ErrValidation) {
+		t.Fatalf("recolor protected: err=%v want validation", err)
+	}
 	if err := DeleteTag(ctx, 1, removed.ID); !errors.Is(err, ErrValidation) {
 		t.Fatalf("delete protected: err=%v want validation", err)
 	}

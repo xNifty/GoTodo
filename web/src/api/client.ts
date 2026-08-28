@@ -737,6 +737,13 @@ export const api = {
     })
   },
 
+  updateTag(id: number, payload: { name?: string; color?: string }) {
+    return request<Tag>(`/api/v1/tags/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    })
+  },
+
   deleteTag(id: number) {
     return request<void>(`/api/v1/tags/${id}`, { method: 'DELETE' })
   },
