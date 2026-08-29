@@ -534,7 +534,7 @@ function applyTaskUpdate(updated: Task) {
     }
   }
 
-  if (!taskMatchesStatusFilter(updated) || !taskMatchesBoardSprint(updated)) {
+  if (!taskMatchesCurrentFilters(updated)) {
     if (found) {
       removeTaskLocally(found.task)
     }

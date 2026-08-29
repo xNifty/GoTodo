@@ -291,7 +291,7 @@ const boardTasks = computed(() => {
   const out: Task[] = []
   const seen = new Set<number>()
   const take = (task: Task) => {
-    if (seen.has(task.id) || !matchesBoardSprint(task)) return
+    if (seen.has(task.id) || task.project_id !== props.projectId || !matchesBoardSprint(task)) return
     out.push(task)
     seen.add(task.id)
   }
