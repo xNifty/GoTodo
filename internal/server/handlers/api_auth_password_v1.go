@@ -75,7 +75,7 @@ This link will expire in 15 minutes.
 If you did not request this password reset, please ignore this email.
 `, resetLink)
 
-			_ = mailer.SendEmail(settings.Email, subject, body, email)
+			_ = mailer.SendEmail(storage.SiteEmailConfig(settings), mailer.TriggerPasswordReset, subject, body, email)
 		}
 	}
 
@@ -175,7 +175,7 @@ Your password has been changed for %s.
 
 If you did not request this, please reach out to support.
 `, siteName)
-	_ = mailer.SendEmail(settings.Email, subject, body, reset.Email)
+	_ = mailer.SendEmail(storage.SiteEmailConfig(settings), mailer.TriggerPasswordChanged, subject, body, reset.Email)
 	_ = storage.DeleteResetToken(id, token)
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")

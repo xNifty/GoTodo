@@ -10,6 +10,8 @@ import type {
   DashboardStats,
   DeviceDecisionResult,
   DeviceStatus,
+  EmailAuditList,
+  EmailAuditQuery,
   GitHubConnection,
   Invite,
   JoinRequest,
@@ -842,6 +844,15 @@ export const api = {
 
   listAdminJoinRequests() {
     return request<JoinRequest[]>('/api/v1/admin/join-requests')
+  },
+
+  listAdminEmailAudit(params: EmailAuditQuery = {}) {
+    const qs = new URLSearchParams()
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== '') qs.set(k, String(v))
+    }
+    const q = qs.toString()
+    return request<EmailAuditList>(`/api/v1/admin/email-audit${q ? `?${q}` : ''}`)
   },
 
   approveJoinRequest(id: number) {

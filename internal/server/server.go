@@ -2,6 +2,7 @@ package server
 
 import (
 	"GoTodo/internal/live"
+	"GoTodo/internal/mailer"
 	"GoTodo/internal/server/digest"
 	"GoTodo/internal/server/handlers"
 	"GoTodo/internal/server/utils"
@@ -61,6 +62,8 @@ func StartServer() error {
 	}
 
 	digest.StartDigestWorker()
+	mailer.SetAuditor(storage.RecordEmailAudit)
+	storage.StartEmailAuditPurgeWorker()
 
 	registerAPIV1Routes()
 
@@ -143,6 +146,7 @@ func registerAPIV1Routes() {
 	handleBoth("/api/v1/admin/users/", utils.AdminAPIChain(handlers.APIV1AdminUsersRouter))
 	handleBoth("/api/v1/admin/join-requests", utils.AdminAPIChain(handlers.APIV1AdminJoinRequestsRouter))
 	handleBoth("/api/v1/admin/join-requests/", utils.AdminAPIChain(handlers.APIV1AdminJoinRequestsRouter))
+	handleBoth("/api/v1/admin/email-audit", utils.AdminAPIChain(handlers.APIV1AdminEmailAudit))
 	handleBoth("/api/v1/announcements/dismiss", utils.AuthSessionChain(handlers.APIV1DismissAnnouncement))
 
 	handleBoth("/cal/", handlers.CalendarFeedHandler)

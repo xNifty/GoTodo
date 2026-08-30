@@ -28,16 +28,17 @@ type adminSettingsJSON struct {
 	GlobalAnnouncementText   string `json:"global_announcement_text"`
 	EnableAPI                bool   `json:"enable_api"`
 
-	EmailProvider         string `json:"email_provider"`
-	EmailFromAddress      string `json:"email_from_address"`
-	EmailFromName         string `json:"email_from_name"`
-	EmailMailgunDomain    string `json:"email_mailgun_domain"`
-	EmailMailgunAPIKeySet bool   `json:"email_mailgun_api_key_set"`
-	EmailSMTPHost         string `json:"email_smtp_host"`
-	EmailSMTPPort         int    `json:"email_smtp_port"`
-	EmailSMTPUsername     string `json:"email_smtp_username"`
-	EmailSMTPPasswordSet  bool   `json:"email_smtp_password_set"`
-	EmailSMTPTLS          bool   `json:"email_smtp_tls"`
+	EmailProvider           string `json:"email_provider"`
+	EmailFromAddress        string `json:"email_from_address"`
+	EmailFromName           string `json:"email_from_name"`
+	EmailMailgunDomain      string `json:"email_mailgun_domain"`
+	EmailMailgunAPIKeySet   bool   `json:"email_mailgun_api_key_set"`
+	EmailSMTPHost           string `json:"email_smtp_host"`
+	EmailSMTPPort           int    `json:"email_smtp_port"`
+	EmailSMTPUsername       string `json:"email_smtp_username"`
+	EmailSMTPPasswordSet    bool   `json:"email_smtp_password_set"`
+	EmailSMTPTLS            bool   `json:"email_smtp_tls"`
+	EmailAuditRetentionDays int    `json:"email_audit_retention_days"`
 
 	GitHubOAuthClientID        string `json:"github_oauth_client_id"`
 	GitHubOAuthClientSecretSet bool   `json:"github_oauth_client_secret_set"`
@@ -56,16 +57,17 @@ type adminSettingsPatch struct {
 	GlobalAnnouncementText   *string `json:"global_announcement_text"`
 	EnableAPI                *bool   `json:"enable_api"`
 
-	EmailProvider      *string `json:"email_provider"`
-	EmailFromAddress   *string `json:"email_from_address"`
-	EmailFromName      *string `json:"email_from_name"`
-	EmailMailgunDomain *string `json:"email_mailgun_domain"`
-	EmailMailgunAPIKey *string `json:"email_mailgun_api_key"`
-	EmailSMTPHost      *string `json:"email_smtp_host"`
-	EmailSMTPPort      *int    `json:"email_smtp_port"`
-	EmailSMTPUsername  *string `json:"email_smtp_username"`
-	EmailSMTPPassword  *string `json:"email_smtp_password"`
-	EmailSMTPTLS       *bool   `json:"email_smtp_tls"`
+	EmailProvider           *string `json:"email_provider"`
+	EmailFromAddress        *string `json:"email_from_address"`
+	EmailFromName           *string `json:"email_from_name"`
+	EmailMailgunDomain      *string `json:"email_mailgun_domain"`
+	EmailMailgunAPIKey      *string `json:"email_mailgun_api_key"`
+	EmailSMTPHost           *string `json:"email_smtp_host"`
+	EmailSMTPPort           *int    `json:"email_smtp_port"`
+	EmailSMTPUsername       *string `json:"email_smtp_username"`
+	EmailSMTPPassword       *string `json:"email_smtp_password"`
+	EmailSMTPTLS            *bool   `json:"email_smtp_tls"`
+	EmailAuditRetentionDays *int    `json:"email_audit_retention_days"`
 
 	GitHubOAuthClientID     *string `json:"github_oauth_client_id"`
 	GitHubOAuthClientSecret *string `json:"github_oauth_client_secret"`
@@ -184,6 +186,15 @@ func apiV1PatchAdminSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.EmailSMTPTLS != nil {
 		next.Email.SMTPTLS = *req.EmailSMTPTLS
+	}
+	if req.EmailAuditRetentionDays != nil {
+		d := *req.EmailAuditRetentionDays
+		if d < storage.MinEmailAuditRetentionDays || d > storage.MaxEmailAuditRetentionDays {
+			utils.APIJSONError(w, http.StatusBadRequest, "invalid_request",
+				"email_audit_retention_days must be between 1 and 90.")
+			return
+		}
+		next.EmailAuditRetentionDays = d
 	}
 	if req.GitHubOAuthClientID != nil {
 		next.GitHubOAuthClientID = strings.TrimSpace(*req.GitHubOAuthClientID)
@@ -310,6 +321,7 @@ func writeAdminSettings(w http.ResponseWriter, s *storage.SiteSettings) {
 		EmailSMTPUsername:          s.Email.SMTPUsername,
 		EmailSMTPPasswordSet:       s.Email.SMTPPasswordEnc != "",
 		EmailSMTPTLS:               s.Email.SMTPTLS,
+		EmailAuditRetentionDays:    storage.ClampEmailAuditRetentionDays(s.EmailAuditRetentionDays),
 		GitHubOAuthClientID:        s.GitHubOAuthClientID,
 		GitHubOAuthClientSecretSet: s.GitHubOAuthClientSecretEnc != "",
 		GitHubOAuthConfigured:      strings.TrimSpace(s.GitHubOAuthClientID) != "" && s.GitHubOAuthClientSecretEnc != "",

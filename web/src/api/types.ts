@@ -407,6 +407,7 @@ export type AdminSettings = {
   email_smtp_username: string
   email_smtp_password_set: boolean
   email_smtp_tls: boolean
+  email_audit_retention_days: number
   github_oauth_client_id: string
   github_oauth_client_secret_set: boolean
   github_oauth_configured: boolean
@@ -424,6 +425,43 @@ export type AdminUser = {
   email: string
   user_name: string
   is_banned: boolean
+}
+
+export type EmailAuditStatus = 'sent' | 'failed' | 'not_configured'
+
+export type EmailAuditTrigger =
+  | 'password_reset'
+  | 'password_changed'
+  | 'site_invite'
+  | 'join_request'
+  | 'project_invite'
+  | 'daily_digest'
+
+export type EmailAuditEntry = {
+  id: number
+  created_at: string
+  trigger: string
+  to_email: string
+  status: EmailAuditStatus | string
+  error: string
+  provider: string
+}
+
+export type EmailAuditList = {
+  items: EmailAuditEntry[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export type EmailAuditQuery = {
+  status?: string
+  trigger?: string
+  q?: string
+  from?: string
+  to?: string
+  limit?: number
+  offset?: number
 }
 
 export type APIKey = {

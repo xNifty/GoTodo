@@ -497,7 +497,7 @@ func CreateProjectInvite(projectID int, email, role string, invitedBy int, expir
 	if settings, err := GetSiteSettings(); err == nil && settings != nil {
 		subject := "Project Invite"
 		body := fmt.Sprintf("You have been invited to join project %s by %s.", inv.ProjectName, inv.InviterUserName)
-		if err := mailer.SendEmail(settings.Email, subject, body, inv.Email); err != nil {
+		if err := mailer.SendEmail(settings.Email, mailer.TriggerProjectInvite, subject, body, inv.Email); err != nil {
 			fmt.Printf("Warning: Failed to send project invite email to %s: %v\n", inv.Email, err)
 		}
 	}

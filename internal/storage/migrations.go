@@ -248,6 +248,14 @@ func RunMigrations() error {
 		fmt.Printf("migration: CreateJoinRequestsTable failed: %v\n", err)
 		errCount++
 	}
+	if err := MigrateSiteSettingsAddEmailAuditRetention(); err != nil {
+		fmt.Printf("migration: MigrateSiteSettingsAddEmailAuditRetention failed: %v\n", err)
+		errCount++
+	}
+	if err := CreateEmailAuditTable(); err != nil {
+		fmt.Printf("migration: CreateEmailAuditTable failed: %v\n", err)
+		errCount++
+	}
 
 	// Ensure password_reset table exists
 	if err := CreatePasswordResetTable(); err != nil {
