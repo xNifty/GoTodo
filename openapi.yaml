@@ -3989,6 +3989,10 @@ components:
         project_id:
           type: integer
           nullable: true
+          description: >
+            Set a project id, or null/0 to move the task to the inbox. Sending the
+            current project is a no-op. Only the source project owner can change
+            project_id on a task that already belongs to a project.
         parent_id:
           type: integer
           nullable: true
