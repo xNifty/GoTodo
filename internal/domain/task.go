@@ -331,6 +331,7 @@ func UpdateTask(ctx context.Context, userID, taskID int, in UpdateTaskInput) (*U
 	oldCompleted := completed
 	statusTouched := false
 	completedTouched := in.Completed != nil
+	originalProjectID := projectID
 
 	result := &UpdateResult{
 		OldPriority:  priority,
@@ -411,6 +412,10 @@ func UpdateTask(ctx context.Context, userID, taskID int, in UpdateTaskInput) (*U
 			}
 			newProjectID = sql.NullInt64{Int64: int64(**in.ProjectID), Valid: true}
 		}
+	}
+
+	if !sameNullInt64(originalProjectID, newProjectID) && !storage.RoleCanManage(writeRole) {
+		return nil, fmt.Errorf("%w: only the project owner can move a task to another project", ErrForbidden)
 	}
 
 	if newParentID.Valid {
@@ -942,6 +947,13 @@ func nullInt(v sql.NullInt64) int {
 		return int(v.Int64)
 	}
 	return 0
+}
+
+func sameNullInt64(a, b sql.NullInt64) bool {
+	if !a.Valid && !b.Valid {
+		return true
+	}
+	return a.Valid && b.Valid && a.Int64 == b.Int64
 }
 
 // ChildIDsOf returns direct child task ids for the given parents.

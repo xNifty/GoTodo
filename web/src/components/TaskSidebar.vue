@@ -11,7 +11,7 @@ import { useAuth } from '@/composables/useAuth'
 import { useTaskSidebar } from '@/composables/useTaskSidebar'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
-import { projectOptionLabel, isArchivedProject } from '@/utils/projectLabel'
+import { projectOptionLabel, isArchivedProject, isProjectOwner } from '@/utils/projectLabel'
 import { sprintLockedForUser, sprintOptionLabel } from '@/utils/sprintLabel'
 import { useLiveUpdates, isOwnFocusedLiveEvent, type LiveEvent } from '@/composables/useLiveUpdates'
 import { assignableTags, archiveConfirmMessage, isArchivedTask, isProtectedTag } from '@/utils/tags'
@@ -111,6 +111,14 @@ const canManageTags = computed(() => {
   const role = selectedProject.value?.role
   if (!role) return true
   return role === 'owner' || role === 'editor'
+})
+/** Editors on a shared board cannot move the task; lock from the loaded project, not the v-model. */
+const projectLockedToOwner = computed(() => {
+  if (mode.value !== 'edit') return false
+  const pid = currentTask.value?.project_id
+  if (!pid) return false
+  const p = projects.value.find((pr) => pr.id === pid)
+  return !!p && !isProjectOwner(p)
 })
 const pickerTags = computed(() => assignableTags(allTags.value))
 const taskIsArchived = computed(() => isArchivedTask(currentTask.value))
@@ -1193,12 +1201,15 @@ async function removeTimeEntry(entryId: number) {
             id="project_id"
             v-model="projectId"
             class="form-select"
-            :disabled="readOnly || isSubtask"
+            :disabled="readOnly || isSubtask || projectLockedToOwner"
             @change="onProjectChange"
           >
             <option value="">No project</option>
             <option v-for="p in assignableProjects" :key="p.id" :value="p.id" :disabled="isArchivedProject(p)">{{ projectOptionLabel(p) }}</option>
           </select>
+          <small v-if="projectLockedToOwner" class="form-hint d-block mt-1">
+            Only the project owner can move this task to another project.
+          </small>
           <small v-if="mode === 'add' && selectedProject && isArchivedProject(selectedProject)" class="text-warning">
             This project is archived, so new tasks cannot be added.
           </small>
