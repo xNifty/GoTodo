@@ -36,6 +36,8 @@ type SiteSettings struct {
 
 	Email mailer.Config
 
+	EmailAuditRetentionDays int
+
 	GitHubOAuthClientID        string
 	GitHubOAuthClientSecretEnc string
 }
@@ -101,6 +103,7 @@ func GetSiteSettings() (*SiteSettings, error) {
 			COALESCE(email_smtp_username, ''),
 			COALESCE(email_smtp_password_enc, ''),
 			COALESCE(email_smtp_tls, TRUE),
+			COALESCE(email_audit_retention_days, 7),
 			COALESCE(github_oauth_client_id, ''),
 			COALESCE(github_oauth_client_secret_enc, '')
 		FROM site_settings WHERE id = 1`)
@@ -112,10 +115,12 @@ func GetSiteSettings() (*SiteSettings, error) {
 		&s.Email.MailgunDomain, &s.Email.MailgunAPIKeyEnc,
 		&s.Email.SMTPHost, &s.Email.SMTPPort, &s.Email.SMTPUsername,
 		&s.Email.SMTPPasswordEnc, &s.Email.SMTPTLS,
+		&s.EmailAuditRetentionDays,
 		&s.GitHubOAuthClientID, &s.GitHubOAuthClientSecretEnc,
 	); err != nil {
 		return nil, err
 	}
+	s.EmailAuditRetentionDays = ClampEmailAuditRetentionDays(s.EmailAuditRetentionDays)
 	return &s, nil
 }
 
@@ -130,6 +135,7 @@ func UpsertSiteSettings(s SiteSettings) error {
 	if s.Email.SMTPPort <= 0 {
 		s.Email.SMTPPort = 587
 	}
+	s.EmailAuditRetentionDays = ClampEmailAuditRetentionDays(s.EmailAuditRetentionDays)
 
 	_, err = pool.Exec(context.Background(), `
         INSERT INTO site_settings (
@@ -140,9 +146,10 @@ func UpsertSiteSettings(s SiteSettings) error {
 			email_mailgun_domain, email_mailgun_api_key_enc,
 			email_smtp_host, email_smtp_port, email_smtp_username,
 			email_smtp_password_enc, email_smtp_tls,
+			email_audit_retention_days,
 			github_oauth_client_id, github_oauth_client_secret_enc
 		)
-        VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+        VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
         ON CONFLICT (id) DO UPDATE SET
             site_name = EXCLUDED.site_name,
             default_timezone = EXCLUDED.default_timezone,
@@ -165,6 +172,7 @@ func UpsertSiteSettings(s SiteSettings) error {
 			email_smtp_username = EXCLUDED.email_smtp_username,
 			email_smtp_password_enc = EXCLUDED.email_smtp_password_enc,
 			email_smtp_tls = EXCLUDED.email_smtp_tls,
+			email_audit_retention_days = EXCLUDED.email_audit_retention_days,
 			github_oauth_client_id = EXCLUDED.github_oauth_client_id,
 			github_oauth_client_secret_enc = EXCLUDED.github_oauth_client_secret_enc
     `, s.SiteName, s.DefaultTimezone, s.ShowChangelog, s.SiteVersion,
@@ -174,6 +182,7 @@ func UpsertSiteSettings(s SiteSettings) error {
 		s.Email.MailgunDomain, s.Email.MailgunAPIKeyEnc,
 		s.Email.SMTPHost, s.Email.SMTPPort, s.Email.SMTPUsername,
 		s.Email.SMTPPasswordEnc, s.Email.SMTPTLS,
+		s.EmailAuditRetentionDays,
 		s.GitHubOAuthClientID, s.GitHubOAuthClientSecretEnc)
 	if err != nil {
 		return fmt.Errorf("failed to upsert site_settings: %v", err)
@@ -301,6 +310,21 @@ func MigrateSiteSettingsAddGitHubOAuth() error {
 		if _, err := pool.Exec(context.Background(), q); err != nil {
 			return fmt.Errorf("failed to migrate site_settings github oauth columns: %v", err)
 		}
+	}
+	return nil
+}
+
+// MigrateSiteSettingsAddEmailAuditRetention adds email_audit_retention_days if missing.
+func MigrateSiteSettingsAddEmailAuditRetention() error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return err
+	}
+	defer CloseDatabase(pool)
+
+	if _, err := pool.Exec(context.Background(),
+		"ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS email_audit_retention_days INTEGER DEFAULT 7"); err != nil {
+		return fmt.Errorf("failed to add email_audit_retention_days column to site_settings: %v", err)
 	}
 	return nil
 }

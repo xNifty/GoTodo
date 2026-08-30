@@ -2937,6 +2937,65 @@ paths:
         "409":
           $ref: "#/components/responses/APIError"
 
+  /api/v1/admin/email-audit:
+    get:
+      tags: [Admin]
+      summary: Query outbound email audit log
+      description: |
+        Lists recent outbound email attempts (success, failure, and not configured).
+        Message bodies are never stored. Rows older than email_audit_retention_days are deleted automatically.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [sent, failed, not_configured]
+        - name: trigger
+          in: query
+          schema:
+            type: string
+            enum: [password_reset, password_changed, site_invite, join_request, project_invite, daily_digest]
+        - name: q
+          in: query
+          description: Case-insensitive substring match on recipient email
+          schema:
+            type: string
+        - name: from
+          in: query
+          description: RFC3339 timestamp or YYYY-MM-DD (inclusive start)
+          schema:
+            type: string
+        - name: to
+          in: query
+          description: RFC3339 timestamp or YYYY-MM-DD (inclusive end of day when a date)
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: Audit rows, newest first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailAuditList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
   /api/v1/admin/join-requests:
     get:
       tags: [Admin]
@@ -4407,6 +4466,11 @@ components:
           type: boolean
         email_smtp_tls:
           type: boolean
+        email_audit_retention_days:
+          type: integer
+          minimum: 1
+          maximum: 90
+          description: How many days to keep outbound email audit rows (default 7)
 
     AdminSettingsPatch:
       type: object
@@ -4453,6 +4517,10 @@ components:
           description: Omit to keep; non-empty to replace; empty string to clear
         email_smtp_tls:
           type: boolean
+        email_audit_retention_days:
+          type: integer
+          minimum: 1
+          maximum: 90
 
     AdminUser:
       type: object
@@ -4466,4 +4534,38 @@ components:
         is_banned:
           type: boolean
         interval:
+          type: integer
+
+    EmailAuditEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        trigger:
+          type: string
+        to_email:
+          type: string
+        status:
+          type: string
+          enum: [sent, failed, not_configured]
+        error:
+          type: string
+        provider:
+          type: string
+
+    EmailAuditList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/EmailAuditEntry"
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
           type: integer

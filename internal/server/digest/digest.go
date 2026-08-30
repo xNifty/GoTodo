@@ -105,5 +105,5 @@ func sendUserDigest(userID int, email, timezone string) error {
 	body += "\nLog in to manage your tasks.\n"
 
 	subject := fmt.Sprintf("%s — Daily task digest", siteName)
-	return mailer.SendEmail(settings.Email, subject, body, email)
+	return mailer.SendEmail(storage.SiteEmailConfig(settings), mailer.TriggerDailyDigest, subject, body, email)
 }
