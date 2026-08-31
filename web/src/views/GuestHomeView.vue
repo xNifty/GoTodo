@@ -30,7 +30,7 @@ const previewTasks: Task[] = [
     due_date: isoDaysFromToday(0),
     project: 'Launch',
     priority: 3,
-    favorite: true,
+    favorite: false,
     position: 0,
     child_count: 2,
     children_completed: 1,
@@ -135,7 +135,7 @@ const previewTasks: Task[] = [
                 <i class="bi bi-check2-square fs-3 mb-2 d-block" style="color: var(--ordryn-accent);" />
                 <h3 class="h6">Tasks</h3>
                 <p class="small mb-0" style="color: var(--ordryn-muted);">
-                  Capture work, nest subtasks, star what matters, and mark items done.
+                  Capture work, nest subtasks, and mark items done.
                 </p>
               </div>
             </div>

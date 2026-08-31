@@ -4,19 +4,15 @@ import { pauseLiveReload, resumeLiveReload } from '@/composables/useLiveUpdates'
 
 type ReorderHandler = (
   taskIds: number[],
-  favorite: boolean,
   parentId?: number | null,
 ) => void | Promise<void>
 
 export function useTaskSortable(
-  favoriteListEl: Ref<HTMLElement | null>,
   taskListEl: Ref<HTMLElement | null>,
   enabled: Ref<boolean>,
-  showFavorites: Ref<boolean>,
   onReorder: ReorderHandler,
 ) {
-  let favSortable: Sortable | null = null
-  let regSortable: Sortable | null = null
+  let rootSortable: Sortable | null = null
   const childSortables: Sortable[] = []
   let dragPaused = 0
 
@@ -33,16 +29,14 @@ export function useTaskSortable(
 
   function destroy() {
     while (dragPaused > 0) endDrag()
-    favSortable?.destroy()
-    regSortable?.destroy()
-    favSortable = null
-    regSortable = null
+    rootSortable?.destroy()
+    rootSortable = null
     while (childSortables.length) {
       childSortables.pop()?.destroy()
     }
   }
 
-  function createRootOptions(favorite: boolean): Sortable.Options {
+  function createRootOptions(): Sortable.Options {
     const coarse = window.matchMedia('(pointer: coarse)').matches
     return {
       handle: '.drag-handle',
@@ -60,7 +54,7 @@ export function useTaskSortable(
         const ids = Array.from(container.querySelectorAll(':scope > .task-tree-root'))
           .map((el) => parseInt((el as HTMLElement).dataset.taskId || '', 10))
           .filter((id) => !Number.isNaN(id))
-        void onReorder(ids, favorite, null)
+        void onReorder(ids, null)
       },
     }
   }
@@ -86,7 +80,7 @@ export function useTaskSortable(
             return parseInt(rawId, 10)
           })
           .filter((id) => !Number.isNaN(id))
-        void onReorder(ids, false, parentId)
+        void onReorder(ids, parentId)
       },
     }
   }
@@ -104,17 +98,13 @@ export function useTaskSortable(
     destroy()
     if (!enabled.value) return
 
-    if (showFavorites.value && favoriteListEl.value) {
-      favSortable = Sortable.create(favoriteListEl.value, createRootOptions(true))
-      initChildLists(favoriteListEl.value)
-    }
     if (taskListEl.value) {
-      regSortable = Sortable.create(taskListEl.value, createRootOptions(false))
+      rootSortable = Sortable.create(taskListEl.value, createRootOptions())
       initChildLists(taskListEl.value)
     }
   }
 
-  watch([enabled, showFavorites, favoriteListEl, taskListEl], () => {
+  watch([enabled, taskListEl], () => {
     void nextTick(init)
   })
 

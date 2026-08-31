@@ -12,6 +12,11 @@ info:
     Bearer API keys: 120 GET/min (~2/sec) and 60 writes/min (~1/sec).
     SPA session cookies use a higher budget (600 GET/min, 240 writes/min) so the
     web UI is not gated by the external API ceiling.
+
+    Deprecations: task favoriting (`favorite`) is deprecated and will be removed
+    in API v4. Create, update, reorder (`favorite: true`), and CSV import that
+    use `favorite` still succeed and return `Deprecation: true`, a RFC 7234
+    `Warning` header, and `deprecation_notice` in the JSON body.
   version: 1.0.0
   license:
     name: See LICENSE in repository
@@ -1063,7 +1068,14 @@ paths:
               $ref: "#/components/schemas/TaskCreate"
       responses:
         "201":
-          description: Created
+          description: >
+            Created. When the request included `favorite`, the response also has
+            `Deprecation` and `Warning` headers and `deprecation_notice` in the body.
+          headers:
+            Deprecation:
+              $ref: "#/components/headers/FavoriteDeprecation"
+            Warning:
+              $ref: "#/components/headers/FavoriteWarning"
           content:
             application/json:
               schema:
@@ -1074,7 +1086,13 @@ paths:
   /api/v1/tasks/reorder:
     post:
       tags: [Tasks]
-      summary: Reorder tasks within a favorite group
+      summary: Reorder tasks (favorite grouping is deprecated)
+      description: |
+        Updates manual sort order (`position`) within one favorite or non-favorite
+        group. Favorite grouping is deprecated and will be removed in API v4; the
+        `favorite` field is still required. Reordering the starred group
+        (`favorite: true`) returns `Deprecation` and `Warning` headers plus
+        `deprecation_notice` in the JSON body.
       security:
         - SessionCookie: []
         - BearerAuth: []
@@ -1086,11 +1104,18 @@ paths:
               $ref: "#/components/schemas/TaskReorder"
       responses:
         "200":
-          description: Reordered
+          description: >
+            Reordered. When `favorite` is true, the response also has `Deprecation`
+            and `Warning` headers and `deprecation_notice` in the body.
+          headers:
+            Deprecation:
+              $ref: "#/components/headers/FavoriteDeprecation"
+            Warning:
+              $ref: "#/components/headers/FavoriteWarning"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/OK"
+                $ref: "#/components/schemas/TaskReorderResult"
         "400":
           $ref: "#/components/responses/BadRequest"
 
@@ -1179,7 +1204,14 @@ paths:
               $ref: "#/components/schemas/TaskPatch"
       responses:
         "200":
-          description: Updated task
+          description: >
+            Updated task. When the request included `favorite`, the response also has
+            `Deprecation` and `Warning` headers and `deprecation_notice` in the body.
+          headers:
+            Deprecation:
+              $ref: "#/components/headers/FavoriteDeprecation"
+            Warning:
+              $ref: "#/components/headers/FavoriteWarning"
           content:
             application/json:
               schema:
@@ -2702,7 +2734,15 @@ paths:
                   format: binary
       responses:
         "200":
-          description: Staged import preview
+          description: >
+            Staged import preview. When the CSV includes a `favorite` column, the
+            response also has `Deprecation` and `Warning` headers and
+            `deprecation_notice` in the body.
+          headers:
+            Deprecation:
+              $ref: "#/components/headers/FavoriteDeprecation"
+            Warning:
+              $ref: "#/components/headers/FavoriteWarning"
           content:
             application/json:
               schema:
@@ -2719,7 +2759,15 @@ paths:
         - BearerAuth: []
       responses:
         "200":
-          description: Import completed
+          description: >
+            Import completed. When the staged CSV included a `favorite` column, the
+            response also has `Deprecation` and `Warning` headers and
+            `deprecation_notice` in the body.
+          headers:
+            Deprecation:
+              $ref: "#/components/headers/FavoriteDeprecation"
+            Warning:
+              $ref: "#/components/headers/FavoriteWarning"
           content:
             application/json:
               schema:
@@ -3090,6 +3138,22 @@ components:
         type: integer
         minimum: 1
 
+  headers:
+    FavoriteDeprecation:
+      description: >
+        Set to `true` when the request used the deprecated `favorite` field.
+        Task favoriting will be removed in API v4.
+      schema:
+        type: string
+        example: "true"
+    FavoriteWarning:
+      description: >
+        RFC 7234 miscellaneous persistent warning describing the favorite
+        deprecation (`299 - "Task favoriting is deprecated and will be removed in API v4."`).
+      schema:
+        type: string
+        example: '299 - "Task favoriting is deprecated and will be removed in API v4."'
+
   responses:
     BadRequest:
       description: Invalid request
@@ -3150,6 +3214,17 @@ components:
       properties:
         ok:
           type: boolean
+
+    TaskReorderResult:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        deprecation_notice:
+          type: string
+          description: >
+            Present when reordering the deprecated favorite group (`favorite: true`).
+            Favoriting will be removed in API v4.
 
     Health:
       type: object
@@ -3763,6 +3838,11 @@ components:
           maximum: 3
         favorite:
           type: boolean
+          deprecated: true
+          description: >
+            Whether the task is starred. Deprecated; will be removed in API v4.
+            Still returned. Requests that set this field receive `Deprecation` and
+            `Warning` headers plus `deprecation_notice` in the JSON body.
         position:
           type: integer
         parent_id:
@@ -3786,6 +3866,11 @@ components:
           type: string
         modified_at:
           type: string
+        deprecation_notice:
+          type: string
+          description: >
+            Present on create/update responses that included the deprecated
+            `favorite` field. Favoriting will be removed in API v4.
         status_id:
           type: integer
           nullable: true
@@ -3960,6 +4045,11 @@ components:
           type: boolean
         favorite:
           type: boolean
+          deprecated: true
+          description: >
+            Optional (default false). Deprecated; will be removed in API v4.
+            Including this field still stars or unstars the task and returns
+            `Deprecation`/`Warning` headers plus `deprecation_notice`.
         tag_ids:
           type: array
           items:
@@ -4003,6 +4093,11 @@ components:
           type: boolean
         favorite:
           type: boolean
+          deprecated: true
+          description: >
+            Deprecated; will be removed in API v4. Including this field still
+            stars or unstars the task and returns `Deprecation`/`Warning` headers
+            plus `deprecation_notice`.
         tag_ids:
           type: array
           items:
@@ -4028,6 +4123,11 @@ components:
             type: integer
         favorite:
           type: boolean
+          deprecated: true
+          description: >
+            Which group is being reordered. Deprecated; favorite grouping will be
+            removed in API v4. Still required. `favorite: true` returns
+            `Deprecation`/`Warning` headers plus `deprecation_notice`.
         parent_id:
           type: integer
           nullable: true
@@ -4108,6 +4208,11 @@ components:
           type: integer
         total_rows:
           type: integer
+        deprecation_notice:
+          type: string
+          description: >
+            Present when the CSV includes a `favorite` column. Favoriting will
+            be removed in API v4.
 
     ImportResult:
       type: object
@@ -4116,6 +4221,11 @@ components:
           type: integer
         skipped:
           type: integer
+        deprecation_notice:
+          type: string
+          description: >
+            Present when the staged CSV included a `favorite` column. Favoriting
+            will be removed in API v4.
 
     DeleteResult:
       type: object

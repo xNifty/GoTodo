@@ -450,9 +450,6 @@ async function onCardDrop(evt: Sortable.SortableEvent) {
   const orderedIds = collectIds(to)
   const statusChanged = !Number.isNaN(taskId) && fromStatusId !== statusId
 
-  const current = !Number.isNaN(taskId) ? boardTasks.value.find((t) => t.id === taskId) : undefined
-  const reorderFavorite = current?.favorite ?? false
-
   const rootIds = orderedIds.filter((id) => {
     const t = boardTasks.value.find((task) => task.id === id)
     return !!t && !t.parent_id
@@ -479,12 +476,27 @@ async function onCardDrop(evt: Sortable.SortableEvent) {
       }
     }
     if (rootIds.length) {
-      await api.reorderTasks({
-        task_ids: rootIds,
-        favorite: reorderFavorite,
+      const byId = new Map(boardTasks.value.map((t) => [t.id, t]))
+      const favoriteIds = rootIds.filter((id) => byId.get(id)?.favorite)
+      const regularIds = rootIds.filter((id) => !byId.get(id)?.favorite)
+      const reorderPayload = {
         status_id: statusId,
         project: String(props.projectId),
-      })
+      }
+      if (favoriteIds.length) {
+        await api.reorderTasks({
+          task_ids: favoriteIds,
+          favorite: true,
+          ...reorderPayload,
+        })
+      }
+      if (regularIds.length) {
+        await api.reorderTasks({
+          task_ids: regularIds,
+          favorite: false,
+          ...reorderPayload,
+        })
+      }
     }
   } catch (err) {
     toast.push(err instanceof APIError ? err.message : 'Could not update board', 'error')
