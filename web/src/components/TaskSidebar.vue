@@ -154,6 +154,13 @@ const sidebarTitle = computed(() => {
 const kanbanHeaderTitle = computed(() => (mode.value === 'add' ? 'Add Task' : 'Task'))
 const submitText = computed(() => (mode.value === 'edit' ? 'Save Task' : 'Add Task'))
 const charCount = computed(() => description.value.length)
+const editingDescription = ref(false)
+const showDescriptionEditor = computed(() => {
+  if (readOnly.value) return false
+  if (editingDescription.value) return true
+  if (mode.value === 'add' && !description.value.trim()) return true
+  return false
+})
 const timeSpentLabel = computed(() => formatMinutes(timeSpentMinutes.value))
 const showDiscussion = computed(
   () => (mode.value === 'edit' || mode.value === 'view') && !!currentTask.value?.project_id,
@@ -245,12 +252,21 @@ function insertDescriptionImage(markdown: string) {
     return
   }
   description.value = next.body
+  editingDescription.value = false
+}
+
+function startEditDescription() {
+  if (readOnly.value) return
+  editingDescription.value = true
   void nextTick(() => {
-    if (!el) return
-    el.focus()
-    el.setSelectionRange(next.cursor, next.cursor)
+    const el = descriptionInput.value
+    el?.focus()
     autosizeDescription()
   })
+}
+
+function stopEditDescription() {
+  editingDescription.value = false
 }
 
 async function ingestDescriptionImage(file: File) {
@@ -313,6 +329,7 @@ function resetForm() {
   githubIssue.value = null
   projectHasGitHub.value = false
   githubIssueRef.value = ''
+  editingDescription.value = true
 }
 
 async function loadMeta() {
@@ -450,6 +467,7 @@ async function loadTask(id: number) {
   currentTask.value = task
   title.value = task.title
   description.value = task.description || ''
+  editingDescription.value = false
   projectId.value = task.project_id ?? ''
   parentId.value = task.parent_id ?? ''
   parentTitle.value = ''
@@ -635,6 +653,7 @@ async function save(keepOpen = false) {
         description.value = ''
         newTags.value = ''
         descriptionError.value = ''
+        editingDescription.value = true
         await nextTick()
         autosizeDescription()
         titleInput.value?.focus()
@@ -667,6 +686,7 @@ async function save(keepOpen = false) {
     const updated = await api.patchTask(taskId.value, payload)
     notifySaved(updated, true)
     toast.push('Task saved', 'success')
+    editingDescription.value = false
     if (eventsLoaded.value) await loadEvents(true)
   } catch (err) {
     const msg = err instanceof APIError ? err.message : err instanceof Error ? err.message : 'Save failed'
@@ -1182,9 +1202,27 @@ async function removeTimeEntry(entryId: number) {
           <div v-if="completed" class="alert alert-success py-2 mb-2">
             <i class="bi bi-check-circle" /> This task is completed
           </div>
-          <label for="description" :class="{ 'kanban-section-label': isKanbanTask }">Description:</label>
+          <div class="d-flex align-items-center justify-content-between gap-2">
+            <label for="description" :class="{ 'kanban-section-label': isKanbanTask }" class="mb-0">Description:</label>
+            <button
+              v-if="!readOnly && !showDescriptionEditor"
+              type="button"
+              class="btn btn-sm btn-link p-0"
+              @click="startEditDescription"
+            >
+              Edit
+            </button>
+            <button
+              v-else-if="!readOnly && showDescriptionEditor && (mode !== 'add' || description.trim())"
+              type="button"
+              class="btn btn-sm btn-link p-0"
+              @click="stopEditDescription"
+            >
+              Done
+            </button>
+          </div>
           <textarea
-            v-if="!readOnly"
+            v-if="showDescriptionEditor"
             id="description"
             ref="descriptionInput"
             v-model="description"
@@ -1196,16 +1234,35 @@ async function removeTimeEntry(entryId: number) {
             @dragover="onDescriptionDragOver"
             @drop="onDescriptionDrop"
           />
-          <div v-else id="description" class="task-description-view">
+          <div
+            v-else
+            id="description"
+            class="task-description-view"
+            tabindex="0"
+            @paste="onDescriptionPaste"
+            @dragover="onDescriptionDragOver"
+            @drop="onDescriptionDrop"
+          >
             <RichBody v-if="description.trim()" :body="description" />
+            <button
+              v-else-if="!readOnly"
+              type="button"
+              class="btn btn-link p-0 text-muted"
+              @click="startEditDescription"
+            >
+              Add a description…
+            </button>
             <span v-else class="text-muted">No description</span>
           </div>
-          <div v-if="!readOnly" class="d-flex justify-content-between align-items-center mt-1 gap-2">
+          <div v-if="!readOnly && showDescriptionEditor" class="d-flex justify-content-between align-items-center mt-1 gap-2">
             <small class="form-hint">Max 1000 Characters. Paste or drop an image, or use Insert image.</small>
             <div class="d-flex align-items-center gap-2">
-              <ImageInsertButton compact :disabled="readOnly" @insert="insertDescriptionImage" />
+              <ImageInsertButton compact @insert="insertDescriptionImage" />
               <small class="text-muted"><span id="char-count">{{ charCount }}</span>/1000</small>
             </div>
+          </div>
+          <div v-else-if="!readOnly && imageEnabled" class="form-hint mt-1">
+            Paste or drop an image here, or click Edit to change the text.
           </div>
           <div v-if="descriptionError" id="description-error" class="invalid-feedback d-block">
             {{ descriptionError }}

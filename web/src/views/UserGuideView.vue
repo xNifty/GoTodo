@@ -50,8 +50,9 @@ onUnmounted(() => {
           sidebar. Fill in a title, optional markdown description, due date, project, tags, and priority, then
           save. When an admin has enabled image hosting, paste or drop a JPEG, PNG, GIF, or WebP
           into the description or a comment, or use <strong>Insert image</strong>. The picture
-          shows in the discussion the same way GitHub comments do — inline, sized to the thread.
-          Clicking it opens the image in a new tab.
+          shows inline in the task description and in discussion comments, sized to the panel.
+          Click <strong>Edit</strong> on the description to change the text. Clicking an image
+          opens it in a new tab.
         </p>
         <ul>
           <li>Click a task’s edit control (or press <kbd>e</kbd> / <kbd>Enter</kbd> on a focused task) to edit it in the sidebar.</li>
