@@ -233,48 +233,84 @@ func TestS3StoreHTMLGatewayError(t *testing.T) {
 }
 
 func TestS3StoreR2DashboardEndpointDoesNotDoubleBucket(t *testing.T) {
-	cfg := Config{
-		Provider:         ProviderS3,
-		S3Endpoint:       "https://abc123.r2.cloudflarestorage.com/media",
-		S3Region:         "ENAM",
-		S3Bucket:         "media",
-		S3AccessKey:      "AKID",
-		S3SecretKey:      "secret",
-		S3PublicURL:      "https://pub-example.r2.dev",
-		S3ForcePathStyle: false,
-	}
-	store, err := NewS3Store(cfg, http.DefaultClient)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if store.cfg.S3Endpoint != "https://abc123.r2.cloudflarestorage.com" {
-		t.Fatalf("endpoint=%q", store.cfg.S3Endpoint)
-	}
-	if !store.cfg.S3ForcePathStyle {
-		t.Fatal("R2 should force path-style")
-	}
-	if store.cfg.S3Region != "auto" {
-		t.Fatalf("region=%q", store.cfg.S3Region)
-	}
-	req, err := store.newPutRequest(context.Background(), Object{
-		Key: "pic.jpg", ContentType: TypeJPEG, Data: tinyPNG,
-	}, time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if req.URL.Path != "/media/pic.jpg" {
-		t.Fatalf("path=%q (bucket should appear once)", req.URL.Path)
-	}
-	if req.URL.Host != "abc123.r2.cloudflarestorage.com" {
-		t.Fatalf("host=%q", req.URL.Host)
-	}
-	auth := req.Header.Get("Authorization")
-	if !strings.Contains(auth, "/auto/s3/") {
-		t.Fatalf("credential scope should use auto, got %s", auth)
-	}
-	if strings.Contains(auth, "content-type") {
-		t.Fatalf("content-type should not be signed: %s", auth)
-	}
+	t.Run("path-style keeps leftover dashboard path off the PUT URL", func(t *testing.T) {
+		cfg := Config{
+			Provider:         ProviderS3,
+			S3Endpoint:       "https://abc123.r2.cloudflarestorage.com/media",
+			S3Region:         "ENAM",
+			S3Bucket:         "media",
+			S3AccessKey:      "AKID",
+			S3SecretKey:      "secret",
+			S3PublicURL:      "https://pub-example.r2.dev",
+			S3ForcePathStyle: true,
+		}
+		store, err := NewS3Store(cfg, http.DefaultClient)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if store.cfg.S3Endpoint != "https://abc123.r2.cloudflarestorage.com/media" {
+			t.Fatalf("endpoint=%q, want stored as entered", store.cfg.S3Endpoint)
+		}
+		if !store.cfg.S3ForcePathStyle {
+			t.Fatal("path-style must stay checked")
+		}
+		if store.cfg.S3Region != "ENAM" {
+			t.Fatalf("region=%q, want stored as entered", store.cfg.S3Region)
+		}
+		req, err := store.newPutRequest(context.Background(), Object{
+			Key: "pic.jpg", ContentType: TypeJPEG, Data: tinyPNG,
+		}, time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if req.URL.Path != "/media/pic.jpg" {
+			t.Fatalf("path=%q (bucket should appear once)", req.URL.Path)
+		}
+		if req.URL.Host != "abc123.r2.cloudflarestorage.com" {
+			t.Fatalf("host=%q", req.URL.Host)
+		}
+		auth := req.Header.Get("Authorization")
+		if !strings.Contains(auth, "/ENAM/s3/") {
+			t.Fatalf("credential scope should use saved region, got %s", auth)
+		}
+		if strings.Contains(auth, "content-type") {
+			t.Fatalf("content-type should not be signed: %s", auth)
+		}
+	})
+	t.Run("unchecked path-style is virtual-hosted without doubling the bucket", func(t *testing.T) {
+		cfg := Config{
+			Provider:         ProviderS3,
+			S3Endpoint:       "https://abc123.r2.cloudflarestorage.com/media",
+			S3Region:         "ENAM",
+			S3Bucket:         "media",
+			S3AccessKey:      "AKID",
+			S3SecretKey:      "secret",
+			S3PublicURL:      "https://pub-example.r2.dev",
+			S3ForcePathStyle: false,
+		}
+		store, err := NewS3Store(cfg, http.DefaultClient)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if store.cfg.S3ForcePathStyle {
+			t.Fatal("path-style must stay unchecked")
+		}
+		req, err := store.newPutRequest(context.Background(), Object{
+			Key: "pic.jpg", ContentType: TypeJPEG, Data: tinyPNG,
+		}, time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if req.URL.Path != "/pic.jpg" {
+			t.Fatalf("path=%q, want /pic.jpg", req.URL.Path)
+		}
+		if req.URL.Host != "media.abc123.r2.cloudflarestorage.com" {
+			t.Fatalf("host=%q", req.URL.Host)
+		}
+		if strings.Contains(req.URL.Path, "/media/") {
+			t.Fatalf("bucket doubled in path %q", req.URL.Path)
+		}
+	})
 }
 
 func TestDefaultS3HTTPClientDisablesHTTP2(t *testing.T) {

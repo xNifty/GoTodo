@@ -58,18 +58,21 @@ func TestValidateImageHostingSettings(t *testing.T) {
 				S3Bucket:         "ordryn-testing",
 				S3AccessKey:      "ak",
 				S3PublicURL:      "https://pub-example.r2.dev",
-				S3ForcePathStyle: true,
+				S3ForcePathStyle: false,
 			},
 			ImageS3SecretKeyEnc: "ciphertext",
 		}
 		if msg := validateImageHostingSettings(s); msg != "" {
 			t.Fatalf("msg=%q", msg)
 		}
-		if s.Image.S3Endpoint != "https://abc123.r2.cloudflarestorage.com" {
-			t.Fatalf("endpoint=%q", s.Image.S3Endpoint)
+		if s.Image.S3Endpoint != "https://abc123.r2.cloudflarestorage.com/ordryn-testing" {
+			t.Fatalf("endpoint=%q, want stored as entered", s.Image.S3Endpoint)
 		}
-		if s.Image.S3Region != "auto" {
-			t.Fatalf("region=%q", s.Image.S3Region)
+		if s.Image.S3Region != "ENAM" {
+			t.Fatalf("region=%q, want stored as entered", s.Image.S3Region)
+		}
+		if s.Image.S3ForcePathStyle {
+			t.Fatal("path-style must stay unchecked")
 		}
 	})
 	t.Run("s3 missing secret", func(t *testing.T) {
@@ -132,5 +135,22 @@ func TestAPIV1AdminSettingsMethodNotAllowed(t *testing.T) {
 	APIV1AdminSettings(rec, req)
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("status=%d", rec.Code)
+	}
+}
+
+func TestAdminSettingsPatchDecodesUncheckedPathStyleAndEndpoint(t *testing.T) {
+	body := `{"image_s3_endpoint":"https://s3.example.com/changed","image_s3_region":"us-east-1","image_s3_force_path_style":false}`
+	var req adminSettingsPatch
+	if err := json.Unmarshal([]byte(body), &req); err != nil {
+		t.Fatal(err)
+	}
+	if req.ImageS3ForcePathStyle == nil || *req.ImageS3ForcePathStyle {
+		t.Fatal("unchecked path-style must decode as false, not omitted")
+	}
+	if req.ImageS3Endpoint == nil || *req.ImageS3Endpoint != "https://s3.example.com/changed" {
+		t.Fatalf("endpoint=%v", req.ImageS3Endpoint)
+	}
+	if req.ImageS3Region == nil || *req.ImageS3Region != "us-east-1" {
+		t.Fatalf("region=%v", req.ImageS3Region)
 	}
 }

@@ -8,7 +8,8 @@
       "Admin settings include the API endpoint, region, bucket, credentials, public URL, path-style option, local directory, and a maximum image size",
       "Signed-in users can upload JPEG, PNG, GIF, or WebP images into task descriptions and comments when hosting is configured",
       "Failed uploads show a generic message to users; site admins can Test connection to verify the backend without exposing provider XML or secrets",
-      "S3 uploads talk HTTP/1.1 (Cloudflare R2 returns 502 over HTTP/2)"
+      "S3 uploads talk HTTP/1.1 (Cloudflare R2 returns 502 over HTTP/2)",
+      "Saving image hosting settings keeps the API endpoint, region, and path-style checkbox as entered"
     ]
   },
   {

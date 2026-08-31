@@ -78,6 +78,9 @@ func (c Config) Enabled() bool {
 }
 
 // Validate returns a user-facing error message, or "" if the config is usable.
+// It trims whitespace (and a trailing slash on URLs) but does not rewrite the
+// admin-entered S3 endpoint, region, or path-style flag. Those values are
+// persisted as submitted so the settings form does not appear to revert.
 func (c *Config) Validate() string {
 	c.Provider = NormalizeProvider(c.Provider)
 	c.MaxBytes = ClampMaxBytes(c.MaxBytes)
@@ -89,7 +92,7 @@ func (c *Config) Validate() string {
 	c.S3PublicURL = strings.TrimRight(strings.TrimSpace(c.S3PublicURL), "/")
 	c.LocalPath = strings.TrimSpace(c.LocalPath)
 	c.LocalPublicBase = strings.TrimRight(strings.TrimSpace(c.LocalPublicBase), "/")
-	normalizeS3Endpoint(c)
+	c.S3Endpoint = strings.TrimRight(c.S3Endpoint, "/")
 
 	switch c.Provider {
 	case ProviderNone:
@@ -159,28 +162,6 @@ func (c Config) PublicOrigin() string {
 		scheme = "https"
 	}
 	return scheme + "://" + u.Host
-}
-
-// normalizeS3Endpoint keeps scheme+host only and applies R2 defaults.
-// Cloudflare's dashboard copies https://<account>.r2.cloudflarestorage.com/<bucket>;
-// the extra path would otherwise be easy to paste into the API endpoint field.
-func normalizeS3Endpoint(c *Config) {
-	if c == nil || c.S3Endpoint == "" {
-		return
-	}
-	u, err := url.Parse(c.S3Endpoint)
-	if err != nil || u.Host == "" {
-		return
-	}
-	if u.Scheme == "" {
-		u.Scheme = "https"
-	}
-	c.S3Endpoint = u.Scheme + "://" + u.Host
-	host := strings.ToLower(u.Host)
-	if strings.Contains(host, "r2.cloudflarestorage.com") {
-		c.S3ForcePathStyle = true
-		c.S3Region = "auto"
-	}
 }
 
 // JoinPublicURL concatenates a public base and object key without double slashes.

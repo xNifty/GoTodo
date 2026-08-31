@@ -168,7 +168,7 @@ func TestConfigValidate(t *testing.T) {
 			t.Fatalf("got %q", msg)
 		}
 	})
-	t.Run("r2 dashboard endpoint and location code", func(t *testing.T) {
+	t.Run("r2 dashboard endpoint is stored as entered", func(t *testing.T) {
 		c := Config{
 			Provider:         "s3",
 			S3Endpoint:       "https://abc123.r2.cloudflarestorage.com/ordryn-testing",
@@ -182,17 +182,38 @@ func TestConfigValidate(t *testing.T) {
 		if msg := c.Validate(); msg != "" {
 			t.Fatalf("validate: %s", msg)
 		}
-		if c.S3Endpoint != "https://abc123.r2.cloudflarestorage.com" {
-			t.Fatalf("endpoint=%q", c.S3Endpoint)
+		if c.S3Endpoint != "https://abc123.r2.cloudflarestorage.com/ordryn-testing" {
+			t.Fatalf("endpoint=%q, want stored as entered", c.S3Endpoint)
 		}
-		if c.S3Region != "auto" {
-			t.Fatalf("region=%q", c.S3Region)
+		if c.S3Region != "ENAM" {
+			t.Fatalf("region=%q, want stored as entered", c.S3Region)
 		}
-		if !c.S3ForcePathStyle {
-			t.Fatal("expected path-style for R2")
+		if c.S3ForcePathStyle {
+			t.Fatal("path-style must stay unchecked")
 		}
 		if c.S3SecretKey != "s" {
 			t.Fatalf("secret not trimmed: %q", c.S3SecretKey)
+		}
+	})
+	t.Run("unchecking path-style is not overwritten", func(t *testing.T) {
+		c := Config{
+			Provider:         "s3",
+			S3Endpoint:       "https://abc123.r2.cloudflarestorage.com",
+			S3Region:         "auto",
+			S3Bucket:         "ordryn-testing",
+			S3AccessKey:      "k",
+			S3SecretKey:      "s",
+			S3PublicURL:      "https://pub-example.r2.dev",
+			S3ForcePathStyle: false,
+		}
+		if msg := c.Validate(); msg != "" {
+			t.Fatalf("validate: %s", msg)
+		}
+		if c.S3ForcePathStyle {
+			t.Fatal("S3ForcePathStyle must remain false")
+		}
+		if c.S3Endpoint != "https://abc123.r2.cloudflarestorage.com" {
+			t.Fatalf("endpoint=%q", c.S3Endpoint)
 		}
 	})
 	t.Run("unknown provider", func(t *testing.T) {
