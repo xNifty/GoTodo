@@ -7,6 +7,7 @@ import { APIError } from '@/api/types'
 import ParentTaskCombobox from '@/components/ParentTaskCombobox.vue'
 import DeleteTaskDialog from '@/components/DeleteTaskDialog.vue'
 import TaskDiscussion from '@/components/TaskDiscussion.vue'
+import ImageInsertButton from '@/components/ImageInsertButton.vue'
 import { useAuth } from '@/composables/useAuth'
 import { useTaskSidebar } from '@/composables/useTaskSidebar'
 import { useToast } from '@/composables/useToast'
@@ -227,6 +228,25 @@ function autosizeDescription() {
   const min = isKanbanTask.value ? KANBAN_DESCRIPTION_MIN_HEIGHT : DESCRIPTION_MIN_HEIGHT
   el.style.height = 'auto'
   el.style.height = `${Math.max(el.scrollHeight, min)}px`
+}
+
+function insertDescriptionImage(markdown: string) {
+  const el = descriptionInput.value
+  const start = el?.selectionStart ?? description.value.length
+  const end = el?.selectionEnd ?? start
+  const next = description.value.slice(0, start) + markdown + description.value.slice(end)
+  if (next.length > 1000) {
+    toast.push('Description would exceed 1000 characters', 'error')
+    return
+  }
+  description.value = next
+  void nextTick(() => {
+    if (!el) return
+    const pos = start + markdown.length
+    el.focus()
+    el.setSelectionRange(pos, pos)
+    autosizeDescription()
+  })
 }
 
 function resetForm() {
@@ -1141,9 +1161,12 @@ async function removeTimeEntry(entryId: number) {
             :disabled="readOnly"
             @input="autosizeDescription"
           />
-          <div v-if="!readOnly" class="d-flex justify-content-between align-items-center mt-1">
-            <small class="form-hint">Max 1000 Characters</small>
-            <small class="text-muted"><span id="char-count">{{ charCount }}</span>/1000</small>
+          <div v-if="!readOnly" class="d-flex justify-content-between align-items-center mt-1 gap-2">
+            <small class="form-hint">Max 1000 Characters. Markdown is supported.</small>
+            <div class="d-flex align-items-center gap-2">
+              <ImageInsertButton compact :disabled="readOnly" @insert="insertDescriptionImage" />
+              <small class="text-muted"><span id="char-count">{{ charCount }}</span>/1000</small>
+            </div>
           </div>
           <div v-if="descriptionError" id="description-error" class="invalid-feedback d-block">
             {{ descriptionError }}

@@ -13,6 +13,7 @@ import type {
   EmailAuditList,
   EmailAuditQuery,
   GitHubConnection,
+  ImageUpload,
   Invite,
   JoinRequest,
   Project,
@@ -961,6 +962,10 @@ export const api = {
 
   importCancel() {
     return request<{ ok: boolean }>('/api/v1/import/cancel', { method: 'POST' })
+  },
+
+  uploadImage(file: File) {
+    return upload<ImageUpload>('/api/v1/images', 'file', file)
   },
 
   syncCalendar(file: File) {

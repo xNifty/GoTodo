@@ -139,6 +139,8 @@ func registerAPIV1Routes() {
 	handleBoth("/api/v1/export", v1(handlers.APIV1Export))
 	handleBoth("/api/v1/import", v1(handlers.APIV1ImportRouter))
 	handleBoth("/api/v1/import/", v1(handlers.APIV1ImportRouter))
+	handleBoth("/api/v1/images", v1(handlers.APIV1Images))
+	handleBoth("/uploads/", handlers.ServeLocalImage)
 	handleBoth("/api/v1/invites", utils.InviteAPIChain(handlers.APIV1InvitesRouter))
 	handleBoth("/api/v1/invites/", utils.InviteAPIChain(handlers.APIV1InvitesRouter))
 	handleBoth("/api/v1/admin/settings", utils.AdminAPIChain(handlers.APIV1AdminSettings))

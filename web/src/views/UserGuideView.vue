@@ -47,8 +47,9 @@ onUnmounted(() => {
         <h2 id="tasks" class="h4 mt-4">Creating and editing tasks</h2>
         <p>
           Click <strong>Add Task</strong> (or press <kbd>n</kbd> on the home page) to open the task
-          sidebar. Fill in a title, optional description, due date, project, tags, and priority, then
-          save.
+          sidebar. Fill in a title, optional markdown description, due date, project, tags, and priority, then
+          save. When an admin has enabled image hosting, use <strong>Insert image</strong> to upload a
+          JPEG, PNG, GIF, or WebP file.
         </p>
         <ul>
           <li>Click a task’s edit control (or press <kbd>e</kbd> / <kbd>Enter</kbd> on a focused task) to edit it in the sidebar.</li>
@@ -202,6 +203,8 @@ onUnmounted(() => {
           Password reset does not disable MFA; the next login still asks for a code.
           For machine clients and integrations, see the
           <RouterLink to="/docs/api/v1">REST API documentation</RouterLink>.
+          Site admins configure outbound email and image hosting (S3-compatible or local uploads) on
+          <RouterLink to="/admin">Admin</RouterLink>.
         </p>
       </div>
     </div>

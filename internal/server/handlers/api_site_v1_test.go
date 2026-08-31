@@ -18,11 +18,13 @@ func TestAPIV1SiteMethodNotAllowed(t *testing.T) {
 
 func TestAPISiteResponsePublicFields(t *testing.T) {
 	raw, err := json.Marshal(apiSiteResponse{
-		SiteName:           "Demo",
-		EnableRegistration: true,
-		InviteOnly:         false,
-		EnableJoinRequests: true,
-		MetaDescription:    "Hello",
+		SiteName:            "Demo",
+		EnableRegistration:  true,
+		InviteOnly:          false,
+		EnableJoinRequests:  true,
+		MetaDescription:     "Hello",
+		ImageHostingEnabled: true,
+		ImageMaxBytes:       5242880,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -39,6 +41,8 @@ func TestAPISiteResponsePublicFields(t *testing.T) {
 		"meta_description",
 		"show_changelog",
 		"github_oauth_configured",
+		"image_hosting_enabled",
+		"image_max_bytes",
 	} {
 		if _, ok := m[key]; !ok {
 			t.Fatalf("missing key %q in %s", key, string(raw))

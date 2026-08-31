@@ -77,6 +77,7 @@ var requiredOpenAPIPaths = []string{
 	"/api/v1/import/preview",
 	"/api/v1/import/confirm",
 	"/api/v1/import/cancel",
+	"/api/v1/images",
 	"/api/v1/auth/forgot-password",
 	"/api/v1/auth/reset-password",
 	"/api/v1/join-requests",

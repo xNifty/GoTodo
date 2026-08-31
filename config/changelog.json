@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.8.0",
+    "date": "2026-08-31",
+    "title": "Configurable image hosting",
+    "notes": [
+      "Admins can enable image hosting with an S3-compatible backend (AWS S3, Cloudflare R2, DigitalOcean Spaces, MinIO) or local disk uploads",
+      "Admin settings include the API endpoint, region, bucket, credentials, public URL, path-style option, local directory, and a maximum image size",
+      "Signed-in users can upload JPEG, PNG, GIF, or WebP images into task descriptions and comments when hosting is configured"
+    ]
+  },
+  {
     "version": "3.7.0",
     "date": "2026-08-31",
     "title": "Editable discussion comments",
@@ -8,6 +18,7 @@
       "Comments show posted and edited timestamps; hover the edited date to see who originally posted it",
       "Previous comment text is kept in an audit log so project owners and site admins can review and restore it",
       "Site admins can browse and restore comment history from Admin → Comment history"
+    ]
   },
   {
     "version": "3.6.0",

@@ -38,6 +38,7 @@ tags:
   - name: Device Auth
   - name: GitHub
   - name: Live
+  - name: Images
 
 paths:
   /api/v1/health:
@@ -2892,6 +2893,42 @@ paths:
               schema:
                 $ref: "#/components/schemas/OK"
 
+  /api/v1/images:
+    post:
+      tags: [Images]
+      summary: Upload an image
+      description: |
+        Stores an image using the admin-configured backend (`s3` or `local`).
+        S3-compatible endpoints cover AWS S3, Cloudflare R2, DigitalOcean Spaces, and MinIO.
+        Local uploads are served from `/uploads/{key}`.
+        Disabled when `image_hosting_provider` is unset.
+        Allowed types: JPEG, PNG, GIF, WebP. Size is capped by `image_max_bytes`.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: Uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageUpload"
+        "400":
+          description: Not configured, missing file, or unsupported type
+        "413":
+          description: File exceeds image_max_bytes
+
   /api/v1/announcements/dismiss:
     post:
       tags: [Announcements]
@@ -3431,6 +3468,13 @@ components:
           type: string
         github_oauth_configured:
           type: boolean
+        image_hosting_enabled:
+          type: boolean
+          description: True when an admin has configured S3 or local image hosting
+        image_max_bytes:
+          type: integer
+          format: int64
+          description: Maximum upload size in bytes when image hosting is enabled
 
     User:
       type: object
@@ -4813,6 +4857,35 @@ components:
           minimum: 1
           maximum: 90
           description: How many days to keep outbound email audit rows (default 7)
+        image_hosting_provider:
+          type: string
+          description: none, s3, or local
+        image_max_bytes:
+          type: integer
+          format: int64
+          minimum: 65536
+          maximum: 52428800
+          description: Maximum image size in bytes (default 5 MiB)
+        image_s3_endpoint:
+          type: string
+          description: S3-compatible API endpoint (AWS, Cloudflare R2, DigitalOcean Spaces, MinIO)
+        image_s3_region:
+          type: string
+        image_s3_bucket:
+          type: string
+        image_s3_access_key:
+          type: string
+        image_s3_secret_key_set:
+          type: boolean
+        image_s3_public_url:
+          type: string
+          description: Public CDN or bucket URL used to form image URLs
+        image_s3_force_path_style:
+          type: boolean
+          description: Use path-style URLs (recommended for R2, Spaces, and MinIO)
+        image_local_path:
+          type: string
+          description: Directory on the server for local uploads (default data/uploads)
 
     AdminSettingsPatch:
       type: object
@@ -4863,6 +4936,28 @@ components:
           type: integer
           minimum: 1
           maximum: 90
+        image_hosting_provider:
+          type: string
+        image_max_bytes:
+          type: integer
+          format: int64
+        image_s3_endpoint:
+          type: string
+        image_s3_region:
+          type: string
+        image_s3_bucket:
+          type: string
+        image_s3_access_key:
+          type: string
+        image_s3_secret_key:
+          type: string
+          description: Omit to keep; non-empty to replace; empty string to clear
+        image_s3_public_url:
+          type: string
+        image_s3_force_path_style:
+          type: boolean
+        image_local_path:
+          type: string
 
     AdminUser:
       type: object
@@ -4911,3 +5006,17 @@ components:
           type: integer
         offset:
           type: integer
+
+    ImageUpload:
+      type: object
+      properties:
+        url:
+          type: string
+        content_type:
+          type: string
+        size:
+          type: integer
+        filename:
+          type: string
+        key:
+          type: string

@@ -9,6 +9,9 @@ RELEASE_NOTES_DRAFT.md
 # Ad-hoc drafts. Operator docs live on the GitHub wiki.
 docs/*
 
+# Uploaded images when using local hosting
+data/uploads/
+
 # Node/npm
 node_modules/
 npm-debug.log

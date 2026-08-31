@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { api } from '@/api/client'
 import type { TaskComment, TaskCommentRevision } from '@/api/types'
+import ImageInsertButton from '@/components/ImageInsertButton.vue'
 import { useAuth } from '@/composables/useAuth'
 import { useConfirm } from '@/composables/useConfirm'
 import { useTaskSidebar } from '@/composables/useTaskSidebar'
@@ -36,6 +37,7 @@ const loading = ref(false)
 const posting = ref(false)
 const draft = ref('')
 const draftEl = ref<HTMLTextAreaElement | null>(null)
+const editEl = ref<HTMLTextAreaElement | null>(null)
 const mentionListEl = ref<HTMLElement | null>(null)
 const bottomEl = ref<HTMLElement | null>(null)
 const MAX_BODY = 2000
@@ -306,6 +308,27 @@ function onDraftInput(e: Event) {
   syncMentionFromEl()
 }
 
+function insertCommentImage(markdown: string, target: 'draft' | 'edit' = 'draft') {
+  const el = target === 'edit' ? editEl.value : draftEl.value
+  const current = target === 'edit' ? editDraft.value : draft.value
+  const start = el?.selectionStart ?? current.length
+  const end = el?.selectionEnd ?? start
+  const next = current.slice(0, start) + markdown + current.slice(end)
+  if (next.length > MAX_BODY) {
+    toast.push('Comment would exceed 2000 characters', 'error')
+    return
+  }
+  if (target === 'edit') editDraft.value = next
+  else draft.value = next
+  void nextTick(() => {
+    if (!el) return
+    const pos = start + markdown.length
+    el.focus()
+    el.setSelectionRange(pos, pos)
+    if (target === 'draft') syncMentionFromEl()
+  })
+}
+
 function onDraftKeydown(e: KeyboardEvent) {
   if (!showMentionMenu.value) return
   if (e.key === 'Escape') {
@@ -546,6 +569,7 @@ defineExpose({ reload })
             </div>
             <div v-else-if="editingId === c.id" class="task-post-body">
               <textarea
+                ref="editEl"
                 class="form-control"
                 rows="3"
                 :maxlength="MAX_BODY"
@@ -553,7 +577,10 @@ defineExpose({ reload })
                 @input="onEditInput"
               />
               <div class="d-flex justify-content-between align-items-center mt-2">
-                <small class="text-muted">{{ editDraft.length }}/{{ MAX_BODY }}</small>
+                <div class="d-flex align-items-center gap-2">
+                  <ImageInsertButton compact @insert="(md) => insertCommentImage(md, 'edit')" />
+                  <small class="text-muted">{{ editDraft.length }}/{{ MAX_BODY }}</small>
+                </div>
                 <div class="d-flex gap-2">
                   <button type="button" class="btn btn-sm btn-outline-secondary" :disabled="savingEdit" @click="cancelEdit">
                     Cancel
@@ -689,7 +716,10 @@ defineExpose({ reload })
       </div>
     </div>
     <div class="d-flex justify-content-between align-items-center mt-1">
-      <small class="text-muted">{{ charCount }}/{{ MAX_BODY }}</small>
+      <div class="d-flex align-items-center gap-2">
+        <ImageInsertButton compact @insert="insertCommentImage" />
+        <small class="text-muted">{{ charCount }}/{{ MAX_BODY }}</small>
+      </div>
       <button
         type="button"
         class="btn btn-sm btn-primary"

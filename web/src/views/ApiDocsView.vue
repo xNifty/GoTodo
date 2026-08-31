@@ -54,6 +54,7 @@ onUnmounted(() => {
                             <li class="list-inline-item"><a href="#saved-views">Saved views</a></li>
                             <li class="list-inline-item"><a href="#projects">Projects</a></li>
                             <li class="list-inline-item"><a href="#tags">Tags</a></li>
+                            <li class="list-inline-item"><a href="#images">Images</a></li>
                         </ul>
                     </nav>
 
@@ -115,6 +116,7 @@ onUnmounted(() => {
                             <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#tags"><code>/api/v1/tags</code></a></td><td>Create a tag</td></tr>
                             <tr><td><span class="badge bg-warning text-dark">PATCH</span></td><td><a href="#tags"><code>/api/v1/tags/{id}</code></a></td><td>Update a tag (name and/or color)</td></tr>
                             <tr><td><span class="badge bg-danger">DELETE</span></td><td><a href="#tags"><code>/api/v1/tags/{id}</code></a></td><td>Delete a tag</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#images"><code>/api/v1/images</code></a></td><td>Upload an image (S3 or local hosting)</td></tr>
                         </tbody>
                     </table>
 
@@ -638,6 +640,26 @@ Content-Type: application/json
                     <p class="text-muted small mb-0">
                         Pass <code>tag_ids</code> when creating or updating tasks to assign tags from the task’s namespace
                         (that project, or personal tags for inbox tasks).
+                    </p>
+
+                    <h2 id="images" class="h4 mt-4">Images</h2>
+                    <p>
+                        Image uploads are available when an admin has configured hosting under Admin → Image hosting
+                        (<code>s3</code> or <code>local</code>). JPEG, PNG, GIF, and WebP are accepted.
+                        Size is limited by <code>image_max_bytes</code> (default 5&nbsp;MiB).
+                    </p>
+                    <p><span class="badge bg-primary">POST</span> <code>/api/v1/images</code></p>
+                    <p>Multipart form field <code>file</code>. Returns <code>201 Created</code>:</p>
+                    <pre class="api-docs-pre"><code>{
+  "url": "https://cdn.example.com/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.png",
+  "content_type": "image/png",
+  "size": 67,
+  "filename": "dot.png",
+  "key": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.png"
+}</code></pre>
+                    <p>
+                        Local uploads are also readable at <code>/uploads/{key}</code>.
+                        If hosting is disabled the API returns <code>400 not_configured</code>.
                     </p>
                 </div>
             </div>
