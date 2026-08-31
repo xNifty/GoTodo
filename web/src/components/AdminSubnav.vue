@@ -15,6 +15,7 @@ const links = [
   { name: 'admin-requests', label: 'Requests', to: '/admin/requests' },
   { name: 'admin-users', label: 'Users', to: '/admin/users' },
   { name: 'admin-email-audit', label: 'Email log', to: '/admin/email-audit' },
+  { name: 'admin-comment-audit', label: 'Comment history', to: '/admin/comment-audit' },
 ] as const
 
 const activeName = computed(() => String(route.name || ''))

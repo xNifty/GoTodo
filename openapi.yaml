@@ -12,6 +12,11 @@ info:
     Bearer API keys: 120 GET/min (~2/sec) and 60 writes/min (~1/sec).
     SPA session cookies use a higher budget (600 GET/min, 240 writes/min) so the
     web UI is not gated by the external API ceiling.
+
+    Deprecations: task favoriting (`favorite`) is deprecated and will be removed
+    in API v4. Create, update, reorder (`favorite: true`), and CSV import that
+    use `favorite` still succeed and return `Deprecation: true`, a RFC 7234
+    `Warning` header, and `deprecation_notice` in the JSON body.
   version: 1.0.0
   license:
     name: See LICENSE in repository
@@ -1063,7 +1068,14 @@ paths:
               $ref: "#/components/schemas/TaskCreate"
       responses:
         "201":
-          description: Created
+          description: >
+            Created. When the request included `favorite`, the response also has
+            `Deprecation` and `Warning` headers and `deprecation_notice` in the body.
+          headers:
+            Deprecation:
+              $ref: "#/components/headers/FavoriteDeprecation"
+            Warning:
+              $ref: "#/components/headers/FavoriteWarning"
           content:
             application/json:
               schema:
@@ -1074,7 +1086,13 @@ paths:
   /api/v1/tasks/reorder:
     post:
       tags: [Tasks]
-      summary: Reorder tasks within a favorite group
+      summary: Reorder tasks (favorite grouping is deprecated)
+      description: |
+        Updates manual sort order (`position`) within one favorite or non-favorite
+        group. Favorite grouping is deprecated and will be removed in API v4; the
+        `favorite` field is still required. Reordering the starred group
+        (`favorite: true`) returns `Deprecation` and `Warning` headers plus
+        `deprecation_notice` in the JSON body.
       security:
         - SessionCookie: []
         - BearerAuth: []
@@ -1086,11 +1104,18 @@ paths:
               $ref: "#/components/schemas/TaskReorder"
       responses:
         "200":
-          description: Reordered
+          description: >
+            Reordered. When `favorite` is true, the response also has `Deprecation`
+            and `Warning` headers and `deprecation_notice` in the body.
+          headers:
+            Deprecation:
+              $ref: "#/components/headers/FavoriteDeprecation"
+            Warning:
+              $ref: "#/components/headers/FavoriteWarning"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/OK"
+                $ref: "#/components/schemas/TaskReorderResult"
         "400":
           $ref: "#/components/responses/BadRequest"
 
@@ -1179,7 +1204,14 @@ paths:
               $ref: "#/components/schemas/TaskPatch"
       responses:
         "200":
-          description: Updated task
+          description: >
+            Updated task. When the request included `favorite`, the response also has
+            `Deprecation` and `Warning` headers and `deprecation_notice` in the body.
+          headers:
+            Deprecation:
+              $ref: "#/components/headers/FavoriteDeprecation"
+            Warning:
+              $ref: "#/components/headers/FavoriteWarning"
           content:
             application/json:
               schema:
@@ -2026,6 +2058,42 @@ paths:
         required: true
         schema:
           type: integer
+    patch:
+      tags: [Tasks]
+      summary: Edit a discussion comment (author or project owner)
+      description: |
+        Authors may edit their own comments. Project owners may edit any comment
+        on the task. Previous content is stored in an audit log.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body:
+                  type: string
+                  minLength: 1
+                  maxLength: 2000
+      responses:
+        "200":
+          description: Updated comment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskComment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
     delete:
       tags: [Tasks]
       summary: Soft-delete a comment (author or project owner)
@@ -2041,6 +2109,72 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+
+  /api/v1/tasks/{id}/comments/{commentId}/revisions:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+      - name: commentId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Tasks]
+      summary: List previous versions of a comment (project owner or site admin)
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Revisions newest-first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TaskCommentRevision"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/tasks/{id}/comments/{commentId}/restore:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+      - name: commentId
+        in: path
+        required: true
+        schema:
+          type: integer
+    post:
+      tags: [Tasks]
+      summary: Restore a previous comment version (project owner or site admin)
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision_id]
+              properties:
+                revision_id:
+                  type: integer
+      responses:
+        "200":
+          description: Restored comment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskComment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /api/v1/tasks/{id}/time-entries/{entryId}:
     parameters:
@@ -2702,7 +2836,15 @@ paths:
                   format: binary
       responses:
         "200":
-          description: Staged import preview
+          description: >
+            Staged import preview. When the CSV includes a `favorite` column, the
+            response also has `Deprecation` and `Warning` headers and
+            `deprecation_notice` in the body.
+          headers:
+            Deprecation:
+              $ref: "#/components/headers/FavoriteDeprecation"
+            Warning:
+              $ref: "#/components/headers/FavoriteWarning"
           content:
             application/json:
               schema:
@@ -2719,7 +2861,15 @@ paths:
         - BearerAuth: []
       responses:
         "200":
-          description: Import completed
+          description: >
+            Import completed. When the staged CSV included a `favorite` column, the
+            response also has `Deprecation` and `Warning` headers and
+            `deprecation_notice` in the body.
+          headers:
+            Deprecation:
+              $ref: "#/components/headers/FavoriteDeprecation"
+            Warning:
+              $ref: "#/components/headers/FavoriteWarning"
           content:
             application/json:
               schema:
@@ -2996,6 +3146,73 @@ paths:
         "400":
           $ref: "#/components/responses/BadRequest"
 
+  /api/v1/admin/comment-audit:
+    get:
+      tags: [Admin]
+      summary: Query discussion comment audit log
+      description: |
+        Lists previous comment bodies captured when a comment was edited, deleted, or restored.
+        Site admins can restore any revision.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - name: kind
+          in: query
+          schema:
+            type: string
+            enum: [edit, delete, restore]
+        - name: q
+          in: query
+          description: Case-insensitive substring match on body, task title, project, or usernames
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: Audit rows, newest first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommentAuditList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/admin/comment-audit/{id}/restore:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      tags: [Admin]
+      summary: Restore a comment to a previous version
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Restored comment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskComment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /api/v1/admin/join-requests:
     get:
       tags: [Admin]
@@ -3090,6 +3307,22 @@ components:
         type: integer
         minimum: 1
 
+  headers:
+    FavoriteDeprecation:
+      description: >
+        Set to `true` when the request used the deprecated `favorite` field.
+        Task favoriting will be removed in API v4.
+      schema:
+        type: string
+        example: "true"
+    FavoriteWarning:
+      description: >
+        RFC 7234 miscellaneous persistent warning describing the favorite
+        deprecation (`299 - "Task favoriting is deprecated and will be removed in API v4."`).
+      schema:
+        type: string
+        example: '299 - "Task favoriting is deprecated and will be removed in API v4."'
+
   responses:
     BadRequest:
       description: Invalid request
@@ -3150,6 +3383,17 @@ components:
       properties:
         ok:
           type: boolean
+
+    TaskReorderResult:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        deprecation_notice:
+          type: string
+          description: >
+            Present when reordering the deprecated favorite group (`favorite: true`).
+            Favoriting will be removed in API v4.
 
     Health:
       type: object
@@ -3549,6 +3793,14 @@ components:
         created_at:
           type: string
           format: date-time
+        edited_at:
+          type: string
+          format: date-time
+          description: Set when the comment has been edited or restored
+        edited_by_user_id:
+          type: integer
+        edited_by_user_name:
+          type: string
         deleted:
           type: boolean
         deleted_at:
@@ -3569,6 +3821,57 @@ components:
                 type: integer
               title:
                 type: string
+
+    TaskCommentRevision:
+      type: object
+      properties:
+        id:
+          type: integer
+        comment_id:
+          type: integer
+        task_id:
+          type: integer
+        body:
+          type: string
+          description: Previous comment content captured before the change
+        kind:
+          type: string
+          enum: [edit, delete, restore]
+        created_at:
+          type: string
+          format: date-time
+        edited_by_user_id:
+          type: integer
+        edited_by_user_name:
+          type: string
+        author_user_id:
+          type: integer
+        author_user_name:
+          type: string
+        task_title:
+          type: string
+        project_id:
+          type: integer
+        project_name:
+          type: string
+        comment_deleted:
+          type: boolean
+        current_body:
+          type: string
+
+    CommentAuditList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskCommentRevision"
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
 
     ProjectMember:
       type: object
@@ -3763,6 +4066,11 @@ components:
           maximum: 3
         favorite:
           type: boolean
+          deprecated: true
+          description: >
+            Whether the task is starred. Deprecated; will be removed in API v4.
+            Still returned. Requests that set this field receive `Deprecation` and
+            `Warning` headers plus `deprecation_notice` in the JSON body.
         position:
           type: integer
         parent_id:
@@ -3786,6 +4094,11 @@ components:
           type: string
         modified_at:
           type: string
+        deprecation_notice:
+          type: string
+          description: >
+            Present on create/update responses that included the deprecated
+            `favorite` field. Favoriting will be removed in API v4.
         status_id:
           type: integer
           nullable: true
@@ -3960,6 +4273,11 @@ components:
           type: boolean
         favorite:
           type: boolean
+          deprecated: true
+          description: >
+            Optional (default false). Deprecated; will be removed in API v4.
+            Including this field still stars or unstars the task and returns
+            `Deprecation`/`Warning` headers plus `deprecation_notice`.
         tag_ids:
           type: array
           items:
@@ -4003,6 +4321,11 @@ components:
           type: boolean
         favorite:
           type: boolean
+          deprecated: true
+          description: >
+            Deprecated; will be removed in API v4. Including this field still
+            stars or unstars the task and returns `Deprecation`/`Warning` headers
+            plus `deprecation_notice`.
         tag_ids:
           type: array
           items:
@@ -4028,6 +4351,11 @@ components:
             type: integer
         favorite:
           type: boolean
+          deprecated: true
+          description: >
+            Which group is being reordered. Deprecated; favorite grouping will be
+            removed in API v4. Still required. `favorite: true` returns
+            `Deprecation`/`Warning` headers plus `deprecation_notice`.
         parent_id:
           type: integer
           nullable: true
@@ -4108,6 +4436,11 @@ components:
           type: integer
         total_rows:
           type: integer
+        deprecation_notice:
+          type: string
+          description: >
+            Present when the CSV includes a `favorite` column. Favoriting will
+            be removed in API v4.
 
     ImportResult:
       type: object
@@ -4116,6 +4449,11 @@ components:
           type: integer
         skipped:
           type: integer
+        deprecation_notice:
+          type: string
+          description: >
+            Present when the staged CSV included a `favorite` column. Favoriting
+            will be removed in API v4.
 
     DeleteResult:
       type: object

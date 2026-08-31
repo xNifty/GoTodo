@@ -29,7 +29,6 @@ const props = withDefaults(
 const emit = defineEmits<{
   'toggle-select': [checked: boolean]
   'toggle-complete': []
-  'toggle-favorite': []
   'toggle-expand': []
   'patch-task': [payload: { id: number; title?: string; description?: string }]
   'add-subtask': []
@@ -164,22 +163,6 @@ function formatMinutes(total: number) {
             @change="emit('toggle-select', ($event.target as HTMLInputElement).checked)"
           />
         </div>
-
-        <!-- Favorite Star Button (roots only) -->
-        <button
-          v-if="!isSubtask()"
-          type="button"
-          class="btn btn-link p-0 m-0 border-0 text-decoration-none hover-reveal flex-shrink-0 d-inline-flex align-items-center justify-content-center"
-          :class="{ 'is-visible': task.favorite }"
-          :aria-label="task.favorite ? 'Unstar task' : 'Star task'"
-          :disabled="!canWrite"
-          @click="emit('toggle-favorite')"
-        >
-          <i
-            :class="task.favorite ? 'bi bi-star-fill text-warning' : 'bi bi-star text-muted opacity-60'"
-            style="font-size: 1.05rem; line-height: 1;"
-          />
-        </button>
 
         <!-- Completion Checkmark Button -->
         <button

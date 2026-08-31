@@ -130,12 +130,12 @@ func TestAPIV1TaskCommentsInvalidID(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 
-	req = httptest.NewRequest(http.MethodDelete, "/api/v1/tasks/1/comments/abc", nil)
+	req = httptest.NewRequest(http.MethodPatch, "/api/v1/tasks/1/comments/abc", nil)
 	req = utils.SetAPIUserID(req, 1)
 	rec = httptest.NewRecorder()
 	APIV1TasksRouter(rec, req)
 	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("comment id status = %d, want %d", rec.Code, http.StatusBadRequest)
+		t.Fatalf("patch comment id status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 }
 

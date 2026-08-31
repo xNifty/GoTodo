@@ -15,7 +15,6 @@ withDefaults(
 const emit = defineEmits<{
   'toggle-select': [checked: boolean]
   'toggle-complete': []
-  'toggle-favorite': []
   edit: []
   remove: []
 }>()
@@ -52,19 +51,6 @@ function priorityLabel(priority: number) {
     </td>
     <td class="title-column">
       <div class="d-flex align-items-center flex-wrap">
-        <button
-          v-if="canWrite && showWriteColumns"
-          type="button"
-          class="btn btn-link p-0 me-2 favorite-btn"
-          style="text-decoration: none"
-          :aria-label="task.favorite ? 'Unstar task' : 'Star task'"
-          @click="emit('toggle-favorite')"
-        >
-          <i
-            :class="task.favorite ? 'bi bi-star-fill' : 'bi bi-star'"
-            :style="task.favorite ? 'color: gold' : ''"
-          />
-        </button>
         <button
           type="button"
           class="btn btn-link p-0 task-toggle title-text text-start"

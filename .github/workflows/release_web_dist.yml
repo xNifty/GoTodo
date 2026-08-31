@@ -1,0 +1,45 @@
+name: Build web distribution for release
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: write
+
+jobs:
+  build-web:
+    name: Build and attach web distribution
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out released tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Build web distribution
+        working-directory: web
+        run: npm run build:web
+
+      - name: Package web distribution
+        run: |
+          cd web/dist
+          zip -r ../../web-dist-${{ github.event.release.tag_name }}.zip .
+
+      - name: Attach web distribution to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: web-dist-${{ github.event.release.tag_name }}.zip

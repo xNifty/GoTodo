@@ -147,6 +147,8 @@ func registerAPIV1Routes() {
 	handleBoth("/api/v1/admin/join-requests", utils.AdminAPIChain(handlers.APIV1AdminJoinRequestsRouter))
 	handleBoth("/api/v1/admin/join-requests/", utils.AdminAPIChain(handlers.APIV1AdminJoinRequestsRouter))
 	handleBoth("/api/v1/admin/email-audit", utils.AdminAPIChain(handlers.APIV1AdminEmailAudit))
+	handleBoth("/api/v1/admin/comment-audit", utils.AdminAPIChain(handlers.APIV1AdminCommentAuditRouter))
+	handleBoth("/api/v1/admin/comment-audit/", utils.AdminAPIChain(handlers.APIV1AdminCommentAuditRouter))
 	handleBoth("/api/v1/announcements/dismiss", utils.AuthSessionChain(handlers.APIV1DismissAnnouncement))
 
 	handleBoth("/cal/", handlers.CalendarFeedHandler)

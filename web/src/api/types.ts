@@ -108,11 +108,46 @@ export type TaskComment = {
   user_name?: string
   body: string
   created_at: string
+  edited_at?: string | null
+  edited_by_user_id?: number
+  edited_by_user_name?: string
   deleted: boolean
   deleted_at?: string | null
   deleted_by_user_id?: number
   deleted_by_kind?: 'user' | 'owner' | string
   links?: TaskCommentLink[]
+}
+
+export type TaskCommentRevision = {
+  id: number
+  comment_id: number
+  task_id: number
+  body: string
+  kind: 'edit' | 'delete' | 'restore' | string
+  created_at: string
+  edited_by_user_id?: number
+  edited_by_user_name?: string
+  author_user_id?: number
+  author_user_name?: string
+  task_title?: string
+  project_id?: number
+  project_name?: string
+  comment_deleted: boolean
+  current_body?: string
+}
+
+export type CommentAuditList = {
+  items: TaskCommentRevision[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export type CommentAuditQuery = {
+  kind?: string
+  q?: string
+  limit?: number
+  offset?: number
 }
 
 export type ProjectMember = {
@@ -196,6 +231,7 @@ export type Task = {
   project_id?: number | null
   project?: string
   priority: number
+  /** @deprecated Task favoriting will be removed in API v4. */
   favorite: boolean
   position: number
   parent_id?: number | null
@@ -216,6 +252,8 @@ export type Task = {
   sprint_name?: string
   parent_title?: string
   github?: TaskGitHubIssue | null
+  /** Present on write responses that used the deprecated favorite field. */
+  deprecation_notice?: string
 }
 
 export type GitHubConnection = {

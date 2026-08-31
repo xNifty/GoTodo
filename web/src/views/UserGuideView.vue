@@ -53,7 +53,6 @@ onUnmounted(() => {
         <ul>
           <li>Click a task’s edit control (or press <kbd>e</kbd> / <kbd>Enter</kbd> on a focused task) to edit it in the sidebar.</li>
           <li>Use the checkmark to mark a task complete, or press <kbd>x</kbd> on the focused task.</li>
-          <li>Star important tasks so they stay pinned at the top of the list.</li>
           <li>Nest work under a parent with <strong>Add subtask</strong>; expand or collapse children as needed.</li>
           <li>
             Each task has a stable number (for example <code>#42</code>) shown in the task panel.
@@ -121,10 +120,15 @@ onUnmounted(() => {
             session.
           </li>
           <li>
-            Owners, editors, and viewers can discuss a project task in the sidebar. Deleting a comment
-            leaves a tombstone (“Message deleted by user” or “Message deleted by project owner”). New
-            comments show up live for anyone with the task open. The notification bell
-            refreshes when you open it, change pages, or return to the tab.
+            Owners, editors, and viewers can discuss a project task in the sidebar.
+            You can edit your own comments; project owners can also edit anyone else’s.
+            Each comment shows when it was posted and, if changed, when it was last edited.
+            Hover the edited date to see who originally posted it (and who edited it, if that was someone else).
+            Deleting a comment leaves a tombstone (“Message deleted by user” or “Message deleted by project owner”).
+            Project owners and site admins can open History to review previous text and restore it.
+            Site admins also have a Comment history log under Admin. New comments show up live for
+            anyone with the task open. The notification bell refreshes when you open it, change pages,
+            or return to the tab.
           </li>
           <li>
             Type <code>@</code> in a comment to mention a project member. Autocomplete lists matching

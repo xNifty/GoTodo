@@ -35,6 +35,9 @@ import type {
   TaskList,
   TaskTimeEntry,
   TaskComment,
+  TaskCommentRevision,
+  CommentAuditList,
+  CommentAuditQuery,
   User,
   UserSearchHit,
   WorkflowMode,
@@ -291,6 +294,7 @@ export const api = {
     project_id?: number | null
     parent_id?: number | null
     priority?: number
+    /** @deprecated Task favoriting will be removed in API v4. */
     favorite?: boolean
     tag_ids?: number[]
     status_id?: number | null
@@ -314,6 +318,7 @@ export const api = {
       parent_id: number | null
       priority: number
       completed: boolean
+      /** @deprecated Task favoriting will be removed in API v4. */
       favorite: boolean
       tag_ids: number[]
       status_id: number | null
@@ -377,6 +382,7 @@ export const api = {
 
   reorderTasks(payload: {
     task_ids: number[]
+    /** @deprecated Favorite grouping will be removed in API v4. */
     favorite: boolean
     project?: string
     parent_id?: number | null
@@ -603,6 +609,24 @@ export const api = {
   deleteTaskComment(taskId: number, commentId: number) {
     return request<void>(`/api/v1/tasks/${taskId}/comments/${commentId}`, {
       method: 'DELETE',
+    })
+  },
+
+  editTaskComment(taskId: number, commentId: number, body: string) {
+    return request<TaskComment>(`/api/v1/tasks/${taskId}/comments/${commentId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ body }),
+    })
+  },
+
+  listTaskCommentRevisions(taskId: number, commentId: number) {
+    return request<TaskCommentRevision[]>(`/api/v1/tasks/${taskId}/comments/${commentId}/revisions`)
+  },
+
+  restoreTaskComment(taskId: number, commentId: number, revisionId: number) {
+    return request<TaskComment>(`/api/v1/tasks/${taskId}/comments/${commentId}/restore`, {
+      method: 'POST',
+      body: JSON.stringify({ revision_id: revisionId }),
     })
   },
 
@@ -853,6 +877,21 @@ export const api = {
     }
     const q = qs.toString()
     return request<EmailAuditList>(`/api/v1/admin/email-audit${q ? `?${q}` : ''}`)
+  },
+
+  listAdminCommentAudit(params: CommentAuditQuery = {}) {
+    const qs = new URLSearchParams()
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== '') qs.set(k, String(v))
+    }
+    const q = qs.toString()
+    return request<CommentAuditList>(`/api/v1/admin/comment-audit${q ? `?${q}` : ''}`)
+  },
+
+  restoreAdminCommentRevision(revisionId: number) {
+    return request<TaskComment>(`/api/v1/admin/comment-audit/${revisionId}/restore`, {
+      method: 'POST',
+    })
   },
 
   approveJoinRequest(id: number) {
