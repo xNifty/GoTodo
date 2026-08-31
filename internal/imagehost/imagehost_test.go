@@ -93,6 +93,24 @@ func TestClampMaxBytes(t *testing.T) {
 	}
 }
 
+func TestNormalizeMaxBytes(t *testing.T) {
+	if got := NormalizeMaxBytes(5); got != 5<<20 {
+		t.Fatalf("5 MiB from UI, got %d", got)
+	}
+	if got := NormalizeMaxBytes(1); got != 1<<20 {
+		t.Fatalf("1 MiB from UI, got %d", got)
+	}
+	if got := NormalizeMaxBytes(50); got != 50<<20 {
+		t.Fatalf("50 MiB from UI, got %d", got)
+	}
+	if got := NormalizeMaxBytes(5 << 20); got != 5<<20 {
+		t.Fatalf("already bytes, got %d", got)
+	}
+	if got := NormalizeMaxBytes(0); got != DefaultMaxBytes {
+		t.Fatalf("zero -> default, got %d", got)
+	}
+}
+
 func TestConfigValidate(t *testing.T) {
 	t.Run("none", func(t *testing.T) {
 		c := Config{Provider: ""}

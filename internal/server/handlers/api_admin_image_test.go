@@ -49,6 +49,29 @@ func TestValidateImageHostingSettings(t *testing.T) {
 			t.Fatalf("msg=%q", msg)
 		}
 	})
+	t.Run("s3 r2 dashboard endpoint with stored secret", func(t *testing.T) {
+		s := &storage.SiteSettings{
+			Image: imagehost.Config{
+				Provider:         "s3",
+				S3Endpoint:       "https://abc123.r2.cloudflarestorage.com/ordryn-testing",
+				S3Region:         "ENAM",
+				S3Bucket:         "ordryn-testing",
+				S3AccessKey:      "ak",
+				S3PublicURL:      "https://pub-example.r2.dev",
+				S3ForcePathStyle: true,
+			},
+			ImageS3SecretKeyEnc: "ciphertext",
+		}
+		if msg := validateImageHostingSettings(s); msg != "" {
+			t.Fatalf("msg=%q", msg)
+		}
+		if s.Image.S3Endpoint != "https://abc123.r2.cloudflarestorage.com" {
+			t.Fatalf("endpoint=%q", s.Image.S3Endpoint)
+		}
+		if s.Image.S3Region != "auto" {
+			t.Fatalf("region=%q", s.Image.S3Region)
+		}
+	})
 	t.Run("s3 missing secret", func(t *testing.T) {
 		s := &storage.SiteSettings{
 			Image: imagehost.Config{

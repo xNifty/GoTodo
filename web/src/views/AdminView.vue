@@ -150,20 +150,35 @@ async function saveGitHubOAuthSettings() {
   }
 }
 
+const imageMaxMB = computed({
+  get() {
+    const n = Number(settings.image_max_bytes) || 5 * 1024 * 1024
+    if (n >= 1 && n <= 50) return n
+    return Math.max(1, Math.round(n / (1024 * 1024)))
+  },
+  set(v: number) {
+    const mb = Math.min(50, Math.max(1, Number(v) || 1))
+    settings.image_max_bytes = mb * 1024 * 1024
+  },
+})
+
 function imageHostingFormPayload(): AdminSettingsPatch {
+  const mb = Math.min(50, Math.max(1, Number(imageMaxMB.value) || 1))
+  settings.image_max_bytes = mb * 1024 * 1024
   const payload: AdminSettingsPatch = {
     image_hosting_provider: settings.image_hosting_provider || '',
     image_max_bytes: settings.image_max_bytes,
-    image_s3_endpoint: settings.image_s3_endpoint,
-    image_s3_region: settings.image_s3_region,
-    image_s3_bucket: settings.image_s3_bucket,
-    image_s3_access_key: settings.image_s3_access_key,
-    image_s3_public_url: settings.image_s3_public_url,
-    image_s3_force_path_style: settings.image_s3_force_path_style,
-    image_local_path: settings.image_local_path,
+    image_s3_endpoint: (settings.image_s3_endpoint || '').trim(),
+    image_s3_region: (settings.image_s3_region || '').trim(),
+    image_s3_bucket: (settings.image_s3_bucket || '').trim(),
+    image_s3_access_key: (settings.image_s3_access_key || '').trim(),
+    image_s3_public_url: (settings.image_s3_public_url || '').trim(),
+    image_s3_force_path_style: !!settings.image_s3_force_path_style,
+    image_local_path: (settings.image_local_path || '').trim(),
   }
-  if (s3SecretInput.value !== '') {
-    payload.image_s3_secret_key = s3SecretInput.value
+  const secret = s3SecretInput.value.trim()
+  if (secret !== '') {
+    payload.image_s3_secret_key = secret
   }
   return payload
 }
@@ -198,17 +213,6 @@ async function testImageHosting() {
     imageTestBusy.value = false
   }
 }
-
-const imageMaxMB = computed({
-  get() {
-    const n = Number(settings.image_max_bytes) || 5 * 1024 * 1024
-    return Math.max(1, Math.round(n / (1024 * 1024)))
-  },
-  set(v: number) {
-    const mb = Math.min(50, Math.max(1, Number(v) || 1))
-    settings.image_max_bytes = mb * 1024 * 1024
-  },
-})
 
 onMounted(load)
 </script>
@@ -446,7 +450,7 @@ onMounted(load)
           or other S3-compatible APIs. Local uploads are stored on this server and served from
           <code>/uploads/</code>.
         </p>
-        <form @submit.prevent="saveImageHostingSettings">
+        <form novalidate @submit.prevent="saveImageHostingSettings">
           <div class="mb-3">
             <label class="form-label" for="image-provider">Provider</label>
             <select id="image-provider" v-model="settings.image_hosting_provider" class="form-select">
@@ -476,7 +480,9 @@ onMounted(load)
               <input
                 id="image-s3-endpoint"
                 v-model="settings.image_s3_endpoint"
-                type="url"
+                type="text"
+                inputmode="url"
+                autocomplete="off"
                 class="form-control"
                 placeholder="https://nyc3.digitaloceanspaces.com"
                 required
@@ -544,7 +550,9 @@ onMounted(load)
               <input
                 id="image-s3-public-url"
                 v-model="settings.image_s3_public_url"
-                type="url"
+                type="text"
+                inputmode="url"
+                autocomplete="off"
                 class="form-control"
                 placeholder="https://cdn.example.com"
                 required
@@ -593,13 +601,13 @@ onMounted(load)
             {{ imageTestResult.message }}
           </div>
 
-          <button type="submit" class="btn btn-primary" :disabled="imageBusy || imageTestBusy">
+          <button type="submit" class="btn btn-primary" :disabled="imageBusy">
             {{ imageBusy ? 'Saving…' : 'Save image hosting' }}
           </button>
           <button
             type="button"
             class="btn btn-outline-secondary ms-2"
-            :disabled="imageBusy || imageTestBusy || !settings.image_hosting_provider"
+            :disabled="imageTestBusy || !settings.image_hosting_provider"
             @click="testImageHosting"
           >
             {{ imageTestBusy ? 'Testing…' : 'Test connection' }}

@@ -61,6 +61,16 @@ func ClampMaxBytes(n int64) int64 {
 	return n
 }
 
+// NormalizeMaxBytes accepts either a byte count or a UI value in MiB (1–50).
+// The admin form displays megabytes; a payload of 5 must not be rejected as
+// "below 64 KiB".
+func NormalizeMaxBytes(n int64) int64 {
+	if n >= 1 && n <= 50 {
+		n = n << 20
+	}
+	return ClampMaxBytes(n)
+}
+
 // Enabled reports whether uploads should be accepted.
 func (c Config) Enabled() bool {
 	p := NormalizeProvider(c.Provider)

@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -240,13 +239,7 @@ func apiV1PatchAdminSettings(w http.ResponseWriter, r *http.Request) {
 		next.Image.Provider = imagehost.NormalizeProvider(*req.ImageHostingProvider)
 	}
 	if req.ImageMaxBytes != nil {
-		n := *req.ImageMaxBytes
-		if n < imagehost.MinMaxBytes || n > imagehost.MaxMaxBytes {
-			utils.APIJSONError(w, http.StatusBadRequest, "invalid_request",
-				fmt.Sprintf("image_max_bytes must be between %d and %d.", imagehost.MinMaxBytes, imagehost.MaxMaxBytes))
-			return
-		}
-		next.Image.MaxBytes = n
+		next.Image.MaxBytes = imagehost.NormalizeMaxBytes(*req.ImageMaxBytes)
 	}
 	if req.ImageS3Endpoint != nil {
 		next.Image.S3Endpoint = strings.TrimSpace(*req.ImageS3Endpoint)
@@ -262,9 +255,7 @@ func apiV1PatchAdminSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.ImageS3SecretKey != nil {
 		sec := strings.TrimSpace(*req.ImageS3SecretKey)
-		if sec == "" {
-			next.ImageS3SecretKeyEnc = ""
-		} else {
+		if sec != "" {
 			enc, err := secret.Encrypt(sec)
 			if err != nil {
 				utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to encrypt S3 secret key.")
@@ -272,6 +263,7 @@ func apiV1PatchAdminSettings(w http.ResponseWriter, r *http.Request) {
 			}
 			next.ImageS3SecretKeyEnc = enc
 		}
+		// Blank means keep the stored secret (the form placeholder says leave blank to keep).
 	}
 	if req.ImageS3PublicURL != nil {
 		next.Image.S3PublicURL = strings.TrimSpace(*req.ImageS3PublicURL)
