@@ -192,7 +192,7 @@ If you did not request this, please reach out to support.
 
 This email cannot receive replies. Please do not reply to this email.
 `, siteName)
-		if err := mailer.SendEmail(settings.Email, subject, body, profile.Email); err != nil {
+		if err := mailer.SendEmail(storage.SiteEmailConfig(settings), mailer.TriggerPasswordChanged, subject, body, profile.Email); err != nil {
 			fmt.Printf("Warning: Failed to send password changed email to %s: %v\n", profile.Email, err)
 		}
 	}

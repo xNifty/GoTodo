@@ -136,7 +136,7 @@ func notifyAdminsOfJoinRequest(r *http.Request, siteName, email, message string)
 	body += "Review join requests in Admin:\n" + adminURL + "\n"
 	subject := fmt.Sprintf("%s - New join request", siteName)
 	for _, to := range admins {
-		_ = mailer.SendEmail(settings.Email, subject, body, to)
+		_ = mailer.SendEmail(storage.SiteEmailConfig(settings), mailer.TriggerJoinRequest, subject, body, to)
 	}
 }
 

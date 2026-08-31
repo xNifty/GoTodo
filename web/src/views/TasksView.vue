@@ -22,7 +22,7 @@ import { useViewDensity } from '@/composables/useViewDensity'
 import { useSidebarState } from '@/composables/useSidebarState'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useLiveUpdates, isOwnFocusedLiveEvent } from '@/composables/useLiveUpdates'
-import { projectOptionLabel, activeProjects, isArchivedProject } from '@/utils/projectLabel'
+import { projectOptionLabel, activeProjects, isArchivedProject, isProjectOwner } from '@/utils/projectLabel'
 import { sprintOptionLabel } from '@/utils/sprintLabel'
 import { uniqueTagsByName, isArchivedTask } from '@/utils/tags'
 
@@ -339,6 +339,20 @@ function canWriteTask(task: Task): boolean {
   }
   return true
 }
+
+function canMoveTaskProject(task: Task): boolean {
+  const pid = task.project_id
+  if (!pid) return true
+  const p = projects.value.find((pr) => pr.id === pid)
+  return !!p && isProjectOwner(p)
+}
+
+const canBulkMoveProject = computed(() =>
+  selected.value.every((id) => {
+    const found = findTaskInTree(id)
+    return !!found && canMoveTaskProject(found.task)
+  }),
+)
 
 /** Open edit for writers, view-only for project viewers. */
 function openTaskDetails(id: number) {
@@ -980,6 +994,7 @@ async function toggleCompleteChild(child: Task) {
 
 async function bulk(action: string, extra: Record<string, unknown> = {}) {
   if (!selected.value.length || isViewerProjectView.value) return
+  if (action === 'move_project' && !canBulkMoveProject.value) return
   if (action === 'delete') {
     const nestedCount = selected.value.reduce((n, id) => {
       const t = findTaskInTree(id)?.task
@@ -1473,7 +1488,7 @@ onUnmounted(() => {
                 <!-- Move to Project -->
                 <div class="mb-3">
                   <label class="form-label text-muted small fw-bold text-uppercase mb-1" style="font-size: 0.7rem;">Move to project...</label>
-                  <select v-model="bulkProject" class="form-select form-select-sm mb-2">
+                  <select v-model="bulkProject" class="form-select form-select-sm mb-2" :disabled="!canBulkMoveProject">
                     <option value="">Select project...</option>
                     <option value="0">No Project</option>
                     <option v-for="p in activeProjects(projects)" :key="p.id" :value="String(p.id)">{{ projectOptionLabel(p) }}</option>
@@ -1481,11 +1496,14 @@ onUnmounted(() => {
                   <button
                     type="button"
                     class="btn btn-xs btn-outline-primary rounded-pill w-100"
-                    :disabled="bulkProject === ''"
+                    :disabled="!canBulkMoveProject || bulkProject === ''"
                     @click="bulk('move_project', { project_id: bulkProject })"
                   >
                     Move
                   </button>
+                  <small v-if="!canBulkMoveProject" class="form-hint d-block mt-1">
+                    Only the project owner can move this task to another project.
+                  </small>
                 </div>
 
                 <!-- Select Tag -->

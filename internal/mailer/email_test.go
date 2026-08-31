@@ -1,6 +1,7 @@
 package mailer
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -100,7 +101,7 @@ func TestSendEmailValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := SendEmail(tt.cfg, "subject", "body", "to@example.com")
+			err := SendEmail(tt.cfg, TriggerPasswordReset, "subject", "body", "to@example.com")
 			if err == nil {
 				t.Fatalf("SendEmail() error = nil, want %q", tt.wantErr)
 			}
@@ -127,5 +128,44 @@ func TestFormatFrom(t *testing.T) {
 		if got != tt.want {
 			t.Fatalf("formatFrom(%q, %q) = %q, want %q", tt.name, tt.from, got, tt.want)
 		}
+	}
+}
+
+func TestSendEmailRecordsAudit(t *testing.T) {
+	t.Cleanup(func() { SetAuditor(nil) })
+
+	var got AuditEntry
+	SetAuditor(func(entry AuditEntry) { got = entry })
+
+	err := SendEmail(Config{FromAddress: "noreply@example.com"}, TriggerPasswordReset, "subject", "body", "user@example.com")
+	if err == nil {
+		t.Fatal("expected send error")
+	}
+	if got.Trigger != TriggerPasswordReset {
+		t.Fatalf("trigger = %q", got.Trigger)
+	}
+	if got.ToEmail != "user@example.com" {
+		t.Fatalf("to = %q", got.ToEmail)
+	}
+	if got.Status != StatusNotConfigured {
+		t.Fatalf("status = %q, want %s", got.Status, StatusNotConfigured)
+	}
+	if got.Error == "" {
+		t.Fatal("expected error text")
+	}
+}
+
+func TestClassifyAudit(t *testing.T) {
+	if status, _ := classifyAudit(Config{Provider: ProviderSMTP}, nil); status != StatusSent {
+		t.Fatalf("nil err status = %q", status)
+	}
+	if status, _ := classifyAudit(Config{}, fmt.Errorf("email not configured")); status != StatusNotConfigured {
+		t.Fatalf("empty provider status = %q", status)
+	}
+	if status, _ := classifyAudit(Config{Provider: ProviderSMTP}, fmt.Errorf("smtp credentials not configured")); status != StatusNotConfigured {
+		t.Fatalf("missing creds status = %q", status)
+	}
+	if status, msg := classifyAudit(Config{Provider: ProviderSMTP}, fmt.Errorf("failed to send email: connection refused")); status != StatusFailed || msg == "" {
+		t.Fatalf("smtp failure status = %q msg = %q", status, msg)
 	}
 }

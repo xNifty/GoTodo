@@ -89,6 +89,7 @@ var requiredOpenAPIPaths = []string{
 	"/api/v1/admin/join-requests",
 	"/api/v1/admin/join-requests/{id}/approve",
 	"/api/v1/admin/join-requests/{id}/deny",
+	"/api/v1/admin/email-audit",
 }
 
 func moduleRoot(t *testing.T) string {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import { api } from '@/api/client'
 import type { AdminSettings, AdminSettingsPatch } from '@/api/types'
 import { APIError } from '@/api/types'
@@ -38,6 +39,7 @@ const settings = reactive<AdminSettings>({
   email_smtp_username: '',
   email_smtp_password_set: false,
   email_smtp_tls: true,
+  email_audit_retention_days: 7,
   github_oauth_client_id: '',
   github_oauth_client_secret_set: false,
   github_oauth_configured: false,
@@ -92,6 +94,7 @@ async function saveEmailSettings() {
       email_smtp_port: settings.email_smtp_port,
       email_smtp_username: settings.email_smtp_username,
       email_smtp_tls: settings.email_smtp_tls,
+      email_audit_retention_days: settings.email_audit_retention_days,
     }
     if (mailgunApiKeyInput.value !== '') {
       payload.email_mailgun_api_key = mailgunApiKeyInput.value
@@ -333,6 +336,24 @@ onMounted(load)
           <p v-if="!settings.email_provider" class="text-muted small">
             Outbound email is disabled. Password resets and digests will not send until a provider is configured.
           </p>
+
+          <div class="mb-3">
+            <label class="form-label" for="email-audit-retention">Audit log retention (days)</label>
+            <input
+              id="email-audit-retention"
+              v-model.number="settings.email_audit_retention_days"
+              type="number"
+              class="form-control"
+              min="1"
+              max="90"
+              required
+              style="max-width: 8rem"
+            />
+            <div class="form-text">
+              Outbound email attempts are kept this many days, then deleted automatically.
+              <RouterLink to="/admin/email-audit">View email log</RouterLink>
+            </div>
+          </div>
 
           <button type="submit" class="btn btn-primary" :disabled="emailBusy">
             {{ emailBusy ? 'Saving…' : 'Save email settings' }}

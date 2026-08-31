@@ -40,5 +40,5 @@ If the link does not work, enter your email and the following invite token on th
 
 If you did not expect this invitation, you can ignore this email.
 `, siteName, registerURL, token)
-	_ = mailer.SendEmail(settings.Email, subject, body, email)
+	_ = mailer.SendEmail(storage.SiteEmailConfig(settings), mailer.TriggerSiteInvite, subject, body, email)
 }
