@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.6.0",
+    "date": "2026-08-31",
+    "title": "Task favoriting deprecated",
+    "notes": [
+      "Starred tasks are removed from the web UI; starring is no longer available in the Vue app",
+      "The API still accepts favorite on create, update, reorder, and import, and returns a deprecation notice when it is used",
+      "Task favoriting will be removed in API v4"
+    ]
+  },
+  {
     "version": "3.0.0",
     "date": "2026-08-25",
     "title": "Archive projects",

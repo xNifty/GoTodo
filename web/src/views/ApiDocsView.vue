@@ -96,7 +96,7 @@ onUnmounted(() => {
                             <tr><td><span class="badge bg-danger">DELETE</span></td><td><a href="#tasks"><code>/api/v1/tasks/{id}</code></a></td><td>Delete a task (permanent; may return undo_token)</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#tasks"><code>/api/v1/tasks/{id}/archive</code></a></td><td>Archive a task (applies protected removed tag)</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#tasks"><code>/api/v1/tasks/{id}/restore</code></a></td><td>Restore an archived task</td></tr>
-                            <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#tasks"><code>/api/v1/tasks/reorder</code></a></td><td>Reorder tasks within a favorite group</td></tr>
+                            <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#tasks"><code>/api/v1/tasks/reorder</code></a></td><td>Reorder tasks (favorite grouping is deprecated)</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#tasks"><code>/api/v1/tasks/bulk</code></a></td><td>Bulk actions</td></tr>
                             <tr><td><span class="badge bg-primary">POST</span></td><td><a href="#tasks"><code>/api/v1/tasks/undo</code></a></td><td>Restore deleted tasks via undo_token</td></tr>
                             <tr><td><span class="badge bg-success">GET</span></td><td><a href="#tasks"><code>/api/v1/tasks/{id}/events</code></a></td><td>Task activity timeline</td></tr>
@@ -277,6 +277,14 @@ Content-Type: application/json
 
                     <h2 id="tasks" class="h4 mt-4">Tasks</h2>
 
+                    <div class="alert alert-warning" role="alert">
+                        <strong>Deprecation:</strong> Task favoriting (<code>favorite</code>) is deprecated and
+                        will be removed in API v4. Create, update, reorder (<code>favorite: true</code>), and
+                        CSV import requests that use <code>favorite</code> still succeed. Those responses include
+                        <code>Deprecation: true</code>, a RFC 7234 <code>Warning</code> header, and
+                        <code>deprecation_notice</code> in the JSON body.
+                    </div>
+
                     <h3 class="h5 mt-3">Task object</h3>
                     <pre class="api-docs-pre"><code>{
   "id": 42,
@@ -287,7 +295,7 @@ Content-Type: application/json
   "project_id": 3,
   "project": "Personal",
   "priority": 2,
-  "favorite": false,
+  "favorite": false,             // deprecated; will be removed in API v4
   "position": 5,
   "tags": [
   { "id": 1, "name": "errands", "color": "#6c757d", "project_id": 3 }
@@ -299,6 +307,8 @@ Content-Type: application/json
                         <code>priority</code>: 0 = None, 1 = Low, 2 = Medium, 3 = High.
                         <code>due_date</code> is empty string when unset.
                         <code>project_id</code> is omitted when the task has no project.
+                        <code>favorite</code> is deprecated and will be removed in API v4.
+                        Responses that set or change it also include <code>deprecation_notice</code>.
                     </p>
 
                     <h3 class="h5 mt-3">List tasks</h3>
@@ -340,10 +350,10 @@ Content-Type: application/json
   "project_id": 3,               // optional; omit or use 0 for no project
   "priority": 1,                 // optional, 0–3 (default 0)
   "completed": false,            // optional (default false)
-  "favorite": false,             // optional (default false)
+  "favorite": false,             // deprecated; optional (default false); removed in API v4
   "tag_ids": [1, 2]              // optional
 }</code></pre>
-                    <p>Returns <code>201 Created</code> with the new task object.</p>
+                    <p>Returns <code>201 Created</code> with the new task object. Including <code>favorite</code> adds deprecation headers and <code>deprecation_notice</code>.</p>
 
                     <h3 class="h5 mt-3">Get task</h3>
                     <p><span class="badge bg-success">GET</span> <code>/api/v1/tasks/{id}</code></p>
@@ -360,10 +370,10 @@ Content-Type: application/json
   "project_id": null,            // null or 0 clears project; number sets project
   "priority": 3,
   "completed": true,
-  "favorite": true,
+  "favorite": true,              // deprecated; will be removed in API v4
   "tag_ids": [1]                 // replaces all tags on the task
 }</code></pre>
-                    <p>Returns the updated task object.</p>
+                    <p>Returns the updated task object. Including <code>favorite</code> adds deprecation headers and <code>deprecation_notice</code>.</p>
 
                     <h3 class="h5 mt-3">Archive / restore</h3>
                     <p><span class="badge bg-primary">POST</span> <code>/api/v1/tasks/{id}/archive</code></p>
@@ -404,14 +414,17 @@ Content-Type: application/json
                     <h3 class="h5 mt-3">Reorder tasks</h3>
                     <p><span class="badge bg-primary">POST</span> <code>/api/v1/tasks/reorder</code></p>
                     <p>
-                        Updates manual sort order (<code>position</code>) within one favorite or non-favorite group,
-                        matching the web drag-and-drop behavior. Tasks cannot move across favorite groups.
+                        Updates manual sort order (<code>position</code>) within one favorite or non-favorite group.
+                        Favorite grouping is deprecated and will be removed in API v4; the <code>favorite</code>
+                        field is still required. Reordering the starred group (<code>favorite: true</code>)
+                        returns deprecation headers and <code>deprecation_notice</code>.
+                        Tasks cannot move across favorite groups.
                         Listed IDs are rearranged among the slots they already occupy, so filtered lists
                         (e.g. incomplete-only) do not overwrite unrelated tasks.
                     </p>
                     <pre class="api-docs-pre"><code>{
   "task_ids": [12, 5, 9],   // required: new order for this page window
-  "favorite": false,        // required: which group is being reordered
+  "favorite": false,        // required: which group is being reordered (deprecated; removed in API v4)
   "page": 1,                // optional; default 1
   "per_page": 50,           // optional; default 50, max 100
   "project": "3"            // optional: project id, or "none"/"0" for no project

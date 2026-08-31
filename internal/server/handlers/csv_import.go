@@ -109,13 +109,18 @@ func apiV1ImportPreview(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	notice := favoriteDeprecationNoticeIfUsed(w, cols.favorite >= 0)
+	payload := map[string]interface{}{
 		"preview":      out,
 		"would_import": wouldImport,
 		"would_skip":   wouldSkip,
 		"total_rows":   len(rows),
-	})
+	}
+	if notice != "" {
+		payload["deprecation_notice"] = notice
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_ = json.NewEncoder(w).Encode(payload)
 }
 
 func apiV1ImportConfirm(w http.ResponseWriter, r *http.Request) {
@@ -139,10 +144,16 @@ func apiV1ImportConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	notice := favoriteDeprecationNoticeIfUsed(w, cols.favorite >= 0)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	_ = json.NewEncoder(w).Encode(map[string]int{
-		"imported": imported,
-		"skipped":  skipped,
+	_ = json.NewEncoder(w).Encode(struct {
+		Imported          int    `json:"imported"`
+		Skipped           int    `json:"skipped"`
+		DeprecationNotice string `json:"deprecation_notice,omitempty"`
+	}{
+		Imported:          imported,
+		Skipped:           skipped,
+		DeprecationNotice: notice,
 	})
 }
 

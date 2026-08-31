@@ -98,12 +98,10 @@ const boardSprintKey = ref('backlog')
 let sprintsLoadedForProject: number | null = null
 const selected = ref<number[]>([])
 const selectMode = ref(false)
-const favoriteListEl = ref<HTMLElement | null>(null)
 const taskListEl = ref<HTMLElement | null>(null)
 const loadMoreSentinel = ref<HTMLElement | null>(null)
 
-const favoriteTasks = computed(() => tasks.value.filter((t) => t.favorite && !t.parent_id))
-const regularTasks = computed(() => tasks.value.filter((t) => !t.favorite && !t.parent_id))
+const rootTasks = computed(() => tasks.value.filter((t) => !t.parent_id))
 const flatSelectableIds = computed(() => {
   const ids: number[] = []
   for (const t of tasks.value) {
@@ -120,7 +118,6 @@ const isSearching = computed(() => filters.search !== '')
 const showTaskTable = computed(
   () =>
     total.value > 0 ||
-    favoriteTasks.value.length > 0 ||
     hasActiveFilters.value ||
     isKanbanProjectView.value,
 )
@@ -365,7 +362,6 @@ function openTaskDetails(id: number) {
 
 const hasMore = computed(() => loadedPage.value < totalPages.value)
 const sortableEnabled = computed(() => filters.sort !== 'priority' && !loading.value)
-const showFavoriteList = computed(() => favoriteTasks.value.length > 0)
 
 function getTodayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -452,11 +448,7 @@ function registerTaskAdded(task: Task) {
   else incompleteCount.value += 1
   if (!taskMatchesCurrentFilters(task) || tasks.value.some((t) => t.id === task.id)) return
   const withChildren = { ...task, children: task.children || [] }
-  if (task.favorite) {
-    tasks.value = [withChildren, ...tasks.value]
-  } else {
-    tasks.value = [...tasks.value, withChildren]
-  }
+  tasks.value = [...tasks.value, withChildren]
 }
 
 function removeTaskLocally(task: Task) {
@@ -576,7 +568,7 @@ function applyTaskUpdate(updated: Task) {
   tasks.value = [...tasks.value, { ...updated, children: updated.children || [] }]
 }
 
-function reorderLocalTasks(orderedIds: number[], favorite: boolean, parentId?: number | null) {
+function reorderLocalTasks(orderedIds: number[], parentId?: number | null) {
   if (parentId) {
     const parent = tasks.value.find((t) => t.id === parentId)
     if (!parent?.children) return
@@ -588,22 +580,39 @@ function reorderLocalTasks(orderedIds: number[], favorite: boolean, parentId?: n
   const reordered = orderedIds
     .map((id) => tasks.value.find((t) => t.id === id))
     .filter((t): t is Task => !!t)
-  if (favorite) {
-    tasks.value = [...reordered, ...tasks.value.filter((t) => !t.favorite)]
-  } else {
-    tasks.value = [...tasks.value.filter((t) => t.favorite), ...reordered]
-  }
+  const leftover = tasks.value.filter((t) => !orderedIds.includes(t.id))
+  tasks.value = [...reordered, ...leftover]
 }
 
-async function saveReorder(orderedIds: number[], favorite: boolean, parentId?: number | null) {
-  reorderLocalTasks(orderedIds, favorite, parentId)
+async function saveReorder(orderedIds: number[], parentId?: number | null) {
+  reorderLocalTasks(orderedIds, parentId)
   try {
-    await api.reorderTasks({
-      task_ids: orderedIds,
-      favorite: parentId ? false : favorite,
-      project: parentId ? undefined : filters.project || undefined,
-      parent_id: parentId ?? null,
-    })
+    if (parentId) {
+      await api.reorderTasks({
+        task_ids: orderedIds,
+        favorite: false,
+        parent_id: parentId,
+      })
+      return
+    }
+    const byId = new Map(tasks.value.map((t) => [t.id, t]))
+    const favoriteIds = orderedIds.filter((id) => byId.get(id)?.favorite)
+    const regularIds = orderedIds.filter((id) => !byId.get(id)?.favorite)
+    const project = filters.project || undefined
+    if (favoriteIds.length) {
+      await api.reorderTasks({
+        task_ids: favoriteIds,
+        favorite: true,
+        project,
+      })
+    }
+    if (regularIds.length) {
+      await api.reorderTasks({
+        task_ids: regularIds,
+        favorite: false,
+        project,
+      })
+    }
   } catch (err) {
     toast.push(err instanceof APIError ? err.message : 'Could not save task order', 'error')
     await reloadInitial()
@@ -611,10 +620,8 @@ async function saveReorder(orderedIds: number[], favorite: boolean, parentId?: n
 }
 
 const { refresh: refreshSortable } = useTaskSortable(
-  favoriteListEl,
   taskListEl,
   sortableEnabled,
-  showFavoriteList,
   saveReorder,
 )
 
@@ -833,17 +840,6 @@ async function toggleComplete(task: Task) {
   try {
     const updated = await api.patchTask(task.id, { completed: !task.completed })
     applyTaskUpdate(updated)
-  } catch (err) {
-    toast.push(err instanceof APIError ? err.message : 'Update failed', 'error')
-  }
-}
-
-async function toggleFavorite(task: Task) {
-  try {
-    const updated = await api.patchTask(task.id, { favorite: !task.favorite })
-    applyTaskUpdate(updated)
-    await nextTick()
-    refreshSortable()
   } catch (err) {
     toast.push(err instanceof APIError ? err.message : 'Update failed', 'error')
   }
@@ -1197,8 +1193,7 @@ function getFocusableTaskIds(): number[] {
       }
     }
   }
-  pushVisible(favoriteTasks.value)
-  pushVisible(regularTasks.value)
+  pushVisible(rootTasks.value)
   return ids
 }
 
@@ -1591,7 +1586,7 @@ onUnmounted(() => {
           </div>
 
           <div v-else-if="showTaskTable">
-            <!-- Merged Header Row: Select All Checkbox + Starred Tasks Label -->
+            <!-- Merged Header Row: Select All Checkbox -->
             <div class="d-flex align-items-center justify-content-between mb-2 px-1">
               <div class="d-flex align-items-center gap-3">
                 <div
@@ -1611,9 +1606,6 @@ onUnmounted(() => {
                     Select all
                   </label>
                 </div>
-                <span v-if="showFavoriteList" class="small fw-bold text-muted d-flex align-items-center gap-1 ms-2">
-                  <i class="bi bi-star-fill text-warning" /> Starred Tasks
-                </span>
               </div>
               <button
                 v-if="hasActiveFilters"
@@ -1625,62 +1617,10 @@ onUnmounted(() => {
               </button>
             </div>
 
-            <!-- Starred Tasks Section -->
-            <div v-if="showFavoriteList" class="starred-tasks-section mb-3">
-              <div id="favorite-task-list" ref="favoriteListEl">
-                <div
-                  v-for="task in favoriteTasks"
-                  :key="task.id"
-                  class="task-tree-root"
-                  :data-task-id="task.id"
-                >
-                  <ModernTaskCard
-                    :task="task"
-                    :selected="selected.includes(task.id)"
-                    :selecting="isSelecting"
-                    :focused="focusedTaskId === task.id"
-                    :density="density"
-                    :show-project-pill="!filters.project"
-                    :can-write="canWriteTask(task)"
-                    :expanded="isParentExpanded(task.id)"
-                    @toggle-select="toggleSelect(task.id, $event)"
-                    @toggle-complete="toggleComplete(task)"
-                    @toggle-favorite="toggleFavorite(task)"
-                    @toggle-expand="toggleParentExpanded(task.id)"
-                    @patch-task="handleInlineTaskPatch"
-                    @add-subtask="openAddSubtask(task)"
-                    @edit="openTaskDetails(task.id)"
-                  />
-                  <div
-                    v-if="task.children?.length && isParentExpanded(task.id)"
-                    class="task-children"
-                    :data-parent-id="task.id"
-                  >
-                    <ModernTaskCard
-                      v-for="child in task.children"
-                      :key="child.id"
-                      :task="child"
-                      :depth="1"
-                      :selected="selected.includes(child.id)"
-                      :selecting="isSelecting"
-                      :focused="focusedTaskId === child.id"
-                      :density="density"
-                      :show-project-pill="false"
-                      :can-write="canWriteTask(child)"
-                      @toggle-select="toggleSelect(child.id, $event)"
-                      @toggle-complete="toggleCompleteChild(child)"
-                      @patch-task="handleInlineTaskPatch"
-                      @edit="openTaskDetails(child.id)"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Regular Task List -->
+            <!-- Task List -->
             <div id="task-list" ref="taskListEl">
               <div
-                v-for="task in regularTasks"
+                v-for="task in rootTasks"
                 :key="task.id"
                 class="task-tree-root"
                 :data-task-id="task.id"
@@ -1696,7 +1636,6 @@ onUnmounted(() => {
                   :expanded="isParentExpanded(task.id)"
                   @toggle-select="toggleSelect(task.id, $event)"
                   @toggle-complete="toggleComplete(task)"
-                  @toggle-favorite="toggleFavorite(task)"
                   @toggle-expand="toggleParentExpanded(task.id)"
                   @patch-task="handleInlineTaskPatch"
                   @add-subtask="openAddSubtask(task)"

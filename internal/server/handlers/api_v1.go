@@ -51,6 +51,7 @@ type apiTaskJSON struct {
 	SprintName        string             `json:"sprint_name,omitempty"`
 	ParentTitle       string             `json:"parent_title,omitempty"`
 	GitHub            *apiTaskGitHubJSON `json:"github,omitempty"`
+	DeprecationNotice string             `json:"deprecation_notice,omitempty"`
 }
 
 type apiTaskListResponse struct {
@@ -165,7 +166,8 @@ type apiTaskReorderRequest struct {
 }
 
 type apiReorderOKResponse struct {
-	OK bool `json:"ok"`
+	OK                bool   `json:"ok"`
+	DeprecationNotice string `json:"deprecation_notice,omitempty"`
 }
 
 type apiProjectJSON struct {
@@ -512,6 +514,7 @@ func apiV1CreateTask(w http.ResponseWriter, r *http.Request) {
 	if req.Favorite != nil {
 		favorite = *req.Favorite
 	}
+	notice := favoriteDeprecationNoticeIfUsed(w, req.Favorite != nil)
 	in := domain.CreateTaskInput{
 		Title:          req.Title,
 		Description:    req.Description,
@@ -550,9 +553,11 @@ func apiV1CreateTask(w http.ResponseWriter, r *http.Request) {
 		utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Task created but failed to load.")
 		return
 	}
+	out := taskToAPIJSON(task)
+	out.DeprecationNotice = notice
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(taskToAPIJSON(task))
+	json.NewEncoder(w).Encode(out)
 }
 
 func apiV1PatchTask(w http.ResponseWriter, r *http.Request, taskID int) {
@@ -566,6 +571,7 @@ func apiV1PatchTask(w http.ResponseWriter, r *http.Request, taskID int) {
 		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Invalid JSON body.")
 		return
 	}
+	notice := favoriteDeprecationNoticeIfUsed(w, req.Favorite != nil)
 
 	in := domain.UpdateTaskInput{
 		Title:       req.Title,
@@ -612,8 +618,10 @@ func apiV1PatchTask(w http.ResponseWriter, r *http.Request, taskID int) {
 		utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Task updated but failed to load.")
 		return
 	}
+	out := taskToAPIJSON(task)
+	out.DeprecationNotice = notice
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	json.NewEncoder(w).Encode(taskToAPIJSON(task))
+	json.NewEncoder(w).Encode(out)
 }
 
 func apiV1DeleteTask(w http.ResponseWriter, r *http.Request, taskID int) {
@@ -939,6 +947,7 @@ func apiV1ReorderTasks(w http.ResponseWriter, r *http.Request) {
 		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "favorite is required.")
 		return
 	}
+	notice := favoriteDeprecationNoticeIfUsed(w, *req.Favorite)
 
 	var projectFilter *int
 	if req.Project != nil {
@@ -955,7 +964,7 @@ func apiV1ReorderTasks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	json.NewEncoder(w).Encode(apiReorderOKResponse{OK: true})
+	json.NewEncoder(w).Encode(apiReorderOKResponse{OK: true, DeprecationNotice: notice})
 }
 
 // APIV1ProjectsRouter handles /api/v1/projects and /api/v1/projects/{id}[/members|invites|events].
