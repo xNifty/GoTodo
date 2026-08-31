@@ -1,6 +1,6 @@
 [
   {
-    "version": "3.6.0",
+    "version": "3.7.0",
     "date": "2026-08-31",
     "title": "Editable discussion comments",
     "notes": [
@@ -8,6 +8,15 @@
       "Comments show posted and edited timestamps; hover the edited date to see who originally posted it",
       "Previous comment text is kept in an audit log so project owners and site admins can review and restore it",
       "Site admins can browse and restore comment history from Admin → Comment history"
+  },
+  {
+    "version": "3.6.0",
+    "date": "2026-08-31",
+    "title": "Task favoriting deprecated",
+    "notes": [
+      "Starred tasks are removed from the web UI; starring is no longer available in the Vue app",
+      "The API still accepts favorite on create, update, reorder, and import, and returns a deprecation notice when it is used",
+      "Task favoriting will be removed in API v4"
     ]
   },
   {

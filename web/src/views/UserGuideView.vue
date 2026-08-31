@@ -53,7 +53,6 @@ onUnmounted(() => {
         <ul>
           <li>Click a task’s edit control (or press <kbd>e</kbd> / <kbd>Enter</kbd> on a focused task) to edit it in the sidebar.</li>
           <li>Use the checkmark to mark a task complete, or press <kbd>x</kbd> on the focused task.</li>
-          <li>Star important tasks so they stay pinned at the top of the list.</li>
           <li>Nest work under a parent with <strong>Add subtask</strong>; expand or collapse children as needed.</li>
           <li>
             Each task has a stable number (for example <code>#42</code>) shown in the task panel.

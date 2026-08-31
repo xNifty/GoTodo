@@ -13,7 +13,6 @@ GoTodo (Ordryn) is a self-hosted task manager built with Go, PostgreSQL, Redis, 
 - Kanban boards with custom statuses, estimates, claims, and named sprints (descriptions, date ranges, lock dates, and a board sprint switcher)
 - Priority levels (None / Low / Medium / High) with optional sort-by-priority view
 - Due dates with smart filters (today, overdue, this week, no date) and relative labels
-- Starred tasks pinned above pagination
 - Search with project, status, tag, and due-date filters
 - Markdown task descriptions with truncated list view and expand-in-place
 - Task discussion comments with @-mentions of project members (notifies them) and #task links; authors and project owners can edit comments, with posted/edited timestamps and an admin restore log

@@ -294,6 +294,7 @@ export const api = {
     project_id?: number | null
     parent_id?: number | null
     priority?: number
+    /** @deprecated Task favoriting will be removed in API v4. */
     favorite?: boolean
     tag_ids?: number[]
     status_id?: number | null
@@ -317,6 +318,7 @@ export const api = {
       parent_id: number | null
       priority: number
       completed: boolean
+      /** @deprecated Task favoriting will be removed in API v4. */
       favorite: boolean
       tag_ids: number[]
       status_id: number | null
@@ -380,6 +382,7 @@ export const api = {
 
   reorderTasks(payload: {
     task_ids: number[]
+    /** @deprecated Favorite grouping will be removed in API v4. */
     favorite: boolean
     project?: string
     parent_id?: number | null

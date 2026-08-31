@@ -231,6 +231,7 @@ export type Task = {
   project_id?: number | null
   project?: string
   priority: number
+  /** @deprecated Task favoriting will be removed in API v4. */
   favorite: boolean
   position: number
   parent_id?: number | null
@@ -251,6 +252,8 @@ export type Task = {
   sprint_name?: string
   parent_title?: string
   github?: TaskGitHubIssue | null
+  /** Present on write responses that used the deprecated favorite field. */
+  deprecation_notice?: string
 }
 
 export type GitHubConnection = {
