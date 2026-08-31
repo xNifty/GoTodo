@@ -252,6 +252,10 @@ func RunMigrations() error {
 		fmt.Printf("migration: MigrateSiteSettingsAddEmailAuditRetention failed: %v\n", err)
 		errCount++
 	}
+	if err := MigrateSiteSettingsAddImageHosting(); err != nil {
+		fmt.Printf("migration: MigrateSiteSettingsAddImageHosting failed: %v\n", err)
+		errCount++
+	}
 	if err := CreateEmailAuditTable(); err != nil {
 		fmt.Printf("migration: CreateEmailAuditTable failed: %v\n", err)
 		errCount++

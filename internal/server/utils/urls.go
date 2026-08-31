@@ -38,3 +38,12 @@ func AbsoluteURLForRequest(r *http.Request, path string) string {
 	}
 	return fmt.Sprintf("%s://%s%s%s", RequestScheme(r), r.Host, base, path)
 }
+
+// TrimPublicPrefix removes BASE_PATH from an incoming request path.
+func TrimPublicPrefix(path string) string {
+	base := strings.TrimSuffix(GetBasePath(), "/")
+	if base != "" && base != "/" && strings.HasPrefix(path, base) {
+		return strings.TrimPrefix(path, base)
+	}
+	return path
+}

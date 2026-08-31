@@ -6,6 +6,7 @@ import { APIError } from '@/api/types'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import AdminSubnav from '@/components/AdminSubnav.vue'
+import RichBody from '@/components/RichBody.vue'
 
 const toast = useToast()
 const { askConfirm } = useConfirm()
@@ -164,8 +165,9 @@ onMounted(load)
               </td>
               <td>{{ row.author_user_name || '—' }}</td>
               <td>{{ row.edited_by_user_name || '—' }}</td>
-              <td class="small" style="max-width: 22rem; white-space: pre-wrap; word-break: break-word">
-                {{ row.body || '—' }}
+              <td class="small" style="max-width: 22rem; word-break: break-word">
+                <RichBody v-if="row.body.trim()" compact :body="row.body" />
+                <span v-else>—</span>
               </td>
               <td class="text-nowrap">
                 <button

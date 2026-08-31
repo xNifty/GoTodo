@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"GoTodo/internal/domain"
+	"GoTodo/internal/imagehost"
 	"GoTodo/internal/server/utils"
 	"GoTodo/internal/storage"
 )
@@ -20,6 +21,8 @@ type apiSiteResponse struct {
 	GlobalAnnouncementText   string `json:"global_announcement_text"`
 	AnnouncementDismissed    bool   `json:"announcement_dismissed"`
 	GitHubOAuthConfigured    bool   `json:"github_oauth_configured"`
+	ImageHostingEnabled      bool   `json:"image_hosting_enabled"`
+	ImageMaxBytes            int64  `json:"image_max_bytes"`
 }
 
 // APIV1Site returns public site metadata for the SPA shell.
@@ -40,6 +43,13 @@ func APIV1Site(w http.ResponseWriter, r *http.Request) {
 			dismissed = true
 		}
 	}
+	imageEnabled := false
+	imageMax := imagehost.DefaultMaxBytes
+	if cfg, err := settings.ImageHostingConfig(); err == nil {
+		imageEnabled = cfg.Enabled()
+		imageMax = imagehost.ClampMaxBytes(cfg.MaxBytes)
+	}
+
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	_ = json.NewEncoder(w).Encode(apiSiteResponse{
 		SiteName:                 settings.SiteName,
@@ -52,5 +62,7 @@ func APIV1Site(w http.ResponseWriter, r *http.Request) {
 		GlobalAnnouncementText:   settings.GlobalAnnouncementText,
 		AnnouncementDismissed:    dismissed,
 		GitHubOAuthConfigured:    domain.GitHubOAuthConfigured(),
+		ImageHostingEnabled:      imageEnabled,
+		ImageMaxBytes:            imageMax,
 	})
 }

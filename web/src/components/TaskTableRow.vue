@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Task } from '@/api/types'
+import { previewWithoutImages } from '@/utils/taskCommentBody'
 
 withDefaults(
   defineProps<{
@@ -78,7 +79,7 @@ function priorityLabel(priority: number) {
     </td>
     <td class="desc-column">
       <div v-if="task.description" class="desc-preview text-muted small">
-        {{ task.description.length > 120 ? `${task.description.slice(0, 120)}…` : task.description }}
+        {{ previewWithoutImages(task.description, 120) }}
       </div>
     </td>
     <td class="date-added" data-label="Due Date">

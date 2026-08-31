@@ -10,6 +10,7 @@ import (
 	"GoTodo/internal/config"
 	"GoTodo/internal/crypto/secret"
 	"GoTodo/internal/domain"
+	"GoTodo/internal/imagehost"
 	"GoTodo/internal/server/utils"
 	"GoTodo/internal/storage"
 	"GoTodo/internal/version"
@@ -43,6 +44,17 @@ type adminSettingsJSON struct {
 	GitHubOAuthClientID        string `json:"github_oauth_client_id"`
 	GitHubOAuthClientSecretSet bool   `json:"github_oauth_client_secret_set"`
 	GitHubOAuthConfigured      bool   `json:"github_oauth_configured"`
+
+	ImageHostingProvider  string `json:"image_hosting_provider"`
+	ImageMaxBytes         int64  `json:"image_max_bytes"`
+	ImageS3Endpoint       string `json:"image_s3_endpoint"`
+	ImageS3Region         string `json:"image_s3_region"`
+	ImageS3Bucket         string `json:"image_s3_bucket"`
+	ImageS3AccessKey      string `json:"image_s3_access_key"`
+	ImageS3SecretKeySet   bool   `json:"image_s3_secret_key_set"`
+	ImageS3PublicURL      string `json:"image_s3_public_url"`
+	ImageS3ForcePathStyle bool   `json:"image_s3_force_path_style"`
+	ImageLocalPath        string `json:"image_local_path"`
 }
 
 type adminSettingsPatch struct {
@@ -71,6 +83,17 @@ type adminSettingsPatch struct {
 
 	GitHubOAuthClientID     *string `json:"github_oauth_client_id"`
 	GitHubOAuthClientSecret *string `json:"github_oauth_client_secret"`
+
+	ImageHostingProvider  *string `json:"image_hosting_provider"`
+	ImageMaxBytes         *int64  `json:"image_max_bytes"`
+	ImageS3Endpoint       *string `json:"image_s3_endpoint"`
+	ImageS3Region         *string `json:"image_s3_region"`
+	ImageS3Bucket         *string `json:"image_s3_bucket"`
+	ImageS3AccessKey      *string `json:"image_s3_access_key"`
+	ImageS3SecretKey      *string `json:"image_s3_secret_key"`
+	ImageS3PublicURL      *string `json:"image_s3_public_url"`
+	ImageS3ForcePathStyle *bool   `json:"image_s3_force_path_style"`
+	ImageLocalPath        *string `json:"image_local_path"`
 }
 
 // APIV1AdminSettings handles GET/PATCH /api/v1/admin/settings.
@@ -212,6 +235,45 @@ func apiV1PatchAdminSettings(w http.ResponseWriter, r *http.Request) {
 			next.GitHubOAuthClientSecretEnc = enc
 		}
 	}
+	if req.ImageHostingProvider != nil {
+		next.Image.Provider = imagehost.NormalizeProvider(*req.ImageHostingProvider)
+	}
+	if req.ImageMaxBytes != nil {
+		next.Image.MaxBytes = imagehost.NormalizeMaxBytes(*req.ImageMaxBytes)
+	}
+	if req.ImageS3Endpoint != nil {
+		next.Image.S3Endpoint = strings.TrimSpace(*req.ImageS3Endpoint)
+	}
+	if req.ImageS3Region != nil {
+		next.Image.S3Region = strings.TrimSpace(*req.ImageS3Region)
+	}
+	if req.ImageS3Bucket != nil {
+		next.Image.S3Bucket = strings.TrimSpace(*req.ImageS3Bucket)
+	}
+	if req.ImageS3AccessKey != nil {
+		next.Image.S3AccessKey = strings.TrimSpace(*req.ImageS3AccessKey)
+	}
+	if req.ImageS3SecretKey != nil {
+		sec := strings.TrimSpace(*req.ImageS3SecretKey)
+		if sec != "" {
+			enc, err := secret.Encrypt(sec)
+			if err != nil {
+				utils.APIJSONError(w, http.StatusInternalServerError, "internal_error", "Failed to encrypt S3 secret key.")
+				return
+			}
+			next.ImageS3SecretKeyEnc = enc
+		}
+		// Blank means keep the stored secret (the form placeholder says leave blank to keep).
+	}
+	if req.ImageS3PublicURL != nil {
+		next.Image.S3PublicURL = strings.TrimSpace(*req.ImageS3PublicURL)
+	}
+	if req.ImageS3ForcePathStyle != nil {
+		next.Image.S3ForcePathStyle = *req.ImageS3ForcePathStyle
+	}
+	if req.ImageLocalPath != nil {
+		next.Image.LocalPath = strings.TrimSpace(*req.ImageLocalPath)
+	}
 	if next.SiteName == "" || next.DefaultTimezone == "" {
 		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "site_name and default_timezone are required.")
 		return
@@ -229,6 +291,10 @@ func apiV1PatchAdminSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if errMsg := validateEmailSettings(&next); errMsg != "" {
+		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", errMsg)
+		return
+	}
+	if errMsg := validateImageHostingSettings(&next); errMsg != "" {
 		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", errMsg)
 		return
 	}
@@ -297,6 +363,18 @@ func validateEmailSettings(s *storage.SiteSettings) string {
 	return ""
 }
 
+func validateImageHostingSettings(s *storage.SiteSettings) string {
+	cfg := s.Image
+	if imagehost.NormalizeProvider(cfg.Provider) == imagehost.ProviderS3 && s.ImageS3SecretKeyEnc != "" {
+		cfg.S3SecretKey = "set"
+	}
+	msg := cfg.Validate()
+	secret := s.Image.S3SecretKey
+	s.Image = cfg
+	s.Image.S3SecretKey = secret
+	return msg
+}
+
 func writeAdminSettings(w http.ResponseWriter, s *storage.SiteSettings) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	_ = json.NewEncoder(w).Encode(adminSettingsJSON{
@@ -325,6 +403,16 @@ func writeAdminSettings(w http.ResponseWriter, s *storage.SiteSettings) {
 		GitHubOAuthClientID:        s.GitHubOAuthClientID,
 		GitHubOAuthClientSecretSet: s.GitHubOAuthClientSecretEnc != "",
 		GitHubOAuthConfigured:      strings.TrimSpace(s.GitHubOAuthClientID) != "" && s.GitHubOAuthClientSecretEnc != "",
+		ImageHostingProvider:       imagehost.NormalizeProvider(s.Image.Provider),
+		ImageMaxBytes:              imagehost.ClampMaxBytes(s.Image.MaxBytes),
+		ImageS3Endpoint:            s.Image.S3Endpoint,
+		ImageS3Region:              s.Image.S3Region,
+		ImageS3Bucket:              s.Image.S3Bucket,
+		ImageS3AccessKey:           s.Image.S3AccessKey,
+		ImageS3SecretKeySet:        s.ImageS3SecretKeyEnc != "",
+		ImageS3PublicURL:           s.Image.S3PublicURL,
+		ImageS3ForcePathStyle:      s.Image.S3ForcePathStyle,
+		ImageLocalPath:             s.Image.LocalPath,
 	})
 }
 

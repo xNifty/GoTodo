@@ -6,6 +6,8 @@ import (
 	"encoding/base64"
 	"net/http"
 	"os"
+
+	"GoTodo/internal/storage"
 )
 
 type contextKey string
@@ -67,7 +69,7 @@ func SecurityHeadersMiddleware(next http.Handler) http.Handler {
 				"frame-ancestors 'none'; "+
 				"script-src 'self' "+cspNonce+"; "+
 				"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "+
-				"img-src 'self' data:; "+
+				ImageSrcCSP()+
 				"font-src 'self' data: https://fonts.gstatic.com; "+
 				"connect-src 'self'; "+
 				"object-src 'none'",
@@ -75,4 +77,16 @@ func SecurityHeadersMiddleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// ImageSrcCSP is the img-src directive, including a configured S3/CDN origin when set.
+func ImageSrcCSP() string {
+	src := "img-src 'self' data:"
+	s, err := storage.GetSiteSettings()
+	if err == nil && s != nil {
+		if origin := s.Image.PublicOrigin(); origin != "" {
+			src += " " + origin
+		}
+	}
+	return src + "; "
 }

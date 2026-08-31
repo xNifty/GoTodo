@@ -47,8 +47,12 @@ onUnmounted(() => {
         <h2 id="tasks" class="h4 mt-4">Creating and editing tasks</h2>
         <p>
           Click <strong>Add Task</strong> (or press <kbd>n</kbd> on the home page) to open the task
-          sidebar. Fill in a title, optional description, due date, project, tags, and priority, then
-          save.
+          sidebar. Fill in a title, optional markdown description, due date, project, tags, and priority, then
+          save. When an admin has enabled image hosting, paste or drop a JPEG, PNG, GIF, or WebP
+          into the description or a comment, or use <strong>Insert image</strong>. The picture
+          shows inline in the task description and in discussion comments, sized to the panel.
+          Click <strong>Edit</strong> on the description to change the text. Clicking an image
+          opens it in a new tab.
         </p>
         <ul>
           <li>Click a task’s edit control (or press <kbd>e</kbd> / <kbd>Enter</kbd> on a focused task) to edit it in the sidebar.</li>
@@ -140,6 +144,10 @@ onUnmounted(() => {
             only you can see). Click <strong>Insert link</strong>, and it renders as
             <em>Task #123 - Title</em> for anyone who can open that task.
           </li>
+          <li>
+            Use <strong>Insert image</strong>, or paste/drop a file, in a comment (when image hosting
+            is enabled). After you post, the picture appears inline in that comment.
+          </li>
         </ul>
 
         <h2 id="shortcuts" class="h4 mt-4">Keyboard shortcuts</h2>
@@ -202,6 +210,10 @@ onUnmounted(() => {
           Password reset does not disable MFA; the next login still asks for a code.
           For machine clients and integrations, see the
           <RouterLink to="/docs/api/v1">REST API documentation</RouterLink>.
+          Site admins configure outbound email and image hosting (S3-compatible or local uploads) on
+          <RouterLink to="/admin">Admin</RouterLink>.
+          After filling in image hosting, use <strong>Test connection</strong> to confirm the server
+          can upload to the bucket or local directory.
         </p>
       </div>
     </div>

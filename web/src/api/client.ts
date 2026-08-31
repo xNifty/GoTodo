@@ -13,6 +13,8 @@ import type {
   EmailAuditList,
   EmailAuditQuery,
   GitHubConnection,
+  ImageUpload,
+  ImageHostingTestResult,
   Invite,
   JoinRequest,
   Project,
@@ -127,11 +129,13 @@ async function upload<T>(path: string, field: string, file: File): Promise<T> {
   }
   if (!res.ok) {
     const body = data as APIErrorBody | null
-    throw new APIError(
-      res.status,
-      body?.error || 'request_failed',
-      body?.message || res.statusText || 'Request failed',
-    )
+    const message =
+      body && typeof body === 'object' && typeof body.message === 'string'
+        ? body.message
+        : typeof data === 'string' && data.toLowerCase().includes('<html')
+          ? 'Request failed (proxy returned an HTML error page).'
+          : res.statusText || 'Request failed'
+    throw new APIError(res.status, body?.error || 'request_failed', message)
   }
   return data as T
 }
@@ -840,6 +844,13 @@ export const api = {
     })
   },
 
+  testImageHosting(payload: AdminSettingsPatch) {
+    return request<ImageHostingTestResult>('/api/v1/admin/image-hosting/test', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+
   listAdminUsers() {
     return request<AdminUser[]>('/api/v1/admin/users')
   },
@@ -961,6 +972,10 @@ export const api = {
 
   importCancel() {
     return request<{ ok: boolean }>('/api/v1/import/cancel', { method: 'POST' })
+  },
+
+  uploadImage(file: File) {
+    return upload<ImageUpload>('/api/v1/images', 'file', file)
   },
 
   syncCalendar(file: File) {

@@ -329,6 +329,8 @@ export type SiteInfo = {
   global_announcement_text: string
   announcement_dismissed: boolean
   github_oauth_configured?: boolean
+  image_hosting_enabled?: boolean
+  image_max_bytes?: number
 }
 
 export type ChangelogEntry = {
@@ -449,6 +451,16 @@ export type AdminSettings = {
   github_oauth_client_id: string
   github_oauth_client_secret_set: boolean
   github_oauth_configured: boolean
+  image_hosting_provider: string
+  image_max_bytes: number
+  image_s3_endpoint: string
+  image_s3_region: string
+  image_s3_bucket: string
+  image_s3_access_key: string
+  image_s3_secret_key_set: boolean
+  image_s3_public_url: string
+  image_s3_force_path_style: boolean
+  image_local_path: string
 }
 
 /** Write-only secret fields accepted by PATCH /admin/settings. */
@@ -456,6 +468,21 @@ export type AdminSettingsPatch = Partial<AdminSettings> & {
   email_mailgun_api_key?: string
   email_smtp_password?: string
   github_oauth_client_secret?: string
+  image_s3_secret_key?: string
+}
+
+export type ImageUpload = {
+  url: string
+  content_type: string
+  size: number
+  filename?: string
+  key: string
+}
+
+export type ImageHostingTestResult = {
+  ok: boolean
+  message: string
+  public_url_ok: boolean
 }
 
 export type AdminUser = {

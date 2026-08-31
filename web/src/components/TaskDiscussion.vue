@@ -2,20 +2,24 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { api } from '@/api/client'
 import type { TaskComment, TaskCommentRevision } from '@/api/types'
+import ImageInsertButton from '@/components/ImageInsertButton.vue'
+import RichBody from '@/components/RichBody.vue'
 import { useAuth } from '@/composables/useAuth'
 import { useConfirm } from '@/composables/useConfirm'
 import { useTaskSidebar } from '@/composables/useTaskSidebar'
 import { useToast } from '@/composables/useToast'
 import { USER_SEARCH_MIN_QUERY, useUserSearch } from '@/composables/useUserSearch'
+import { useImageUpload } from '@/composables/useImageUpload'
 import {
   extractTaskRefIDs,
+  insertMarkdownAtCursor,
   insertMention,
   insertTaskRef,
   isInsertedTaskRef,
   mentionTokenAtCursor,
-  splitCommentBody,
   type MentionToken,
 } from '@/utils/taskCommentBody'
+import { dropHasFiles, imageFileFromClipboard, imageFileFromDrop } from '@/utils/imageUpload'
 
 const props = defineProps<{
   taskId: number
@@ -30,12 +34,14 @@ const toast = useToast()
 const { askConfirm } = useConfirm()
 const { openEdit } = useTaskSidebar()
 const { hasPermission } = useAuth()
+const { enabled: imageEnabled, uploadImageFile } = useImageUpload()
 
 const comments = ref<TaskComment[]>([])
 const loading = ref(false)
 const posting = ref(false)
 const draft = ref('')
 const draftEl = ref<HTMLTextAreaElement | null>(null)
+const editEl = ref<HTMLTextAreaElement | null>(null)
 const mentionListEl = ref<HTMLElement | null>(null)
 const bottomEl = ref<HTMLElement | null>(null)
 const MAX_BODY = 2000
@@ -306,6 +312,69 @@ function onDraftInput(e: Event) {
   syncMentionFromEl()
 }
 
+function insertCommentImage(markdown: string, target: 'draft' | 'edit' = 'draft') {
+  const el = target === 'edit' ? editEl.value : draftEl.value
+  const current = target === 'edit' ? editDraft.value : draft.value
+  const start = el?.selectionStart ?? current.length
+  const end = el?.selectionEnd ?? start
+  const next = insertMarkdownAtCursor(current, markdown, start, end)
+  if (next.body.length > MAX_BODY) {
+    toast.push('Comment would exceed 2000 characters', 'error')
+    return
+  }
+  if (target === 'edit') editDraft.value = next.body
+  else draft.value = next.body
+  void nextTick(() => {
+    if (!el) return
+    el.focus()
+    el.setSelectionRange(next.cursor, next.cursor)
+    if (target === 'draft') syncMentionFromEl()
+  })
+}
+
+async function ingestImageFile(file: File, target: 'draft' | 'edit' = 'draft') {
+  const markdown = await uploadImageFile(file)
+  if (markdown) insertCommentImage(markdown, target)
+}
+
+function onDraftPaste(e: ClipboardEvent) {
+  const file = imageFileFromClipboard(e)
+  if (!file || !imageEnabled.value) return
+  e.preventDefault()
+  void ingestImageFile(file, 'draft')
+}
+
+function onEditPaste(e: ClipboardEvent) {
+  const file = imageFileFromClipboard(e)
+  if (!file || !imageEnabled.value) return
+  e.preventDefault()
+  void ingestImageFile(file, 'edit')
+}
+
+function onDraftDragOver(e: DragEvent) {
+  if (!imageEnabled.value || !dropHasFiles(e)) return
+  e.preventDefault()
+}
+
+function onDraftDrop(e: DragEvent) {
+  const file = imageFileFromDrop(e)
+  if (!file || !imageEnabled.value) return
+  e.preventDefault()
+  void ingestImageFile(file, 'draft')
+}
+
+function onEditDragOver(e: DragEvent) {
+  if (!imageEnabled.value || !dropHasFiles(e)) return
+  e.preventDefault()
+}
+
+function onEditDrop(e: DragEvent) {
+  const file = imageFileFromDrop(e)
+  if (!file || !imageEnabled.value) return
+  e.preventDefault()
+  void ingestImageFile(file, 'edit')
+}
+
 function onDraftKeydown(e: KeyboardEvent) {
   if (!showMentionMenu.value) return
   if (e.key === 'Escape') {
@@ -546,14 +615,21 @@ defineExpose({ reload })
             </div>
             <div v-else-if="editingId === c.id" class="task-post-body">
               <textarea
+                ref="editEl"
                 class="form-control"
                 rows="3"
                 :maxlength="MAX_BODY"
                 :value="editDraft"
                 @input="onEditInput"
+                @paste="onEditPaste"
+                @dragover="onEditDragOver"
+                @drop="onEditDrop"
               />
               <div class="d-flex justify-content-between align-items-center mt-2">
-                <small class="text-muted">{{ editDraft.length }}/{{ MAX_BODY }}</small>
+                <div class="d-flex align-items-center gap-2">
+                  <ImageInsertButton compact @insert="(md) => insertCommentImage(md, 'edit')" />
+                  <small class="text-muted">{{ editDraft.length }}/{{ MAX_BODY }}</small>
+                </div>
                 <div class="d-flex gap-2">
                   <button type="button" class="btn btn-sm btn-outline-secondary" :disabled="savingEdit" @click="cancelEdit">
                     Cancel
@@ -570,19 +646,7 @@ defineExpose({ reload })
               </div>
             </div>
             <div v-else class="task-post-body">
-              <template v-for="(part, i) in splitCommentBody(c.body)" :key="i">
-                <span v-if="part.type === 'text'" style="white-space: pre-wrap;">{{ part.value }}</span>
-                <span v-else-if="part.type === 'mention'" class="task-post-mention">{{ part.raw }}</span>
-                <button
-                  v-else-if="linkTitle(c, part.id)"
-                  type="button"
-                  class="task-post-task-link"
-                  @click="openLinkedTask(part.id)"
-                >
-                  {{ taskLinkLabel(part.id, linkTitle(c, part.id)) }}
-                </button>
-                <span v-else>#{{ part.id }}</span>
-              </template>
+              <RichBody :body="c.body" :task-title="(id) => linkTitle(c, id)" @open-task="openLinkedTask" />
             </div>
             <div v-if="historyId === c.id" class="task-post-history">
               <p v-if="historyLoading && !historyByComment[c.id]" class="small text-muted mb-0">Loading history…</p>
@@ -612,7 +676,10 @@ defineExpose({ reload })
                       {{ restoringId === rev.id ? 'Restoring…' : 'Restore' }}
                     </button>
                   </div>
-                  <div class="task-post-revision-body">{{ rev.body || '(empty)' }}</div>
+                  <div class="task-post-revision-body">
+                    <RichBody v-if="rev.body.trim()" :body="rev.body" />
+                    <span v-else>(empty)</span>
+                  </div>
                 </li>
               </ul>
             </div>
@@ -630,9 +697,12 @@ defineExpose({ reload })
       class="form-control"
       rows="3"
       :maxlength="MAX_BODY"
-      placeholder="Write a comment… Type @ to mention a member, or paste #123 to link a task."
+      placeholder="Write a comment… Paste or drop an image, type @ to mention a member, or paste #123 to link a task."
       @input="onDraftInput"
       @keydown="onDraftKeydown"
+      @paste="onDraftPaste"
+      @dragover="onDraftDragOver"
+      @drop="onDraftDrop"
       @click="syncMentionFromEl"
       @keyup="syncMentionFromEl"
     />
@@ -689,7 +759,10 @@ defineExpose({ reload })
       </div>
     </div>
     <div class="d-flex justify-content-between align-items-center mt-1">
-      <small class="text-muted">{{ charCount }}/{{ MAX_BODY }}</small>
+      <div class="d-flex align-items-center gap-2">
+        <ImageInsertButton compact @insert="insertCommentImage" />
+        <small class="text-muted">{{ charCount }}/{{ MAX_BODY }}</small>
+      </div>
       <button
         type="button"
         class="btn btn-sm btn-primary"
@@ -787,6 +860,8 @@ defineExpose({ reload })
   font-size: 0.9rem;
   line-height: 1.45;
   word-break: break-word;
+  min-width: 0;
+  overflow: hidden;
 }
 .task-post-history {
   padding: 0 0.75rem 0.75rem;
@@ -802,8 +877,9 @@ defineExpose({ reload })
   border-radius: 0.375rem;
   background: var(--ordryn-muted-bg, #f8f6ee);
   font-size: 0.85rem;
-  white-space: pre-wrap;
   word-break: break-word;
+  min-width: 0;
+  overflow: hidden;
 }
 .task-post-task-link {
   display: inline;

@@ -15,6 +15,23 @@ func TestRenderMarkdownStripsScript(t *testing.T) {
 	}
 }
 
+func TestRenderMarkdownImages(t *testing.T) {
+	html := RenderMarkdown("See ![cat](https://cdn.example.com/cat.png)")
+	if !strings.Contains(html, `<img`) {
+		t.Fatalf("expected img tag, got: %s", html)
+	}
+	if !strings.Contains(html, `src="https://cdn.example.com/cat.png"`) {
+		t.Fatalf("expected image src, got: %s", html)
+	}
+	if strings.Contains(html, "javascript:") {
+		t.Fatal("javascript URL should not survive")
+	}
+	unsafe := RenderMarkdown(`![x](javascript:alert(1))`)
+	if strings.Contains(unsafe, "javascript:") {
+		t.Fatalf("javascript src leaked: %s", unsafe)
+	}
+}
+
 func TestTruncateDescription(t *testing.T) {
 	if got := TruncateDescription("hello world", 20); got != "hello world" {
 		t.Fatalf("short text unchanged: %q", got)

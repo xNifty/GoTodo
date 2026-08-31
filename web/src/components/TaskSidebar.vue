@@ -7,6 +7,11 @@ import { APIError } from '@/api/types'
 import ParentTaskCombobox from '@/components/ParentTaskCombobox.vue'
 import DeleteTaskDialog from '@/components/DeleteTaskDialog.vue'
 import TaskDiscussion from '@/components/TaskDiscussion.vue'
+import ImageInsertButton from '@/components/ImageInsertButton.vue'
+import RichBody from '@/components/RichBody.vue'
+import { useImageUpload } from '@/composables/useImageUpload'
+import { insertMarkdownAtCursor } from '@/utils/taskCommentBody'
+import { dropHasFiles, imageFileFromClipboard, imageFileFromDrop, shouldIgnoreTaskOverlayClose } from '@/utils/imageUpload'
 import { useAuth } from '@/composables/useAuth'
 import { useTaskSidebar } from '@/composables/useTaskSidebar'
 import { useToast } from '@/composables/useToast'
@@ -34,6 +39,7 @@ const {
 const toast = useToast()
 const { askConfirm } = useConfirm()
 const { user } = useAuth()
+const { enabled: imageEnabled, uploadImageFile } = useImageUpload()
 const router = useRouter()
 const showTaskNumber = computed(() => (mode.value === 'edit' || mode.value === 'view') && !!taskId.value)
 
@@ -148,6 +154,13 @@ const sidebarTitle = computed(() => {
 const kanbanHeaderTitle = computed(() => (mode.value === 'add' ? 'Add Task' : 'Task'))
 const submitText = computed(() => (mode.value === 'edit' ? 'Save Task' : 'Add Task'))
 const charCount = computed(() => description.value.length)
+const editingDescription = ref(false)
+const showDescriptionEditor = computed(() => {
+  if (readOnly.value) return false
+  if (editingDescription.value) return true
+  if (mode.value === 'add' && !description.value.trim()) return true
+  return false
+})
 const timeSpentLabel = computed(() => formatMinutes(timeSpentMinutes.value))
 const showDiscussion = computed(
   () => (mode.value === 'edit' || mode.value === 'view') && !!currentTask.value?.project_id,
@@ -229,6 +242,62 @@ function autosizeDescription() {
   el.style.height = `${Math.max(el.scrollHeight, min)}px`
 }
 
+function insertDescriptionImage(markdown: string) {
+  const el = descriptionInput.value
+  const start = el?.selectionStart ?? description.value.length
+  const end = el?.selectionEnd ?? start
+  const next = insertMarkdownAtCursor(description.value, markdown, start, end)
+  if (next.body.length > 1000) {
+    toast.push('Description would exceed 1000 characters', 'error')
+    return
+  }
+  description.value = next.body
+  editingDescription.value = false
+}
+
+function startEditDescription() {
+  if (readOnly.value) return
+  editingDescription.value = true
+  void nextTick(() => {
+    const el = descriptionInput.value
+    el?.focus()
+    autosizeDescription()
+  })
+}
+
+function stopEditDescription() {
+  editingDescription.value = false
+}
+
+async function ingestDescriptionImage(file: File) {
+  const markdown = await uploadImageFile(file)
+  if (markdown) insertDescriptionImage(markdown)
+}
+
+function onDescriptionPaste(e: ClipboardEvent) {
+  const file = imageFileFromClipboard(e)
+  if (!file || !imageEnabled.value || readOnly.value) return
+  e.preventDefault()
+  void ingestDescriptionImage(file)
+}
+
+function onDescriptionDragOver(e: DragEvent) {
+  if (readOnly.value || !imageEnabled.value || !dropHasFiles(e)) return
+  e.preventDefault()
+}
+
+function onDescriptionDrop(e: DragEvent) {
+  const file = imageFileFromDrop(e)
+  if (!file || !imageEnabled.value || readOnly.value) return
+  e.preventDefault()
+  void ingestDescriptionImage(file)
+}
+
+function onTaskOverlayClick() {
+  if (shouldIgnoreTaskOverlayClose()) return
+  close()
+}
+
 function resetForm() {
   title.value = ''
   description.value = ''
@@ -260,6 +329,7 @@ function resetForm() {
   githubIssue.value = null
   projectHasGitHub.value = false
   githubIssueRef.value = ''
+  editingDescription.value = true
 }
 
 async function loadMeta() {
@@ -397,6 +467,7 @@ async function loadTask(id: number) {
   currentTask.value = task
   title.value = task.title
   description.value = task.description || ''
+  editingDescription.value = false
   projectId.value = task.project_id ?? ''
   parentId.value = task.parent_id ?? ''
   parentTitle.value = ''
@@ -582,6 +653,7 @@ async function save(keepOpen = false) {
         description.value = ''
         newTags.value = ''
         descriptionError.value = ''
+        editingDescription.value = true
         await nextTick()
         autosizeDescription()
         titleInput.value?.focus()
@@ -614,6 +686,7 @@ async function save(keepOpen = false) {
     const updated = await api.patchTask(taskId.value, payload)
     notifySaved(updated, true)
     toast.push('Task saved', 'success')
+    editingDescription.value = false
     if (eventsLoaded.value) await loadEvents(true)
   } catch (err) {
     const msg = err instanceof APIError ? err.message : err instanceof Error ? err.message : 'Save failed'
@@ -975,7 +1048,7 @@ async function removeTimeEntry(entryId: number) {
     tabindex="-1"
     role="dialog"
     aria-modal="true"
-    @click.self="close"
+    @click.self="onTaskOverlayClick"
   >
     <div
       class="modal-dialog oryryn-task-dialog"
@@ -1129,21 +1202,67 @@ async function removeTimeEntry(entryId: number) {
           <div v-if="completed" class="alert alert-success py-2 mb-2">
             <i class="bi bi-check-circle" /> This task is completed
           </div>
-          <label for="description" :class="{ 'kanban-section-label': isKanbanTask }">Description:</label>
+          <div class="d-flex align-items-center justify-content-between gap-2">
+            <label for="description" :class="{ 'kanban-section-label': isKanbanTask }" class="mb-0">Description:</label>
+            <button
+              v-if="!readOnly && !showDescriptionEditor"
+              type="button"
+              class="btn btn-sm btn-link p-0"
+              @click="startEditDescription"
+            >
+              Edit
+            </button>
+            <button
+              v-else-if="!readOnly && showDescriptionEditor && (mode !== 'add' || description.trim())"
+              type="button"
+              class="btn btn-sm btn-link p-0"
+              @click="stopEditDescription"
+            >
+              Done
+            </button>
+          </div>
           <textarea
+            v-if="showDescriptionEditor"
             id="description"
             ref="descriptionInput"
             v-model="description"
             class="form-control task-description-input"
             maxlength="1000"
             rows="4"
-            :readonly="readOnly"
-            :disabled="readOnly"
             @input="autosizeDescription"
+            @paste="onDescriptionPaste"
+            @dragover="onDescriptionDragOver"
+            @drop="onDescriptionDrop"
           />
-          <div v-if="!readOnly" class="d-flex justify-content-between align-items-center mt-1">
-            <small class="form-hint">Max 1000 Characters</small>
-            <small class="text-muted"><span id="char-count">{{ charCount }}</span>/1000</small>
+          <div
+            v-else
+            id="description"
+            class="task-description-view"
+            tabindex="0"
+            @paste="onDescriptionPaste"
+            @dragover="onDescriptionDragOver"
+            @drop="onDescriptionDrop"
+          >
+            <RichBody v-if="description.trim()" :body="description" />
+            <button
+              v-else-if="!readOnly"
+              type="button"
+              class="btn btn-link p-0 text-muted"
+              @click="startEditDescription"
+            >
+              Add a description…
+            </button>
+            <span v-else class="text-muted">No description</span>
+          </div>
+          <div v-if="!readOnly && showDescriptionEditor" class="d-flex justify-content-between align-items-center mt-1 gap-2">
+            <small class="form-hint">Max 1000 Characters. Paste or drop an image, or use Insert image.</small>
+            <div class="d-flex align-items-center gap-2">
+              <ImageInsertButton compact @insert="insertDescriptionImage" />
+              <small class="text-muted"><span id="char-count">{{ charCount }}</span>/1000</small>
+            </div>
+          </div>
+          <div v-else-if="!readOnly && imageEnabled" class="form-hint mt-1">
+            Paste or drop an image here, or click Edit to change the text.
           </div>
           <div v-if="descriptionError" id="description-error" class="invalid-feedback d-block">
             {{ descriptionError }}
@@ -1565,6 +1684,16 @@ textarea.task-description-input {
   min-height: 80px;
   resize: vertical;
   overflow-y: hidden;
+}
+
+.task-description-view {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--ordryn-card-border, #dee2e6);
+  border-radius: 0.375rem;
+  background: var(--ordryn-muted-bg, #f8f6ee);
+  min-height: 80px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .kanban-task-head textarea.task-description-input {

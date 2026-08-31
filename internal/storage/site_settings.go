@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"GoTodo/internal/crypto/secret"
+	"GoTodo/internal/imagehost"
 	"GoTodo/internal/mailer"
 
 	"github.com/jackc/pgx/v5"
@@ -40,6 +41,9 @@ type SiteSettings struct {
 
 	GitHubOAuthClientID        string
 	GitHubOAuthClientSecretEnc string
+
+	Image               imagehost.Config
+	ImageS3SecretKeyEnc string
 }
 
 // CreateSiteSettingsTable ensures the site_settings table exists.
@@ -105,7 +109,17 @@ func GetSiteSettings() (*SiteSettings, error) {
 			COALESCE(email_smtp_tls, TRUE),
 			COALESCE(email_audit_retention_days, 7),
 			COALESCE(github_oauth_client_id, ''),
-			COALESCE(github_oauth_client_secret_enc, '')
+			COALESCE(github_oauth_client_secret_enc, ''),
+			COALESCE(image_hosting_provider, ''),
+			COALESCE(image_max_bytes, 5242880),
+			COALESCE(image_s3_endpoint, ''),
+			COALESCE(image_s3_region, ''),
+			COALESCE(image_s3_bucket, ''),
+			COALESCE(image_s3_access_key, ''),
+			COALESCE(image_s3_secret_key_enc, ''),
+			COALESCE(image_s3_public_url, ''),
+			COALESCE(image_s3_force_path_style, TRUE),
+			COALESCE(image_local_path, '')
 		FROM site_settings WHERE id = 1`)
 	if err := row.Scan(
 		&s.SiteName, &s.DefaultTimezone, &s.ShowChangelog, &s.SiteVersion,
@@ -117,10 +131,15 @@ func GetSiteSettings() (*SiteSettings, error) {
 		&s.Email.SMTPPasswordEnc, &s.Email.SMTPTLS,
 		&s.EmailAuditRetentionDays,
 		&s.GitHubOAuthClientID, &s.GitHubOAuthClientSecretEnc,
+		&s.Image.Provider, &s.Image.MaxBytes,
+		&s.Image.S3Endpoint, &s.Image.S3Region, &s.Image.S3Bucket,
+		&s.Image.S3AccessKey, &s.ImageS3SecretKeyEnc, &s.Image.S3PublicURL,
+		&s.Image.S3ForcePathStyle, &s.Image.LocalPath,
 	); err != nil {
 		return nil, err
 	}
 	s.EmailAuditRetentionDays = ClampEmailAuditRetentionDays(s.EmailAuditRetentionDays)
+	s.Image.MaxBytes = imagehost.ClampMaxBytes(s.Image.MaxBytes)
 	return &s, nil
 }
 
@@ -136,6 +155,11 @@ func UpsertSiteSettings(s SiteSettings) error {
 		s.Email.SMTPPort = 587
 	}
 	s.EmailAuditRetentionDays = ClampEmailAuditRetentionDays(s.EmailAuditRetentionDays)
+	s.Image.MaxBytes = imagehost.ClampMaxBytes(s.Image.MaxBytes)
+	s.Image.Provider = imagehost.NormalizeProvider(s.Image.Provider)
+	if s.Image.LocalPath == "" {
+		s.Image.LocalPath = imagehost.DefaultLocalPath
+	}
 
 	_, err = pool.Exec(context.Background(), `
         INSERT INTO site_settings (
@@ -147,9 +171,12 @@ func UpsertSiteSettings(s SiteSettings) error {
 			email_smtp_host, email_smtp_port, email_smtp_username,
 			email_smtp_password_enc, email_smtp_tls,
 			email_audit_retention_days,
-			github_oauth_client_id, github_oauth_client_secret_enc
+			github_oauth_client_id, github_oauth_client_secret_enc,
+			image_hosting_provider, image_max_bytes, image_s3_endpoint, image_s3_region,
+			image_s3_bucket, image_s3_access_key, image_s3_secret_key_enc,
+			image_s3_public_url, image_s3_force_path_style, image_local_path
 		)
-        VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+        VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34)
         ON CONFLICT (id) DO UPDATE SET
             site_name = EXCLUDED.site_name,
             default_timezone = EXCLUDED.default_timezone,
@@ -174,7 +201,17 @@ func UpsertSiteSettings(s SiteSettings) error {
 			email_smtp_tls = EXCLUDED.email_smtp_tls,
 			email_audit_retention_days = EXCLUDED.email_audit_retention_days,
 			github_oauth_client_id = EXCLUDED.github_oauth_client_id,
-			github_oauth_client_secret_enc = EXCLUDED.github_oauth_client_secret_enc
+			github_oauth_client_secret_enc = EXCLUDED.github_oauth_client_secret_enc,
+			image_hosting_provider = EXCLUDED.image_hosting_provider,
+			image_max_bytes = EXCLUDED.image_max_bytes,
+			image_s3_endpoint = EXCLUDED.image_s3_endpoint,
+			image_s3_region = EXCLUDED.image_s3_region,
+			image_s3_bucket = EXCLUDED.image_s3_bucket,
+			image_s3_access_key = EXCLUDED.image_s3_access_key,
+			image_s3_secret_key_enc = EXCLUDED.image_s3_secret_key_enc,
+			image_s3_public_url = EXCLUDED.image_s3_public_url,
+			image_s3_force_path_style = EXCLUDED.image_s3_force_path_style,
+			image_local_path = EXCLUDED.image_local_path
     `, s.SiteName, s.DefaultTimezone, s.ShowChangelog, s.SiteVersion,
 		s.EnableRegistration, s.InviteOnly, s.EnableJoinRequests, s.MetaDescription,
 		s.EnableGlobalAnnouncement, s.GlobalAnnouncementText, s.EnableAPI,
@@ -183,7 +220,11 @@ func UpsertSiteSettings(s SiteSettings) error {
 		s.Email.SMTPHost, s.Email.SMTPPort, s.Email.SMTPUsername,
 		s.Email.SMTPPasswordEnc, s.Email.SMTPTLS,
 		s.EmailAuditRetentionDays,
-		s.GitHubOAuthClientID, s.GitHubOAuthClientSecretEnc)
+		s.GitHubOAuthClientID, s.GitHubOAuthClientSecretEnc,
+		s.Image.Provider, s.Image.MaxBytes,
+		s.Image.S3Endpoint, s.Image.S3Region, s.Image.S3Bucket,
+		s.Image.S3AccessKey, s.ImageS3SecretKeyEnc, s.Image.S3PublicURL,
+		s.Image.S3ForcePathStyle, s.Image.LocalPath)
 	if err != nil {
 		return fmt.Errorf("failed to upsert site_settings: %v", err)
 	}
@@ -388,4 +429,55 @@ func MaybeImportEmailSettingsFromEnv() error {
 	}
 	fmt.Println("migration: imported Mailgun email settings from MAILGUN_* / FROM_EMAIL env into site_settings; configure email in Admin going forward (env vars are deprecated)")
 	return nil
+}
+
+// MigrateSiteSettingsAddImageHosting adds S3/local image hosting columns.
+func MigrateSiteSettingsAddImageHosting() error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return err
+	}
+	defer CloseDatabase(pool)
+
+	alters := []string{
+		"ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS image_hosting_provider TEXT DEFAULT ''",
+		"ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS image_max_bytes BIGINT DEFAULT 5242880",
+		"ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS image_s3_endpoint TEXT DEFAULT ''",
+		"ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS image_s3_region TEXT DEFAULT ''",
+		"ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS image_s3_bucket TEXT DEFAULT ''",
+		"ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS image_s3_access_key TEXT DEFAULT ''",
+		"ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS image_s3_secret_key_enc TEXT DEFAULT ''",
+		"ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS image_s3_public_url TEXT DEFAULT ''",
+		"ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS image_s3_force_path_style BOOLEAN DEFAULT TRUE",
+		"ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS image_local_path TEXT DEFAULT ''",
+	}
+	for _, q := range alters {
+		if _, err := pool.Exec(context.Background(), q); err != nil {
+			return fmt.Errorf("failed to migrate site_settings image hosting columns: %v", err)
+		}
+	}
+	return nil
+}
+
+// ImageHostingConfig returns a runtime imagehost.Config with the S3 secret decrypted.
+// The secret stays empty when hosting is not S3 or no ciphertext is stored.
+func (s *SiteSettings) ImageHostingConfig() (imagehost.Config, error) {
+	cfg := imagehost.Config{}
+	if s == nil {
+		return cfg, nil
+	}
+	cfg = s.Image
+	cfg.Provider = imagehost.NormalizeProvider(cfg.Provider)
+	cfg.MaxBytes = imagehost.ClampMaxBytes(cfg.MaxBytes)
+	if cfg.LocalPath == "" {
+		cfg.LocalPath = imagehost.DefaultLocalPath
+	}
+	if cfg.Provider == imagehost.ProviderS3 && strings.TrimSpace(s.ImageS3SecretKeyEnc) != "" {
+		plain, err := secret.Decrypt(s.ImageS3SecretKeyEnc)
+		if err != nil {
+			return cfg, fmt.Errorf("decrypt image s3 secret: %w", err)
+		}
+		cfg.S3SecretKey = strings.TrimSpace(plain)
+	}
+	return cfg, nil
 }
