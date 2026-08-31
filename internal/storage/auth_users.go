@@ -73,6 +73,23 @@ func UpdateUserProfileByID(userID int, userName, timezone string, itemsPerPage i
 	return err
 }
 
+// UserHasPermission reports whether the user's role includes the named permission.
+func UserHasPermission(userID int, permission string) bool {
+	if userID <= 0 || permission == "" {
+		return false
+	}
+	profile, err := GetUserProfileByID(userID)
+	if err != nil {
+		return false
+	}
+	for _, p := range profile.Permissions {
+		if p == permission {
+			return true
+		}
+	}
+	return false
+}
+
 // UserAllowsProjectInvites reports whether the user accepts project invites (default true).
 func UserAllowsProjectInvites(userID int) (bool, error) {
 	pool, err := OpenDatabase()

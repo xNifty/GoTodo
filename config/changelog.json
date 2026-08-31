@@ -1,5 +1,16 @@
 [
   {
+    "version": "3.6.0",
+    "date": "2026-08-31",
+    "title": "Editable discussion comments",
+    "notes": [
+      "Authors can edit their own task discussion comments; project owners can edit anyone's comment on that project",
+      "Comments show posted and edited timestamps; hover the edited date to see who originally posted it",
+      "Previous comment text is kept in an audit log so project owners and site admins can review and restore it",
+      "Site admins can browse and restore comment history from Admin → Comment history"
+    ]
+  },
+  {
     "version": "3.0.0",
     "date": "2026-08-25",
     "title": "Archive projects",

@@ -173,12 +173,9 @@ func AddCommentForUser(ctx context.Context, userID, taskID int, body string) (*s
 	if err != nil {
 		return nil, err
 	}
-	body = strings.TrimSpace(body)
-	if body == "" {
-		return nil, fmt.Errorf("%w: comment cannot be empty", ErrValidation)
-	}
-	if len(body) > storage.MaxTaskCommentBody {
-		return nil, fmt.Errorf("%w: comment must be %d characters or less", ErrValidation, storage.MaxTaskCommentBody)
+	body, err = validateCommentBody(body)
+	if err != nil {
+		return nil, err
 	}
 	comment, err := storage.CreateTaskComment(taskID, userID, body)
 	if err != nil {
@@ -223,6 +220,154 @@ func DeleteCommentForUser(ctx context.Context, userID, taskID, commentID int) er
 	}
 	live.AfterTaskChange(userID, taskID, live.TypeTaskCommented)
 	return nil
+}
+
+func commentActorRole(projectID, userID int, comment *storage.TaskComment) (isAuthor, isOwner, isAdmin bool) {
+	isAuthor = comment.UserID == userID
+	role, _ := storage.GetProjectRole(projectID, userID)
+	isOwner = storage.RoleCanManage(role)
+	isAdmin = storage.UserHasPermission(userID, "admin")
+	return isAuthor, isOwner, isAdmin
+}
+
+func validateCommentBody(body string) (string, error) {
+	body = strings.TrimSpace(body)
+	if body == "" {
+		return "", fmt.Errorf("%w: comment cannot be empty", ErrValidation)
+	}
+	if len(body) > storage.MaxTaskCommentBody {
+		return "", fmt.Errorf("%w: comment must be %d characters or less", ErrValidation, storage.MaxTaskCommentBody)
+	}
+	return body, nil
+}
+
+func loadCommentOnTask(taskID, commentID int) (*storage.TaskComment, error) {
+	comment, err := storage.GetTaskComment(commentID)
+	if err != nil || comment.TaskID != taskID {
+		return nil, ErrNotFound
+	}
+	return comment, nil
+}
+
+// EditCommentForUser updates a comment. Authors edit their own posts;
+// project owners may edit anyone's comment on that project.
+func EditCommentForUser(ctx context.Context, userID, taskID, commentID int, body string) (*storage.TaskComment, error) {
+	_ = ctx
+	projectID, err := requireProjectTaskAccess(taskID, userID)
+	if err != nil {
+		return nil, err
+	}
+	comment, err := loadCommentOnTask(taskID, commentID)
+	if err != nil {
+		return nil, err
+	}
+	if comment.DeletedAt != nil {
+		return nil, fmt.Errorf("%w: cannot edit a deleted comment", ErrConflict)
+	}
+	isAuthor, isOwner, _ := commentActorRole(projectID, userID, comment)
+	if !isAuthor && !isOwner {
+		return nil, ErrForbidden
+	}
+	body, err = validateCommentBody(body)
+	if err != nil {
+		return nil, err
+	}
+	updated, err := storage.UpdateTaskComment(commentID, userID, body)
+	if err != nil {
+		return nil, err
+	}
+	updated.Links = ResolveCommentTaskLinks(userID, updated.Body)
+	live.AfterTaskChange(userID, taskID, live.TypeTaskCommented)
+	return updated, nil
+}
+
+func canViewCommentHistory(projectID, userID int) bool {
+	role, _ := storage.GetProjectRole(projectID, userID)
+	return storage.RoleCanManage(role) || storage.UserHasPermission(userID, "admin")
+}
+
+// ListCommentRevisionsForUser returns prior versions for a project owner or site admin.
+func ListCommentRevisionsForUser(ctx context.Context, userID, taskID, commentID int) ([]storage.TaskCommentRevision, error) {
+	_ = ctx
+	projectID, err := requireProjectTaskAccess(taskID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := loadCommentOnTask(taskID, commentID); err != nil {
+		return nil, err
+	}
+	if !canViewCommentHistory(projectID, userID) {
+		return nil, ErrForbidden
+	}
+	revs, err := storage.ListCommentRevisions(commentID)
+	if err != nil {
+		return nil, err
+	}
+	if revs == nil {
+		revs = []storage.TaskCommentRevision{}
+	}
+	return revs, nil
+}
+
+// RestoreCommentRevisionForUser restores a previous version. Project owners
+// and site admins with task access may restore.
+func RestoreCommentRevisionForUser(ctx context.Context, userID, taskID, commentID, revisionID int) (*storage.TaskComment, error) {
+	_ = ctx
+	projectID, err := requireProjectTaskAccess(taskID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := loadCommentOnTask(taskID, commentID); err != nil {
+		return nil, err
+	}
+	if !canViewCommentHistory(projectID, userID) {
+		return nil, ErrForbidden
+	}
+	rev, err := storage.GetCommentRevision(revisionID)
+	if err != nil || rev.CommentID != commentID || rev.TaskID != taskID {
+		return nil, ErrNotFound
+	}
+	if strings.TrimSpace(rev.Body) == "" {
+		return nil, fmt.Errorf("%w: cannot restore empty comment content", ErrValidation)
+	}
+	updated, err := storage.RestoreTaskCommentFromRevision(revisionID, userID)
+	if err != nil {
+		return nil, err
+	}
+	updated.Links = ResolveCommentTaskLinks(userID, updated.Body)
+	live.AfterTaskChange(userID, taskID, live.TypeTaskCommented)
+	return updated, nil
+}
+
+// ListCommentAuditForAdmin returns the site-wide comment revision log.
+func ListCommentAuditForAdmin(ctx context.Context, userID int, filter storage.CommentAuditFilter) ([]storage.TaskCommentRevision, int, error) {
+	_ = ctx
+	if !storage.UserHasPermission(userID, "admin") {
+		return nil, 0, ErrForbidden
+	}
+	return storage.ListCommentAudit(filter)
+}
+
+// RestoreCommentRevisionForAdmin restores from the site-wide audit log.
+func RestoreCommentRevisionForAdmin(ctx context.Context, userID, revisionID int) (*storage.TaskComment, error) {
+	_ = ctx
+	if !storage.UserHasPermission(userID, "admin") {
+		return nil, ErrForbidden
+	}
+	rev, err := storage.GetCommentRevision(revisionID)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+	if _, err := validateCommentBody(rev.Body); err != nil {
+		return nil, err
+	}
+	updated, err := storage.RestoreTaskCommentFromRevision(revisionID, userID)
+	if err != nil {
+		return nil, err
+	}
+	updated.Links = ResolveCommentTaskLinks(userID, updated.Body)
+	live.AfterTaskChange(userID, updated.TaskID, live.TypeTaskCommented)
+	return updated, nil
 }
 
 func commentPreview(body string) string {
