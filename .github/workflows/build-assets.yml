@@ -6,9 +6,16 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   build-web:
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: web
 
     steps:
       - name: Checkout
@@ -21,5 +28,11 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
+      - name: Install dependencies
+        run: npm ci
+
       - name: Build Vue SPA
         run: npm run build:web
+
+      - name: Verify build output
+        run: test -d dist && test -n "$(find dist -type f -print -quit)"
