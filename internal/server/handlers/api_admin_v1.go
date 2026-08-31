@@ -261,7 +261,7 @@ func apiV1PatchAdminSettings(w http.ResponseWriter, r *http.Request) {
 		next.Image.S3AccessKey = strings.TrimSpace(*req.ImageS3AccessKey)
 	}
 	if req.ImageS3SecretKey != nil {
-		sec := *req.ImageS3SecretKey
+		sec := strings.TrimSpace(*req.ImageS3SecretKey)
 		if sec == "" {
 			next.ImageS3SecretKeyEnc = ""
 		} else {

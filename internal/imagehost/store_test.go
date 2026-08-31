@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -109,7 +110,7 @@ func TestS3StorePathStylePut(t *testing.T) {
 	if !strings.HasPrefix(gotAuth, "AWS4-HMAC-SHA256 Credential=AKIAEXAMPLE/20260831/auto/s3/aws4_request") {
 		t.Fatalf("authorization=%q", gotAuth)
 	}
-	if !strings.Contains(gotAuth, "SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date") {
+	if !strings.Contains(gotAuth, "SignedHeaders=host;x-amz-content-sha256;x-amz-date") {
 		t.Fatalf("signed headers missing: %s", gotAuth)
 	}
 	if gotType != TypePNG {
@@ -159,7 +160,7 @@ func TestS3StoreVirtualHostPut(t *testing.T) {
 func TestS3StoreErrorStatus(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
-		_, _ = w.Write([]byte("AccessDenied"))
+		_, _ = w.Write([]byte(`<?xml version="1.0"?><Error><Code>AccessDenied</Code><Message>Access Denied</Message></Error>`))
 	}))
 	t.Cleanup(srv.Close)
 	cfg := Config{
@@ -177,9 +178,132 @@ func TestS3StoreErrorStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = store.Put(context.Background(), Object{Key: "a.png", ContentType: TypePNG, Data: tinyPNG})
-	if err == nil || !strings.Contains(err.Error(), "403") {
+	var ue *UploadError
+	if err == nil || !asUploadError(err, &ue) {
 		t.Fatalf("err=%v", err)
 	}
+	if ue.Status != http.StatusForbidden || ue.Code != "AccessDenied" {
+		t.Fatalf("upload error=%+v", ue)
+	}
+	if !ue.ClientError() {
+		t.Fatal("403 should be a client error")
+	}
+	if !strings.Contains(ue.UserMessage(), "AccessDenied") {
+		t.Fatalf("user message=%q", ue.UserMessage())
+	}
+}
+
+func TestS3StoreHTMLGatewayError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = w.Write([]byte("<html><body>502 Bad Gateway</body></html>"))
+	}))
+	t.Cleanup(srv.Close)
+	cfg := Config{
+		Provider:         ProviderS3,
+		S3Endpoint:       srv.URL,
+		S3Region:         "auto",
+		S3Bucket:         "media",
+		S3AccessKey:      "k",
+		S3SecretKey:      "s",
+		S3PublicURL:      "https://cdn.example.com",
+		S3ForcePathStyle: true,
+	}
+	store, err := NewS3Store(cfg, srv.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = store.Put(context.Background(), Object{Key: "a.png", ContentType: TypePNG, Data: tinyPNG})
+	var ue *UploadError
+	if err == nil || !asUploadError(err, &ue) {
+		t.Fatalf("err=%v", err)
+	}
+	if ue.Status != http.StatusBadGateway {
+		t.Fatalf("status=%d", ue.Status)
+	}
+	if !strings.Contains(ue.UserMessage(), "HTML") {
+		t.Fatalf("user message=%q", ue.UserMessage())
+	}
+}
+
+func TestS3StoreR2DashboardEndpointDoesNotDoubleBucket(t *testing.T) {
+	cfg := Config{
+		Provider:         ProviderS3,
+		S3Endpoint:       "https://abc123.r2.cloudflarestorage.com/media",
+		S3Region:         "ENAM",
+		S3Bucket:         "media",
+		S3AccessKey:      "AKID",
+		S3SecretKey:      "secret",
+		S3PublicURL:      "https://pub-example.r2.dev",
+		S3ForcePathStyle: false,
+	}
+	store, err := NewS3Store(cfg, http.DefaultClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if store.cfg.S3Endpoint != "https://abc123.r2.cloudflarestorage.com" {
+		t.Fatalf("endpoint=%q", store.cfg.S3Endpoint)
+	}
+	if !store.cfg.S3ForcePathStyle {
+		t.Fatal("R2 should force path-style")
+	}
+	if store.cfg.S3Region != "auto" {
+		t.Fatalf("region=%q", store.cfg.S3Region)
+	}
+	req, err := store.newPutRequest(context.Background(), Object{
+		Key: "pic.jpg", ContentType: TypeJPEG, Data: tinyPNG,
+	}, time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if req.URL.Path != "/media/pic.jpg" {
+		t.Fatalf("path=%q (bucket should appear once)", req.URL.Path)
+	}
+	if req.URL.Host != "abc123.r2.cloudflarestorage.com" {
+		t.Fatalf("host=%q", req.URL.Host)
+	}
+	auth := req.Header.Get("Authorization")
+	if !strings.Contains(auth, "/auto/s3/") {
+		t.Fatalf("credential scope should use auto, got %s", auth)
+	}
+	if strings.Contains(auth, "content-type") {
+		t.Fatalf("content-type should not be signed: %s", auth)
+	}
+}
+
+func TestDefaultS3HTTPClientDisablesHTTP2(t *testing.T) {
+	cfg := Config{
+		Provider:         ProviderS3,
+		S3Endpoint:       "https://abc123.r2.cloudflarestorage.com",
+		S3Region:         "auto",
+		S3Bucket:         "media",
+		S3AccessKey:      "k",
+		S3SecretKey:      "s",
+		S3PublicURL:      "https://cdn.example.com",
+		S3ForcePathStyle: true,
+	}
+	store, err := NewS3Store(cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client, ok := store.client.(*http.Client)
+	if !ok {
+		t.Fatalf("client type=%T", store.client)
+	}
+	tr, ok := client.Transport.(*http.Transport)
+	if !ok {
+		t.Fatalf("transport type=%T", client.Transport)
+	}
+	if tr.ForceAttemptHTTP2 {
+		t.Fatal("HTTP/2 should be disabled for S3")
+	}
+	if tr.TLSNextProto == nil {
+		t.Fatal("nil TLSNextProto allows the runtime to negotiate HTTP/2")
+	}
+}
+
+func asUploadError(err error, target **UploadError) bool {
+	return errors.As(err, target)
 }
 
 func TestNewStore(t *testing.T) {

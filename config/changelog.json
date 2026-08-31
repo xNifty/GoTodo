@@ -6,7 +6,8 @@
     "notes": [
       "Admins can enable image hosting with an S3-compatible backend (AWS S3, Cloudflare R2, DigitalOcean Spaces, MinIO) or local disk uploads",
       "Admin settings include the API endpoint, region, bucket, credentials, public URL, path-style option, local directory, and a maximum image size",
-      "Signed-in users can upload JPEG, PNG, GIF, or WebP images into task descriptions and comments when hosting is configured"
+      "Signed-in users can upload JPEG, PNG, GIF, or WebP images into task descriptions and comments when hosting is configured",
+      "S3 uploads talk HTTP/1.1 (Cloudflare R2 returns 502 over HTTP/2) and surface the storage provider's error instead of a generic Bad Gateway"
     ]
   },
   {

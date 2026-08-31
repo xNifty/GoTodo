@@ -91,7 +91,7 @@ func APIV1Images(w http.ResponseWriter, r *http.Request) {
 
 	url, err := store.Put(r.Context(), obj)
 	if err != nil {
-		utils.APIJSONError(w, http.StatusBadGateway, "upload_failed", "Failed to store image.")
+		writeStoreError(w, err)
 		return
 	}
 
@@ -108,6 +108,19 @@ func APIV1Images(w http.ResponseWriter, r *http.Request) {
 		"filename":     name,
 		"key":          obj.Key,
 	})
+}
+
+func writeStoreError(w http.ResponseWriter, err error) {
+	var ue *imagehost.UploadError
+	if errors.As(err, &ue) {
+		status := http.StatusBadGateway
+		if ue.ClientError() {
+			status = http.StatusBadRequest
+		}
+		utils.APIJSONError(w, status, "upload_failed", ue.UserMessage())
+		return
+	}
+	utils.APIJSONError(w, http.StatusBadGateway, "upload_failed", "Failed to store image.")
 }
 
 func writeImageUploadError(w http.ResponseWriter, err error, max int64) {

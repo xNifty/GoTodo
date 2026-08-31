@@ -22,6 +22,59 @@ type Store interface {
 	Put(ctx context.Context, obj Object) (publicURL string, error error)
 }
 
+// UploadError is a storage-provider failure with an HTTP status when known.
+type UploadError struct {
+	Status  int
+	Code    string
+	Message string
+	Cause   error
+}
+
+func (e *UploadError) Error() string {
+	if e == nil {
+		return "upload failed"
+	}
+	switch {
+	case e.Code != "" && e.Status != 0:
+		return fmt.Sprintf("s3 upload failed (%d): %s: %s", e.Status, e.Code, e.Message)
+	case e.Status != 0 && e.Message != "":
+		return fmt.Sprintf("s3 upload failed (%d): %s", e.Status, e.Message)
+	case e.Status != 0:
+		return fmt.Sprintf("s3 upload failed (%d)", e.Status)
+	case e.Cause != nil:
+		return fmt.Sprintf("s3 upload: %v", e.Cause)
+	case e.Message != "":
+		return e.Message
+	default:
+		return "upload failed"
+	}
+}
+
+func (e *UploadError) Unwrap() error { return e.Cause }
+
+// ClientError reports a 4xx response from the storage provider.
+func (e *UploadError) ClientError() bool {
+	return e != nil && e.Status >= 400 && e.Status < 500
+}
+
+// UserMessage is safe to show in an API error body.
+func (e *UploadError) UserMessage() string {
+	if e == nil {
+		return "Failed to store image."
+	}
+	msg := strings.TrimSpace(e.Message)
+	if msg == "" {
+		if e.Cause != nil {
+			return "Could not reach the S3 endpoint."
+		}
+		return "Failed to store image."
+	}
+	if e.Code != "" && !strings.HasPrefix(msg, e.Code+":") {
+		return e.Code + ": " + msg
+	}
+	return msg
+}
+
 // NewStore builds a Store for the given config. LocalPublicBase should already
 // be set by the caller for local uploads.
 func NewStore(cfg Config) (Store, error) {

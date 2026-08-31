@@ -128,11 +128,13 @@ async function upload<T>(path: string, field: string, file: File): Promise<T> {
   }
   if (!res.ok) {
     const body = data as APIErrorBody | null
-    throw new APIError(
-      res.status,
-      body?.error || 'request_failed',
-      body?.message || res.statusText || 'Request failed',
-    )
+    const message =
+      body && typeof body === 'object' && typeof body.message === 'string'
+        ? body.message
+        : typeof data === 'string' && data.toLowerCase().includes('<html')
+          ? 'Request failed (proxy returned an HTML error page).'
+          : res.statusText || 'Request failed'
+    throw new APIError(res.status, body?.error || 'request_failed', message)
   }
   return data as T
 }

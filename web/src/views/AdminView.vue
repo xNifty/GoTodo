@@ -460,10 +460,13 @@ onMounted(load)
                 required
               />
               <div class="form-text">
-                S3 API URL, not the public CDN. Examples:
+                S3 API host only — do not include the bucket in the path. Examples:
                 <code>https://s3.us-east-1.amazonaws.com</code>,
                 <code>https://&lt;accountid&gt;.r2.cloudflarestorage.com</code>,
                 <code>https://nyc3.digitaloceanspaces.com</code>.
+                Cloudflare's dashboard copies
+                <code>https://&lt;accountid&gt;.r2.cloudflarestorage.com/&lt;bucket&gt;</code>;
+                drop the bucket segment.
               </div>
             </div>
             <div class="mb-3">
@@ -525,7 +528,7 @@ onMounted(load)
                 required
               />
               <div class="form-text">
-                Base URL used in markdown. For Spaces this is often the CDN endpoint; for R2, a custom domain.
+                Base URL used in markdown. For Spaces this is often the CDN endpoint; for R2, the public development URL or a custom domain.
               </div>
             </div>
             <div class="form-check mb-3">

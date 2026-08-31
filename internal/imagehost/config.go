@@ -75,9 +75,11 @@ func (c *Config) Validate() string {
 	c.S3Region = strings.TrimSpace(c.S3Region)
 	c.S3Bucket = strings.TrimSpace(c.S3Bucket)
 	c.S3AccessKey = strings.TrimSpace(c.S3AccessKey)
+	c.S3SecretKey = strings.TrimSpace(c.S3SecretKey)
 	c.S3PublicURL = strings.TrimRight(strings.TrimSpace(c.S3PublicURL), "/")
 	c.LocalPath = strings.TrimSpace(c.LocalPath)
 	c.LocalPublicBase = strings.TrimRight(strings.TrimSpace(c.LocalPublicBase), "/")
+	normalizeS3Endpoint(c)
 
 	switch c.Provider {
 	case ProviderNone:
@@ -109,7 +111,7 @@ func (c *Config) Validate() string {
 		if c.S3AccessKey == "" {
 			return "image_s3_access_key is required for S3."
 		}
-		if strings.TrimSpace(c.S3SecretKey) == "" {
+		if c.S3SecretKey == "" {
 			return "image_s3_secret_key is required for S3."
 		}
 		if c.S3PublicURL == "" {
@@ -147,6 +149,28 @@ func (c Config) PublicOrigin() string {
 		scheme = "https"
 	}
 	return scheme + "://" + u.Host
+}
+
+// normalizeS3Endpoint keeps scheme+host only and applies R2 defaults.
+// Cloudflare's dashboard copies https://<account>.r2.cloudflarestorage.com/<bucket>;
+// the extra path would otherwise be easy to paste into the API endpoint field.
+func normalizeS3Endpoint(c *Config) {
+	if c == nil || c.S3Endpoint == "" {
+		return
+	}
+	u, err := url.Parse(c.S3Endpoint)
+	if err != nil || u.Host == "" {
+		return
+	}
+	if u.Scheme == "" {
+		u.Scheme = "https"
+	}
+	c.S3Endpoint = u.Scheme + "://" + u.Host
+	host := strings.ToLower(u.Host)
+	if strings.Contains(host, "r2.cloudflarestorage.com") {
+		c.S3ForcePathStyle = true
+		c.S3Region = "auto"
+	}
 }
 
 // JoinPublicURL concatenates a public base and object key without double slashes.

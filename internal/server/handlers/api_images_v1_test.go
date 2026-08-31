@@ -243,6 +243,62 @@ func TestAPIV1ImagesS3Upload(t *testing.T) {
 	}
 }
 
+func TestAPIV1ImagesStoreClientError(t *testing.T) {
+	stub := &stubStore{err: &imagehost.UploadError{Status: 403, Code: "AccessDenied", Message: "Access Denied"}}
+	cfg := imagehost.Config{
+		Provider:         imagehost.ProviderS3,
+		MaxBytes:         imagehost.DefaultMaxBytes,
+		S3Endpoint:       "https://abc.r2.cloudflarestorage.com",
+		S3Region:         "auto",
+		S3Bucket:         "media",
+		S3AccessKey:      "key",
+		S3SecretKey:      "secret",
+		S3PublicURL:      "https://cdn.example.com",
+		S3ForcePathStyle: true,
+	}
+	withImageHosting(t, cfg, stub)
+	body, ctype := multipartPNG(t, "file", "dot.png", handlerTinyPNG)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/images", body)
+	req.Header.Set("Content-Type", ctype)
+	req = utils.SetAPIUserID(req, 1)
+	rec := httptest.NewRecorder()
+	APIV1Images(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "AccessDenied") {
+		t.Fatalf("body=%s", rec.Body.String())
+	}
+}
+
+func TestAPIV1ImagesStoreGatewayError(t *testing.T) {
+	stub := &stubStore{err: &imagehost.UploadError{Status: 502, Message: "the storage provider returned an HTML error page (often HTTP/2 or a gateway failure)"}}
+	cfg := imagehost.Config{
+		Provider:         imagehost.ProviderS3,
+		MaxBytes:         imagehost.DefaultMaxBytes,
+		S3Endpoint:       "https://abc.r2.cloudflarestorage.com",
+		S3Region:         "auto",
+		S3Bucket:         "media",
+		S3AccessKey:      "key",
+		S3SecretKey:      "secret",
+		S3PublicURL:      "https://cdn.example.com",
+		S3ForcePathStyle: true,
+	}
+	withImageHosting(t, cfg, stub)
+	body, ctype := multipartPNG(t, "file", "dot.png", handlerTinyPNG)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/images", body)
+	req.Header.Set("Content-Type", ctype)
+	req = utils.SetAPIUserID(req, 1)
+	rec := httptest.NewRecorder()
+	APIV1Images(rec, req)
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "HTML error page") {
+		t.Fatalf("body=%s", rec.Body.String())
+	}
+}
+
 func TestAPIV1ImagesMissingFile(t *testing.T) {
 	dir := t.TempDir()
 	withImageHosting(t, imagehost.Config{Provider: imagehost.ProviderLocal, LocalPath: dir, MaxBytes: imagehost.DefaultMaxBytes}, nil)

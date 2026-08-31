@@ -5,7 +5,9 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/hex"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"net/http"
@@ -27,6 +29,19 @@ type S3Store struct {
 	client HTTPDoer
 }
 
+// defaultS3HTTPClient talks HTTP/1.1 only. HTTP/2 to Cloudflare R2
+// (*.r2.cloudflarestorage.com) is a documented source of 502 Bad Gateway.
+func defaultS3HTTPClient() *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.ForceAttemptHTTP2 = false
+	transport.DisableCompression = true
+	transport.ExpectContinueTimeout = 0
+	// An empty map disables HTTP/2 even when ALPN would otherwise negotiate it.
+	// A nil map lets the runtime enable HTTP/2.
+	transport.TLSNextProto = map[string]func(authority string, c *tls.Conn) http.RoundTripper{}
+	return &http.Client{Timeout: 45 * time.Second, Transport: transport}
+}
+
 // NewS3Store builds an S3-compatible store. client may be nil to use a default timeout client.
 func NewS3Store(cfg Config, client HTTPDoer) (*S3Store, error) {
 	if msg := cfg.Validate(); msg != "" {
@@ -36,7 +51,7 @@ func NewS3Store(cfg Config, client HTTPDoer) (*S3Store, error) {
 		return nil, fmt.Errorf("s3 store requires provider %q", ProviderS3)
 	}
 	if client == nil {
-		client = &http.Client{Timeout: 30 * time.Second}
+		client = defaultS3HTTPClient()
 	}
 	return &S3Store{cfg: cfg, client: client}, nil
 }
@@ -55,18 +70,54 @@ func (s *S3Store) Put(ctx context.Context, obj Object) (string, error) {
 	}
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("s3 upload: %w", err)
+		return "", &UploadError{Message: "Could not reach the S3 endpoint.", Cause: err}
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 8192))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		msg := strings.TrimSpace(string(body))
-		if msg == "" {
-			msg = resp.Status
-		}
-		return "", fmt.Errorf("s3 upload failed (%d): %s", resp.StatusCode, msg)
+		return "", s3StatusError(resp.StatusCode, body)
 	}
 	return JoinPublicURL(s.cfg.S3PublicURL, obj.Key), nil
+}
+
+type s3ErrorBody struct {
+	XMLName xml.Name `xml:"Error"`
+	Code    string   `xml:"Code"`
+	Message string   `xml:"Message"`
+}
+
+func s3StatusError(status int, body []byte) error {
+	code, message := parseS3XMLError(body)
+	if message == "" {
+		message = sanitizeS3ErrorMessage(string(body))
+	}
+	if message == "" {
+		message = fmt.Sprintf("S3 returned HTTP %d.", status)
+	}
+	return &UploadError{Status: status, Code: code, Message: message}
+}
+
+func parseS3XMLError(body []byte) (code, message string) {
+	var parsed s3ErrorBody
+	if err := xml.Unmarshal(body, &parsed); err != nil {
+		return "", ""
+	}
+	return strings.TrimSpace(parsed.Code), strings.TrimSpace(parsed.Message)
+}
+
+func sanitizeS3ErrorMessage(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	lower := strings.ToLower(raw)
+	if strings.Contains(lower, "<html") {
+		return "the storage provider returned an HTML error page (often HTTP/2 or a gateway failure)"
+	}
+	if len(raw) > 300 {
+		return raw[:300]
+	}
+	return raw
 }
 
 func (s *S3Store) newPutRequest(ctx context.Context, obj Object, now time.Time) (*http.Request, error) {
@@ -80,12 +131,14 @@ func (s *S3Store) newPutRequest(ctx context.Context, obj Object, now time.Time) 
 
 	escapedKey := escapePath(obj.Key)
 	escapedBucket := escapePath(s.cfg.S3Bucket)
-	var requestURL string
-	var canonicalURI string
 	host := endpoint.Host
 
-	base := strings.TrimRight(endpoint.Scheme+"://"+endpoint.Host, "/")
+	base := endpoint.Scheme + "://" + endpoint.Host
+	var requestURL string
+	var canonicalURI string
 	if s.cfg.S3ForcePathStyle {
+		// Host-only base: a leftover /bucket path on the endpoint (R2 dashboard
+		// copies it) is ignored so the bucket is not duplicated in the PUT URL.
 		canonicalURI = "/" + escapedBucket + "/" + escapedKey
 		requestURL = base + canonicalURI
 	} else {
@@ -102,11 +155,13 @@ func (s *S3Store) newPutRequest(ctx context.Context, obj Object, now time.Time) 
 		contentType = "application/octet-stream"
 	}
 
-	canonicalHeaders := "content-type:" + contentType + "\n" +
-		"host:" + host + "\n" +
+	// Sign host + x-amz-* only. Signing Content-Type is a common
+	// SignatureDoesNotMatch source when a proxy or client mutates the header
+	// (charset, case). The header is still sent so R2/S3 can store the type.
+	canonicalHeaders := "host:" + host + "\n" +
 		"x-amz-content-sha256:" + payloadHash + "\n" +
 		"x-amz-date:" + amzDate + "\n"
-	signedHeaders := "content-type;host;x-amz-content-sha256;x-amz-date"
+	signedHeaders := "host;x-amz-content-sha256;x-amz-date"
 	canonicalRequest := strings.Join([]string{
 		http.MethodPut,
 		canonicalURI,

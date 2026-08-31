@@ -477,7 +477,7 @@ func (s *SiteSettings) ImageHostingConfig() (imagehost.Config, error) {
 		if err != nil {
 			return cfg, fmt.Errorf("decrypt image s3 secret: %w", err)
 		}
-		cfg.S3SecretKey = plain
+		cfg.S3SecretKey = strings.TrimSpace(plain)
 	}
 	return cfg, nil
 }
