@@ -13,10 +13,6 @@ jobs:
   build-web:
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: web
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,11 +24,12 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - name: Install dependencies
+      - name: Install web dependencies
+        working-directory: web
         run: npm ci
 
       - name: Build Vue SPA
         run: npm run build:web
 
-      - name: Verify build output
-        run: test -d dist && test -n "$(find dist -type f -print -quit)"
+      - name: Verify production build
+        run: test -f web/dist/index.html
