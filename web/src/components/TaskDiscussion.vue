@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { api } from '@/api/client'
 import type { TaskComment, TaskCommentRevision } from '@/api/types'
 import ImageInsertButton from '@/components/ImageInsertButton.vue'
+import RichBody from '@/components/RichBody.vue'
 import { useAuth } from '@/composables/useAuth'
 import { useConfirm } from '@/composables/useConfirm'
 import { useTaskSidebar } from '@/composables/useTaskSidebar'
@@ -14,7 +15,6 @@ import {
   insertTaskRef,
   isInsertedTaskRef,
   mentionTokenAtCursor,
-  splitCommentBody,
   type MentionToken,
 } from '@/utils/taskCommentBody'
 
@@ -597,19 +597,7 @@ defineExpose({ reload })
               </div>
             </div>
             <div v-else class="task-post-body">
-              <template v-for="(part, i) in splitCommentBody(c.body)" :key="i">
-                <span v-if="part.type === 'text'" style="white-space: pre-wrap;">{{ part.value }}</span>
-                <span v-else-if="part.type === 'mention'" class="task-post-mention">{{ part.raw }}</span>
-                <button
-                  v-else-if="linkTitle(c, part.id)"
-                  type="button"
-                  class="task-post-task-link"
-                  @click="openLinkedTask(part.id)"
-                >
-                  {{ taskLinkLabel(part.id, linkTitle(c, part.id)) }}
-                </button>
-                <span v-else>#{{ part.id }}</span>
-              </template>
+              <RichBody :body="c.body" :task-title="(id) => linkTitle(c, id)" @open-task="openLinkedTask" />
             </div>
             <div v-if="historyId === c.id" class="task-post-history">
               <p v-if="historyLoading && !historyByComment[c.id]" class="small text-muted mb-0">Loading history…</p>
@@ -639,7 +627,10 @@ defineExpose({ reload })
                       {{ restoringId === rev.id ? 'Restoring…' : 'Restore' }}
                     </button>
                   </div>
-                  <div class="task-post-revision-body">{{ rev.body || '(empty)' }}</div>
+                  <div class="task-post-revision-body">
+                    <RichBody v-if="rev.body.trim()" :body="rev.body" />
+                    <span v-else>(empty)</span>
+                  </div>
                 </li>
               </ul>
             </div>

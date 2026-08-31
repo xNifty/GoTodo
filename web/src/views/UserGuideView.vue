@@ -49,7 +49,8 @@ onUnmounted(() => {
           Click <strong>Add Task</strong> (or press <kbd>n</kbd> on the home page) to open the task
           sidebar. Fill in a title, optional markdown description, due date, project, tags, and priority, then
           save. When an admin has enabled image hosting, use <strong>Insert image</strong> to upload a
-          JPEG, PNG, GIF, or WebP file.
+          JPEG, PNG, GIF, or WebP file. Uploaded images render in the task description, discussion
+          comments, and share-link task view — not as raw markdown.
         </p>
         <ul>
           <li>Click a task’s edit control (or press <kbd>e</kbd> / <kbd>Enter</kbd> on a focused task) to edit it in the sidebar.</li>
@@ -140,6 +141,10 @@ onUnmounted(() => {
             Paste <code>#123</code> in a comment to link another task you can access (including tasks
             only you can see). Click <strong>Insert link</strong>, and it renders as
             <em>Task #123 - Title</em> for anyone who can open that task.
+          </li>
+          <li>
+            Use <strong>Insert image</strong> in a comment (when image hosting is enabled). The picture
+            is stored as markdown while you type and shows as an image once the comment is posted.
           </li>
         </ul>
 

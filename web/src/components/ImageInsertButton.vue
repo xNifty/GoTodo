@@ -42,7 +42,12 @@ async function onFile(ev: Event) {
   busy.value = true
   try {
     const uploaded = await api.uploadImage(file)
-    const alt = file.name.replace(/\.[^.]+$/, '') || 'image'
+    const alt =
+      file.name
+        .replace(/\.[^.]+$/, '')
+        .replace(/[[\]()]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim() || 'image'
     emit('insert', `![${alt}](${uploaded.url})`)
   } catch (err) {
     toast.push(err instanceof APIError ? err.message : 'Image upload failed', 'error')

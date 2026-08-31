@@ -8,6 +8,8 @@ import ParentTaskCombobox from '@/components/ParentTaskCombobox.vue'
 import DeleteTaskDialog from '@/components/DeleteTaskDialog.vue'
 import TaskDiscussion from '@/components/TaskDiscussion.vue'
 import ImageInsertButton from '@/components/ImageInsertButton.vue'
+import RichBody from '@/components/RichBody.vue'
+import { hasImageMarkdown } from '@/utils/taskCommentBody'
 import { useAuth } from '@/composables/useAuth'
 import { useTaskSidebar } from '@/composables/useTaskSidebar'
 import { useToast } from '@/composables/useToast'
@@ -149,6 +151,7 @@ const sidebarTitle = computed(() => {
 const kanbanHeaderTitle = computed(() => (mode.value === 'add' ? 'Add Task' : 'Task'))
 const submitText = computed(() => (mode.value === 'edit' ? 'Save Task' : 'Add Task'))
 const charCount = computed(() => description.value.length)
+const descriptionHasImage = computed(() => hasImageMarkdown(description.value))
 const timeSpentLabel = computed(() => formatMinutes(timeSpentMinutes.value))
 const showDiscussion = computed(
   () => (mode.value === 'edit' || mode.value === 'view') && !!currentTask.value?.project_id,
@@ -1151,16 +1154,26 @@ async function removeTimeEntry(entryId: number) {
           </div>
           <label for="description" :class="{ 'kanban-section-label': isKanbanTask }">Description:</label>
           <textarea
+            v-if="!readOnly"
             id="description"
             ref="descriptionInput"
             v-model="description"
             class="form-control task-description-input"
             maxlength="1000"
             rows="4"
-            :readonly="readOnly"
-            :disabled="readOnly"
             @input="autosizeDescription"
           />
+          <div v-else id="description" class="task-description-view">
+            <RichBody v-if="description.trim()" :body="description" />
+            <span v-else class="text-muted">No description</span>
+          </div>
+          <div
+            v-if="!readOnly && descriptionHasImage"
+            class="task-description-preview mt-2"
+          >
+            <div class="form-hint mb-1">Preview</div>
+            <RichBody :body="description" />
+          </div>
           <div v-if="!readOnly" class="d-flex justify-content-between align-items-center mt-1 gap-2">
             <small class="form-hint">Max 1000 Characters. Markdown is supported.</small>
             <div class="d-flex align-items-center gap-2">
@@ -1588,6 +1601,19 @@ textarea.task-description-input {
   min-height: 80px;
   resize: vertical;
   overflow-y: hidden;
+}
+
+.task-description-view,
+.task-description-preview {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--ordryn-card-border, #dee2e6);
+  border-radius: 0.375rem;
+  background: var(--ordryn-muted-bg, #f8f6ee);
+  min-height: 80px;
+}
+
+.task-description-preview {
+  min-height: 0;
 }
 
 .kanban-task-head textarea.task-description-input {

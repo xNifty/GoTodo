@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from 'vue'
 import type { ShareLinkTask } from '@/api/types'
+import RichBody from '@/components/RichBody.vue'
 
 const props = defineProps<{
   task: ShareLinkTask
@@ -72,7 +73,7 @@ onUnmounted(() => {
 
           <div class="mb-3">
             <div class="form-label text-muted small mb-1">Description</div>
-            <p v-if="description" class="mb-0" style="white-space: pre-wrap;">{{ description }}</p>
+            <RichBody v-if="description" :body="description" />
             <p v-else class="text-muted small mb-0">No description</p>
           </div>
 

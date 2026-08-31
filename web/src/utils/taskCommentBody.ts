@@ -2,6 +2,7 @@ export type CommentBodyPart =
   | { type: 'text'; value: string }
   | { type: 'task'; id: number; raw: string }
   | { type: 'mention'; userName: string; raw: string }
+  | { type: 'image'; alt: string; src: string; raw: string }
 
 export type MentionToken = {
   start: number
@@ -10,9 +11,47 @@ export type MentionToken = {
 }
 
 const TASK_REF_RE = /\[\[(\d+)\]\]|#(\d+)\b/g
+const IMAGE_RE = /!\[([^\]]*)]\(\s*<?([^)\s>]+)>?(?:\s+["'][^"']*["'])?\s*\)/g
 const COMMENT_TOKEN_RE =
-  /\[\[(\d+)\]\]|#(\d+)\b|(^|[^A-Za-z0-9_@])@([A-Za-z0-9_]{3,32})\b/g
+  /!\[([^\]]*)]\(\s*<?([^)\s>]+)>?(?:\s+["'][^"']*["'])?\s*\)|\[\[(\d+)\]\]|#(\d+)\b|(^|[^A-Za-z0-9_@])@([A-Za-z0-9_]{3,32})\b/g
 const MENTION_RE = /(^|[^A-Za-z0-9_@])@([A-Za-z0-9_]{3,32})\b/g
+
+/** http(s) URLs and local /uploads/ keys only — never javascript: or data:. */
+export function isSafeImageSrc(src: string): boolean {
+  const s = src.trim()
+  if (!s || /\s/.test(s) || s.includes('\\') || s.includes('<')) return false
+  if (s.startsWith('/uploads/')) {
+    return !s.includes('..') && !s.startsWith('//')
+  }
+  if (s.startsWith('/') || s.startsWith('//')) return false
+  try {
+    const u = new URL(s)
+    return (u.protocol === 'https:' || u.protocol === 'http:') && !!u.hostname
+  } catch {
+    return false
+  }
+}
+
+export function hasImageMarkdown(body: string): boolean {
+  const re = new RegExp(IMAGE_RE.source, 'g')
+  let m: RegExpExecArray | null
+  while ((m = re.exec(body))) {
+    if (isSafeImageSrc(m[2] || '')) return true
+  }
+  return false
+}
+
+/** Strip image markdown so list previews do not show raw ![alt](url). */
+export function previewWithoutImages(body: string, limit = 0): string {
+  const re = new RegExp(IMAGE_RE.source, 'g')
+  let text = body.replace(re, (_, alt) => {
+    const a = String(alt || '').trim()
+    return a ? `[image: ${a}]` : '[image]'
+  })
+  text = text.replace(/\s+/g, ' ').trim()
+  if (limit > 0 && text.length > limit) return text.slice(0, limit - 1) + '…'
+  return text
+}
 
 export function extractTaskRefIDs(body: string): number[] {
   const ids: number[] = []
@@ -93,9 +132,23 @@ export function splitCommentBody(body: string): CommentBodyPart[] {
   let last = 0
   let m: RegExpExecArray | null
   while ((m = re.exec(body))) {
-    const mentionName = m[4]
+    const imageSrc = m[2]
+    if (m[1] != null && imageSrc != null) {
+      if (m.index > last) {
+        parts.push({ type: 'text', value: body.slice(last, m.index) })
+      }
+      const src = imageSrc.trim()
+      if (isSafeImageSrc(src)) {
+        parts.push({ type: 'image', alt: m[1], src, raw: m[0] })
+      } else {
+        parts.push({ type: 'text', value: m[0] })
+      }
+      last = m.index + m[0].length
+      continue
+    }
+    const mentionName = m[6]
     if (mentionName) {
-      const prefix = m[3] ?? ''
+      const prefix = m[5] ?? ''
       const tokenStart = m.index + prefix.length
       if (tokenStart > last) {
         parts.push({ type: 'text', value: body.slice(last, tokenStart) })
@@ -107,7 +160,7 @@ export function splitCommentBody(body: string): CommentBodyPart[] {
     if (m.index > last) {
       parts.push({ type: 'text', value: body.slice(last, m.index) })
     }
-    const id = Number(m[1] || m[2])
+    const id = Number(m[3] || m[4])
     parts.push({ type: 'task', id, raw: m[0] })
     last = m.index + m[0].length
   }

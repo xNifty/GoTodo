@@ -9,7 +9,8 @@
       "Signed-in users can upload JPEG, PNG, GIF, or WebP images into task descriptions and comments when hosting is configured",
       "Failed uploads show a generic message to users; site admins can Test connection to verify the backend without exposing provider XML or secrets",
       "S3 uploads talk HTTP/1.1 (Cloudflare R2 returns 502 over HTTP/2)",
-      "Saving image hosting settings keeps the API endpoint, region, and path-style checkbox as entered"
+      "Saving image hosting settings keeps the API endpoint, region, and path-style checkbox as entered",
+      "Inserted images render in task descriptions and discussion comments instead of showing as markdown"
     ]
   },
   {

@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --experimental-strip-types --test src/utils/taskCommentBody.test.ts"
   },
   "dependencies": {
     "bootstrap": "^5.3.3",
