@@ -31,15 +31,18 @@ jobs:
         run: npm ci
 
       - name: Build web distribution
-        working-directory: web
         run: npm run build:web
+
+      - name: Verify web output
+        run: test -f web/dist/index.html
 
       - name: Package web distribution
         run: |
           cd web/dist
-          zip -r ../../web-dist-${{ github.event.release.tag_name }}.zip .
+          zip -r "../../web-dist-${{ github.event.release.tag_name }}.zip" .
 
       - name: Attach web distribution to release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.release.tag_name }}
           files: web-dist-${{ github.event.release.tag_name }}.zip
