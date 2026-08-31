@@ -42,6 +42,8 @@ var requiredOpenAPIPaths = []string{
 	"/api/v1/tasks/{id}/events",
 	"/api/v1/tasks/{id}/comments",
 	"/api/v1/tasks/{id}/comments/{commentId}",
+	"/api/v1/tasks/{id}/comments/{commentId}/revisions",
+	"/api/v1/tasks/{id}/comments/{commentId}/restore",
 	"/api/v1/users/search",
 	"/api/v1/projects",
 	"/api/v1/projects/reorder",
@@ -90,6 +92,8 @@ var requiredOpenAPIPaths = []string{
 	"/api/v1/admin/join-requests/{id}/approve",
 	"/api/v1/admin/join-requests/{id}/deny",
 	"/api/v1/admin/email-audit",
+	"/api/v1/admin/comment-audit",
+	"/api/v1/admin/comment-audit/{id}/restore",
 }
 
 func moduleRoot(t *testing.T) string {

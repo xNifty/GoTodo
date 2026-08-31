@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { api } from '@/api/client'
-import type { TaskComment } from '@/api/types'
+import type { TaskComment, TaskCommentRevision } from '@/api/types'
+import { useAuth } from '@/composables/useAuth'
 import { useConfirm } from '@/composables/useConfirm'
 import { useTaskSidebar } from '@/composables/useTaskSidebar'
 import { useToast } from '@/composables/useToast'
@@ -28,6 +29,7 @@ const props = defineProps<{
 const toast = useToast()
 const { askConfirm } = useConfirm()
 const { openEdit } = useTaskSidebar()
+const { hasPermission } = useAuth()
 
 const comments = ref<TaskComment[]>([])
 const loading = ref(false)
@@ -37,6 +39,14 @@ const draftEl = ref<HTMLTextAreaElement | null>(null)
 const mentionListEl = ref<HTMLElement | null>(null)
 const bottomEl = ref<HTMLElement | null>(null)
 const MAX_BODY = 2000
+const editingId = ref<number | null>(null)
+const editDraft = ref('')
+const savingEdit = ref(false)
+const historyId = ref<number | null>(null)
+const historyByComment = ref<Record<number, TaskCommentRevision[]>>({})
+const historyLoading = ref(false)
+const restoringId = ref<number | null>(null)
+const isAdmin = computed(() => hasPermission('admin'))
 
 type DraftLink = {
   id: number
@@ -66,11 +76,21 @@ const showMentionMenu = computed(
 
 async function reload() {
   if (!props.taskId) return
+  const keepEditing = editingId.value
+  const keepDraft = editDraft.value
+  const keepHistory = historyId.value
   loading.value = true
   try {
     comments.value = await api.listTaskComments(props.taskId)
     await nextTick()
     bottomEl.value?.scrollIntoView({ block: 'nearest' })
+    if (keepEditing && comments.value.some((c) => c.id === keepEditing && !c.deleted)) {
+      editingId.value = keepEditing
+      editDraft.value = keepDraft
+    }
+    if (keepHistory && comments.value.some((c) => c.id === keepHistory)) {
+      historyId.value = keepHistory
+    }
   } catch (err) {
     toast.push(err instanceof Error ? err.message : 'Could not load discussion', 'error')
   } finally {
@@ -81,6 +101,15 @@ async function reload() {
 function authorLabel(c: TaskComment) {
   if (props.currentUserId && c.user_id === props.currentUserId) return 'You'
   return c.user_name || `User #${c.user_id}`
+}
+
+function postedByName(c: TaskComment) {
+  return c.user_name || `User #${c.user_id}`
+}
+
+function editorName(c: TaskComment) {
+  if (props.currentUserId && c.edited_by_user_id === props.currentUserId) return 'You'
+  return c.edited_by_user_name || (c.edited_by_user_id ? `User #${c.edited_by_user_id}` : '')
 }
 
 function initials(c: TaskComment) {
@@ -103,6 +132,15 @@ function formatWhen(iso: string) {
   })
 }
 
+function editedHover(c: TaskComment) {
+  const posted = postedByName(c)
+  const editor = editorName(c)
+  if (editor && c.edited_by_user_id && c.edited_by_user_id !== c.user_id) {
+    return `Posted by ${posted}. Edited by ${editor}.`
+  }
+  return `Posted by ${posted}`
+}
+
 function tombstone(c: TaskComment) {
   if (c.deleted_by_kind === 'owner') return 'Message deleted by project owner'
   return 'Message deleted by user'
@@ -112,6 +150,23 @@ function canDelete(c: TaskComment) {
   if (c.deleted) return false
   if (props.currentUserId && c.user_id === props.currentUserId) return true
   return props.isOwner
+}
+
+function canEdit(c: TaskComment) {
+  if (c.deleted) return false
+  if (props.currentUserId && c.user_id === props.currentUserId) return true
+  return props.isOwner
+}
+
+function canViewHistory(c: TaskComment) {
+  if (!props.isOwner && !isAdmin.value) return false
+  return !!c.edited_at || c.deleted
+}
+
+function revisionKindLabel(kind: string) {
+  if (kind === 'delete') return 'Before delete'
+  if (kind === 'restore') return 'Before restore'
+  return 'Before edit'
 }
 
 function linkTitle(c: TaskComment, id: number) {
@@ -315,15 +370,100 @@ async function remove(c: TaskComment) {
   if (!ok) return
   try {
     await api.deleteTaskComment(props.taskId, c.id)
+    if (editingId.value === c.id) {
+      editingId.value = null
+      editDraft.value = ''
+    }
     await reload()
   } catch (err) {
     toast.push(err instanceof Error ? err.message : 'Could not delete comment', 'error')
   }
 }
 
+function onEditInput(e: Event) {
+  editDraft.value = (e.target as HTMLTextAreaElement).value
+}
+
+function startEdit(c: TaskComment) {
+  editingId.value = c.id
+  editDraft.value = c.body
+}
+
+function cancelEdit() {
+  editingId.value = null
+  editDraft.value = ''
+}
+
+async function saveEdit(c: TaskComment) {
+  const body = editDraft.value.trim()
+  if (!body || savingEdit.value) return
+  savingEdit.value = true
+  try {
+    const updated = await api.editTaskComment(props.taskId, c.id, body)
+    comments.value = comments.value.map((row) => (row.id === updated.id ? updated : row))
+    editingId.value = null
+    editDraft.value = ''
+    if (historyId.value === c.id) {
+      await loadHistory(c.id)
+    }
+  } catch (err) {
+    toast.push(err instanceof Error ? err.message : 'Could not save comment', 'error')
+  } finally {
+    savingEdit.value = false
+  }
+}
+
+async function loadHistory(commentId: number) {
+  historyLoading.value = true
+  try {
+    historyByComment.value = {
+      ...historyByComment.value,
+      [commentId]: await api.listTaskCommentRevisions(props.taskId, commentId),
+    }
+  } catch (err) {
+    toast.push(err instanceof Error ? err.message : 'Could not load comment history', 'error')
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+async function toggleHistory(c: TaskComment) {
+  if (historyId.value === c.id) {
+    historyId.value = null
+    return
+  }
+  historyId.value = c.id
+  await loadHistory(c.id)
+}
+
+async function restoreRevision(c: TaskComment, rev: TaskCommentRevision) {
+  const ok = await askConfirm({
+    title: 'Restore comment',
+    message: 'Replace the current comment with this previous version?',
+    confirmLabel: 'Restore',
+  })
+  if (!ok) return
+  restoringId.value = rev.id
+  try {
+    const updated = await api.restoreTaskComment(props.taskId, c.id, rev.id)
+    comments.value = comments.value.map((row) => (row.id === updated.id ? updated : row))
+    editingId.value = null
+    editDraft.value = ''
+    await loadHistory(c.id)
+  } catch (err) {
+    toast.push(err instanceof Error ? err.message : 'Could not restore comment', 'error')
+  } finally {
+    restoringId.value = null
+  }
+}
+
 watch(
   () => props.taskId,
   () => {
+    editingId.value = null
+    editDraft.value = ''
+    historyId.value = null
+    historyByComment.value = {}
     void reload()
   },
 )
@@ -364,19 +504,70 @@ defineExpose({ reload })
               <div class="task-post-avatar" aria-hidden="true">{{ initials(c) }}</div>
               <div class="task-post-meta">
                 <div class="task-post-author text-truncate">{{ authorLabel(c) }}</div>
-                <time class="task-post-time" :datetime="c.created_at">{{ formatWhen(c.created_at) }}</time>
+                <div class="task-post-times">
+                  <time class="task-post-time" :datetime="c.created_at">Posted {{ formatWhen(c.created_at) }}</time>
+                  <time
+                    v-if="c.edited_at && !c.deleted"
+                    class="task-post-time"
+                    :datetime="c.edited_at"
+                    :title="editedHover(c)"
+                  >Edited {{ formatWhen(c.edited_at) }}</time>
+                </div>
               </div>
-              <button
-                v-if="canDelete(c)"
-                class="btn btn-sm btn-link text-danger p-0 ms-auto"
-                type="button"
-                @click="remove(c)"
-              >
-                Delete
-              </button>
+              <div class="task-post-actions ms-auto">
+                <button
+                  v-if="canEdit(c) && editingId !== c.id"
+                  class="btn btn-sm btn-link p-0"
+                  type="button"
+                  @click="startEdit(c)"
+                >
+                  Edit
+                </button>
+                <button
+                  v-if="canViewHistory(c)"
+                  class="btn btn-sm btn-link p-0"
+                  type="button"
+                  @click="toggleHistory(c)"
+                >
+                  {{ historyId === c.id ? 'Hide history' : 'History' }}
+                </button>
+                <button
+                  v-if="canDelete(c) && editingId !== c.id"
+                  class="btn btn-sm btn-link text-danger p-0"
+                  type="button"
+                  @click="remove(c)"
+                >
+                  Delete
+                </button>
+              </div>
             </header>
             <div v-if="c.deleted" class="task-post-body fst-italic text-muted">
               {{ tombstone(c) }}
+            </div>
+            <div v-else-if="editingId === c.id" class="task-post-body">
+              <textarea
+                class="form-control"
+                rows="3"
+                :maxlength="MAX_BODY"
+                :value="editDraft"
+                @input="onEditInput"
+              />
+              <div class="d-flex justify-content-between align-items-center mt-2">
+                <small class="text-muted">{{ editDraft.length }}/{{ MAX_BODY }}</small>
+                <div class="d-flex gap-2">
+                  <button type="button" class="btn btn-sm btn-outline-secondary" :disabled="savingEdit" @click="cancelEdit">
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-primary"
+                    :disabled="savingEdit || !editDraft.trim()"
+                    @click="saveEdit(c)"
+                  >
+                    {{ savingEdit ? 'Saving…' : 'Save' }}
+                  </button>
+                </div>
+              </div>
             </div>
             <div v-else class="task-post-body">
               <template v-for="(part, i) in splitCommentBody(c.body)" :key="i">
@@ -392,6 +583,38 @@ defineExpose({ reload })
                 </button>
                 <span v-else>#{{ part.id }}</span>
               </template>
+            </div>
+            <div v-if="historyId === c.id" class="task-post-history">
+              <p v-if="historyLoading && !historyByComment[c.id]" class="small text-muted mb-0">Loading history…</p>
+              <p
+                v-else-if="!(historyByComment[c.id] && historyByComment[c.id].length)"
+                class="small text-muted mb-0"
+              >
+                No previous versions.
+              </p>
+              <ul v-else class="list-unstyled mb-0">
+                <li v-for="rev in historyByComment[c.id]" :key="rev.id" class="task-post-revision">
+                  <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div>
+                      <div class="small fw-semibold">{{ revisionKindLabel(rev.kind) }}</div>
+                      <div class="small text-muted">
+                        {{ formatWhen(rev.created_at) }}
+                        <span v-if="rev.edited_by_user_name"> · {{ rev.edited_by_user_name }}</span>
+                      </div>
+                    </div>
+                    <button
+                      v-if="rev.body.trim()"
+                      type="button"
+                      class="btn btn-sm btn-outline-secondary"
+                      :disabled="restoringId === rev.id"
+                      @click="restoreRevision(c, rev)"
+                    >
+                      {{ restoringId === rev.id ? 'Restoring…' : 'Restore' }}
+                    </button>
+                  </div>
+                  <div class="task-post-revision-body">{{ rev.body || '(empty)' }}</div>
+                </li>
+              </ul>
             </div>
           </article>
         </li>
@@ -534,21 +757,52 @@ defineExpose({ reload })
 }
 .task-post-meta {
   min-width: 0;
+  flex: 1;
 }
 .task-post-author {
   font-weight: 600;
   font-size: 0.875rem;
   line-height: 1.2;
 }
+.task-post-times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.65rem;
+}
 .task-post-time {
   display: block;
   font-size: 0.75rem;
   color: var(--ordryn-muted, #64748b);
 }
+.task-post-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  flex-shrink: 0;
+}
 .task-post-body {
   padding: 0.75rem;
   font-size: 0.9rem;
   line-height: 1.45;
+  word-break: break-word;
+}
+.task-post-history {
+  padding: 0 0.75rem 0.75rem;
+  border-top: 1px dashed var(--ordryn-card-border, #dee2e6);
+  padding-top: 0.65rem;
+}
+.task-post-revision + .task-post-revision {
+  margin-top: 0.55rem;
+}
+.task-post-revision-body {
+  margin-top: 0.3rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 0.375rem;
+  background: var(--ordryn-muted-bg, #f8f6ee);
+  font-size: 0.85rem;
+  white-space: pre-wrap;
   word-break: break-word;
 }
 .task-post-task-link {

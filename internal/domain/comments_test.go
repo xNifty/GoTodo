@@ -444,3 +444,141 @@ func TestCommentTaskLinksRespectAccess(t *testing.T) {
 		t.Fatalf("editor should not see inaccessible task title, got %+v", forEditor[0].Links)
 	}
 }
+
+func TestCommentsEditAuthorAndOwner(t *testing.T) {
+	ctx := context.Background()
+	proj, err := CreateProject(ctx, 1, "Edit Proj", "")
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	if err := storage.UpsertProjectMember(proj.ID, 2, storage.RoleEditor); err != nil {
+		t.Fatalf("add editor: %v", err)
+	}
+	if err := storage.UpsertProjectMember(proj.ID, 3, storage.RoleViewer); err != nil {
+		t.Fatalf("add viewer: %v", err)
+	}
+	pid := proj.ID
+	taskID, err := CreateTask(ctx, 1, CreateTaskInput{Title: "Edit thread", ProjectID: &pid})
+	if err != nil {
+		t.Fatalf("create task: %v", err)
+	}
+
+	posted, err := AddCommentForUser(ctx, 2, taskID, "Original text")
+	if err != nil {
+		t.Fatalf("post: %v", err)
+	}
+	if posted.EditedAt != nil {
+		t.Fatalf("new comment should not be edited %+v", posted)
+	}
+	createdAt := posted.CreatedAt
+
+	if _, err := EditCommentForUser(ctx, 3, taskID, posted.ID, "Viewer rewrite"); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("viewer edit err=%v, want forbidden", err)
+	}
+
+	edited, err := EditCommentForUser(ctx, 2, taskID, posted.ID, "Editor rewrite")
+	if err != nil {
+		t.Fatalf("author edit: %v", err)
+	}
+	if edited.Body != "Editor rewrite" {
+		t.Fatalf("body=%q", edited.Body)
+	}
+	if edited.EditedAt == nil || edited.EditedByUserID != 2 {
+		t.Fatalf("edited meta %+v", edited)
+	}
+	if !edited.CreatedAt.Equal(createdAt) {
+		t.Fatalf("created_at changed from %v to %v", createdAt, edited.CreatedAt)
+	}
+
+	if _, err := EditCommentForUser(ctx, 1, taskID, posted.ID, "Owner rewrite"); err != nil {
+		t.Fatalf("owner edit: %v", err)
+	}
+
+	if _, err := ListCommentRevisionsForUser(ctx, 2, taskID, posted.ID); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("editor history err=%v, want forbidden", err)
+	}
+
+	revs, err := ListCommentRevisionsForUser(ctx, 1, taskID, posted.ID)
+	if err != nil {
+		t.Fatalf("owner history: %v", err)
+	}
+	if len(revs) != 2 {
+		t.Fatalf("revisions=%d want 2: %+v", len(revs), revs)
+	}
+	if revs[0].Body != "Editor rewrite" || revs[0].Kind != storage.CommentRevisionKindEdit {
+		t.Fatalf("latest revision %+v", revs[0])
+	}
+	if revs[1].Body != "Original text" {
+		t.Fatalf("oldest revision %+v", revs[1])
+	}
+
+	restored, err := RestoreCommentRevisionForUser(ctx, 1, taskID, posted.ID, revs[1].ID)
+	if err != nil {
+		t.Fatalf("restore: %v", err)
+	}
+	if restored.Body != "Original text" || restored.DeletedAt != nil {
+		t.Fatalf("restored %+v", restored)
+	}
+
+	if _, err := RestoreCommentRevisionForUser(ctx, 2, taskID, posted.ID, revs[0].ID); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("editor restore err=%v, want forbidden", err)
+	}
+}
+
+func TestCommentsCannotEditDeleted(t *testing.T) {
+	ctx := context.Background()
+	proj, err := CreateProject(ctx, 1, "Edit Deleted Proj", "")
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	pid := proj.ID
+	taskID, err := CreateTask(ctx, 1, CreateTaskInput{Title: "Gone", ProjectID: &pid})
+	if err != nil {
+		t.Fatalf("create task: %v", err)
+	}
+	c, err := AddCommentForUser(ctx, 1, taskID, "Soon gone")
+	if err != nil {
+		t.Fatalf("post: %v", err)
+	}
+	if err := DeleteCommentForUser(ctx, 1, taskID, c.ID); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	if _, err := EditCommentForUser(ctx, 1, taskID, c.ID, "Back"); !errors.Is(err, ErrConflict) {
+		t.Fatalf("edit deleted err=%v, want conflict", err)
+	}
+
+	revs, err := ListCommentRevisionsForUser(ctx, 1, taskID, c.ID)
+	if err != nil {
+		t.Fatalf("history: %v", err)
+	}
+	if len(revs) != 1 || revs[0].Body != "Soon gone" || revs[0].Kind != storage.CommentRevisionKindDelete {
+		t.Fatalf("delete revision %+v", revs)
+	}
+	restored, err := RestoreCommentRevisionForUser(ctx, 1, taskID, c.ID, revs[0].ID)
+	if err != nil {
+		t.Fatalf("restore deleted: %v", err)
+	}
+	if restored.DeletedAt != nil || restored.Body != "Soon gone" {
+		t.Fatalf("undelete %+v", restored)
+	}
+}
+
+func TestCommentsEditRejectsEmpty(t *testing.T) {
+	ctx := context.Background()
+	proj, err := CreateProject(ctx, 1, "Empty Edit Proj", "")
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	pid := proj.ID
+	taskID, err := CreateTask(ctx, 1, CreateTaskInput{Title: "Empty", ProjectID: &pid})
+	if err != nil {
+		t.Fatalf("create task: %v", err)
+	}
+	c, err := AddCommentForUser(ctx, 1, taskID, "Keep me")
+	if err != nil {
+		t.Fatalf("post: %v", err)
+	}
+	if _, err := EditCommentForUser(ctx, 1, taskID, c.ID, "   "); !errors.Is(err, ErrValidation) {
+		t.Fatalf("empty edit err=%v, want validation", err)
+	}
+}

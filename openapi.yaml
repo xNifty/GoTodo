@@ -2058,6 +2058,42 @@ paths:
         required: true
         schema:
           type: integer
+    patch:
+      tags: [Tasks]
+      summary: Edit a discussion comment (author or project owner)
+      description: |
+        Authors may edit their own comments. Project owners may edit any comment
+        on the task. Previous content is stored in an audit log.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body:
+                  type: string
+                  minLength: 1
+                  maxLength: 2000
+      responses:
+        "200":
+          description: Updated comment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskComment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
     delete:
       tags: [Tasks]
       summary: Soft-delete a comment (author or project owner)
@@ -2073,6 +2109,72 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+
+  /api/v1/tasks/{id}/comments/{commentId}/revisions:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+      - name: commentId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Tasks]
+      summary: List previous versions of a comment (project owner or site admin)
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Revisions newest-first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TaskCommentRevision"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/tasks/{id}/comments/{commentId}/restore:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+      - name: commentId
+        in: path
+        required: true
+        schema:
+          type: integer
+    post:
+      tags: [Tasks]
+      summary: Restore a previous comment version (project owner or site admin)
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision_id]
+              properties:
+                revision_id:
+                  type: integer
+      responses:
+        "200":
+          description: Restored comment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskComment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /api/v1/tasks/{id}/time-entries/{entryId}:
     parameters:
@@ -3044,6 +3146,73 @@ paths:
         "400":
           $ref: "#/components/responses/BadRequest"
 
+  /api/v1/admin/comment-audit:
+    get:
+      tags: [Admin]
+      summary: Query discussion comment audit log
+      description: |
+        Lists previous comment bodies captured when a comment was edited, deleted, or restored.
+        Site admins can restore any revision.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - name: kind
+          in: query
+          schema:
+            type: string
+            enum: [edit, delete, restore]
+        - name: q
+          in: query
+          description: Case-insensitive substring match on body, task title, project, or usernames
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: Audit rows, newest first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommentAuditList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/admin/comment-audit/{id}/restore:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      tags: [Admin]
+      summary: Restore a comment to a previous version
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Restored comment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskComment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /api/v1/admin/join-requests:
     get:
       tags: [Admin]
@@ -3624,6 +3793,14 @@ components:
         created_at:
           type: string
           format: date-time
+        edited_at:
+          type: string
+          format: date-time
+          description: Set when the comment has been edited or restored
+        edited_by_user_id:
+          type: integer
+        edited_by_user_name:
+          type: string
         deleted:
           type: boolean
         deleted_at:
@@ -3644,6 +3821,57 @@ components:
                 type: integer
               title:
                 type: string
+
+    TaskCommentRevision:
+      type: object
+      properties:
+        id:
+          type: integer
+        comment_id:
+          type: integer
+        task_id:
+          type: integer
+        body:
+          type: string
+          description: Previous comment content captured before the change
+        kind:
+          type: string
+          enum: [edit, delete, restore]
+        created_at:
+          type: string
+          format: date-time
+        edited_by_user_id:
+          type: integer
+        edited_by_user_name:
+          type: string
+        author_user_id:
+          type: integer
+        author_user_name:
+          type: string
+        task_title:
+          type: string
+        project_id:
+          type: integer
+        project_name:
+          type: string
+        comment_deleted:
+          type: boolean
+        current_body:
+          type: string
+
+    CommentAuditList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskCommentRevision"
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
 
     ProjectMember:
       type: object

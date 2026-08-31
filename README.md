@@ -15,7 +15,7 @@ GoTodo (Ordryn) is a self-hosted task manager built with Go, PostgreSQL, Redis, 
 - Due dates with smart filters (today, overdue, this week, no date) and relative labels
 - Search with project, status, tag, and due-date filters
 - Markdown task descriptions with truncated list view and expand-in-place
-- Task discussion comments with @-mentions of project members (notifies them) and #task links
+- Task discussion comments with @-mentions of project members (notifies them) and #task links; authors and project owners can edit comments, with posted/edited timestamps and an admin restore log
 - Bulk actions: complete, delete, move project, add/remove tag, set/clear due date, set priority
 - Undo delete (toast with up to 120 seconds to restore, preserves task IDs when possible)
 - ICS calendar feed for due tasks; in-app calendar view; ICS import to sync due dates
