@@ -14,6 +14,7 @@ import type {
   EmailAuditQuery,
   GitHubConnection,
   ImageUpload,
+  ImageHostingTestResult,
   Invite,
   JoinRequest,
   Project,
@@ -839,6 +840,13 @@ export const api = {
   patchAdminSettings(payload: AdminSettingsPatch) {
     return request<AdminSettings>('/api/v1/admin/settings', {
       method: 'PATCH',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  testImageHosting(payload: AdminSettingsPatch) {
+    return request<ImageHostingTestResult>('/api/v1/admin/image-hosting/test', {
+      method: 'POST',
       body: JSON.stringify(payload),
     })
   },

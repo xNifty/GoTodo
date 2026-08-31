@@ -2,21 +2,12 @@ package imagehost
 
 import (
 	"bytes"
-	"encoding/base64"
 	"strings"
 	"testing"
 )
 
 // 1x1 PNG (67 bytes).
-var tinyPNG = mustDecode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
-
-func mustDecode(s string) []byte {
-	b, err := base64.StdEncoding.DecodeString(s)
-	if err != nil {
-		panic(err)
-	}
-	return b
-}
+var tinyPNG = TinyPNG
 
 func TestDetectImage(t *testing.T) {
 	t.Run("png", func(t *testing.T) {

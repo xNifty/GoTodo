@@ -45,6 +45,21 @@ func (s *LocalStore) Put(ctx context.Context, obj Object) (string, error) {
 	return JoinPublicURL(s.PublicBase, obj.Key), nil
 }
 
+// Delete removes a previously stored local object.
+func (s *LocalStore) Delete(ctx context.Context, key string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if !SafeObjectKey(key) {
+		return fmt.Errorf("invalid object key")
+	}
+	err := os.Remove(filepath.Join(s.Dir, key))
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
 // Read returns the bytes for a previously stored local object.
 func (s *LocalStore) Read(key string) ([]byte, string, error) {
 	if !SafeObjectKey(key) {

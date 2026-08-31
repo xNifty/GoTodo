@@ -85,6 +85,7 @@ var requiredOpenAPIPaths = []string{
 	"/api/v1/invites",
 	"/api/v1/invites/{id}",
 	"/api/v1/admin/settings",
+	"/api/v1/admin/image-hosting/test",
 	"/api/v1/admin/users",
 	"/api/v1/admin/users/{id}/ban",
 	"/api/v1/admin/users/{id}/unban",

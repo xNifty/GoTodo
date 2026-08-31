@@ -479,6 +479,12 @@ export type ImageUpload = {
   key: string
 }
 
+export type ImageHostingTestResult = {
+  ok: boolean
+  message: string
+  public_url_ok: boolean
+}
+
 export type AdminUser = {
   id: number
   email: string

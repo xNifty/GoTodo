@@ -144,6 +144,7 @@ func registerAPIV1Routes() {
 	handleBoth("/api/v1/invites", utils.InviteAPIChain(handlers.APIV1InvitesRouter))
 	handleBoth("/api/v1/invites/", utils.InviteAPIChain(handlers.APIV1InvitesRouter))
 	handleBoth("/api/v1/admin/settings", utils.AdminAPIChain(handlers.APIV1AdminSettings))
+	handleBoth("/api/v1/admin/image-hosting/test", utils.AdminAPIChain(handlers.APIV1AdminImageHostingTest))
 	handleBoth("/api/v1/admin/users", utils.AdminAPIChain(handlers.APIV1AdminUsersRouter))
 	handleBoth("/api/v1/admin/users/", utils.AdminAPIChain(handlers.APIV1AdminUsersRouter))
 	handleBoth("/api/v1/admin/join-requests", utils.AdminAPIChain(handlers.APIV1AdminJoinRequestsRouter))

@@ -2928,6 +2928,36 @@ paths:
           description: Not configured, missing file, or unsupported type
         "413":
           description: File exceeds image_max_bytes
+        "502":
+          description: Storage backend failed; message is generic for end users
+
+  /api/v1/admin/image-hosting/test:
+    post:
+      tags: [Admin]
+      summary: Test image hosting configuration
+      description: |
+        Uploads a tiny probe image using the submitted settings (falling back to
+        the saved secret key when omitted), then deletes it. The JSON `message`
+        is safe for site admins and does not include provider XML or secrets.
+        End-user uploads never receive this diagnostic.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminSettingsPatch"
+      responses:
+        "200":
+          description: Probe finished (ok true or false)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageHostingTestResult"
+        "400":
+          description: Provider unset or settings invalid
 
   /api/v1/announcements/dismiss:
     post:
@@ -5020,3 +5050,12 @@ components:
           type: string
         key:
           type: string
+    ImageHostingTestResult:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        message:
+          type: string
+        public_url_ok:
+          type: boolean

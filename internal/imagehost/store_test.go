@@ -188,8 +188,11 @@ func TestS3StoreErrorStatus(t *testing.T) {
 	if !ue.ClientError() {
 		t.Fatal("403 should be a client error")
 	}
-	if !strings.Contains(ue.UserMessage(), "AccessDenied") {
-		t.Fatalf("user message=%q", ue.UserMessage())
+	if strings.Contains(ue.UserMessage(), "AccessDenied") {
+		t.Fatalf("user message leaked code: %q", ue.UserMessage())
+	}
+	if !strings.Contains(ue.AdminMessage(), "AccessDenied") {
+		t.Fatalf("admin message=%q", ue.AdminMessage())
 	}
 }
 
@@ -221,8 +224,11 @@ func TestS3StoreHTMLGatewayError(t *testing.T) {
 	if ue.Status != http.StatusBadGateway {
 		t.Fatalf("status=%d", ue.Status)
 	}
-	if !strings.Contains(ue.UserMessage(), "HTML") {
-		t.Fatalf("user message=%q", ue.UserMessage())
+	if strings.Contains(ue.UserMessage(), "HTML") || strings.Contains(ue.UserMessage(), "<html") {
+		t.Fatalf("user message leaked html: %q", ue.UserMessage())
+	}
+	if !strings.Contains(ue.AdminMessage(), "502") && !strings.Contains(ue.AdminMessage(), "gateway") {
+		t.Fatalf("admin message=%q", ue.AdminMessage())
 	}
 }
 

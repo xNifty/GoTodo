@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -85,7 +86,8 @@ func APIV1Images(w http.ResponseWriter, r *http.Request) {
 			utils.APIJSONError(w, http.StatusBadRequest, "not_configured", "Image hosting is not configured.")
 			return
 		}
-		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		log.Printf("image store open failed: %v", err)
+		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Image hosting is not configured correctly.")
 		return
 	}
 
@@ -113,14 +115,12 @@ func APIV1Images(w http.ResponseWriter, r *http.Request) {
 func writeStoreError(w http.ResponseWriter, err error) {
 	var ue *imagehost.UploadError
 	if errors.As(err, &ue) {
-		status := http.StatusBadGateway
-		if ue.ClientError() {
-			status = http.StatusBadRequest
-		}
-		utils.APIJSONError(w, status, "upload_failed", ue.UserMessage())
+		log.Printf("image upload failed: %s", ue.Error())
+		utils.APIJSONError(w, http.StatusBadGateway, "upload_failed", ue.UserMessage())
 		return
 	}
-	utils.APIJSONError(w, http.StatusBadGateway, "upload_failed", "Failed to store image.")
+	log.Printf("image upload failed: %v", err)
+	utils.APIJSONError(w, http.StatusBadGateway, "upload_failed", "Couldn't upload that image. Try again later.")
 }
 
 func writeImageUploadError(w http.ResponseWriter, err error, max int64) {
@@ -133,7 +133,7 @@ func writeImageUploadError(w http.ResponseWriter, err error, max int64) {
 		utils.APIJSONError(w, http.StatusRequestEntityTooLarge, "too_large",
 			fmt.Sprintf("Image exceeds the %d byte limit.", max))
 	default:
-		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		utils.APIJSONError(w, http.StatusBadRequest, "invalid_request", "Couldn't upload that image.")
 	}
 }
 

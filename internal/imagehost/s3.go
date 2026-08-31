@@ -120,57 +120,68 @@ func sanitizeS3ErrorMessage(raw string) string {
 	return raw
 }
 
-func (s *S3Store) newPutRequest(ctx context.Context, obj Object, now time.Time) (*http.Request, error) {
+// Delete removes an object. A missing object is treated as success.
+func (s *S3Store) Delete(ctx context.Context, key string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if !SafeObjectKey(key) {
+		return fmt.Errorf("invalid object key")
+	}
+	req, err := s.newDeleteRequest(ctx, key, Now())
+	if err != nil {
+		return err
+	}
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return &UploadError{Message: "Could not reach the S3 endpoint.", Cause: err}
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 8192))
+	if resp.StatusCode == http.StatusNotFound || (resp.StatusCode >= 200 && resp.StatusCode < 300) {
+		return nil
+	}
+	return s3StatusError(resp.StatusCode, body)
+}
+
+func (s *S3Store) objectTarget(key string) (requestURL, canonicalURI, host string, err error) {
 	endpoint, err := url.Parse(s.cfg.S3Endpoint)
 	if err != nil {
-		return nil, fmt.Errorf("parse s3 endpoint: %w", err)
+		return "", "", "", fmt.Errorf("parse s3 endpoint: %w", err)
 	}
 	if endpoint.Scheme == "" {
 		endpoint.Scheme = "https"
 	}
-
-	escapedKey := escapePath(obj.Key)
+	escapedKey := escapePath(key)
 	escapedBucket := escapePath(s.cfg.S3Bucket)
-	host := endpoint.Host
-
+	host = endpoint.Host
 	base := endpoint.Scheme + "://" + endpoint.Host
-	var requestURL string
-	var canonicalURI string
 	if s.cfg.S3ForcePathStyle {
-		// Host-only base: a leftover /bucket path on the endpoint (R2 dashboard
-		// copies it) is ignored so the bucket is not duplicated in the PUT URL.
 		canonicalURI = "/" + escapedBucket + "/" + escapedKey
 		requestURL = base + canonicalURI
-	} else {
-		host = s.cfg.S3Bucket + "." + endpoint.Host
-		canonicalURI = "/" + escapedKey
-		requestURL = endpoint.Scheme + "://" + host + canonicalURI
+		return requestURL, canonicalURI, host, nil
 	}
+	host = s.cfg.S3Bucket + "." + endpoint.Host
+	canonicalURI = "/" + escapedKey
+	requestURL = endpoint.Scheme + "://" + host + canonicalURI
+	return requestURL, canonicalURI, host, nil
+}
 
-	payloadHash := sha256Hex(obj.Data)
+func (s *S3Store) authorize(req *http.Request, canonicalURI, host, payloadHash string, now time.Time) {
 	amzDate := now.UTC().Format("20060102T150405Z")
 	dateStamp := now.UTC().Format("20060102")
-	contentType := obj.ContentType
-	if contentType == "" {
-		contentType = "application/octet-stream"
-	}
-
-	// Sign host + x-amz-* only. Signing Content-Type is a common
-	// SignatureDoesNotMatch source when a proxy or client mutates the header
-	// (charset, case). The header is still sent so R2/S3 can store the type.
 	canonicalHeaders := "host:" + host + "\n" +
 		"x-amz-content-sha256:" + payloadHash + "\n" +
 		"x-amz-date:" + amzDate + "\n"
 	signedHeaders := "host;x-amz-content-sha256;x-amz-date"
 	canonicalRequest := strings.Join([]string{
-		http.MethodPut,
+		req.Method,
 		canonicalURI,
 		"",
 		canonicalHeaders,
 		signedHeaders,
 		payloadHash,
 	}, "\n")
-
 	credentialScope := dateStamp + "/" + s.cfg.S3Region + "/" + s3Service + "/aws4_request"
 	stringToSign := strings.Join([]string{
 		"AWS4-HMAC-SHA256",
@@ -181,21 +192,46 @@ func (s *S3Store) newPutRequest(ctx context.Context, obj Object, now time.Time) 
 	signature := hex.EncodeToString(hmacSHA256(signingKey(s.cfg.S3SecretKey, dateStamp, s.cfg.S3Region, s3Service), []byte(stringToSign)))
 	auth := fmt.Sprintf("AWS4-HMAC-SHA256 Credential=%s/%s, SignedHeaders=%s, Signature=%s",
 		s.cfg.S3AccessKey, credentialScope, signedHeaders, signature)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, requestURL, bytes.NewReader(obj.Data))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("Host", host)
 	req.Header.Set("X-Amz-Content-Sha256", payloadHash)
 	req.Header.Set("X-Amz-Date", amzDate)
 	req.Header.Set("Authorization", auth)
 	req.Host = host
+}
+
+func (s *S3Store) newDeleteRequest(ctx context.Context, key string, now time.Time) (*http.Request, error) {
+	requestURL, canonicalURI, host, err := s.objectTarget(key)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, requestURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	s.authorize(req, canonicalURI, host, sha256Hex(nil), now)
+	return req, nil
+}
+
+func (s *S3Store) newPutRequest(ctx context.Context, obj Object, now time.Time) (*http.Request, error) {
+	requestURL, canonicalURI, host, err := s.objectTarget(obj.Key)
+	if err != nil {
+		return nil, err
+	}
+	contentType := obj.ContentType
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	payloadHash := sha256Hex(obj.Data)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, requestURL, bytes.NewReader(obj.Data))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", contentType)
 	req.ContentLength = int64(len(obj.Data))
 	req.GetBody = func() (io.ReadCloser, error) {
 		return io.NopCloser(bytes.NewReader(obj.Data)), nil
 	}
+	s.authorize(req, canonicalURI, host, payloadHash, now)
 	return req, nil
 }
 

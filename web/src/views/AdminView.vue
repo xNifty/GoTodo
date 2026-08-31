@@ -18,6 +18,8 @@ const smtpPasswordInput = ref('')
 const githubOAuthSecretInput = ref('')
 const githubBusy = ref(false)
 const imageBusy = ref(false)
+const imageTestBusy = ref(false)
+const imageTestResult = ref<{ ok: boolean; message: string } | null>(null)
 const s3SecretInput = ref('')
 const settings = reactive<AdminSettings>({
   site_name: '',
@@ -148,24 +150,28 @@ async function saveGitHubOAuthSettings() {
   }
 }
 
+function imageHostingFormPayload(): AdminSettingsPatch {
+  const payload: AdminSettingsPatch = {
+    image_hosting_provider: settings.image_hosting_provider || '',
+    image_max_bytes: settings.image_max_bytes,
+    image_s3_endpoint: settings.image_s3_endpoint,
+    image_s3_region: settings.image_s3_region,
+    image_s3_bucket: settings.image_s3_bucket,
+    image_s3_access_key: settings.image_s3_access_key,
+    image_s3_public_url: settings.image_s3_public_url,
+    image_s3_force_path_style: settings.image_s3_force_path_style,
+    image_local_path: settings.image_local_path,
+  }
+  if (s3SecretInput.value !== '') {
+    payload.image_s3_secret_key = s3SecretInput.value
+  }
+  return payload
+}
+
 async function saveImageHostingSettings() {
   imageBusy.value = true
   try {
-    const payload: AdminSettingsPatch = {
-      image_hosting_provider: settings.image_hosting_provider || '',
-      image_max_bytes: settings.image_max_bytes,
-      image_s3_endpoint: settings.image_s3_endpoint,
-      image_s3_region: settings.image_s3_region,
-      image_s3_bucket: settings.image_s3_bucket,
-      image_s3_access_key: settings.image_s3_access_key,
-      image_s3_public_url: settings.image_s3_public_url,
-      image_s3_force_path_style: settings.image_s3_force_path_style,
-      image_local_path: settings.image_local_path,
-    }
-    if (s3SecretInput.value !== '') {
-      payload.image_s3_secret_key = s3SecretInput.value
-    }
-    const saved = await api.patchAdminSettings(payload)
+    const saved = await api.patchAdminSettings(imageHostingFormPayload())
     Object.assign(settings, saved)
     s3SecretInput.value = ''
     await refreshSite()
@@ -174,6 +180,22 @@ async function saveImageHostingSettings() {
     toast.push(err instanceof APIError ? err.message : 'Save failed', 'error')
   } finally {
     imageBusy.value = false
+  }
+}
+
+async function testImageHosting() {
+  imageTestBusy.value = true
+  imageTestResult.value = null
+  try {
+    const result = await api.testImageHosting(imageHostingFormPayload())
+    imageTestResult.value = { ok: result.ok, message: result.message }
+    toast.push(result.message, result.ok ? 'success' : 'error')
+  } catch (err) {
+    const message = err instanceof APIError ? err.message : 'Connection test failed'
+    imageTestResult.value = { ok: false, message }
+    toast.push(message, 'error')
+  } finally {
+    imageTestBusy.value = false
   }
 }
 
@@ -562,9 +584,30 @@ onMounted(load)
             Image uploads are disabled until a provider is selected.
           </p>
 
-          <button type="submit" class="btn btn-primary" :disabled="imageBusy">
+          <div
+            v-if="imageTestResult"
+            class="alert"
+            :class="imageTestResult.ok ? 'alert-success' : 'alert-danger'"
+            role="status"
+          >
+            {{ imageTestResult.message }}
+          </div>
+
+          <button type="submit" class="btn btn-primary" :disabled="imageBusy || imageTestBusy">
             {{ imageBusy ? 'Saving…' : 'Save image hosting' }}
           </button>
+          <button
+            type="button"
+            class="btn btn-outline-secondary ms-2"
+            :disabled="imageBusy || imageTestBusy || !settings.image_hosting_provider"
+            @click="testImageHosting"
+          >
+            {{ imageTestBusy ? 'Testing…' : 'Test connection' }}
+          </button>
+          <div class="form-text mt-2">
+            Test connection uploads a tiny image and deletes it. It uses the values on this form,
+            including an unsaved secret key.
+          </div>
         </form>
       </div>
     </div>

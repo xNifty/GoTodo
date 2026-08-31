@@ -263,10 +263,13 @@ func TestAPIV1ImagesStoreClientError(t *testing.T) {
 	req = utils.SetAPIUserID(req, 1)
 	rec := httptest.NewRecorder()
 	APIV1Images(rec, req)
-	if rec.Code != http.StatusBadRequest {
+	if rec.Code != http.StatusBadGateway {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	if !strings.Contains(rec.Body.String(), "AccessDenied") {
+	if strings.Contains(rec.Body.String(), "AccessDenied") {
+		t.Fatalf("leaked provider code: %s", rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "site admin") {
 		t.Fatalf("body=%s", rec.Body.String())
 	}
 }
@@ -294,7 +297,10 @@ func TestAPIV1ImagesStoreGatewayError(t *testing.T) {
 	if rec.Code != http.StatusBadGateway {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	if !strings.Contains(rec.Body.String(), "HTML error page") {
+	if strings.Contains(rec.Body.String(), "HTML") || strings.Contains(rec.Body.String(), "<html") {
+		t.Fatalf("leaked html: %s", rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "temporarily unavailable") {
 		t.Fatalf("body=%s", rec.Body.String())
 	}
 }
