@@ -262,11 +262,6 @@ function pickDefaultSprintKey(projectId: number, sprints: ProjectSprint[]): stri
   }
   const active = sprints.find((s) => s.is_active)
   if (active) return String(active.id)
-  const today = new Date().toISOString().slice(0, 10)
-  const upcoming = sprints
-    .filter((s) => s.start_date >= today)
-    .sort((a, b) => a.start_date.localeCompare(b.start_date) || a.id - b.id)
-  if (upcoming[0]) return String(upcoming[0].id)
   return 'backlog'
 }
 
