@@ -126,6 +126,25 @@ export function insertTaskRef(body: string, id: number): string {
   return `${trimmed} [[${id}]]`
 }
 
+/** Insert markdown on its own line, GitHub-style, at the cursor. */
+export function insertMarkdownAtCursor(
+  body: string,
+  markdown: string,
+  start: number,
+  end = start,
+): { body: string; cursor: number } {
+  if (start < 0) start = 0
+  if (end < start) end = start
+  if (start > body.length) start = body.length
+  if (end > body.length) end = body.length
+  const before = body.slice(0, start)
+  const after = body.slice(end)
+  const lead = before.length > 0 && !before.endsWith('\n') ? '\n' : ''
+  const trail = after.length > 0 && !after.startsWith('\n') ? '\n' : ''
+  const block = `${lead}${markdown}${trail}`
+  return { body: before + block + after, cursor: before.length + lead.length + markdown.length }
+}
+
 export function splitCommentBody(body: string): CommentBodyPart[] {
   const parts: CommentBodyPart[] = []
   const re = new RegExp(COMMENT_TOKEN_RE.source, 'g')

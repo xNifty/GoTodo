@@ -10,7 +10,7 @@
       "Failed uploads show a generic message to users; site admins can Test connection to verify the backend without exposing provider XML or secrets",
       "S3 uploads talk HTTP/1.1 (Cloudflare R2 returns 502 over HTTP/2)",
       "Saving image hosting settings keeps the API endpoint, region, and path-style checkbox as entered",
-      "Inserted images render in task descriptions and discussion comments instead of showing as markdown"
+      "Inserted images render inline in task descriptions and discussion comments, like GitHub — paste or drop a file, or use Insert image; clicking opens the picture in a new tab"
     ]
   },
   {

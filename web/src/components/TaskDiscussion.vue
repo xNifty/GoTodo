@@ -9,14 +9,17 @@ import { useConfirm } from '@/composables/useConfirm'
 import { useTaskSidebar } from '@/composables/useTaskSidebar'
 import { useToast } from '@/composables/useToast'
 import { USER_SEARCH_MIN_QUERY, useUserSearch } from '@/composables/useUserSearch'
+import { useImageUpload } from '@/composables/useImageUpload'
 import {
   extractTaskRefIDs,
+  insertMarkdownAtCursor,
   insertMention,
   insertTaskRef,
   isInsertedTaskRef,
   mentionTokenAtCursor,
   type MentionToken,
 } from '@/utils/taskCommentBody'
+import { dropHasFiles, imageFileFromClipboard, imageFileFromDrop } from '@/utils/imageUpload'
 
 const props = defineProps<{
   taskId: number
@@ -31,6 +34,7 @@ const toast = useToast()
 const { askConfirm } = useConfirm()
 const { openEdit } = useTaskSidebar()
 const { hasPermission } = useAuth()
+const { enabled: imageEnabled, uploadImageFile } = useImageUpload()
 
 const comments = ref<TaskComment[]>([])
 const loading = ref(false)
@@ -313,20 +317,62 @@ function insertCommentImage(markdown: string, target: 'draft' | 'edit' = 'draft'
   const current = target === 'edit' ? editDraft.value : draft.value
   const start = el?.selectionStart ?? current.length
   const end = el?.selectionEnd ?? start
-  const next = current.slice(0, start) + markdown + current.slice(end)
-  if (next.length > MAX_BODY) {
+  const next = insertMarkdownAtCursor(current, markdown, start, end)
+  if (next.body.length > MAX_BODY) {
     toast.push('Comment would exceed 2000 characters', 'error')
     return
   }
-  if (target === 'edit') editDraft.value = next
-  else draft.value = next
+  if (target === 'edit') editDraft.value = next.body
+  else draft.value = next.body
   void nextTick(() => {
     if (!el) return
-    const pos = start + markdown.length
     el.focus()
-    el.setSelectionRange(pos, pos)
+    el.setSelectionRange(next.cursor, next.cursor)
     if (target === 'draft') syncMentionFromEl()
   })
+}
+
+async function ingestImageFile(file: File, target: 'draft' | 'edit' = 'draft') {
+  const markdown = await uploadImageFile(file)
+  if (markdown) insertCommentImage(markdown, target)
+}
+
+function onDraftPaste(e: ClipboardEvent) {
+  const file = imageFileFromClipboard(e)
+  if (!file || !imageEnabled.value) return
+  e.preventDefault()
+  void ingestImageFile(file, 'draft')
+}
+
+function onEditPaste(e: ClipboardEvent) {
+  const file = imageFileFromClipboard(e)
+  if (!file || !imageEnabled.value) return
+  e.preventDefault()
+  void ingestImageFile(file, 'edit')
+}
+
+function onDraftDragOver(e: DragEvent) {
+  if (!imageEnabled.value || !dropHasFiles(e)) return
+  e.preventDefault()
+}
+
+function onDraftDrop(e: DragEvent) {
+  const file = imageFileFromDrop(e)
+  if (!file || !imageEnabled.value) return
+  e.preventDefault()
+  void ingestImageFile(file, 'draft')
+}
+
+function onEditDragOver(e: DragEvent) {
+  if (!imageEnabled.value || !dropHasFiles(e)) return
+  e.preventDefault()
+}
+
+function onEditDrop(e: DragEvent) {
+  const file = imageFileFromDrop(e)
+  if (!file || !imageEnabled.value) return
+  e.preventDefault()
+  void ingestImageFile(file, 'edit')
 }
 
 function onDraftKeydown(e: KeyboardEvent) {
@@ -575,6 +621,9 @@ defineExpose({ reload })
                 :maxlength="MAX_BODY"
                 :value="editDraft"
                 @input="onEditInput"
+                @paste="onEditPaste"
+                @dragover="onEditDragOver"
+                @drop="onEditDrop"
               />
               <div class="d-flex justify-content-between align-items-center mt-2">
                 <div class="d-flex align-items-center gap-2">
@@ -648,9 +697,12 @@ defineExpose({ reload })
       class="form-control"
       rows="3"
       :maxlength="MAX_BODY"
-      placeholder="Write a comment… Type @ to mention a member, or paste #123 to link a task."
+      placeholder="Write a comment… Paste or drop an image, type @ to mention a member, or paste #123 to link a task."
       @input="onDraftInput"
       @keydown="onDraftKeydown"
+      @paste="onDraftPaste"
+      @dragover="onDraftDragOver"
+      @drop="onDraftDrop"
       @click="syncMentionFromEl"
       @keyup="syncMentionFromEl"
     />
@@ -808,6 +860,8 @@ defineExpose({ reload })
   font-size: 0.9rem;
   line-height: 1.45;
   word-break: break-word;
+  min-width: 0;
+  overflow: hidden;
 }
 .task-post-history {
   padding: 0 0.75rem 0.75rem;
@@ -823,8 +877,9 @@ defineExpose({ reload })
   border-radius: 0.375rem;
   background: var(--ordryn-muted-bg, #f8f6ee);
   font-size: 0.85rem;
-  white-space: pre-wrap;
   word-break: break-word;
+  min-width: 0;
+  overflow: hidden;
 }
 .task-post-task-link {
   display: inline;

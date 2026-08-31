@@ -48,9 +48,10 @@ onUnmounted(() => {
         <p>
           Click <strong>Add Task</strong> (or press <kbd>n</kbd> on the home page) to open the task
           sidebar. Fill in a title, optional markdown description, due date, project, tags, and priority, then
-          save. When an admin has enabled image hosting, use <strong>Insert image</strong> to upload a
-          JPEG, PNG, GIF, or WebP file. Uploaded images render in the task description, discussion
-          comments, and share-link task view — not as raw markdown.
+          save. When an admin has enabled image hosting, paste or drop a JPEG, PNG, GIF, or WebP
+          into the description or a comment, or use <strong>Insert image</strong>. The picture
+          shows in the discussion the same way GitHub comments do — inline, sized to the thread.
+          Clicking it opens the image in a new tab.
         </p>
         <ul>
           <li>Click a task’s edit control (or press <kbd>e</kbd> / <kbd>Enter</kbd> on a focused task) to edit it in the sidebar.</li>
@@ -143,8 +144,8 @@ onUnmounted(() => {
             <em>Task #123 - Title</em> for anyone who can open that task.
           </li>
           <li>
-            Use <strong>Insert image</strong> in a comment (when image hosting is enabled). The picture
-            is stored as markdown while you type and shows as an image once the comment is posted.
+            Use <strong>Insert image</strong>, or paste/drop a file, in a comment (when image hosting
+            is enabled). After you post, the picture appears inline in that comment.
           </li>
         </ul>
 

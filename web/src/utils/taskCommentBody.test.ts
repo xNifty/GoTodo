@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   hasImageMarkdown,
+  insertMarkdownAtCursor,
   isSafeImageSrc,
   previewWithoutImages,
   splitCommentBody,
@@ -64,5 +65,12 @@ describe('hasImageMarkdown', () => {
   it('detects a safe image', () => {
     assert.equal(hasImageMarkdown('![a](https://cdn.example.com/a.png)'), true)
     assert.equal(hasImageMarkdown('no pictures here'), false)
+  })
+})
+
+describe('insertMarkdownAtCursor', () => {
+  it('puts the image on its own line', () => {
+    const got = insertMarkdownAtCursor('hello', '![cat](https://cdn.example.com/c.png)', 5)
+    assert.equal(got.body, 'hello\n![cat](https://cdn.example.com/c.png)')
   })
 })

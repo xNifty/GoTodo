@@ -9,7 +9,9 @@ import DeleteTaskDialog from '@/components/DeleteTaskDialog.vue'
 import TaskDiscussion from '@/components/TaskDiscussion.vue'
 import ImageInsertButton from '@/components/ImageInsertButton.vue'
 import RichBody from '@/components/RichBody.vue'
-import { hasImageMarkdown } from '@/utils/taskCommentBody'
+import { useImageUpload } from '@/composables/useImageUpload'
+import { insertMarkdownAtCursor } from '@/utils/taskCommentBody'
+import { dropHasFiles, imageFileFromClipboard, imageFileFromDrop, shouldIgnoreTaskOverlayClose } from '@/utils/imageUpload'
 import { useAuth } from '@/composables/useAuth'
 import { useTaskSidebar } from '@/composables/useTaskSidebar'
 import { useToast } from '@/composables/useToast'
@@ -37,6 +39,7 @@ const {
 const toast = useToast()
 const { askConfirm } = useConfirm()
 const { user } = useAuth()
+const { enabled: imageEnabled, uploadImageFile } = useImageUpload()
 const router = useRouter()
 const showTaskNumber = computed(() => (mode.value === 'edit' || mode.value === 'view') && !!taskId.value)
 
@@ -151,7 +154,6 @@ const sidebarTitle = computed(() => {
 const kanbanHeaderTitle = computed(() => (mode.value === 'add' ? 'Add Task' : 'Task'))
 const submitText = computed(() => (mode.value === 'edit' ? 'Save Task' : 'Add Task'))
 const charCount = computed(() => description.value.length)
-const descriptionHasImage = computed(() => hasImageMarkdown(description.value))
 const timeSpentLabel = computed(() => formatMinutes(timeSpentMinutes.value))
 const showDiscussion = computed(
   () => (mode.value === 'edit' || mode.value === 'view') && !!currentTask.value?.project_id,
@@ -237,19 +239,47 @@ function insertDescriptionImage(markdown: string) {
   const el = descriptionInput.value
   const start = el?.selectionStart ?? description.value.length
   const end = el?.selectionEnd ?? start
-  const next = description.value.slice(0, start) + markdown + description.value.slice(end)
-  if (next.length > 1000) {
+  const next = insertMarkdownAtCursor(description.value, markdown, start, end)
+  if (next.body.length > 1000) {
     toast.push('Description would exceed 1000 characters', 'error')
     return
   }
-  description.value = next
+  description.value = next.body
   void nextTick(() => {
     if (!el) return
-    const pos = start + markdown.length
     el.focus()
-    el.setSelectionRange(pos, pos)
+    el.setSelectionRange(next.cursor, next.cursor)
     autosizeDescription()
   })
+}
+
+async function ingestDescriptionImage(file: File) {
+  const markdown = await uploadImageFile(file)
+  if (markdown) insertDescriptionImage(markdown)
+}
+
+function onDescriptionPaste(e: ClipboardEvent) {
+  const file = imageFileFromClipboard(e)
+  if (!file || !imageEnabled.value || readOnly.value) return
+  e.preventDefault()
+  void ingestDescriptionImage(file)
+}
+
+function onDescriptionDragOver(e: DragEvent) {
+  if (readOnly.value || !imageEnabled.value || !dropHasFiles(e)) return
+  e.preventDefault()
+}
+
+function onDescriptionDrop(e: DragEvent) {
+  const file = imageFileFromDrop(e)
+  if (!file || !imageEnabled.value || readOnly.value) return
+  e.preventDefault()
+  void ingestDescriptionImage(file)
+}
+
+function onTaskOverlayClick() {
+  if (shouldIgnoreTaskOverlayClose()) return
+  close()
 }
 
 function resetForm() {
@@ -998,7 +1028,7 @@ async function removeTimeEntry(entryId: number) {
     tabindex="-1"
     role="dialog"
     aria-modal="true"
-    @click.self="close"
+    @click.self="onTaskOverlayClick"
   >
     <div
       class="modal-dialog oryryn-task-dialog"
@@ -1162,20 +1192,16 @@ async function removeTimeEntry(entryId: number) {
             maxlength="1000"
             rows="4"
             @input="autosizeDescription"
+            @paste="onDescriptionPaste"
+            @dragover="onDescriptionDragOver"
+            @drop="onDescriptionDrop"
           />
           <div v-else id="description" class="task-description-view">
             <RichBody v-if="description.trim()" :body="description" />
             <span v-else class="text-muted">No description</span>
           </div>
-          <div
-            v-if="!readOnly && descriptionHasImage"
-            class="task-description-preview mt-2"
-          >
-            <div class="form-hint mb-1">Preview</div>
-            <RichBody :body="description" />
-          </div>
           <div v-if="!readOnly" class="d-flex justify-content-between align-items-center mt-1 gap-2">
-            <small class="form-hint">Max 1000 Characters. Markdown is supported.</small>
+            <small class="form-hint">Max 1000 Characters. Paste or drop an image, or use Insert image.</small>
             <div class="d-flex align-items-center gap-2">
               <ImageInsertButton compact :disabled="readOnly" @insert="insertDescriptionImage" />
               <small class="text-muted"><span id="char-count">{{ charCount }}</span>/1000</small>
@@ -1603,17 +1629,14 @@ textarea.task-description-input {
   overflow-y: hidden;
 }
 
-.task-description-view,
-.task-description-preview {
+.task-description-view {
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--ordryn-card-border, #dee2e6);
   border-radius: 0.375rem;
   background: var(--ordryn-muted-bg, #f8f6ee);
   min-height: 80px;
-}
-
-.task-description-preview {
-  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .kanban-task-head textarea.task-description-input {

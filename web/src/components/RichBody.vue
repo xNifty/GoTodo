@@ -23,19 +23,27 @@ function label(id: number, title: string) {
 </script>
 
 <template>
-  <span class="rich-body" :class="{ 'rich-body--compact': compact }">
+  <div class="rich-body" :class="{ 'rich-body--compact': compact }">
     <template v-for="(part, i) in parts" :key="i">
       <span v-if="part.type === 'text'" class="rich-body-text">{{ part.value }}</span>
       <span v-else-if="part.type === 'mention'" class="rich-body-mention">{{ part.raw }}</span>
-      <img
+      <a
         v-else-if="part.type === 'image'"
-        class="rich-body-image"
-        :src="part.src"
-        :alt="part.alt || 'image'"
-        loading="lazy"
-        decoding="async"
+        class="rich-body-image-link"
+        :href="part.src"
+        target="_blank"
+        rel="noopener noreferrer"
+        :title="part.alt ? `Open ${part.alt}` : 'Open image'"
         @click.stop
-      />
+      >
+        <img
+          class="rich-body-image"
+          :src="part.src"
+          :alt="part.alt || 'image'"
+          loading="lazy"
+          decoding="async"
+        />
+      </a>
       <button
         v-else-if="part.type === 'task' && taskTitle?.(part.id)"
         type="button"
@@ -46,12 +54,15 @@ function label(id: number, title: string) {
       </button>
       <span v-else-if="part.type === 'task'">{{ part.raw }}</span>
     </template>
-  </span>
+  </div>
 </template>
 
 <style scoped>
 .rich-body {
-  display: inline;
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   word-break: break-word;
 }
 .rich-body-text {
@@ -61,19 +72,27 @@ function label(id: number, title: string) {
   font-weight: 600;
   color: var(--ordryn-accent, #2563eb);
 }
+.rich-body-image-link {
+  display: block;
+  max-width: 100%;
+  margin: 0.5rem 0;
+}
 .rich-body-image {
   display: block;
   max-width: 100%;
+  width: auto;
   height: auto;
-  max-height: 28rem;
-  margin: 0.45rem 0;
+  max-height: min(240px, 40vh);
+  object-fit: contain;
   border-radius: 0.375rem;
   border: 1px solid var(--ordryn-card-border, #dee2e6);
   background: var(--ordryn-muted-bg, #f8f6ee);
 }
+.rich-body--compact .rich-body-image-link {
+  margin: 0.25rem 0;
+}
 .rich-body--compact .rich-body-image {
-  max-height: 8rem;
-  margin: 0.3rem 0;
+  max-height: 6rem;
 }
 .rich-body-task-link {
   display: inline;

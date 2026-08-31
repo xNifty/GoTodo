@@ -2,8 +2,7 @@
 import { computed, ref } from 'vue'
 import type { Task } from '@/api/types'
 import type { ViewDensity } from '@/composables/useViewDensity'
-import RichBody from '@/components/RichBody.vue'
-import { hasImageMarkdown } from '@/utils/taskCommentBody'
+import { hasImageMarkdown, previewWithoutImages } from '@/utils/taskCommentBody'
 
 const props = withDefaults(
   defineProps<{
@@ -70,7 +69,11 @@ function cancelEditDesc() {
   isEditingDesc.value = false
 }
 
-const descriptionHasImage = computed(() => hasImageMarkdown(props.task.description || ''))
+const descriptionPreview = computed(() => {
+  const text = props.task.description || ''
+  if (hasImageMarkdown(text)) return previewWithoutImages(text)
+  return text
+})
 
 function priorityLabel(priority: number) {
   if (priority === 1) return 'Low'
@@ -264,8 +267,7 @@ function formatMinutes(total: number) {
               :title="canWrite ? 'Click to edit description' : undefined"
               @click="startEditDesc"
             >
-              <RichBody v-if="descriptionHasImage" compact :body="task.description" />
-              <template v-else>{{ task.description }}</template>
+              {{ descriptionPreview }}
             </div>
           </div>
         </div>
