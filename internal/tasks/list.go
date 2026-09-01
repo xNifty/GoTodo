@@ -267,13 +267,15 @@ func parseSearchTaskID(query string) (int, bool) {
 }
 
 func searchMatchClause(tablePrefix string, idArgIndex int) string {
+	prefix := ""
 	idCol := "id"
 	if tablePrefix != "" {
+		prefix = tablePrefix + "."
 		idCol = tablePrefix + ".id"
 	}
-	clause := fmt.Sprintf(`(title ILIKE $1 OR description ILIKE $1 OR EXISTS (
+	clause := fmt.Sprintf(`(%stitle ILIKE $1 OR %sdescription ILIKE $1 OR EXISTS (
 		SELECT 1 FROM task_tags tt JOIN tags tg ON tt.tag_id = tg.id
-		WHERE tt.task_id = %s AND tg.name ILIKE $1))`, idCol)
+		WHERE tt.task_id = %s AND tg.name ILIKE $1))`, prefix, prefix, idCol)
 	if idArgIndex <= 0 {
 		return clause
 	}

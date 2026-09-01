@@ -11,6 +11,7 @@ export type MentionToken = {
 }
 
 const TASK_REF_RE = /\[\[(\d+)\]\]|#(\d+)\b/g
+const TASK_NAME_REF_RE = /(?:^|[^A-Za-z0-9_])#([A-Za-z0-9][A-Za-z0-9 _-]{0,80})(?=\s|$|[.,!?;:])/g
 const IMAGE_RE = /!\[([^\]]*)]\(\s*<?([^)\s>]+)>?(?:\s+["'][^"']*["'])?\s*\)/g
 const COMMENT_TOKEN_RE =
   /!\[([^\]]*)]\(\s*<?([^)\s>]+)>?(?:\s+["'][^"']*["'])?\s*\)|\[\[(\d+)\]\]|#(\d+)\b|(^|[^A-Za-z0-9_@])@([A-Za-z0-9_]{3,32})\b/g
@@ -67,6 +68,22 @@ export function extractTaskRefIDs(body: string): number[] {
   return ids
 }
 
+export function extractTaskRefQueries(body: string): string[] {
+  const queries: string[] = []
+  const seen = new Set<string>()
+  const re = new RegExp(TASK_NAME_REF_RE.source, 'g')
+  let m: RegExpExecArray | null
+  while ((m = re.exec(body))) {
+    const q = (m[1] ?? '').trim()
+    if (!q || /^\d+$/.test(q)) continue
+    const key = q.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    queries.push(q)
+  }
+  return queries
+}
+
 export function extractMentionNames(body: string): string[] {
   const names: string[] = []
   const seen = new Set<string>()
@@ -117,10 +134,25 @@ export function isInsertedTaskRef(body: string, id: number): boolean {
   return new RegExp(`\\[\\[${id}\\]\\]`).test(body)
 }
 
-export function insertTaskRef(body: string, id: number): string {
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+export function insertTaskRef(body: string, id: number, query?: string): string {
   if (isInsertedTaskRef(body, id)) return body
-  const hash = new RegExp(`#${id}\\b`)
-  if (hash.test(body)) return body.replace(hash, `[[${id}]]`)
+  const hash = new RegExp(`(^|[^A-Za-z0-9_])#${id}\\b`)
+  if (hash.test(body)) {
+    return body.replace(hash, `$1[[${id}]]`)
+  }
+  if (query) {
+    const q = escapeRegex(query.trim())
+    if (q) {
+      const qHash = new RegExp(`(^|[^A-Za-z0-9_])#${q}(?=\\s|$|[.,!?;:])`, 'i')
+      if (qHash.test(body)) {
+        return body.replace(qHash, `$1[[${id}]]`)
+      }
+    }
+  }
   const trimmed = body.trimEnd()
   if (!trimmed) return `[[${id}]]`
   return `${trimmed} [[${id}]]`

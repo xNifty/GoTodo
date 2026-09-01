@@ -12,6 +12,7 @@ import { USER_SEARCH_MIN_QUERY, useUserSearch } from '@/composables/useUserSearc
 import { useImageUpload } from '@/composables/useImageUpload'
 import {
   extractTaskRefIDs,
+  extractTaskRefQueries,
   insertMarkdownAtCursor,
   insertMention,
   insertTaskRef,
@@ -58,10 +59,12 @@ type DraftLink = {
   id: number
   title: string
   inserted: boolean
+  query?: string
 }
 
 const draftLinks = ref<DraftLink[]>([])
 const titleCache = new Map<number, string | null>()
+const queryCache = new Map<string, DraftLink[]>()
 let lookupTimer: ReturnType<typeof setTimeout> | null = null
 
 const mentionOpen = ref(false)
@@ -190,8 +193,14 @@ function openLinkedTask(id: number) {
 
 async function lookupDraftLinks() {
   const ids = extractTaskRefIDs(draft.value)
+  const queries = extractTaskRefQueries(draft.value)
   const next: DraftLink[] = []
+  const seen = new Set<number>()
+
   for (const id of ids) {
+    if (seen.has(id)) continue
+    seen.add(id)
+
     if (!titleCache.has(id)) {
       try {
         const task = await api.getTask(id)
@@ -200,14 +209,58 @@ async function lookupDraftLinks() {
         titleCache.set(id, null)
       }
     }
+
     const title = titleCache.get(id)
     if (!title) continue
+
     next.push({
       id,
       title,
       inserted: isInsertedTaskRef(draft.value, id),
     })
   }
+
+  for (const query of queries) {
+    const normalized = query.trim()
+    if (!normalized || normalized.length < 2) continue
+    if (!/^[A-Za-z0-9][A-Za-z0-9 _-]*$/.test(normalized)) continue
+
+    const key = normalized.toLowerCase()
+    if (queryCache.has(key)) {
+      for (const link of queryCache.get(key)!) {
+        if (seen.has(link.id)) continue
+        seen.add(link.id)
+        next.push(link)
+      }
+      continue
+    }
+
+    try {
+      const list = await api.listTasks({
+        search: normalized,
+        page: 1,
+        per_page: 5,
+        ...(props.projectId ? { project: props.projectId } : {}),
+      })
+
+      const matches = list.tasks.map((task) => ({
+        id: task.id,
+        title: task.title || `Task #${task.id}`,
+        inserted: isInsertedTaskRef(draft.value, task.id),
+        query: normalized,
+      }))
+
+      queryCache.set(key, matches)
+      for (const link of matches) {
+        if (seen.has(link.id)) continue
+        seen.add(link.id)
+        next.push(link)
+      }
+    } catch {
+      queryCache.set(key, [])
+    }
+  }
+
   draftLinks.value = next
 }
 
@@ -218,8 +271,8 @@ function scheduleDraftLookup() {
   }, 250)
 }
 
-function insertLink(id: number) {
-  draft.value = insertTaskRef(draft.value, id)
+function insertLink(id: number, query?: string) {
+  draft.value = insertTaskRef(draft.value, id, query)
   void lookupDraftLinks()
 }
 
@@ -751,7 +804,7 @@ defineExpose({ reload })
           v-if="!link.inserted"
           type="button"
           class="btn btn-sm btn-outline-primary"
-          @click="insertLink(link.id)"
+          @click="insertLink(link.id, link.query)"
         >
           Insert link
         </button>
