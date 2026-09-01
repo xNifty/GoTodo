@@ -223,14 +223,17 @@ async function lookupDraftLinks() {
   for (const query of queries) {
     const normalized = query.trim()
     if (!normalized || normalized.length < 2) continue
-    if (!/^[A-Za-z0-9][A-Za-z0-9 _-]*$/.test(normalized)) continue
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(normalized)) continue
 
     const key = normalized.toLowerCase()
     if (queryCache.has(key)) {
       for (const link of queryCache.get(key)!) {
         if (seen.has(link.id)) continue
         seen.add(link.id)
-        next.push(link)
+        next.push({
+          ...link,
+          inserted: isInsertedTaskRef(draft.value, link.id),
+        })
       }
       continue
     }

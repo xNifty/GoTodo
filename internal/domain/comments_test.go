@@ -392,11 +392,14 @@ func TestSearchUsernamesProjectMembersOnly(t *testing.T) {
 }
 
 func TestParseCommentTaskIDs(t *testing.T) {
-	ids := ParseCommentTaskIDs("Check #191 and also [[42]] plus #191 again")
+	ids := ParseCommentTaskIDs("Check #191 and also [[42]] plus #191 again and #new and #my-task")
 	if len(ids) != 2 || ids[0] != 191 || ids[1] != 42 {
 		t.Fatalf("ids=%v", ids)
 	}
 	if ParseCommentTaskIDs("no refs") != nil {
+		t.Fatal("expected nil")
+	}
+	if ParseCommentTaskIDs("#notanid #abc [[xyz]]") != nil {
 		t.Fatal("expected nil")
 	}
 }

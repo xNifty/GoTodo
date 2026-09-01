@@ -11,7 +11,7 @@ export type MentionToken = {
 }
 
 const TASK_REF_RE = /\[\[(\d+)\]\]|#(\d+)\b/g
-const TASK_NAME_REF_RE = /(?:^|[^A-Za-z0-9_])#([A-Za-z0-9][A-Za-z0-9 _-]{0,80})(?=\s|$|[.,!?;:])/g
+const TASK_NAME_REF_RE = /(?:^|[^A-Za-z0-9_])#([A-Za-z0-9][A-Za-z0-9_-]{0,80})(?=\s|$|[.,!?;:])/g
 const IMAGE_RE = /!\[([^\]]*)]\(\s*<?([^)\s>]+)>?(?:\s+["'][^"']*["'])?\s*\)/g
 const COMMENT_TOKEN_RE =
   /!\[([^\]]*)]\(\s*<?([^)\s>]+)>?(?:\s+["'][^"']*["'])?\s*\)|\[\[(\d+)\]\]|#(\d+)\b|(^|[^A-Za-z0-9_@])@([A-Za-z0-9_]{3,32})\b/g
