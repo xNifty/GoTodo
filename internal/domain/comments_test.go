@@ -392,11 +392,14 @@ func TestSearchUsernamesProjectMembersOnly(t *testing.T) {
 }
 
 func TestParseCommentTaskIDs(t *testing.T) {
-	ids := ParseCommentTaskIDs("Check #191 and also [[42]] plus #191 again")
+	ids := ParseCommentTaskIDs("Check #191 and also [[42]] plus #191 again and #new and #my-task")
 	if len(ids) != 2 || ids[0] != 191 || ids[1] != 42 {
 		t.Fatalf("ids=%v", ids)
 	}
 	if ParseCommentTaskIDs("no refs") != nil {
+		t.Fatal("expected nil")
+	}
+	if ParseCommentTaskIDs("#notanid #abc [[xyz]]") != nil {
 		t.Fatal("expected nil")
 	}
 }
@@ -415,12 +418,27 @@ func TestCommentTaskLinksRespectAccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create task: %v", err)
 	}
+	siblingTaskID, err := CreateTask(ctx, 1, CreateTaskInput{Title: "Sibling in same project", ProjectID: &pid})
+	if err != nil {
+		t.Fatalf("create sibling task: %v", err)
+	}
+
+	otherProj, err := CreateProject(ctx, 1, "Other Proj", "")
+	if err != nil {
+		t.Fatalf("create other project: %v", err)
+	}
+	otherPID := otherProj.ID
+	otherTaskID, err := CreateTask(ctx, 1, CreateTaskInput{Title: "Other project task", ProjectID: &otherPID})
+	if err != nil {
+		t.Fatalf("create other task: %v", err)
+	}
+
 	personalID, err := CreateTask(ctx, 1, CreateTaskInput{Title: "Secret inbox item"})
 	if err != nil {
 		t.Fatalf("personal: %v", err)
 	}
 
-	body := fmt.Sprintf("Check #%d", personalID)
+	body := fmt.Sprintf("Check #%d (self), #%d (sibling), #%d (other proj), and #%d (inbox)", taskID, siblingTaskID, otherTaskID, personalID)
 	if _, err := AddCommentForUser(ctx, 1, taskID, body); err != nil {
 		t.Fatalf("post: %v", err)
 	}
@@ -429,10 +447,10 @@ func TestCommentTaskLinksRespectAccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("owner list: %v", err)
 	}
-	if len(forOwner) != 1 || len(forOwner[0].Links) != 1 || forOwner[0].Links[0].ID != personalID {
-		t.Fatalf("owner links %+v", forOwner)
+	if len(forOwner) != 1 || len(forOwner[0].Links) != 1 || forOwner[0].Links[0].ID != siblingTaskID {
+		t.Fatalf("owner links %+v, want only siblingTaskID %d", forOwner, siblingTaskID)
 	}
-	if forOwner[0].Links[0].Title != "Secret inbox item" {
+	if forOwner[0].Links[0].Title != "Sibling in same project" {
 		t.Fatalf("title=%q", forOwner[0].Links[0].Title)
 	}
 
@@ -440,8 +458,8 @@ func TestCommentTaskLinksRespectAccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("editor list: %v", err)
 	}
-	if len(forEditor) != 1 || len(forEditor[0].Links) != 0 {
-		t.Fatalf("editor should not see inaccessible task title, got %+v", forEditor[0].Links)
+	if len(forEditor) != 1 || len(forEditor[0].Links) != 1 || forEditor[0].Links[0].ID != siblingTaskID {
+		t.Fatalf("editor links %+v, want only siblingTaskID %d", forEditor, siblingTaskID)
 	}
 }
 
