@@ -107,7 +107,12 @@ func ReturnPaginationForUserWithFilters(page, pageSize int, userID *int, timezon
 	}
 
 	countArgs := []interface{}{*userID}
-	countWhere := "WHERE " + storage.TaskListVisibleCondition("", "$1", filters.ProjectFilter) + nonFavoriteCond + rootCond
+	var countWhere string
+	if filters.SprintFilter != nil {
+		countWhere = "WHERE " + storage.TaskListVisibleCondition("", "$1", filters.ProjectFilter)
+	} else {
+		countWhere = "WHERE " + storage.TaskListVisibleCondition("", "$1", filters.ProjectFilter) + nonFavoriteCond + rootCond
+	}
 	countWhere, countArgs = appendFilterSQL(countWhere, countArgs, filters, timezone, "", *userID)
 	var totalTasks int
 	if err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks "+countWhere, countArgs...).Scan(&totalTasks); err != nil {
@@ -152,12 +157,10 @@ func ReturnPaginationForUserWithFilters(page, pageSize int, userID *int, timezon
 		return nil, 0, err
 	}
 	if page == 1 {
-		var extras int
-		taskList, extras, err = appendOrphanSprintSubtasks(taskList, *userID, timezone, filters)
+		taskList, err = appendOrphanSprintSubtasks(taskList, *userID, timezone, filters, "")
 		if err != nil {
 			return nil, 0, err
 		}
-		totalTasks += extras
 	}
 	return taskList, totalTasks, nil
 }
@@ -183,8 +186,11 @@ func SearchTasksForUserWithFilters(page, pageSize int, searchQuery string, userI
 		countArgs = append(countArgs, searchID)
 		countIDIdx = len(countArgs)
 	}
-	countWhere := "WHERE " + storage.TaskListVisibleCondition("", "$2", filters.ProjectFilter) + rootCond +
-		" AND (" + searchMatchClause("", countIDIdx) + " OR EXISTS (SELECT 1 FROM tasks c WHERE c.parent_id = id AND " + childSearchClause(countIDIdx) + "))"
+	countWhere := "WHERE " + storage.TaskListVisibleCondition("", "$2", filters.ProjectFilter)
+	if filters.SprintFilter == nil {
+		countWhere += rootCond
+	}
+	countWhere += " AND (" + searchMatchClause("", countIDIdx) + " OR EXISTS (SELECT 1 FROM tasks c WHERE c.parent_id = id AND " + childSearchClause(countIDIdx) + "))"
 	countWhere, countArgs = appendFilterSQL(countWhere, countArgs, filters, timezone, "", *userID)
 	var totalTasks int
 	if err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks "+countWhere, countArgs...).Scan(&totalTasks); err != nil {
@@ -224,12 +230,10 @@ func SearchTasksForUserWithFilters(page, pageSize int, searchQuery string, userI
 		return nil, 0, err
 	}
 	if page == 1 {
-		var extras int
-		taskList, extras, err = appendOrphanSprintSubtasks(taskList, *userID, timezone, filters)
+		taskList, err = appendOrphanSprintSubtasks(taskList, *userID, timezone, filters, searchQuery)
 		if err != nil {
 			return nil, 0, err
 		}
-		totalTasks += extras
 	}
 	return taskList, totalTasks, nil
 }
@@ -562,13 +566,13 @@ func attachChildrenToRoots(roots []Task, timezone string, sprintFilter *int) err
 
 // appendOrphanSprintSubtasks adds subtasks that match the sprint filter whose
 // parent does not, so the board can show them as their own cards.
-func appendOrphanSprintSubtasks(roots []Task, userID int, timezone string, filters ListFilters) ([]Task, int, error) {
+func appendOrphanSprintSubtasks(roots []Task, userID int, timezone string, filters ListFilters, searchQuery string) ([]Task, error) {
 	if filters.SprintFilter == nil {
-		return roots, 0, nil
+		return roots, nil
 	}
 	pool, err := storage.OpenDatabase()
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	defer storage.CloseDatabase(pool)
 
@@ -590,6 +594,24 @@ func appendOrphanSprintSubtasks(roots []Task, userID int, timezone string, filte
 	args := []interface{}{userID, timezone}
 	where := "WHERE " + storage.TaskListVisibleCondition("t", "$1", filters.ProjectFilter) + " AND t.parent_id IS NOT NULL"
 	where, args = appendFilterSQL(where, args, filters, timezone, "t", userID)
+	if strings.TrimSpace(searchQuery) != "" {
+		searchPattern := "%" + strings.TrimSpace(searchQuery) + "%"
+		searchID, hasSearchID := parseSearchTaskID(searchQuery)
+		args = append(args, searchPattern)
+		searchIdx := len(args)
+		searchIDIdx := 0
+		if hasSearchID {
+			args = append(args, searchID)
+			searchIDIdx = len(args)
+		}
+		matchClause := fmt.Sprintf(`(t.title ILIKE $%d OR t.description ILIKE $%d OR EXISTS (
+			SELECT 1 FROM task_tags tt JOIN tags tg ON tt.tag_id = tg.id
+			WHERE tt.task_id = t.id AND tg.name ILIKE $%d))`, searchIdx, searchIdx, searchIdx)
+		if searchIDIdx > 0 {
+			matchClause = fmt.Sprintf(`(%s OR t.id = $%d)`, matchClause, searchIDIdx)
+		}
+		where += " AND " + matchClause
+	}
 	if len(exclude) > 0 {
 		args = append(args, exclude)
 		where += fmt.Sprintf(" AND NOT (t.id = ANY($%d))", len(args))
@@ -597,7 +619,7 @@ func appendOrphanSprintSubtasks(roots []Task, userID int, timezone string, filte
 
 	rows, err := pool.Query(context.Background(), taskSelectSQL()+where+filters.orderByClause("t"), args...)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -607,7 +629,7 @@ func appendOrphanSprintSubtasks(roots []Task, userID int, timezone string, filte
 	for rows.Next() {
 		child, err := scanFavoriteTaskRow(rows)
 		if err != nil {
-			return nil, 0, err
+			return nil, err
 		}
 		if _, ok := seen[child.ID]; ok {
 			continue
@@ -621,37 +643,37 @@ func appendOrphanSprintSubtasks(roots []Task, userID int, timezone string, filte
 		}
 	}
 	if err := rows.Err(); err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	if len(extras) == 0 {
-		return roots, 0, nil
+		return roots, nil
 	}
 	if err := attachTagsToTasks(extras); err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	if len(parentIDs) > 0 {
 		titles := map[int]string{}
 		titleRows, err := pool.Query(context.Background(), `SELECT id, title FROM tasks WHERE id = ANY($1)`, parentIDs)
 		if err != nil {
-			return nil, 0, err
+			return nil, err
 		}
 		defer titleRows.Close()
 		for titleRows.Next() {
 			var id int
 			var title string
 			if err := titleRows.Scan(&id, &title); err != nil {
-				return nil, 0, err
+				return nil, err
 			}
 			titles[id] = title
 		}
 		if err := titleRows.Err(); err != nil {
-			return nil, 0, err
+			return nil, err
 		}
 		for i := range extras {
 			extras[i].ParentTitle = titles[extras[i].ParentID]
 		}
 	}
-	return append(roots, extras...), len(extras), nil
+	return append(roots, extras...), nil
 }
 
 func ReturnPaginationForUserWithProject(page, pageSize int, userID *int, timezone string, projectFilter *int) ([]Task, int, error) {
