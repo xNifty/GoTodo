@@ -57,6 +57,7 @@ func TestMain(m *testing.M) {
 			id SERIAL PRIMARY KEY,
 			user_id INT,
 			name TEXT,
+			description TEXT NOT NULL DEFAULT '',
 			workflow_mode VARCHAR(16) NOT NULL DEFAULT 'classic'
 		);
 		CREATE TABLE project_statuses (
