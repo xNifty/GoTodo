@@ -115,16 +115,22 @@ func ResolveCommentMentions(projectID int, body string) []storage.ProjectMember 
 	return out
 }
 
-// ResolveCommentTaskLinks returns titles for referenced tasks the user can access.
-func ResolveCommentTaskLinks(userID int, body string) []storage.TaskCommentLink {
+// ResolveCommentTaskLinks returns titles for referenced tasks within projectID (excluding currentTaskID) that the user can access.
+func ResolveCommentTaskLinks(currentTaskID, projectID, userID int, body string) []storage.TaskCommentLink {
 	ids := ParseCommentTaskIDs(body)
 	if len(ids) == 0 {
 		return nil
 	}
 	out := make([]storage.TaskCommentLink, 0, len(ids))
 	for _, id := range ids {
-		canRead, _, _, err := storage.CanUserAccessTask(id, userID)
+		if currentTaskID > 0 && id == currentTaskID {
+			continue
+		}
+		canRead, _, taskProjectID, err := storage.CanUserAccessTask(id, userID)
 		if err != nil || !canRead {
+			continue
+		}
+		if projectID > 0 && taskProjectID != projectID {
 			continue
 		}
 		td, err := storage.GetTaskTitleDescription(id)
@@ -140,19 +146,20 @@ func ResolveCommentTaskLinks(userID int, body string) []storage.TaskCommentLink 
 	return out
 }
 
-func attachCommentLinks(userID int, comments []storage.TaskComment) {
+func attachCommentLinks(taskID, projectID, userID int, comments []storage.TaskComment) {
 	for i := range comments {
 		if comments[i].DeletedAt != nil || comments[i].Body == "" {
 			continue
 		}
-		comments[i].Links = ResolveCommentTaskLinks(userID, comments[i].Body)
+		comments[i].Links = ResolveCommentTaskLinks(taskID, projectID, userID, comments[i].Body)
 	}
 }
 
 // ListCommentsForUser lists discussion posts on a project task the user can read.
 func ListCommentsForUser(ctx context.Context, userID, taskID int) ([]storage.TaskComment, error) {
 	_ = ctx
-	if _, err := requireProjectTaskAccess(taskID, userID); err != nil {
+	projectID, err := requireProjectTaskAccess(taskID, userID)
+	if err != nil {
 		return nil, err
 	}
 	comments, err := storage.ListTaskComments(taskID)
@@ -162,7 +169,7 @@ func ListCommentsForUser(ctx context.Context, userID, taskID int) ([]storage.Tas
 	if comments == nil {
 		comments = []storage.TaskComment{}
 	}
-	attachCommentLinks(userID, comments)
+	attachCommentLinks(taskID, projectID, userID, comments)
 	return comments, nil
 }
 
@@ -181,7 +188,7 @@ func AddCommentForUser(ctx context.Context, userID, taskID int, body string) (*s
 	if err != nil {
 		return nil, err
 	}
-	comment.Links = ResolveCommentTaskLinks(userID, comment.Body)
+	comment.Links = ResolveCommentTaskLinks(taskID, projectID, userID, comment.Body)
 	NotifyProjectMembersTaskCommented(taskID, userID, projectID, body)
 	live.AfterTaskChange(userID, taskID, live.TypeTaskCommented)
 	return comment, nil
@@ -276,7 +283,7 @@ func EditCommentForUser(ctx context.Context, userID, taskID, commentID int, body
 	if err != nil {
 		return nil, err
 	}
-	updated.Links = ResolveCommentTaskLinks(userID, updated.Body)
+	updated.Links = ResolveCommentTaskLinks(taskID, projectID, userID, updated.Body)
 	live.AfterTaskChange(userID, taskID, live.TypeTaskCommented)
 	return updated, nil
 }
@@ -334,7 +341,7 @@ func RestoreCommentRevisionForUser(ctx context.Context, userID, taskID, commentI
 	if err != nil {
 		return nil, err
 	}
-	updated.Links = ResolveCommentTaskLinks(userID, updated.Body)
+	updated.Links = ResolveCommentTaskLinks(taskID, projectID, userID, updated.Body)
 	live.AfterTaskChange(userID, taskID, live.TypeTaskCommented)
 	return updated, nil
 }
@@ -365,7 +372,7 @@ func RestoreCommentRevisionForAdmin(ctx context.Context, userID, revisionID int)
 	if err != nil {
 		return nil, err
 	}
-	updated.Links = ResolveCommentTaskLinks(userID, updated.Body)
+	updated.Links = ResolveCommentTaskLinks(rev.TaskID, rev.ProjectID, userID, updated.Body)
 	live.AfterTaskChange(userID, updated.TaskID, live.TypeTaskCommented)
 	return updated, nil
 }
