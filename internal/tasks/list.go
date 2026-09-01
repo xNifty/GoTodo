@@ -34,7 +34,6 @@ func ReturnTaskListForUser(userID *int) []Task {
 
 	rows, err := pool.Query(context.Background(), "SELECT id, title, description, completed FROM tasks WHERE user_id = $1 ORDER BY id", *userID)
 	if err != nil {
-		fmt.Println("Error in ListTasks (query):", err)
 		return tasks
 	}
 	defer rows.Close()
@@ -43,7 +42,6 @@ func ReturnTaskListForUser(userID *int) []Task {
 		var task Task
 		err = rows.Scan(&task.ID, &task.Title, &task.Description, &task.Completed)
 		if err != nil {
-			fmt.Println("Error in ListTasks (scan):", err)
 			return tasks
 		}
 		tasks = append(tasks, task)
@@ -154,10 +152,12 @@ func ReturnPaginationForUserWithFilters(page, pageSize int, userID *int, timezon
 		return nil, 0, err
 	}
 	if page == 1 {
-		taskList, err = appendOrphanSprintSubtasks(taskList, *userID, timezone, filters)
+		var extras int
+		taskList, extras, err = appendOrphanSprintSubtasks(taskList, *userID, timezone, filters)
 		if err != nil {
 			return nil, 0, err
 		}
+		totalTasks += extras
 	}
 	return taskList, totalTasks, nil
 }
@@ -224,10 +224,12 @@ func SearchTasksForUserWithFilters(page, pageSize int, searchQuery string, userI
 		return nil, 0, err
 	}
 	if page == 1 {
-		taskList, err = appendOrphanSprintSubtasks(taskList, *userID, timezone, filters)
+		var extras int
+		taskList, extras, err = appendOrphanSprintSubtasks(taskList, *userID, timezone, filters)
 		if err != nil {
 			return nil, 0, err
 		}
+		totalTasks += extras
 	}
 	return taskList, totalTasks, nil
 }
@@ -267,13 +269,15 @@ func parseSearchTaskID(query string) (int, bool) {
 }
 
 func searchMatchClause(tablePrefix string, idArgIndex int) string {
+	prefix := ""
 	idCol := "id"
 	if tablePrefix != "" {
+		prefix = tablePrefix + "."
 		idCol = tablePrefix + ".id"
 	}
-	clause := fmt.Sprintf(`(title ILIKE $1 OR description ILIKE $1 OR EXISTS (
+	clause := fmt.Sprintf(`(%stitle ILIKE $1 OR %sdescription ILIKE $1 OR EXISTS (
 		SELECT 1 FROM task_tags tt JOIN tags tg ON tt.tag_id = tg.id
-		WHERE tt.task_id = %s AND tg.name ILIKE $1))`, idCol)
+		WHERE tt.task_id = %s AND tg.name ILIKE $1))`, prefix, prefix, idCol)
 	if idArgIndex <= 0 {
 		return clause
 	}
@@ -558,13 +562,13 @@ func attachChildrenToRoots(roots []Task, timezone string, sprintFilter *int) err
 
 // appendOrphanSprintSubtasks adds subtasks that match the sprint filter whose
 // parent does not, so the board can show them as their own cards.
-func appendOrphanSprintSubtasks(roots []Task, userID int, timezone string, filters ListFilters) ([]Task, error) {
+func appendOrphanSprintSubtasks(roots []Task, userID int, timezone string, filters ListFilters) ([]Task, int, error) {
 	if filters.SprintFilter == nil {
-		return roots, nil
+		return roots, 0, nil
 	}
 	pool, err := storage.OpenDatabase()
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer storage.CloseDatabase(pool)
 
@@ -593,7 +597,7 @@ func appendOrphanSprintSubtasks(roots []Task, userID int, timezone string, filte
 
 	rows, err := pool.Query(context.Background(), taskSelectSQL()+where+filters.orderByClause("t"), args...)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 
@@ -603,7 +607,7 @@ func appendOrphanSprintSubtasks(roots []Task, userID int, timezone string, filte
 	for rows.Next() {
 		child, err := scanFavoriteTaskRow(rows)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		if _, ok := seen[child.ID]; ok {
 			continue
@@ -617,37 +621,37 @@ func appendOrphanSprintSubtasks(roots []Task, userID int, timezone string, filte
 		}
 	}
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	if len(extras) == 0 {
-		return roots, nil
+		return roots, 0, nil
 	}
 	if err := attachTagsToTasks(extras); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	if len(parentIDs) > 0 {
 		titles := map[int]string{}
 		titleRows, err := pool.Query(context.Background(), `SELECT id, title FROM tasks WHERE id = ANY($1)`, parentIDs)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		defer titleRows.Close()
 		for titleRows.Next() {
 			var id int
 			var title string
 			if err := titleRows.Scan(&id, &title); err != nil {
-				return nil, err
+				return nil, 0, err
 			}
 			titles[id] = title
 		}
 		if err := titleRows.Err(); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		for i := range extras {
 			extras[i].ParentTitle = titles[extras[i].ParentID]
 		}
 	}
-	return append(roots, extras...), nil
+	return append(roots, extras...), len(extras), nil
 }
 
 func ReturnPaginationForUserWithProject(page, pageSize int, userID *int, timezone string, projectFilter *int) ([]Task, int, error) {

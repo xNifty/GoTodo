@@ -139,7 +139,7 @@ func TestProjectSprintsCRUDAndTaskAssignment(t *testing.T) {
 	tz := "UTC"
 	uid := 1
 	sprintFilter := sid
-	listedTasks, _, err := tasks.ReturnPaginationForUserWithFilters(1, 50, &uid, tz, tasks.ListFilters{
+	listedTasks, sprintTotal, err := tasks.ReturnPaginationForUserWithFilters(1, 50, &uid, tz, tasks.ListFilters{
 		ProjectFilter:      &pid,
 		WorkflowClaimScope: "all",
 		SprintFilter:       &sprintFilter,
@@ -147,18 +147,24 @@ func TestProjectSprintsCRUDAndTaskAssignment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("filter sprint: %v", err)
 	}
+	if sprintTotal != 1 {
+		t.Fatalf("sprint total=%d want 1", sprintTotal)
+	}
 	if !sprintListHasID(listedTasks, taskID) || sprintListHasID(listedTasks, backlogID) {
 		t.Fatalf("sprint filter mismatch: %+v", sprintTaskIDs(listedTasks))
 	}
 
 	zero := 0
-	backlogTasks, _, err := tasks.ReturnPaginationForUserWithFilters(1, 50, &uid, tz, tasks.ListFilters{
+	backlogTasks, backlogTotal, err := tasks.ReturnPaginationForUserWithFilters(1, 50, &uid, tz, tasks.ListFilters{
 		ProjectFilter:      &pid,
 		WorkflowClaimScope: "all",
 		SprintFilter:       &zero,
 	})
 	if err != nil {
 		t.Fatalf("filter backlog: %v", err)
+	}
+	if backlogTotal != 1 {
+		t.Fatalf("backlog total=%d want 1", backlogTotal)
 	}
 	if !sprintListHasID(backlogTasks, backlogID) || sprintListHasID(backlogTasks, taskID) {
 		t.Fatalf("backlog filter mismatch: %+v", sprintTaskIDs(backlogTasks))
@@ -681,13 +687,16 @@ func TestSprintBoardSeparatesParentAndChildAssignments(t *testing.T) {
 	tz := "UTC"
 	uid := 1
 	zero := 0
-	backlog, _, err := tasks.ReturnPaginationForUserWithFilters(1, 50, &uid, tz, tasks.ListFilters{
+	backlog, backlogTotal, err := tasks.ReturnPaginationForUserWithFilters(1, 50, &uid, tz, tasks.ListFilters{
 		ProjectFilter:      &pid,
 		WorkflowClaimScope: "all",
 		SprintFilter:       &zero,
 	})
 	if err != nil {
 		t.Fatalf("backlog list: %v", err)
+	}
+	if backlogTotal != 1 {
+		t.Fatalf("backlog total=%d want 1", backlogTotal)
 	}
 	parent := sprintTopLevel(backlog, parentID)
 	if parent == nil {
@@ -700,13 +709,16 @@ func TestSprintBoardSeparatesParentAndChildAssignments(t *testing.T) {
 		t.Fatal("sprint-1 subtask should not appear as a backlog card")
 	}
 
-	sprintTasks, _, err := tasks.ReturnPaginationForUserWithFilters(1, 50, &uid, tz, tasks.ListFilters{
+	sprintTasks, sprintTotal, err := tasks.ReturnPaginationForUserWithFilters(1, 50, &uid, tz, tasks.ListFilters{
 		ProjectFilter:      &pid,
 		WorkflowClaimScope: "all",
 		SprintFilter:       &sid,
 	})
 	if err != nil {
 		t.Fatalf("sprint list: %v", err)
+	}
+	if sprintTotal != 1 {
+		t.Fatalf("sprint total=%d want 1 (orphan child included)", sprintTotal)
 	}
 	if sprintTopLevel(sprintTasks, parentID) != nil {
 		t.Fatal("backlog parent should not appear on sprint 1")
@@ -720,6 +732,18 @@ func TestSprintBoardSeparatesParentAndChildAssignments(t *testing.T) {
 	}
 	if child.ParentTitle != "Kanban Project 2" {
 		t.Fatalf("subtask parent_title=%q", child.ParentTitle)
+	}
+
+	searchedSprint, searchedSprintTotal, err := tasks.SearchTasksForUserWithFilters(1, 50, "Sub task", &uid, tz, tasks.ListFilters{
+		ProjectFilter:      &pid,
+		WorkflowClaimScope: "all",
+		SprintFilter:       &sid,
+	})
+	if err != nil {
+		t.Fatalf("search sprint: %v", err)
+	}
+	if searchedSprintTotal != 1 || len(searchedSprint) != 1 {
+		t.Fatalf("search sprint total=%d (tasks=%d) want 1", searchedSprintTotal, len(searchedSprint))
 	}
 }
 
