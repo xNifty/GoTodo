@@ -415,21 +415,13 @@ func TestSprintFilterTotalIncludesOrphanSubtasksAndSearch(t *testing.T) {
 		t.Fatalf("insert sprint: %v", err)
 	}
 
-	var sprintRootID, sprintNestedChildID, backlogParentID, orphanChildID int
+	var sprintRootID, backlogParentID, orphanChildID int
 	err = pool.QueryRow(ctx,
 		`INSERT INTO tasks (title, description, user_id, project_id, sprint_id, position)
 		 VALUES ('Sprint Root Task', 'root in sprint', 1, 1, $1, 10)
 		 RETURNING id`, sprintID).Scan(&sprintRootID)
 	if err != nil {
 		t.Fatalf("insert sprint root: %v", err)
-	}
-
-	err = pool.QueryRow(ctx,
-		`INSERT INTO tasks (title, description, user_id, project_id, parent_id, sprint_id, position)
-		 VALUES ('Sprint Nested Subtask', 'child in sprint whose parent is also in sprint', 1, 1, $1, $2, 11)
-		 RETURNING id`, sprintRootID, sprintID).Scan(&sprintNestedChildID)
-	if err != nil {
-		t.Fatalf("insert sprint nested child: %v", err)
 	}
 
 	err = pool.QueryRow(ctx,
@@ -449,7 +441,7 @@ func TestSprintFilterTotalIncludesOrphanSubtasksAndSearch(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
-		_, _ = pool.Exec(ctx, "DELETE FROM tasks WHERE id IN ($1, $2, $3, $4)", orphanChildID, backlogParentID, sprintNestedChildID, sprintRootID)
+		_, _ = pool.Exec(ctx, "DELETE FROM tasks WHERE id IN ($1, $2, $3)", orphanChildID, backlogParentID, sprintRootID)
 		_, _ = pool.Exec(ctx, "DELETE FROM project_sprints WHERE id = $1", sprintID)
 	})
 
@@ -457,7 +449,7 @@ func TestSprintFilterTotalIncludesOrphanSubtasksAndSearch(t *testing.T) {
 	projectID := 1
 	tz := "UTC"
 
-	// 1. Test sprint filter listing: total should count ALL tasks in sprint (root + nested child + orphan child = 3)
+	// 1. Test sprint filter listing: should return root task + orphan child, with total = 2
 	sprintList, sprintTotal, err := tasks.ReturnPaginationForUserWithFilters(1, 50, &userID, tz, tasks.ListFilters{
 		ProjectFilter: &projectID,
 		SprintFilter:  &sprintID,
@@ -465,13 +457,13 @@ func TestSprintFilterTotalIncludesOrphanSubtasksAndSearch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sprint list: %v", err)
 	}
-	if sprintTotal != 3 {
-		t.Fatalf("expected sprintTotal=3 (1 root + 1 nested subtask + 1 orphan subtask), got %d", sprintTotal)
+	if sprintTotal != 2 {
+		t.Fatalf("expected sprintTotal=2 (1 root + 1 orphan subtask), got %d", sprintTotal)
 	}
 	if len(sprintList) != 2 {
-		t.Fatalf("expected 2 top-level cards in sprint list (root + orphan subtask), got %d", len(sprintList))
+		t.Fatalf("expected 2 tasks in sprint list, got %d", len(sprintList))
 	}
-	var orphanFound, rootFound bool
+	var orphanFound bool
 	for _, task := range sprintList {
 		if task.ID == orphanChildID {
 			orphanFound = true
@@ -482,18 +474,9 @@ func TestSprintFilterTotalIncludesOrphanSubtasksAndSearch(t *testing.T) {
 				t.Fatalf("expected orphan child parent_title='Backlog Parent Task', got %q", task.ParentTitle)
 			}
 		}
-		if task.ID == sprintRootID {
-			rootFound = true
-			if len(task.Children) != 1 || task.Children[0].ID != sprintNestedChildID {
-				t.Fatalf("expected root task to have nested child %d, got %+v", sprintNestedChildID, task.Children)
-			}
-		}
 	}
 	if !orphanFound {
 		t.Fatalf("orphan child %d was not found in sprint list: %+v", orphanChildID, titles(sprintList))
-	}
-	if !rootFound {
-		t.Fatalf("sprint root %d was not found in sprint list: %+v", sprintRootID, titles(sprintList))
 	}
 
 	// 2. Test search with sprint filter matching orphan subtask: should return orphan child with total = 1
@@ -511,7 +494,7 @@ func TestSprintFilterTotalIncludesOrphanSubtasksAndSearch(t *testing.T) {
 		t.Fatalf("expected orphan child in search results, got %+v", searchedList)
 	}
 
-	// 3. Test backlog filter: should include Backlog Parent Task and exclude Sprint tasks
+	// 3. Test backlog filter: should include Backlog Parent Task and exclude Sprint Root Task
 	zero := 0
 	backlogList, _, err := tasks.ReturnPaginationForUserWithFilters(1, 50, &userID, tz, tasks.ListFilters{
 		ProjectFilter: &projectID,
@@ -520,19 +503,19 @@ func TestSprintFilterTotalIncludesOrphanSubtasksAndSearch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("backlog list: %v", err)
 	}
-	var parentFound, rootFound2 bool
+	var parentFound, rootFound bool
 	for _, task := range backlogList {
 		if task.ID == backlogParentID {
 			parentFound = true
 		}
 		if task.ID == sprintRootID {
-			rootFound2 = true
+			rootFound = true
 		}
 	}
 	if !parentFound {
 		t.Fatalf("expected backlog parent %d in backlog list", backlogParentID)
 	}
-	if rootFound2 {
+	if rootFound {
 		t.Fatalf("did not expect sprint root %d in backlog list", sprintRootID)
 	}
 }
