@@ -198,13 +198,18 @@ async function lookupDraftLinks() {
   const seen = new Set<number>()
 
   for (const id of ids) {
+    if (id === props.taskId) continue
     if (seen.has(id)) continue
     seen.add(id)
 
     if (!titleCache.has(id)) {
       try {
         const task = await api.getTask(id)
-        titleCache.set(id, task.title || `Task #${id}`)
+        if (props.projectId && task.project_id !== props.projectId) {
+          titleCache.set(id, null)
+        } else {
+          titleCache.set(id, task.title || `Task #${id}`)
+        }
       } catch {
         titleCache.set(id, null)
       }
@@ -228,6 +233,7 @@ async function lookupDraftLinks() {
     const key = normalized.toLowerCase()
     if (queryCache.has(key)) {
       for (const link of queryCache.get(key)!) {
+        if (link.id === props.taskId) continue
         if (seen.has(link.id)) continue
         seen.add(link.id)
         next.push({
@@ -246,7 +252,13 @@ async function lookupDraftLinks() {
         ...(props.projectId ? { project: props.projectId } : {}),
       })
 
-      const matches = list.tasks.map((task) => ({
+      const filtered = list.tasks.filter((task) => {
+        if (task.id === props.taskId) return false
+        if (props.projectId && task.project_id !== props.projectId) return false
+        return true
+      })
+
+      const matches = filtered.map((task) => ({
         id: task.id,
         title: task.title || `Task #${task.id}`,
         inserted: isInsertedTaskRef(draft.value, task.id),
