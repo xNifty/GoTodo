@@ -462,7 +462,8 @@ func apiV1ListTasks(w http.ResponseWriter, r *http.Request) {
 		out = append(out, taskToAPIJSON(t))
 	}
 	projectFilter := parseProjectFilter(fc.Project)
-	completedCount, incompleteCount := completedIncompleteCounts(&userID, projectFilter)
+	sprintFilter := parseSprintFilter(fc.Sprint)
+	completedCount, incompleteCount := completedIncompleteCounts(&userID, projectFilter, sprintFilter)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	json.NewEncoder(w).Encode(apiTaskListResponse{
 		Tasks:           out,

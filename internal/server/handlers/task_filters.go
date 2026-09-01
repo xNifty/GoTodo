@@ -5,6 +5,7 @@ import (
 	"GoTodo/internal/storage"
 	"GoTodo/internal/tasks"
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -195,11 +196,11 @@ func fetchTasksForFilters(page, pageSize int, fc FilterContext, userID *int, tim
 	return tasks.ReturnPaginationForUserWithFilters(page, pageSize, userID, timezone, filters)
 }
 
-func completedIncompleteCounts(userID *int, projectFilter *int) (int, int) {
+func completedIncompleteCounts(userID *int, projectFilter *int, sprintFilter *int) (int, int) {
 	if userID == nil {
 		return 0, 0
 	}
-	if projectFilter == nil {
+	if projectFilter == nil && sprintFilter == nil {
 		return utils.GetCompletedTasksCount(userID), utils.GetIncompleteTasksCount(userID)
 	}
 
@@ -209,22 +210,33 @@ func completedIncompleteCounts(userID *int, projectFilter *int) (int, int) {
 	}
 	defer storage.CloseDatabase(pool)
 
-	projectCond := ""
+	filterCond := ""
 	args := []interface{}{*userID}
-	if *projectFilter == 0 {
-		projectCond = " AND project_id IS NULL"
-	} else {
-		projectCond = " AND project_id = $2"
-		args = append(args, *projectFilter)
+	if projectFilter != nil {
+		if *projectFilter == 0 {
+			filterCond += " AND project_id IS NULL"
+		} else {
+			args = append(args, *projectFilter)
+			filterCond += fmt.Sprintf(" AND project_id = $%d", len(args))
+		}
+	}
+
+	if sprintFilter != nil {
+		if *sprintFilter > 0 {
+			args = append(args, *sprintFilter)
+			filterCond += fmt.Sprintf(" AND sprint_id = $%d", len(args))
+		} else if *sprintFilter == 0 {
+			filterCond += " AND sprint_id IS NULL"
+		}
 	}
 
 	completedCount := 0
 	incompleteCount := 0
 	notArchived := " AND NOT " + storage.ArchivedTaskExistsSQL("id")
-	if err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND completed = true"+projectCond+notArchived, args...).Scan(&completedCount); err != nil {
+	if err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND completed = true"+filterCond+notArchived, args...).Scan(&completedCount); err != nil {
 		completedCount = 0
 	}
-	if err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND (completed IS NULL OR completed = false)"+projectCond+notArchived, args...).Scan(&incompleteCount); err != nil {
+	if err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND (completed IS NULL OR completed = false)"+filterCond+notArchived, args...).Scan(&incompleteCount); err != nil {
 		incompleteCount = 0
 	}
 	return completedCount, incompleteCount
