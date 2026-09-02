@@ -52,6 +52,10 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "user_name: %v\n", err)
 		os.Exit(1)
 	}
+	if err := storage.MigrateUsersAddAvatarURL(); err != nil {
+		fmt.Fprintf(os.Stderr, "avatar_url: %v\n", err)
+		os.Exit(1)
+	}
 	if err := storage.CreateProjectsTable(); err != nil {
 		fmt.Fprintf(os.Stderr, "projects: %v\n", err)
 		os.Exit(1)
