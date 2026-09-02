@@ -100,6 +100,7 @@ func registerAPIV1Routes() {
 	handleBoth("/api/v1/me/mfa/disable", utils.AuthSessionChain(handlers.APIV1MeMFADisable))
 	handleBoth("/api/v1/me/mfa/recovery-codes", utils.AuthSessionChain(handlers.APIV1MeMFARecoveryCodes))
 	handleBoth("/api/v1/me/username", utils.AuthSessionChain(handlers.APIV1ClaimUsername))
+	handleBoth("/api/v1/me/avatar", utils.AuthSessionChain(handlers.APIV1MeAvatar))
 	handleBoth("/api/v1/me/github", utils.AuthSessionChain(handlers.APIV1MeGitHub))
 	handleBoth("/api/v1/me/github/pat", utils.AuthSessionChain(handlers.APIV1MeGitHubPAT))
 	handleBoth("/api/v1/me/github/oauth/start", utils.AuthSessionChain(handlers.APIV1MeGitHubOAuthStart))

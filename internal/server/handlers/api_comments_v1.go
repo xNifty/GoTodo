@@ -22,6 +22,7 @@ type apiTaskCommentJSON struct {
 	TaskID           int                      `json:"task_id"`
 	UserID           int                      `json:"user_id"`
 	UserName         string                   `json:"user_name,omitempty"`
+	AvatarURL        string                   `json:"avatar_url,omitempty"`
 	Body             string                   `json:"body"`
 	CreatedAt        string                   `json:"created_at"`
 	Deleted          bool                     `json:"deleted"`
@@ -66,6 +67,7 @@ func commentToAPIJSON(c storage.TaskComment) apiTaskCommentJSON {
 		TaskID:           c.TaskID,
 		UserID:           c.UserID,
 		UserName:         c.UserName,
+		AvatarURL:        c.AvatarURL,
 		Body:             c.Body,
 		CreatedAt:        c.CreatedAt.UTC().Format(time.RFC3339),
 		EditedByUserID:   c.EditedByUserID,

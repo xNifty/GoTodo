@@ -573,6 +573,61 @@ paths:
         "409":
           $ref: "#/components/responses/APIError"
 
+  /api/v1/me/avatar:
+    post:
+      tags: [Profile]
+      summary: Upload profile picture
+      description: |
+        Uploads and updates the user's profile picture. Image hosting must be
+        configured. Accepts PNG and JPEG images only, bounded by the site's upload limit.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Updated profile with new avatar URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          description: Image exceeds maximum allowed size
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIError"
+    delete:
+      tags: [Profile]
+      summary: Remove profile picture
+      description: Clears the user's avatar URL.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Updated profile with cleared avatar URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
   /api/v1/me/password:
     post:
       tags: [Profile]
@@ -3539,6 +3594,9 @@ components:
         mfa_enabled:
           type: boolean
           description: When true, password login requires a TOTP or recovery code
+        avatar_url:
+          type: string
+          description: URL to user's uploaded profile picture, or empty if unset
 
     MFARequired:
       type: object
@@ -3861,6 +3919,9 @@ components:
           type: integer
         user_name:
           type: string
+        avatar_url:
+          type: string
+          description: URL to comment author's avatar picture, or empty if unset
         body:
           type: string
           description: Empty when the comment has been deleted

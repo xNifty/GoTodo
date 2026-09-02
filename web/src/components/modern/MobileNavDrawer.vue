@@ -18,7 +18,7 @@ const emit = defineEmits<{
 
 const route = useRoute()
 const router = useRouter()
-const { isAuthenticated, hasPermission, logout } = useAuth()
+const { isAuthenticated, user, hasPermission, logout } = useAuth()
 const { siteInfo } = useSite()
 const { push } = useToast()
 const overdueCount = inject<Ref<number>>('overdueCount', ref(0))
@@ -173,7 +173,14 @@ watch(isAuthenticated, (ok) => {
                 :class="{ active: route.path === '/settings' }"
                 @click="close"
               >
-                <i class="bi bi-person-circle" />
+                <img
+                  v-if="user?.avatar_url"
+                  :src="user.avatar_url"
+                  alt=""
+                  class="rounded-circle drawer-avatar-img"
+                  aria-hidden="true"
+                />
+                <i v-else class="bi bi-person-circle" />
                 <span>Profile</span>
               </RouterLink>
             </li>
@@ -398,3 +405,11 @@ watch(isAuthenticated, (ok) => {
     </nav>
   </Teleport>
 </template>
+
+<style scoped>
+.drawer-avatar-img {
+  width: 18px;
+  height: 18px;
+  object-fit: cover;
+}
+</style>
