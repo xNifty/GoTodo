@@ -69,6 +69,16 @@ export function useAuth() {
     return user.value
   }
 
+  async function uploadAvatar(file: Blob | File) {
+    user.value = await api.uploadAvatar(file)
+    return user.value
+  }
+
+  async function deleteAvatar() {
+    user.value = await api.deleteAvatar()
+    return user.value
+  }
+
   function hasPermission(permission: string) {
     return !!user.value?.permissions?.includes(permission)
   }
@@ -87,5 +97,7 @@ export function useAuth() {
     logout,
     updateProfile,
     claimUsername,
+    uploadAvatar,
+    deleteAvatar,
   }
 }

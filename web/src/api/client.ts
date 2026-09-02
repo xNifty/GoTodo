@@ -114,7 +114,7 @@ async function download(path: string, fallbackName: string): Promise<void> {
   URL.revokeObjectURL(url)
 }
 
-async function upload<T>(path: string, field: string, file: File): Promise<T> {
+async function upload<T>(path: string, field: string, file: Blob | File): Promise<T> {
   const fd = new FormData()
   fd.append(field, file)
   const res = await fetch(withBase(path), { method: 'POST', body: fd, credentials: 'include' })
@@ -976,6 +976,14 @@ export const api = {
 
   uploadImage(file: File) {
     return upload<ImageUpload>('/api/v1/images', 'file', file)
+  },
+
+  uploadAvatar(file: Blob | File) {
+    return upload<User>('/api/v1/me/avatar', 'file', file)
+  },
+
+  deleteAvatar() {
+    return request<User>('/api/v1/me/avatar', { method: 'DELETE' })
   },
 
   syncCalendar(file: File) {

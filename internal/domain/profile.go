@@ -48,3 +48,24 @@ func ChangePassword(ctx context.Context, userID int, currentPassword, newPasswor
 	}
 	return storage.UpdatePasswordByID(userID, string(hashed))
 }
+
+// UpdateAvatarStorage is overridable in tests.
+var UpdateAvatarStorage = storage.UpdateUserAvatarURL
+
+// GetUserProfileStorage is overridable in tests.
+var GetUserProfileStorage = storage.GetUserProfileByID
+
+// UpdateAvatarURL updates the user's avatar image URL and returns the updated profile.
+func UpdateAvatarURL(ctx context.Context, userID int, avatarURL string) (*storage.UserProfile, error) {
+	_ = ctx
+	if err := UpdateAvatarStorage(userID, avatarURL); err != nil {
+		return nil, err
+	}
+	return GetUserProfileStorage(userID)
+}
+
+// RemoveAvatar clears the user's avatar image URL and returns the updated profile.
+func RemoveAvatar(ctx context.Context, userID int) (*storage.UserProfile, error) {
+	return UpdateAvatarURL(ctx, userID, "")
+}
+

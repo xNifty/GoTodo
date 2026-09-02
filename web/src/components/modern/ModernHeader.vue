@@ -259,7 +259,14 @@ async function onLogout() {
           </div>
           <span class="text-muted small d-none d-lg-inline me-1">{{ user?.user_name || user?.email }}</span>
           <RouterLink to="/settings" class="btn btn-outline-secondary btn-sm d-none d-md-flex align-items-center gap-1" title="Profile Settings">
-            <i class="bi bi-person-circle" />
+            <img
+              v-if="user?.avatar_url"
+              :src="user.avatar_url"
+              alt=""
+              class="rounded-circle header-avatar-img"
+              aria-hidden="true"
+            />
+            <i v-else class="bi bi-person-circle" />
             <span class="d-none d-sm-inline">Profile</span>
           </RouterLink>
           <button type="button" class="btn btn-outline-danger btn-sm d-none d-md-flex align-items-center gap-1" @click="onLogout">
@@ -319,5 +326,10 @@ async function onLogout() {
 }
 .notif-unread {
   background: color-mix(in srgb, var(--ordryn-accent) 10%, transparent);
+}
+.header-avatar-img {
+  width: 18px;
+  height: 18px;
+  object-fit: cover;
 }
 </style>

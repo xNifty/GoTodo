@@ -42,6 +42,7 @@ type apiUserMeJSON struct {
 	AllowProjectInvites     bool     `json:"allow_project_invites"`
 	UsernameChangeAvailable bool     `json:"username_change_available"`
 	MFAEnabled              bool     `json:"mfa_enabled"`
+	AvatarURL               string   `json:"avatar_url"`
 }
 
 func profileToMeJSON(p *storage.UserProfile) apiUserMeJSON {
@@ -61,6 +62,7 @@ func profileToMeJSON(p *storage.UserProfile) apiUserMeJSON {
 		AllowProjectInvites:     p.AllowProjectInvites,
 		UsernameChangeAvailable: p.UsernameChangeAvailable,
 		MFAEnabled:              p.MFAEnabled,
+		AvatarURL:               p.AvatarURL,
 	}
 }
 

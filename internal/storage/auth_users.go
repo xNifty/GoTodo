@@ -23,6 +23,7 @@ type UserProfile struct {
 	AllowProjectInvites     bool
 	UsernameChangeAvailable bool
 	MFAEnabled              bool
+	AvatarURL               string
 }
 
 // GetUserProfileByID loads profile fields and role permissions for a user.
@@ -40,13 +41,14 @@ func GetUserProfileByID(userID int) (*UserProfile, error) {
 		       COALESCE(u.digest_enabled, false), COALESCE(u.digest_hour, 8),
 		       COALESCE(u.allow_project_invites, true),
 		       COALESCE(u.username_change_available, false),
-		       COALESCE(u.mfa_enabled, false)
+		       COALESCE(u.mfa_enabled, false),
+		       COALESCE(u.avatar_url, '')
 		FROM users u
 		LEFT JOIN roles r ON r.id = u.role_id
 		WHERE u.id = $1`, userID).Scan(
 		&p.ID, &p.Email, &p.UserName, &p.Timezone, &p.ItemsPerPage, &p.RoleID, &p.Permissions,
 		&p.DigestEnabled, &p.DigestHour, &p.AllowProjectInvites, &p.UsernameChangeAvailable,
-		&p.MFAEnabled,
+		&p.MFAEnabled, &p.AvatarURL,
 	)
 	if err != nil {
 		return nil, err
@@ -70,6 +72,18 @@ func UpdateUserProfileByID(userID int, userName, timezone string, itemsPerPage i
 		       digest_enabled = $4, digest_hour = $5, allow_project_invites = $6
 		WHERE id = $7`,
 		userName, timezone, itemsPerPage, digestEnabled, digestHour, allowProjectInvites, userID)
+	return err
+}
+
+// UpdateUserAvatarURL updates the avatar_url column for a user.
+func UpdateUserAvatarURL(userID int, avatarURL string) error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return err
+	}
+	defer CloseDatabase(pool)
+
+	_, err = pool.Exec(context.Background(), `UPDATE users SET avatar_url = $1 WHERE id = $2`, avatarURL, userID)
 	return err
 }
 

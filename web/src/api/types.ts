@@ -10,6 +10,7 @@ export type User = {
   allow_project_invites: boolean
   username_change_available: boolean
   mfa_enabled: boolean
+  avatar_url?: string
 }
 
 export type MFARequired = {
@@ -106,6 +107,7 @@ export type TaskComment = {
   task_id: number
   user_id: number
   user_name?: string
+  avatar_url?: string
   body: string
   created_at: string
   edited_at?: string | null

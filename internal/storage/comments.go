@@ -31,6 +31,7 @@ type TaskComment struct {
 	TaskID           int
 	UserID           int
 	UserName         string
+	AvatarURL        string
 	Body             string
 	CreatedAt        time.Time
 	DeletedAt        *time.Time
@@ -133,6 +134,7 @@ func scanTaskComment(row interface {
 		&c.ID, &c.TaskID, &c.UserID, &c.Body, &c.CreatedAt,
 		&deletedAt, &deletedBy, &deletedKind,
 		&editedAt, &c.EditedByUserID, &c.UserName, &c.EditedByUserName,
+		&c.AvatarURL,
 	)
 	if err != nil {
 		return err
@@ -158,7 +160,8 @@ const taskCommentSelect = `SELECT c.id, c.task_id, COALESCE(c.user_id, 0), COALE
 		c.deleted_at, c.deleted_by_user_id, c.deleted_by_kind,
 		c.edited_at, COALESCE(c.edited_by_user_id, 0),
 		COALESCE(u.user_name, u.email, ''),
-		COALESCE(eu.user_name, eu.email, '')
+		COALESCE(eu.user_name, eu.email, ''),
+		COALESCE(u.avatar_url, '')
 	 FROM task_comments c
 	 LEFT JOIN users u ON u.id = c.user_id
 	 LEFT JOIN users eu ON eu.id = c.edited_by_user_id`
