@@ -198,6 +198,7 @@ func TestReturnPaginationForUserWithFilters(t *testing.T) {
 		{"no project complete", tasks.ListFilters{ProjectFilter: &projectZero, StatusFilter: "complete"}},
 		{"due today", tasks.ListFilters{DueFilter: "today"}},
 		{"due overdue", tasks.ListFilters{DueFilter: "overdue"}},
+		{"due overdue with subtasks", tasks.ListFilters{DueFilter: "overdue", IncludeSubtasks: true}},
 		{"tag filter", tasks.ListFilters{TagFilter: intPtr(1)}},
 	}
 
@@ -211,6 +212,31 @@ func TestReturnPaginationForUserWithFilters(t *testing.T) {
 				t.Fatalf("expected non-negative total, got %d", total)
 			}
 		})
+	}
+}
+
+func TestIncompleteListTotalIncludesFavoriteRoot(t *testing.T) {
+	userID := 1
+	timezone := "America/New_York"
+	list, total, err := tasks.ReturnPaginationForUserWithFilters(1, 50, &userID, timezone, tasks.ListFilters{
+		StatusFilter:       "incomplete",
+		WorkflowClaimScope: "mine",
+	})
+	if err != nil {
+		t.Fatalf("incomplete list: %v", err)
+	}
+	var found bool
+	for _, task := range list {
+		if task.Title == "Favorite task" && task.IsFavorite && !task.Completed {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected starred incomplete root in incomplete list, got %v", titles(list))
+	}
+	if total < 1 {
+		t.Fatalf("incomplete total should include starred roots, got %d", total)
 	}
 }
 
@@ -395,6 +421,156 @@ func TestFetchTaskByIDAttachesChildrenAndParent(t *testing.T) {
 	}
 	if child.ChildCount != 0 || len(child.Children) != 0 {
 		t.Fatalf("expected no nested children on subtask, got count=%d children=%d", child.ChildCount, len(child.Children))
+	}
+}
+
+func TestIncludeSubtasksReturnsOverdueChildOfCompletedParent(t *testing.T) {
+	pool, err := storage.OpenDatabase()
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer storage.CloseDatabase(pool)
+
+	ctx := context.Background()
+	userID := 1
+	timezone := "America/New_York"
+
+	var parentID, childID int
+	err = pool.QueryRow(ctx,
+		`INSERT INTO tasks (title, description, user_id, completed, is_favorite, position, priority, due_date)
+		 VALUES ('Completed parent', 'root', 1, true, false, 80, 0, CURRENT_DATE - 3)
+		 RETURNING id`).Scan(&parentID)
+	if err != nil {
+		t.Fatalf("insert parent: %v", err)
+	}
+	err = pool.QueryRow(ctx,
+		`INSERT INTO tasks (title, description, user_id, completed, is_favorite, position, priority, parent_id, due_date)
+		 VALUES ('Leftover overdue child', 'child', 1, false, false, 1, 0, $1, CURRENT_DATE - 2)
+		 RETURNING id`, parentID).Scan(&childID)
+	if err != nil {
+		t.Fatalf("insert child: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM tasks WHERE id IN ($1, $2)", childID, parentID)
+	})
+
+	orphans, _, err := tasks.ReturnPaginationForUserWithFilters(1, 50, &userID, timezone, tasks.ListFilters{DueFilter: "overdue"})
+	if err != nil {
+		t.Fatalf("overdue list: %v", err)
+	}
+	var orphan *tasks.Task
+	for i := range orphans {
+		if orphans[i].ID == childID {
+			orphan = &orphans[i]
+			break
+		}
+	}
+	if orphan == nil {
+		t.Fatalf("expected leftover overdue child as an orphan row, got %v", titles(orphans))
+	}
+	if orphan.ParentTitle != "Completed parent" {
+		t.Fatalf("orphan parent_title=%q want Completed parent", orphan.ParentTitle)
+	}
+
+	withChildren, _, err := tasks.ReturnPaginationForUserWithFilters(1, 50, &userID, timezone, tasks.ListFilters{
+		DueFilter:       "overdue",
+		IncludeSubtasks: true,
+	})
+	if err != nil {
+		t.Fatalf("include_subtasks overdue list: %v", err)
+	}
+	var found *tasks.Task
+	for i := range withChildren {
+		if withChildren[i].ID == childID {
+			found = &withChildren[i]
+			break
+		}
+	}
+	if found == nil {
+		t.Fatalf("expected leftover overdue child in include_subtasks list, got %v", titles(withChildren))
+	}
+	if found.ParentID != parentID {
+		t.Fatalf("child parent_id=%d want %d", found.ParentID, parentID)
+	}
+	if found.ParentTitle != "Completed parent" {
+		t.Fatalf("child parent_title=%q want Completed parent", found.ParentTitle)
+	}
+	if len(found.Children) != 0 {
+		t.Fatalf("flattened child should not nest further children, got %d", len(found.Children))
+	}
+}
+
+func TestIncompleteFilterReturnsOrphanChildOfCompletedParent(t *testing.T) {
+	pool, err := storage.OpenDatabase()
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer storage.CloseDatabase(pool)
+
+	ctx := context.Background()
+	userID := 1
+	timezone := "America/New_York"
+
+	var parentID, childID int
+	err = pool.QueryRow(ctx,
+		`INSERT INTO tasks (title, description, user_id, completed, is_favorite, position, priority)
+		 VALUES ('Done parent hiding child', 'root', 1, true, false, 81, 0)
+		 RETURNING id`).Scan(&parentID)
+	if err != nil {
+		t.Fatalf("insert parent: %v", err)
+	}
+	err = pool.QueryRow(ctx,
+		`INSERT INTO tasks (title, description, user_id, completed, is_favorite, position, priority, parent_id)
+		 VALUES ('Nonced Title', 'child', 1, false, false, 1, 0, $1)
+		 RETURNING id`, parentID).Scan(&childID)
+	if err != nil {
+		t.Fatalf("insert child: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM tasks WHERE id IN ($1, $2)", childID, parentID)
+	})
+
+	allStatus, _, err := tasks.ReturnPaginationForUserWithFilters(1, 50, &userID, timezone, tasks.ListFilters{})
+	if err != nil {
+		t.Fatalf("all-status list: %v", err)
+	}
+	var nested bool
+	for _, task := range allStatus {
+		if task.ID == childID {
+			t.Fatal("all-status list should keep the child nested, not top-level")
+		}
+		for _, c := range task.Children {
+			if c.ID == childID {
+				nested = true
+			}
+		}
+	}
+	if !nested {
+		t.Fatal("expected incomplete child nested under completed parent when status is all")
+	}
+
+	incomplete, total, err := tasks.ReturnPaginationForUserWithFilters(1, 50, &userID, timezone, tasks.ListFilters{StatusFilter: "incomplete"})
+	if err != nil {
+		t.Fatalf("incomplete list: %v", err)
+	}
+	var found *tasks.Task
+	for i := range incomplete {
+		if incomplete[i].ID == childID {
+			found = &incomplete[i]
+			break
+		}
+	}
+	if found == nil {
+		t.Fatalf("expected leftover incomplete child in incomplete list, got %v", titles(incomplete))
+	}
+	if found.ParentID != parentID {
+		t.Fatalf("child parent_id=%d want %d", found.ParentID, parentID)
+	}
+	if found.ParentTitle != "Done parent hiding child" {
+		t.Fatalf("child parent_title=%q", found.ParentTitle)
+	}
+	if total < 1 {
+		t.Fatalf("incomplete total should include orphan child, got %d", total)
 	}
 }
 

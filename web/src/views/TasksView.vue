@@ -101,7 +101,7 @@ const selectMode = ref(false)
 const taskListEl = ref<HTMLElement | null>(null)
 const loadMoreSentinel = ref<HTMLElement | null>(null)
 
-const rootTasks = computed(() => tasks.value.filter((t) => !t.parent_id))
+const rootTasks = computed(() => tasks.value)
 const flatSelectableIds = computed(() => {
   const ids: number[] = []
   for (const t of tasks.value) {
@@ -117,6 +117,7 @@ const isSelecting = computed(() => selectMode.value || selected.value.length > 0
 const isSearching = computed(() => filters.search !== '')
 const showTaskTable = computed(
   () =>
+    tasks.value.length > 0 ||
     total.value > 0 ||
     hasActiveFilters.value ||
     isKanbanProjectView.value,

@@ -219,6 +219,13 @@ function formatMinutes(total: number) {
             >
               <i class="bi bi-folder2 me-1" />{{ task.project }}
             </span>
+            <span
+              v-if="depth === 0 && task.parent_title"
+              class="badge rounded-pill bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-20 px-2 py-1 small"
+              :title="`Subtask of ${task.parent_title}`"
+            >
+              <i class="bi bi-diagram-3 me-1" />{{ task.parent_title }}
+            </span>
 
             <!-- Kanban status -->
             <span

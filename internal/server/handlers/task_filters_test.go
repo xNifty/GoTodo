@@ -79,7 +79,7 @@ func TestParseProjectFilter(t *testing.T) {
 }
 
 func TestFilterContextFromRequest(t *testing.T) {
-	req := httptest.NewRequest("GET", "/api/v1/tasks?project=3&sprint_id=7&status=incomplete&due=today&priority=2&tag=urgent&workflow_claim_scope=mine&page=3", nil)
+	req := httptest.NewRequest("GET", "/api/v1/tasks?project=3&sprint_id=7&status=incomplete&due=today&priority=2&tag=urgent&workflow_claim_scope=mine&include_subtasks=1&page=3", nil)
 	fc := filterContextFromRequest(req)
 
 	if fc.Project != "3" {
@@ -102,6 +102,9 @@ func TestFilterContextFromRequest(t *testing.T) {
 	}
 	if fc.WorkflowClaimScope != "mine" {
 		t.Fatalf("fc.WorkflowClaimScope = %q, want 'mine'", fc.WorkflowClaimScope)
+	}
+	if !fc.IncludeSubtasks {
+		t.Fatal("fc.IncludeSubtasks = false, want true")
 	}
 	if fc.Page != 3 {
 		t.Fatalf("fc.Page = %d, want 3", fc.Page)
@@ -132,6 +135,23 @@ func TestFilterContextToListFiltersWithSprint(t *testing.T) {
 	}
 	if lf.WorkflowClaimScope != "all" {
 		t.Fatalf("lf.WorkflowClaimScope = %q, want 'all'", lf.WorkflowClaimScope)
+	}
+	if lf.IncludeSubtasks {
+		t.Fatal("lf.IncludeSubtasks = true, want false by default")
+	}
+}
+
+func TestFilterContextToListFiltersIncludeSubtasks(t *testing.T) {
+	fc := FilterContext{
+		Due:             "overdue",
+		IncludeSubtasks: true,
+	}
+	lf := fc.ToListFilters()
+	if !lf.IncludeSubtasks {
+		t.Fatal("lf.IncludeSubtasks = false, want true")
+	}
+	if lf.DueFilter != "overdue" {
+		t.Fatalf("lf.DueFilter = %q, want overdue", lf.DueFilter)
 	}
 }
 

@@ -40,6 +40,13 @@ function selectView(id: string) {
   void router.push({ path: '/', query: { view: id } })
 }
 
+function taskMetaLine(task: Task): string {
+  const parts: string[] = []
+  if (task.parent_title) parts.push(task.parent_title)
+  if (task.project) parts.push(task.project)
+  return parts.join(' · ')
+}
+
 function formatDueDate(dateStr?: string): string {
   if (!dateStr) return ''
   const dateObj = new Date(dateStr + 'T00:00:00')
@@ -55,12 +62,12 @@ function sortByDueDate(tasks: Task[]): Task[] {
 }
 
 async function loadSectionLists() {
-  const claimScope = { workflow_claim_scope: 'mine' as const }
+  const sectionParams = { workflow_claim_scope: 'mine' as const, include_subtasks: 1 }
   const [overdueList, todayList, weekList, doneList] = await Promise.all([
-    api.listTasks({ due: 'overdue', page: 1, per_page: 50, ...claimScope }),
-    api.listTasks({ due: 'today', status: 'incomplete', page: 1, per_page: 50, ...claimScope }),
-    api.listTasks({ due: 'through_week', page: 1, per_page: 50, ...claimScope }),
-    api.listTasks({ completed: 'week', page: 1, per_page: 50, ...claimScope }),
+    api.listTasks({ due: 'overdue', page: 1, per_page: 50, ...sectionParams }),
+    api.listTasks({ due: 'today', status: 'incomplete', page: 1, per_page: 50, ...sectionParams }),
+    api.listTasks({ due: 'through_week', page: 1, per_page: 50, ...sectionParams }),
+    api.listTasks({ completed: 'week', page: 1, per_page: 50, workflow_claim_scope: 'mine' }),
   ])
   overdueTasks.value = sortByDueDate(overdueList.tasks)
   dueTodayTasks.value = sortByDueDate(todayList.tasks)
@@ -251,7 +258,7 @@ useLiveUpdates((event) => {
                   @click="openEdit(task.id)"
                 >
                   <span class="fw-medium text-body d-block text-truncate">{{ task.title }}</span>
-                  <span v-if="task.project" class="text-muted small">{{ task.project }}</span>
+                  <span v-if="taskMetaLine(task)" class="text-muted small">{{ taskMetaLine(task) }}</span>
                 </button>
                 <span class="text-danger small fw-medium flex-shrink-0 whitespace-nowrap">
                   {{ formatDueDate(task.due_date) }}
@@ -290,7 +297,7 @@ useLiveUpdates((event) => {
                   @click="openEdit(task.id)"
                 >
                   <span class="fw-medium text-body d-block text-truncate">{{ task.title }}</span>
-                  <span v-if="task.project" class="text-muted small">{{ task.project }}</span>
+                  <span v-if="taskMetaLine(task)" class="text-muted small">{{ taskMetaLine(task) }}</span>
                 </button>
                 <span class="text-primary small fw-medium flex-shrink-0 whitespace-nowrap">
                   {{ formatDueDate(task.due_date) }}
@@ -329,7 +336,7 @@ useLiveUpdates((event) => {
                   @click="openEdit(task.id)"
                 >
                   <span class="fw-medium text-body d-block text-truncate">{{ task.title }}</span>
-                  <span v-if="task.project" class="text-muted small">{{ task.project }}</span>
+                  <span v-if="taskMetaLine(task)" class="text-muted small">{{ taskMetaLine(task) }}</span>
                 </button>
                 <span class="text-muted small fw-medium flex-shrink-0 whitespace-nowrap">
                   {{ formatDueDate(task.due_date) }}

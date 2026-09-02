@@ -138,3 +138,98 @@ func TestGetDashboardStatsCompletionNotDoubleCounted(t *testing.T) {
 		t.Fatalf("today chart after toggle spam: want %d, got %d", todayAfter, todayAfterToggle)
 	}
 }
+
+func TestGetDashboardStatsCountsOverdueChildOfCompletedParent(t *testing.T) {
+	before, err := tasks.GetDashboardStats(1, "America/New_York")
+	if err != nil {
+		t.Fatalf("GetDashboardStats baseline: %v", err)
+	}
+
+	pool, err := storage.OpenDatabase()
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer storage.CloseDatabase(pool)
+
+	ctx := context.Background()
+	var parentID, childID int
+	err = pool.QueryRow(ctx,
+		`INSERT INTO tasks (title, user_id, completed, due_date)
+		 VALUES ('Stats completed parent', 1, true, CURRENT_DATE - 4)
+		 RETURNING id`).Scan(&parentID)
+	if err != nil {
+		t.Fatalf("insert parent: %v", err)
+	}
+	err = pool.QueryRow(ctx,
+		`INSERT INTO tasks (title, user_id, completed, parent_id, due_date)
+		 VALUES ('Stats overdue child', 1, false, $1, CURRENT_DATE - 2)
+		 RETURNING id`, parentID).Scan(&childID)
+	if err != nil {
+		t.Fatalf("insert child: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM tasks WHERE id IN ($1, $2)", childID, parentID)
+	})
+
+	after, err := tasks.GetDashboardStats(1, "America/New_York")
+	if err != nil {
+		t.Fatalf("GetDashboardStats after child: %v", err)
+	}
+	if after.OverdueCount != before.OverdueCount+1 {
+		t.Fatalf("overdue_count: want %d, got %d", before.OverdueCount+1, after.OverdueCount)
+	}
+}
+
+func TestGetDashboardStatsExcludesUnclaimedKanbanOverdue(t *testing.T) {
+	before, err := tasks.GetDashboardStats(1, "America/New_York")
+	if err != nil {
+		t.Fatalf("GetDashboardStats baseline: %v", err)
+	}
+	digestBefore, err := tasks.GetOverdueCount(1, "America/New_York")
+	if err != nil {
+		t.Fatalf("GetOverdueCount baseline: %v", err)
+	}
+
+	pool, err := storage.OpenDatabase()
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer storage.CloseDatabase(pool)
+
+	ctx := context.Background()
+	var projectID, taskID int
+	err = pool.QueryRow(ctx,
+		`INSERT INTO projects (id, user_id, name, workflow_mode)
+		 VALUES (90, 1, 'Kanban overdue board', 'kanban')
+		 RETURNING id`).Scan(&projectID)
+	if err != nil {
+		t.Fatalf("insert kanban project: %v", err)
+	}
+	err = pool.QueryRow(ctx,
+		`INSERT INTO tasks (title, user_id, completed, project_id, due_date, claimed_by)
+		 VALUES ('Unclaimed kanban overdue', 1, false, $1, CURRENT_DATE - 1, NULL)
+		 RETURNING id`, projectID).Scan(&taskID)
+	if err != nil {
+		t.Fatalf("insert unclaimed kanban task: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM tasks WHERE id = $1", taskID)
+		_, _ = pool.Exec(ctx, "DELETE FROM projects WHERE id = $1", projectID)
+	})
+
+	after, err := tasks.GetDashboardStats(1, "America/New_York")
+	if err != nil {
+		t.Fatalf("GetDashboardStats after unclaimed kanban: %v", err)
+	}
+	if after.OverdueCount != before.OverdueCount {
+		t.Fatalf("dashboard overdue_count should ignore unclaimed kanban, want %d got %d", before.OverdueCount, after.OverdueCount)
+	}
+
+	digestAfter, err := tasks.GetOverdueCount(1, "America/New_York")
+	if err != nil {
+		t.Fatalf("GetOverdueCount after unclaimed kanban: %v", err)
+	}
+	if digestAfter != digestBefore+1 {
+		t.Fatalf("digest overdue count should still include unclaimed kanban, want %d got %d", digestBefore+1, digestAfter)
+	}
+}

@@ -24,6 +24,7 @@ type FilterContext struct {
 	Page               int
 	WorkflowClaimScope string
 	Sprint             string
+	IncludeSubtasks    bool
 }
 
 func firstNonEmpty(values ...string) string {
@@ -118,6 +119,7 @@ func filterContextFromRequest(r *http.Request) FilterContext {
 		Search:             strings.TrimSpace(firstNonEmpty(r.URL.Query().Get("search"), r.FormValue("search"))),
 		WorkflowClaimScope: normalizeWorkflowClaimScope(firstNonEmpty(r.URL.Query().Get("workflow_claim_scope"), r.FormValue("workflow_claim_scope"))),
 		Sprint:             firstNonEmpty(r.URL.Query().Get("sprint_id"), r.FormValue("sprint_id")),
+		IncludeSubtasks:    parseIncludeSubtasks(firstNonEmpty(r.URL.Query().Get("include_subtasks"), r.FormValue("include_subtasks"))),
 	}
 	if pageParam := firstNonEmpty(r.URL.Query().Get("page"), r.FormValue("page"), r.FormValue("currentPage")); pageParam != "" {
 		if page, err := strconv.Atoi(pageParam); err == nil && page > 0 {
@@ -135,6 +137,7 @@ func (fc FilterContext) ToListFilters() tasks.ListFilters {
 		CompletedFilter:    fc.Completed,
 		Sort:               fc.Sort,
 		WorkflowClaimScope: fc.WorkflowClaimScope,
+		IncludeSubtasks:    fc.IncludeSubtasks,
 	}
 	if sid := parseSprintFilter(fc.Sprint); sid != nil {
 		lf.SprintFilter = sid
@@ -172,6 +175,15 @@ func parseProjectFilter(projectParam string) *int {
 		return &pid
 	}
 	return nil
+}
+
+func parseIncludeSubtasks(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "1", "true", "yes":
+		return true
+	default:
+		return false
+	}
 }
 
 func parseSprintFilter(sprintParam string) *int {
