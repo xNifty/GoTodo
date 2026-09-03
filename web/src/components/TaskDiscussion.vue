@@ -145,9 +145,9 @@ function editedHover(c: TaskComment) {
   const posted = postedByName(c)
   const editor = editorName(c)
   if (editor && c.edited_by_user_id && c.edited_by_user_id !== c.user_id) {
-    return `Posted by ${posted}. Edited by ${editor}.`
+    return `Posted by ${posted} | Edited by ${editor}.`
   }
-  return `Posted by ${posted}`
+  return `Edited by ${posted}`
 }
 
 function tombstone(c: TaskComment) {
