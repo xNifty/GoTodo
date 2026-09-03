@@ -1096,6 +1096,15 @@ paths:
           description: >
             When mine, hide unclaimed kanban-project tasks (classic tasks unchanged).
             Use all for the kanban board backlog. Default is no claim filter when omitted.
+        - name: include_subtasks
+          in: query
+          schema:
+            type: string
+            enum: ["1", "true", "yes"]
+          description: >
+            When set, matching subtasks are returned as their own rows instead of
+            only root tasks. Used by dashboard due sections so leftover overdue
+            children stay visible after a parent is completed.
         - name: sprint_id
           in: query
           schema:

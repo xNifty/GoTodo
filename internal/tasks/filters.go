@@ -18,6 +18,9 @@ type ListFilters struct {
 	WorkflowClaimScope string // "mine" | "all" | ""
 	// SprintFilter: nil = no filter; &0 = backlog (no sprint); &n = sprint n.
 	SprintFilter *int
+	// IncludeSubtasks flattens matching children into the top-level list
+	// instead of returning roots only. Used by dashboard due sections.
+	IncludeSubtasks bool
 }
 
 func (f ListFilters) projectCondition(tablePrefix string) string {
@@ -136,4 +139,40 @@ func (f ListFilters) workflowClaimCondition(tablePrefix string, argIdx int) stri
 
 func (f ListFilters) appendConditions(baseWhere string, timezone string, tablePrefix string, args []interface{}, userID int) (string, []interface{}) {
 	return appendFilterSQL(baseWhere, args, f, timezone, tablePrefix, userID)
+}
+
+func (f ListFilters) rootOnlySQL(tablePrefix string) string {
+	if f.IncludeSubtasks {
+		return ""
+	}
+	if tablePrefix != "" {
+		return rootCondT
+	}
+	return rootCond
+}
+
+func appendMineClaimScope(where string, args []interface{}, userID int, tablePrefix string) (string, []interface{}) {
+	f := ListFilters{WorkflowClaimScope: "mine"}
+	args = append(args, userID)
+	where += f.workflowClaimCondition(tablePrefix, len(args))
+	return where, args
+}
+
+// shouldAppendOrphanSubtasks reports whether matching children should be
+// promoted to top-level rows when their parent is excluded by the current
+// filters (status, due, completed week, or sprint).
+func (f ListFilters) shouldAppendOrphanSubtasks() bool {
+	if f.IncludeSubtasks {
+		return false
+	}
+	if f.SprintFilter != nil {
+		return true
+	}
+	if normalizeListStatusFilter(f.StatusFilter) != "" {
+		return true
+	}
+	if normalizeDueFilter(f.DueFilter) != "" {
+		return true
+	}
+	return strings.TrimSpace(f.CompletedFilter) != ""
 }
