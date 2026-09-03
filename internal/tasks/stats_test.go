@@ -155,14 +155,14 @@ func TestGetDashboardStatsCountsOverdueChildOfCompletedParent(t *testing.T) {
 	var parentID, childID int
 	err = pool.QueryRow(ctx,
 		`INSERT INTO tasks (title, user_id, completed, due_date)
-		 VALUES ('Stats completed parent', 1, true, CURRENT_DATE - 4)
+		 VALUES ('Stats completed parent', 1, true, ((NOW() AT TIME ZONE 'America/New_York')::date - 4))
 		 RETURNING id`).Scan(&parentID)
 	if err != nil {
 		t.Fatalf("insert parent: %v", err)
 	}
 	err = pool.QueryRow(ctx,
 		`INSERT INTO tasks (title, user_id, completed, parent_id, due_date)
-		 VALUES ('Stats overdue child', 1, false, $1, CURRENT_DATE - 2)
+		 VALUES ('Stats overdue child', 1, false, $1, ((NOW() AT TIME ZONE 'America/New_York')::date - 2))
 		 RETURNING id`, parentID).Scan(&childID)
 	if err != nil {
 		t.Fatalf("insert child: %v", err)
@@ -207,7 +207,7 @@ func TestGetDashboardStatsExcludesUnclaimedKanbanOverdue(t *testing.T) {
 	}
 	err = pool.QueryRow(ctx,
 		`INSERT INTO tasks (title, user_id, completed, project_id, due_date, claimed_by)
-		 VALUES ('Unclaimed kanban overdue', 1, false, $1, CURRENT_DATE - 1, NULL)
+		 VALUES ('Unclaimed kanban overdue', 1, false, $1, ((NOW() AT TIME ZONE 'America/New_York')::date - 1), NULL)
 		 RETURNING id`, projectID).Scan(&taskID)
 	if err != nil {
 		t.Fatalf("insert unclaimed kanban task: %v", err)
