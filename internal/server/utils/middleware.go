@@ -81,7 +81,7 @@ func SecurityHeadersMiddleware(next http.Handler) http.Handler {
 
 // ImageSrcCSP is the img-src directive, including a configured S3/CDN origin when set.
 func ImageSrcCSP() string {
-	src := "img-src 'self' data:"
+	src := "img-src 'self' data: blob:"
 	s, err := storage.GetSiteSettings()
 	if err == nil && s != nil {
 		if origin := s.Image.PublicOrigin(); origin != "" {

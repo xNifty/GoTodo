@@ -32,6 +32,7 @@ var requiredOpenAPIPaths = []string{
 	"/api/v1/me/mfa/disable",
 	"/api/v1/me/mfa/recovery-codes",
 	"/api/v1/me/username",
+	"/api/v1/me/avatar",
 	"/api/v1/api-keys",
 	"/api/v1/api-keys/{id}",
 	"/api/v1/tasks",

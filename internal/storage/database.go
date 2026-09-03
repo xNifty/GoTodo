@@ -118,6 +118,7 @@ func CreateUsersTable() error {
 		"role_id INTEGER NOT NULL",
 		"is_banned BOOLEAN DEFAULT FALSE",
 		"items_per_page INTEGER DEFAULT 15",
+		"avatar_url TEXT DEFAULT ''",
 		"created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
 		"updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
 	}

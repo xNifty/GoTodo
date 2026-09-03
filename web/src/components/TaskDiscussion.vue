@@ -638,7 +638,14 @@ defineExpose({ reload })
         <li v-for="c in comments" :key="c.id" class="task-discussion-post">
           <article class="task-post-card" :class="{ 'task-post-card--deleted': c.deleted }">
             <header class="task-post-header">
-              <div class="task-post-avatar" aria-hidden="true">{{ initials(c) }}</div>
+              <img
+                v-if="c.avatar_url"
+                :src="c.avatar_url"
+                alt=""
+                class="task-post-avatar-img"
+                aria-hidden="true"
+              />
+              <div v-else class="task-post-avatar" aria-hidden="true">{{ initials(c) }}</div>
               <div class="task-post-meta">
                 <div class="task-post-author text-truncate">{{ authorLabel(c) }}</div>
                 <div class="task-post-times">
@@ -894,6 +901,13 @@ defineExpose({ reload })
   letter-spacing: 0.02em;
   color: var(--ordryn-filter-active-text, #fff);
   background: var(--ordryn-accent, #2563eb);
+  flex-shrink: 0;
+}
+.task-post-avatar-img {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  object-fit: cover;
   flex-shrink: 0;
 }
 .task-post-meta {

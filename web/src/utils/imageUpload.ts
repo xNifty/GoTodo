@@ -1,12 +1,21 @@
 export const IMAGE_ACCEPT =
   'image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp'
 
+export const AVATAR_ACCEPT = 'image/jpeg,image/png,.jpg,.jpeg,.png'
+
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+const AVATAR_TYPES = new Set(['image/jpeg', 'image/png'])
 
 export function isAllowedImageFile(file: File): boolean {
   const t = (file.type || '').toLowerCase()
   if (IMAGE_TYPES.has(t)) return true
   return /\.(jpe?g|png|gif|webp)$/i.test(file.name || '')
+}
+
+export function isAllowedAvatarFile(file: File): boolean {
+  const t = (file.type || '').toLowerCase()
+  if (AVATAR_TYPES.has(t)) return true
+  return /\.(jpe?g|png)$/i.test(file.name || '')
 }
 
 export function altFromFilename(name: string): string {

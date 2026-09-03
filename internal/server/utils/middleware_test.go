@@ -10,7 +10,7 @@ import (
 
 func TestImageSrcCSPDefault(t *testing.T) {
 	got := ImageSrcCSP()
-	if !strings.HasPrefix(got, "img-src 'self' data:") {
+	if !strings.HasPrefix(got, "img-src 'self' data: blob:") {
 		t.Fatalf("got %q", got)
 	}
 	if !strings.HasSuffix(strings.TrimSpace(got), ";") {

@@ -69,6 +69,10 @@ func RunMigrations() error {
 		fmt.Printf("migration: MigrateUsersAddMFA failed: %v\n", err)
 		errCount++
 	}
+	if err := MigrateUsersAddAvatarURL(); err != nil {
+		fmt.Printf("migration: MigrateUsersAddAvatarURL failed: %v\n", err)
+		errCount++
+	}
 	if err := CreateMFARecoveryCodesTable(); err != nil {
 		fmt.Printf("migration: CreateMFARecoveryCodesTable failed: %v\n", err)
 		errCount++
@@ -395,3 +399,20 @@ func MigrateTasksUserFK() error {
 	}
 	return nil
 }
+
+// MigrateUsersAddAvatarURL adds the avatar_url column to users when missing.
+func MigrateUsersAddAvatarURL() error {
+	pool, err := OpenDatabase()
+	if err != nil {
+		return fmt.Errorf("failed to open database: %v", err)
+	}
+	defer CloseDatabase(pool)
+
+	_, err = pool.Exec(context.Background(),
+		"ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT DEFAULT ''")
+	if err != nil {
+		return fmt.Errorf("failed to ensure avatar_url column on users: %v", err)
+	}
+	return nil
+}
+
