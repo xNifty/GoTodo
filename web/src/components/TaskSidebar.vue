@@ -1261,9 +1261,9 @@ async function removeTimeEntry(entryId: number) {
               <small class="text-muted"><span id="char-count">{{ charCount }}</span>/1000</small>
             </div>
           </div>
-          <div v-else-if="!readOnly && imageEnabled" class="form-hint mt-1">
+          <!-- <div v-else-if="!readOnly && imageEnabled" class="form-hint mt-1">
             Paste or drop an image here, or click Edit to change the text.
-          </div>
+          </div> -->
           <div v-if="descriptionError" id="description-error" class="invalid-feedback d-block">
             {{ descriptionError }}
           </div>
