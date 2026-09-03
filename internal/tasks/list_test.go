@@ -34,6 +34,7 @@ func TestMain(m *testing.M) {
 	os.Setenv("DB_USER", "postgres")
 	os.Setenv("DB_PASSWORD", "postgres")
 	os.Setenv("DB_NAME", "gotodo_test")
+	os.Setenv("DB_SSLMODE", "disable")
 
 	pool, err := pgxpool.New(context.Background(), fmt.Sprintf("postgres://postgres:postgres@localhost:%d/gotodo_test?sslmode=disable", port))
 	if err != nil {
