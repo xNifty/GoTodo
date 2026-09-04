@@ -162,7 +162,7 @@ func ReturnPaginationForUserWithFilters(page, pageSize int, userID *int, timezon
 		}
 		return taskList, totalTasks, nil
 	}
-	if err := attachChildrenToRoots(taskList, timezone, filters.SprintFilter); err != nil {
+	if err := attachChildrenToRoots(taskList, timezone, filters.SprintFilter, IsRemovedTagFilter(filters)); err != nil {
 		return nil, 0, err
 	}
 	if page == 1 {
@@ -245,7 +245,7 @@ func SearchTasksForUserWithFilters(page, pageSize int, searchQuery string, userI
 		}
 		return taskList, totalTasks, nil
 	}
-	if err := attachChildrenToRoots(taskList, timezone, filters.SprintFilter); err != nil {
+	if err := attachChildrenToRoots(taskList, timezone, filters.SprintFilter, IsRemovedTagFilter(filters)); err != nil {
 		return nil, 0, err
 	}
 	if page == 1 {
@@ -354,7 +354,8 @@ func appendTagCondition(where string, args []interface{}, filters ListFilters, u
 	return where, args
 }
 
-func isRemovedTagFilter(filters ListFilters) bool {
+// IsRemovedTagFilter reports whether the filters specify the protected removed tag.
+func IsRemovedTagFilter(filters ListFilters) bool {
 	if storage.IsRemovedTagName(strings.TrimSpace(filters.TagNameFilter)) {
 		return true
 	}
@@ -366,10 +367,10 @@ func isRemovedTagFilter(filters ListFilters) bool {
 }
 
 func appendArchivedExclusion(where string, filters ListFilters, tablePrefix string) string {
-	if isRemovedTagFilter(filters) {
+	if IsRemovedTagFilter(filters) {
 		return where
 	}
-	idCol := "id"
+	idCol := "tasks.id"
 	if tablePrefix != "" {
 		idCol = tablePrefix + ".id"
 	}
@@ -521,7 +522,7 @@ func scanTaskRow(rows interface {
 // attachChildrenToRoots loads direct children for the given root tasks.
 // When sprintFilter is set, every child still counts toward child_count, but
 // only children on that sprint (or the backlog when filter is 0) are nested.
-func attachChildrenToRoots(roots []Task, timezone string, sprintFilter *int) error {
+func attachChildrenToRoots(roots []Task, timezone string, sprintFilter *int, includeRemoved ...bool) error {
 	if len(roots) == 0 {
 		return nil
 	}
@@ -539,6 +540,11 @@ func attachChildrenToRoots(roots []Task, timezone string, sprintFilter *int) err
 		roots[i].Children = []Task{}
 	}
 
+	notArchived := ""
+	if len(includeRemoved) == 0 || !includeRemoved[0] {
+		notArchived = " AND NOT " + storage.ArchivedTaskExistsSQL("t.id")
+	}
+
 	rows, err := pool.Query(context.Background(),
 		`SELECT t.id, t.title, t.description, t.completed,
 			TO_CHAR((t.time_stamp AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM') AS date_added,
@@ -547,7 +553,7 @@ func attachChildrenToRoots(roots []Task, timezone string, sprintFilter *int) err
 			COALESCE(TO_CHAR((t.date_modified AT TIME ZONE 'UTC') AT TIME ZONE $2, 'YYYY/MM/DD HH:MI AM'), '') AS date_modified,
 			COALESCE(t.is_favorite,false), COALESCE(t.position,0), COALESCE(t.priority,0), t.project_id, COALESCE(p.name,''), t.parent_id
 		 FROM tasks t LEFT JOIN projects p ON t.project_id = p.id
-		 WHERE t.parent_id = ANY($1)
+		 WHERE t.parent_id = ANY($1)`+notArchived+`
 		 ORDER BY t.position ASC, t.id ASC`,
 		ids, timezone)
 	if err != nil {

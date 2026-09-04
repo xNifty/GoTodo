@@ -208,11 +208,12 @@ func fetchTasksForFilters(page, pageSize int, fc FilterContext, userID *int, tim
 	return tasks.ReturnPaginationForUserWithFilters(page, pageSize, userID, timezone, filters)
 }
 
-func completedIncompleteCounts(userID *int, projectFilter *int, sprintFilter *int) (int, int) {
+func completedIncompleteCounts(userID *int, projectFilter *int, sprintFilter *int, includeRemoved ...bool) (int, int) {
 	if userID == nil {
 		return 0, 0
 	}
-	if projectFilter == nil && sprintFilter == nil {
+	incRemoved := len(includeRemoved) > 0 && includeRemoved[0]
+	if !incRemoved && projectFilter == nil && sprintFilter == nil {
 		return utils.GetCompletedTasksCount(userID), utils.GetIncompleteTasksCount(userID)
 	}
 
@@ -244,7 +245,10 @@ func completedIncompleteCounts(userID *int, projectFilter *int, sprintFilter *in
 
 	completedCount := 0
 	incompleteCount := 0
-	notArchived := " AND NOT " + storage.ArchivedTaskExistsSQL("id")
+	notArchived := ""
+	if !incRemoved {
+		notArchived = " AND NOT " + storage.ArchivedTaskExistsSQL("id")
+	}
 	if err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND completed = true"+filterCond+notArchived, args...).Scan(&completedCount); err != nil {
 		completedCount = 0
 	}

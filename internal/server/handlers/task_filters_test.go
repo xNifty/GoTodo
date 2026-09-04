@@ -172,4 +172,8 @@ func TestCompletedIncompleteCountsNilUserID(t *testing.T) {
 	if c != 0 || inc != 0 {
 		t.Fatalf("expected (0, 0) for nil user, got (%d, %d)", c, inc)
 	}
+	c, inc = completedIncompleteCounts(nil, nil, nil, true)
+	if c != 0 || inc != 0 {
+		t.Fatalf("expected (0, 0) for nil user with includeRemoved, got (%d, %d)", c, inc)
+	}
 }

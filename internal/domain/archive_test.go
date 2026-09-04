@@ -106,31 +106,56 @@ func TestArchiveRestoreAndListFilter(t *testing.T) {
 	if err := ArchiveTask(ctx, 1, taskID); err != nil {
 		t.Fatalf("archive: %v", err)
 	}
-	listed, _, err = tasks.ReturnPaginationForUserWithFilters(1, 50, &uid, "UTC", tasks.ListFilters{ProjectFilter: &pid})
+	listed, totalAfterArchive, err := tasks.ReturnPaginationForUserWithFilters(1, 50, &uid, "UTC", tasks.ListFilters{ProjectFilter: &pid})
 	if err != nil {
 		t.Fatalf("list after archive: %v", err)
 	}
+	if totalAfterArchive != 0 {
+		t.Fatalf("expected total 0 after archive, got %d", totalAfterArchive)
+	}
 	if containsTaskID(listed, taskID) {
 		t.Fatal("archived task should be hidden from default list")
+	}
+
+	_, searchTotalAfterArchive, err := tasks.SearchTasksForUserWithFilters(1, 50, "Active", &uid, "UTC", tasks.ListFilters{ProjectFilter: &pid})
+	if err != nil {
+		t.Fatalf("search after archive: %v", err)
+	}
+	if searchTotalAfterArchive != 0 {
+		t.Fatalf("expected search total 0 after archive, got %d", searchTotalAfterArchive)
 	}
 
 	removed, err := storage.FindTagByName(1, &pid, storage.RemovedTagName)
 	if err != nil {
 		t.Fatalf("find removed: %v", err)
 	}
-	listed, _, err = tasks.ReturnPaginationForUserWithFilters(1, 50, &uid, "UTC", tasks.ListFilters{ProjectFilter: &pid, TagFilter: &removed.ID})
+	listed, totalByID, err := tasks.ReturnPaginationForUserWithFilters(1, 50, &uid, "UTC", tasks.ListFilters{ProjectFilter: &pid, TagFilter: &removed.ID})
 	if err != nil {
 		t.Fatalf("list by id: %v", err)
+	}
+	if totalByID != 1 {
+		t.Fatalf("expected total 1 for removed tag by id, got %d", totalByID)
 	}
 	if !containsTaskID(listed, taskID) {
 		t.Fatal("filter by removed id should show archived task")
 	}
-	listed, _, err = tasks.ReturnPaginationForUserWithFilters(1, 50, &uid, "UTC", tasks.ListFilters{ProjectFilter: &pid, TagNameFilter: "removed"})
+	listed, totalByName, err := tasks.ReturnPaginationForUserWithFilters(1, 50, &uid, "UTC", tasks.ListFilters{ProjectFilter: &pid, TagNameFilter: "removed"})
 	if err != nil {
 		t.Fatalf("list by name: %v", err)
 	}
+	if totalByName != 1 {
+		t.Fatalf("expected total 1 for removed tag by name, got %d", totalByName)
+	}
 	if !containsTaskID(listed, taskID) {
 		t.Fatal("filter by removed name should show archived task")
+	}
+
+	_, searchRemovedTotal, err := tasks.SearchTasksForUserWithFilters(1, 50, "Active", &uid, "UTC", tasks.ListFilters{ProjectFilter: &pid, TagNameFilter: "removed"})
+	if err != nil {
+		t.Fatalf("search by removed tag name: %v", err)
+	}
+	if searchRemovedTotal != 1 {
+		t.Fatalf("expected search total 1 for removed tag name, got %d", searchRemovedTotal)
 	}
 
 	got, err := storage.GetTagsForTask(taskID)
@@ -299,3 +324,114 @@ func TestRemovedTagNameHelper(t *testing.T) {
 		t.Fatalf("canonical name %q", storage.RemovedTagName)
 	}
 }
+
+func TestRemovedTaskCountsAndChildExclusion(t *testing.T) {
+	ctx := context.Background()
+	proj, err := CreateProject(ctx, 1, "Child Exclusion Proj", "")
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	pid := proj.ID
+
+	if _, err := SetProjectWorkflowMode(ctx, 1, pid, storage.WorkflowKanban); err != nil {
+		t.Fatalf("enable kanban: %v", err)
+	}
+
+	sprint, err := CreateProjectSprintForUser(ctx, 1, pid, CreateProjectSprintInput{
+		Name:      "Sprint With Removed",
+		StartDate: "2026-08-24",
+		EndDate:   "2026-09-06",
+	})
+	if err != nil {
+		t.Fatalf("create sprint: %v", err)
+	}
+	sid := sprint.ID
+
+	rootID, err := CreateTask(ctx, 1, CreateTaskInput{Title: "Root Task", ProjectID: &pid})
+	if err != nil {
+		t.Fatalf("create root: %v", err)
+	}
+
+	child1ID, err := CreateTask(ctx, 1, CreateTaskInput{
+		Title:     "Active Completed Child",
+		ParentID:  &rootID,
+		SprintID:  &sid,
+		Completed: true,
+	})
+	if err != nil {
+		t.Fatalf("create child 1: %v", err)
+	}
+
+	child2ID, err := CreateTask(ctx, 1, CreateTaskInput{
+		Title:     "Archive Completed Child",
+		ParentID:  &rootID,
+		SprintID:  &sid,
+		Completed: true,
+	})
+	if err != nil {
+		t.Fatalf("create child 2: %v", err)
+	}
+
+	sprints, err := storage.ListProjectSprints(pid)
+	if err != nil {
+		t.Fatalf("list project sprints: %v", err)
+	}
+	if len(sprints) == 0 || sprints[0].TaskCount != 2 {
+		t.Fatalf("expected sprint task count 2 before archive, got %+v", sprints)
+	}
+
+	uid := 1
+	listed, _, err := tasks.ReturnPaginationForUserWithFilters(1, 50, &uid, "UTC", tasks.ListFilters{ProjectFilter: &pid})
+	if err != nil {
+		t.Fatalf("list roots: %v", err)
+	}
+	var rootFound *tasks.Task
+	for i := range listed {
+		if listed[i].ID == rootID {
+			rootFound = &listed[i]
+			break
+		}
+	}
+	if rootFound == nil {
+		t.Fatalf("root task not found in list")
+	}
+	if rootFound.ChildCount != 2 || rootFound.ChildrenCompleted != 2 {
+		t.Fatalf("expected child count 2 and completed 2, got (%d, %d)", rootFound.ChildCount, rootFound.ChildrenCompleted)
+	}
+
+	// Archive child 2
+	if err := ArchiveTask(ctx, 1, child2ID); err != nil {
+		t.Fatalf("archive child 2: %v", err)
+	}
+
+	// Sprints task count should now exclude the archived child
+	sprintsAfter, err := storage.ListProjectSprints(pid)
+	if err != nil {
+		t.Fatalf("list project sprints after archive: %v", err)
+	}
+	if len(sprintsAfter) == 0 || sprintsAfter[0].TaskCount != 1 {
+		t.Fatalf("expected sprint task count 1 after archive, got %+v", sprintsAfter)
+	}
+
+	// Root task should now report child count 1 and completed 1
+	listedAfter, _, err := tasks.ReturnPaginationForUserWithFilters(1, 50, &uid, "UTC", tasks.ListFilters{ProjectFilter: &pid})
+	if err != nil {
+		t.Fatalf("list roots after archive: %v", err)
+	}
+	rootFound = nil
+	for i := range listedAfter {
+		if listedAfter[i].ID == rootID {
+			rootFound = &listedAfter[i]
+			break
+		}
+	}
+	if rootFound == nil {
+		t.Fatalf("root task not found in list after archive")
+	}
+	if rootFound.ChildCount != 1 || rootFound.ChildrenCompleted != 1 {
+		t.Fatalf("expected child count 1 and completed 1 after archive, got (%d, %d)", rootFound.ChildCount, rootFound.ChildrenCompleted)
+	}
+
+	_ = child1ID
+}
+
