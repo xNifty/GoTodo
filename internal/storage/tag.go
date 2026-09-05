@@ -1317,6 +1317,9 @@ func TaskHasRemovedTag(taskID int) (bool, error) {
 
 // ArchivedTaskExistsSQL is a SQL EXISTS clause for tasks with the protected removed tag.
 func ArchivedTaskExistsSQL(taskIDExpr string) string {
+	if taskIDExpr == "" || taskIDExpr == "id" {
+		taskIDExpr = "tasks.id"
+	}
 	return fmt.Sprintf(`EXISTS (
 		SELECT 1 FROM task_tags tt
 		JOIN tags tg ON tg.id = tt.tag_id

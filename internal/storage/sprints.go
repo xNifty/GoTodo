@@ -230,7 +230,7 @@ func ListProjectSprints(projectID int) ([]ProjectSprint, error) {
 
 	rows, err := pool.Query(context.Background(),
 		`SELECT s.id, s.project_id, s.name, s.description, s.start_date, s.end_date, s.lock_date, s.created_at,
-		        COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.sprint_id = s.id), 0)
+		        COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.sprint_id = s.id AND NOT `+ArchivedTaskExistsSQL("t.id")+`), 0)
 		 FROM project_sprints s
 		 WHERE s.project_id = $1
 		 ORDER BY s.start_date DESC, s.id DESC`, projectID)
