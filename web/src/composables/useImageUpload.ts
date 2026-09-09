@@ -9,10 +9,12 @@ export function useImageUpload() {
   const { siteInfo } = useSite()
   const toast = useToast()
   const busy = ref(false)
-  const enabled = computed(() => !!siteInfo.value?.image_hosting_enabled)
+  const enabled = computed(() => {
+    if (siteInfo.value === null) return true
+    return !!siteInfo.value?.image_hosting_enabled
+  })
 
   async function uploadImageFile(file: File): Promise<string | null> {
-    if (!enabled.value) return null
     if (!isAllowedImageFile(file)) {
       toast.push('Use a JPEG, PNG, GIF, or WebP image', 'error')
       return null
@@ -27,7 +29,8 @@ export function useImageUpload() {
       const uploaded = await api.uploadImage(file)
       return toImageMarkdown(uploaded.url, altFromFilename(file.name || 'image'))
     } catch (err) {
-      toast.push(err instanceof APIError ? err.message : 'Image upload failed', 'error')
+      const msg = err instanceof APIError ? err.message : err instanceof Error ? err.message : 'Image upload failed'
+      toast.push(msg, 'error')
       return null
     } finally {
       busy.value = false

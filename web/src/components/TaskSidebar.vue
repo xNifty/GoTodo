@@ -7,7 +7,7 @@ import { APIError } from '@/api/types'
 import ParentTaskCombobox from '@/components/ParentTaskCombobox.vue'
 import DeleteTaskDialog from '@/components/DeleteTaskDialog.vue'
 import TaskDiscussion from '@/components/TaskDiscussion.vue'
-import ImageInsertButton from '@/components/ImageInsertButton.vue'
+import WysiwygEditor from '@/components/WysiwygEditor.vue'
 import RichBody from '@/components/RichBody.vue'
 import { useImageUpload } from '@/composables/useImageUpload'
 import { insertMarkdownAtCursor } from '@/utils/taskCommentBody'
@@ -76,7 +76,8 @@ const addingTime = ref(false)
 const taskWorkflow = ref('')
 
 const titleInput = ref<HTMLInputElement | null>(null)
-const descriptionInput = ref<HTMLTextAreaElement | null>(null)
+const descriptionEditor = ref<InstanceType<typeof WysiwygEditor> | null>(null)
+const descriptionInput = computed(() => descriptionEditor.value?.textarea ?? null)
 const title = ref('')
 const description = ref('')
 const projectId = ref<number | ''>('')
@@ -1221,18 +1222,15 @@ async function removeTimeEntry(entryId: number) {
               Done
             </button>
           </div>
-          <textarea
+          <WysiwygEditor
             v-if="showDescriptionEditor"
             id="description"
-            ref="descriptionInput"
+            ref="descriptionEditor"
             v-model="description"
-            class="form-control task-description-input"
-            maxlength="1000"
-            rows="4"
-            @input="autosizeDescription"
-            @paste="onDescriptionPaste"
-            @dragover="onDescriptionDragOver"
-            @drop="onDescriptionDrop"
+            :maxlength="1000"
+            :rows="isKanbanTask ? 6 : 4"
+            placeholder="Add a task description… Format with markdown, click 'Upload image' or paste/drop an image."
+            @open-task="openRelated"
           />
           <div
             v-else
@@ -1243,7 +1241,7 @@ async function removeTimeEntry(entryId: number) {
             @dragover="onDescriptionDragOver"
             @drop="onDescriptionDrop"
           >
-            <RichBody v-if="description.trim()" :body="description" />
+            <RichBody v-if="description.trim()" :body="description" @open-task="openRelated" />
             <button
               v-else-if="!readOnly"
               type="button"
@@ -1255,9 +1253,8 @@ async function removeTimeEntry(entryId: number) {
             <span v-else class="text-muted">No description</span>
           </div>
           <div v-if="!readOnly && showDescriptionEditor" class="d-flex justify-content-between align-items-center mt-1 gap-2">
-            <small class="form-hint">Max 1000 Characters. Paste or drop an image, or use Insert image.</small>
+            <small class="form-hint">Supports Markdown. Use "Upload image" in the toolbar, or paste / drop an image.</small>
             <div class="d-flex align-items-center gap-2">
-              <ImageInsertButton compact @insert="insertDescriptionImage" />
               <small class="text-muted"><span id="char-count">{{ charCount }}</span>/1000</small>
             </div>
           </div>

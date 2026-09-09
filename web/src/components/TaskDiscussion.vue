@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { api } from '@/api/client'
 import type { TaskComment, TaskCommentRevision } from '@/api/types'
-import ImageInsertButton from '@/components/ImageInsertButton.vue'
+import WysiwygEditor from '@/components/WysiwygEditor.vue'
 import RichBody from '@/components/RichBody.vue'
 import { useAuth } from '@/composables/useAuth'
 import { useConfirm } from '@/composables/useConfirm'
@@ -41,8 +41,10 @@ const comments = ref<TaskComment[]>([])
 const loading = ref(false)
 const posting = ref(false)
 const draft = ref('')
-const draftEl = ref<HTMLTextAreaElement | null>(null)
-const editEl = ref<HTMLTextAreaElement | null>(null)
+const draftEditor = ref<InstanceType<typeof WysiwygEditor> | null>(null)
+const draftEl = computed(() => draftEditor.value?.textarea ?? null)
+const editEditor = ref<InstanceType<typeof WysiwygEditor> | null>(null)
+const editEl = computed(() => editEditor.value?.textarea ?? null)
 const mentionListEl = ref<HTMLElement | null>(null)
 const bottomEl = ref<HTMLElement | null>(null)
 const MAX_BODY = 2000
@@ -180,6 +182,10 @@ function revisionKindLabel(kind: string) {
 
 function linkTitle(c: TaskComment, id: number) {
   return c.links?.find((l) => l.id === id)?.title
+}
+
+function linkTitleById(id: number) {
+  return titleCache.get(id) || undefined
 }
 
 function taskLinkLabel(id: number, title?: string) {
@@ -689,22 +695,21 @@ defineExpose({ reload })
               {{ tombstone(c) }}
             </div>
             <div v-else-if="editingId === c.id" class="task-post-body">
-              <textarea
-                ref="editEl"
-                class="form-control"
-                rows="3"
+              <WysiwygEditor
+                ref="editEditor"
+                v-model="editDraft"
+                :rows="3"
                 :maxlength="MAX_BODY"
-                :value="editDraft"
+                :task-title="(id) => linkTitle(c, id) || linkTitleById(id)"
+                placeholder="Edit comment… Format with markdown, click 'Upload image' or paste/drop."
                 @input="onEditInput"
                 @paste="onEditPaste"
                 @dragover="onEditDragOver"
                 @drop="onEditDrop"
+                @open-task="openLinkedTask"
               />
               <div class="d-flex justify-content-between align-items-center mt-2">
-                <div class="d-flex align-items-center gap-2">
-                  <ImageInsertButton compact @insert="(md) => insertCommentImage(md, 'edit')" />
-                  <small class="text-muted">{{ editDraft.length }}/{{ MAX_BODY }}</small>
-                </div>
+                <small class="text-muted">{{ editDraft.length }}/{{ MAX_BODY }}</small>
                 <div class="d-flex gap-2">
                   <button type="button" class="btn btn-sm btn-outline-secondary" :disabled="savingEdit" @click="cancelEdit">
                     Cancel
@@ -765,14 +770,14 @@ defineExpose({ reload })
       <div ref="bottomEl" />
     </div>
     <label class="form-label small mb-1" for="task-comment-body">Add a comment</label>
-    <textarea
+    <WysiwygEditor
       id="task-comment-body"
-      ref="draftEl"
-      :value="draft"
-      class="form-control"
-      rows="3"
+      ref="draftEditor"
+      v-model="draft"
+      :rows="3"
       :maxlength="MAX_BODY"
-      placeholder="Write a comment… Paste or drop an image, type @ to mention a member, or paste #123 to link a task."
+      :task-title="linkTitleById"
+      placeholder="Write a comment… Format with markdown, click 'Upload image' or paste/drop, type @ to mention a member, or paste #123 to link a task."
       @input="onDraftInput"
       @keydown="onDraftKeydown"
       @paste="onDraftPaste"
@@ -780,6 +785,7 @@ defineExpose({ reload })
       @drop="onDraftDrop"
       @click="syncMentionFromEl"
       @keyup="syncMentionFromEl"
+      @open-task="openLinkedTask"
     />
     <Teleport to="body">
       <ul
@@ -834,10 +840,7 @@ defineExpose({ reload })
       </div>
     </div>
     <div class="d-flex justify-content-between align-items-center mt-1">
-      <div class="d-flex align-items-center gap-2">
-        <ImageInsertButton compact @insert="insertCommentImage" />
-        <small class="text-muted">{{ charCount }}/{{ MAX_BODY }}</small>
-      </div>
+      <small class="text-muted">{{ charCount }}/{{ MAX_BODY }}</small>
       <button
         type="button"
         class="btn btn-sm btn-primary"
