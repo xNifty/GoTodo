@@ -11,8 +11,6 @@ import { isProtectedTag } from '@/utils/tags'
 defineProps<{
   timezone: string
   itemsPerPage: number
-  digestEnabled: boolean
-  digestHour: number
   allowProjectInvites: boolean
   busy: boolean
   dirty: boolean
@@ -21,8 +19,6 @@ defineProps<{
 const emit = defineEmits<{
   'update:timezone': [value: string]
   'update:itemsPerPage': [value: number]
-  'update:digestEnabled': [value: boolean]
-  'update:digestHour': [value: number]
   'update:allowProjectInvites': [value: boolean]
   save: []
 }>()
@@ -122,29 +118,6 @@ onMounted(() => {
             <option :value="25">25</option>
             <option :value="50">50</option>
           </select>
-        </div>
-        <div class="form-check mb-3">
-          <input
-            id="profile-digest"
-            class="form-check-input"
-            type="checkbox"
-            :checked="digestEnabled"
-            @change="emit('update:digestEnabled', ($event.target as HTMLInputElement).checked)"
-          />
-          <label class="form-check-label" for="profile-digest">Daily email digest</label>
-        </div>
-        <div class="mb-3">
-          <label for="profile-digest-hour" class="form-label">Digest hour (0–23)</label>
-          <input
-            id="profile-digest-hour"
-            type="number"
-            class="form-control"
-            min="0"
-            max="23"
-            :disabled="!digestEnabled"
-            :value="digestHour"
-            @input="emit('update:digestHour', Number(($event.target as HTMLInputElement).value))"
-          />
         </div>
         <div class="form-check mb-3">
           <input

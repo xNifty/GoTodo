@@ -16,10 +16,6 @@ func TestUpdateProfileValidation(t *testing.T) {
 	if !errors.Is(err, ErrValidation) {
 		t.Fatalf("bad page size: %v", err)
 	}
-	_, err = UpdateProfile(ctx, 1, UpdateProfileInput{Timezone: "UTC", ItemsPerPage: 15, DigestHour: 24}, true, true)
-	if !errors.Is(err, ErrValidation) {
-		t.Fatalf("bad digest hour: %v", err)
-	}
 }
 
 func TestChangePasswordValidation(t *testing.T) {

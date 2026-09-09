@@ -413,7 +413,7 @@ onMounted(load)
           </template>
 
           <p v-if="!settings.email_provider" class="text-muted small">
-            Outbound email is disabled. Password resets and digests will not send until a provider is configured.
+            Outbound email is disabled. Password resets and notifications will not send until a provider is configured.
           </p>
 
           <div class="mb-3">

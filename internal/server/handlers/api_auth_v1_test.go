@@ -243,7 +243,7 @@ func TestProfileToMeJSON(t *testing.T) {
 	if err := json.Unmarshal(raw, &m); err != nil {
 		t.Fatal(err)
 	}
-	for _, key := range []string{"id", "email", "user_name", "timezone", "items_per_page", "permissions", "digest_enabled", "digest_hour", "allow_project_invites", "username_change_available", "mfa_enabled"} {
+	for _, key := range []string{"id", "email", "user_name", "timezone", "items_per_page", "permissions", "allow_project_invites", "username_change_available", "mfa_enabled"} {
 		if _, ok := m[key]; !ok {
 			t.Fatalf("missing key %q in %s", key, string(raw))
 		}

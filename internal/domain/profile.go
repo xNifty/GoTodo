@@ -13,8 +13,6 @@ import (
 type UpdateProfileInput struct {
 	Timezone            string
 	ItemsPerPage        int
-	DigestEnabled       bool
-	DigestHour          int
 	AllowProjectInvites bool
 }
 

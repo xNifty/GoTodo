@@ -3,7 +3,6 @@ package server
 import (
 	"GoTodo/internal/live"
 	"GoTodo/internal/mailer"
-	"GoTodo/internal/server/digest"
 	"GoTodo/internal/server/handlers"
 	"GoTodo/internal/server/utils"
 	"GoTodo/internal/storage"
@@ -61,7 +60,6 @@ func StartServer() error {
 		return fmt.Errorf("bootstrap failed: %w", err)
 	}
 
-	digest.StartDigestWorker()
 	mailer.SetAuditor(storage.RecordEmailAudit)
 	storage.StartEmailAuditPurgeWorker()
 

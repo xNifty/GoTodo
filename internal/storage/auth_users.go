@@ -18,8 +18,6 @@ type UserProfile struct {
 	ItemsPerPage            int
 	RoleID                  int
 	Permissions             []string
-	DigestEnabled           bool
-	DigestHour              int
 	AllowProjectInvites     bool
 	UsernameChangeAvailable bool
 	MFAEnabled              bool
@@ -38,7 +36,6 @@ func GetUserProfileByID(userID int) (*UserProfile, error) {
 	err = pool.QueryRow(context.Background(), `
 		SELECT u.id, u.email, COALESCE(u.user_name, ''), COALESCE(u.timezone, 'America/New_York'),
 		       COALESCE(u.items_per_page, 15), u.role_id, COALESCE(r.permissions, '{}'),
-		       COALESCE(u.digest_enabled, false), COALESCE(u.digest_hour, 8),
 		       COALESCE(u.allow_project_invites, true),
 		       COALESCE(u.username_change_available, false),
 		       COALESCE(u.mfa_enabled, false),
@@ -47,7 +44,7 @@ func GetUserProfileByID(userID int) (*UserProfile, error) {
 		LEFT JOIN roles r ON r.id = u.role_id
 		WHERE u.id = $1`, userID).Scan(
 		&p.ID, &p.Email, &p.UserName, &p.Timezone, &p.ItemsPerPage, &p.RoleID, &p.Permissions,
-		&p.DigestEnabled, &p.DigestHour, &p.AllowProjectInvites, &p.UsernameChangeAvailable,
+		&p.AllowProjectInvites, &p.UsernameChangeAvailable,
 		&p.MFAEnabled, &p.AvatarURL,
 	)
 	if err != nil {
@@ -60,7 +57,7 @@ func GetUserProfileByID(userID int) (*UserProfile, error) {
 }
 
 // UpdateUserProfileByID updates mutable profile fields for a user.
-func UpdateUserProfileByID(userID int, userName, timezone string, itemsPerPage int, digestEnabled bool, digestHour int, allowProjectInvites bool) error {
+func UpdateUserProfileByID(userID int, userName, timezone string, itemsPerPage int, allowProjectInvites bool) error {
 	pool, err := OpenDatabase()
 	if err != nil {
 		return err
@@ -69,9 +66,9 @@ func UpdateUserProfileByID(userID int, userName, timezone string, itemsPerPage i
 
 	_, err = pool.Exec(context.Background(), `
 		UPDATE users SET user_name = $1, timezone = $2, items_per_page = $3,
-		       digest_enabled = $4, digest_hour = $5, allow_project_invites = $6
-		WHERE id = $7`,
-		userName, timezone, itemsPerPage, digestEnabled, digestHour, allowProjectInvites, userID)
+		       allow_project_invites = $4
+		WHERE id = $5`,
+		userName, timezone, itemsPerPage, allowProjectInvites, userID)
 	return err
 }
 
