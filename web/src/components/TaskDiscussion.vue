@@ -2,27 +2,25 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { api } from '@/api/client'
 import type { TaskComment, TaskCommentRevision } from '@/api/types'
-import MarkdownEditor from '@/components/MarkdownEditor.vue'
+import WysiwygEditor from '@/components/WysiwygEditor.vue'
 import RichBody from '@/components/RichBody.vue'
 import { useAuth } from '@/composables/useAuth'
 import { useConfirm } from '@/composables/useConfirm'
 import { useTaskSidebar } from '@/composables/useTaskSidebar'
 import { useToast } from '@/composables/useToast'
 import { USER_SEARCH_MIN_QUERY, useUserSearch } from '@/composables/useUserSearch'
+import { useImageUpload } from '@/composables/useImageUpload'
 import {
   extractTaskRefIDs,
   extractTaskRefQueries,
+  insertMarkdownAtCursor,
   insertMention,
   insertTaskRef,
   isInsertedTaskRef,
   mentionTokenAtCursor,
   type MentionToken,
 } from '@/utils/taskCommentBody'
-
-type EditorExpose = {
-  textarea: HTMLTextAreaElement | null
-  focus: () => void
-}
+import { dropHasFiles, imageFileFromClipboard, imageFileFromDrop } from '@/utils/imageUpload'
 
 const props = defineProps<{
   taskId: number
@@ -37,14 +35,16 @@ const toast = useToast()
 const { askConfirm } = useConfirm()
 const { openEdit } = useTaskSidebar()
 const { hasPermission } = useAuth()
+const { enabled: imageEnabled, uploadImageFile } = useImageUpload()
 
 const comments = ref<TaskComment[]>([])
 const loading = ref(false)
 const posting = ref(false)
 const draft = ref('')
-const draftEditor = ref<EditorExpose | null>(null)
-const editEditor = ref<EditorExpose | null>(null)
+const draftEditor = ref<InstanceType<typeof WysiwygEditor> | null>(null)
 const draftEl = computed(() => draftEditor.value?.textarea ?? null)
+const editEditor = ref<InstanceType<typeof WysiwygEditor> | null>(null)
+const editEl = computed(() => editEditor.value?.textarea ?? null)
 const mentionListEl = ref<HTMLElement | null>(null)
 const bottomEl = ref<HTMLElement | null>(null)
 const MAX_BODY = 2000
@@ -184,6 +184,10 @@ function linkTitle(c: TaskComment, id: number) {
   return c.links?.find((l) => l.id === id)?.title
 }
 
+function linkTitleById(id: number) {
+  return titleCache.get(id) || undefined
+}
+
 function taskLinkLabel(id: number, title?: string) {
   return title ? `Task #${id} - ${title}` : `Task #${id}`
 }
@@ -293,10 +297,6 @@ function insertLink(id: number, query?: string) {
   void lookupDraftLinks()
 }
 
-function previewTaskTitle(id: number) {
-  return draftLinks.value.find((link) => link.id === id)?.title
-}
-
 function updateMentionMenuPosition() {
   const el = draftEl.value
   if (!el) return
@@ -380,6 +380,75 @@ async function scrollMentionHighlight() {
   active?.scrollIntoView({ block: 'nearest' })
 }
 
+function onDraftInput(e: Event) {
+  const el = e.target as HTMLTextAreaElement
+  draft.value = el.value
+  syncMentionFromEl()
+}
+
+function insertCommentImage(markdown: string, target: 'draft' | 'edit' = 'draft') {
+  const el = target === 'edit' ? editEl.value : draftEl.value
+  const current = target === 'edit' ? editDraft.value : draft.value
+  const start = el?.selectionStart ?? current.length
+  const end = el?.selectionEnd ?? start
+  const next = insertMarkdownAtCursor(current, markdown, start, end)
+  if (next.body.length > MAX_BODY) {
+    toast.push('Comment would exceed 2000 characters', 'error')
+    return
+  }
+  if (target === 'edit') editDraft.value = next.body
+  else draft.value = next.body
+  void nextTick(() => {
+    if (!el) return
+    el.focus()
+    el.setSelectionRange(next.cursor, next.cursor)
+    if (target === 'draft') syncMentionFromEl()
+  })
+}
+
+async function ingestImageFile(file: File, target: 'draft' | 'edit' = 'draft') {
+  const markdown = await uploadImageFile(file)
+  if (markdown) insertCommentImage(markdown, target)
+}
+
+function onDraftPaste(e: ClipboardEvent) {
+  const file = imageFileFromClipboard(e)
+  if (!file || !imageEnabled.value) return
+  e.preventDefault()
+  void ingestImageFile(file, 'draft')
+}
+
+function onEditPaste(e: ClipboardEvent) {
+  const file = imageFileFromClipboard(e)
+  if (!file || !imageEnabled.value) return
+  e.preventDefault()
+  void ingestImageFile(file, 'edit')
+}
+
+function onDraftDragOver(e: DragEvent) {
+  if (!imageEnabled.value || !dropHasFiles(e)) return
+  e.preventDefault()
+}
+
+function onDraftDrop(e: DragEvent) {
+  const file = imageFileFromDrop(e)
+  if (!file || !imageEnabled.value) return
+  e.preventDefault()
+  void ingestImageFile(file, 'draft')
+}
+
+function onEditDragOver(e: DragEvent) {
+  if (!imageEnabled.value || !dropHasFiles(e)) return
+  e.preventDefault()
+}
+
+function onEditDrop(e: DragEvent) {
+  const file = imageFileFromDrop(e)
+  if (!file || !imageEnabled.value) return
+  e.preventDefault()
+  void ingestImageFile(file, 'edit')
+}
+
 function onDraftKeydown(e: KeyboardEvent) {
   if (!showMentionMenu.value) return
   if (e.key === 'Escape') {
@@ -412,6 +481,8 @@ function onDraftKeydown(e: KeyboardEvent) {
 function onMentionReposition() {
   if (showMentionMenu.value) updateMentionMenuPosition()
 }
+
+const charCount = computed(() => draft.value.length)
 
 async function post() {
   const body = draft.value.trim()
@@ -450,6 +521,10 @@ async function remove(c: TaskComment) {
   } catch (err) {
     toast.push(err instanceof Error ? err.message : 'Could not delete comment', 'error')
   }
+}
+
+function onEditInput(e: Event) {
+  editDraft.value = (e.target as HTMLTextAreaElement).value
 }
 
 function startEdit(c: TaskComment) {
@@ -620,26 +695,34 @@ defineExpose({ reload })
               {{ tombstone(c) }}
             </div>
             <div v-else-if="editingId === c.id" class="task-post-body">
-              <MarkdownEditor
+              <WysiwygEditor
                 ref="editEditor"
                 v-model="editDraft"
+                :rows="3"
                 :maxlength="MAX_BODY"
-                :disabled="savingEdit"
-                :task-title="(id) => linkTitle(c, id)"
+                :task-title="(id) => linkTitle(c, id) || linkTitleById(id)"
+                placeholder="Edit comment… Format with markdown, click 'Upload image' or paste/drop."
+                @input="onEditInput"
+                @paste="onEditPaste"
+                @dragover="onEditDragOver"
+                @drop="onEditDrop"
                 @open-task="openLinkedTask"
               />
-              <div class="d-flex justify-content-end gap-2 mt-2">
-                <button type="button" class="btn btn-sm btn-outline-secondary" :disabled="savingEdit" @click="cancelEdit">
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  class="btn btn-sm btn-primary"
-                  :disabled="savingEdit || !editDraft.trim()"
-                  @click="saveEdit(c)"
-                >
-                  {{ savingEdit ? 'Saving…' : 'Save' }}
-                </button>
+              <div class="d-flex justify-content-between align-items-center mt-2">
+                <small class="text-muted">{{ editDraft.length }}/{{ MAX_BODY }}</small>
+                <div class="d-flex gap-2">
+                  <button type="button" class="btn btn-sm btn-outline-secondary" :disabled="savingEdit" @click="cancelEdit">
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-primary"
+                    :disabled="savingEdit || !editDraft.trim()"
+                    @click="saveEdit(c)"
+                  >
+                    {{ savingEdit ? 'Saving…' : 'Save' }}
+                  </button>
+                </div>
               </div>
             </div>
             <div v-else class="task-post-body">
@@ -687,19 +770,22 @@ defineExpose({ reload })
       <div ref="bottomEl" />
     </div>
     <label class="form-label small mb-1" for="task-comment-body">Add a comment</label>
-    <MarkdownEditor
+    <WysiwygEditor
       id="task-comment-body"
       ref="draftEditor"
       v-model="draft"
+      :rows="3"
       :maxlength="MAX_BODY"
-      :disabled="posting"
-      placeholder="Write a comment… Use the toolbar for formatting, paste or drop an image, type @ to mention a member, or paste #123 to link a task."
-      :task-title="previewTaskTitle"
-      @open-task="openLinkedTask"
-      @input="syncMentionFromEl"
+      :task-title="linkTitleById"
+      placeholder="Write a comment… Format with markdown, click 'Upload image' or paste/drop, type @ to mention a member, or paste #123 to link a task."
+      @input="onDraftInput"
       @keydown="onDraftKeydown"
+      @paste="onDraftPaste"
+      @dragover="onDraftDragOver"
+      @drop="onDraftDrop"
       @click="syncMentionFromEl"
       @keyup="syncMentionFromEl"
+      @open-task="openLinkedTask"
     />
     <Teleport to="body">
       <ul
@@ -753,7 +839,8 @@ defineExpose({ reload })
         <span v-else class="badge text-bg-secondary">Linked</span>
       </div>
     </div>
-    <div class="d-flex justify-content-end align-items-center mt-1">
+    <div class="d-flex justify-content-between align-items-center mt-1">
+      <small class="text-muted">{{ charCount }}/{{ MAX_BODY }}</small>
       <button
         type="button"
         class="btn btn-sm btn-primary"

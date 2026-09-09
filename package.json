@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "test": "npm --prefix web test",
+    "test:web": "npm --prefix web test",
     "build:web": "npm --prefix web ci && npm --prefix web run build",
     "dev:web": "npm --prefix web run dev"
   }
