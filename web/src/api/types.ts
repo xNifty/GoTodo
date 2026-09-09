@@ -5,8 +5,6 @@ export type User = {
   timezone: string
   items_per_page: number
   permissions: string[]
-  digest_enabled: boolean
-  digest_hour: number
   allow_project_invites: boolean
   username_change_available: boolean
   mfa_enabled: boolean
@@ -502,7 +500,6 @@ export type EmailAuditTrigger =
   | 'site_invite'
   | 'join_request'
   | 'project_invite'
-  | 'daily_digest'
 
 export type EmailAuditEntry = {
   id: number

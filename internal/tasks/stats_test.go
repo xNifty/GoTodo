@@ -185,7 +185,7 @@ func TestGetDashboardStatsExcludesUnclaimedKanbanOverdue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetDashboardStats baseline: %v", err)
 	}
-	digestBefore, err := tasks.GetOverdueCount(1, "America/New_York")
+	overdueBefore, err := tasks.GetOverdueCount(1, "America/New_York")
 	if err != nil {
 		t.Fatalf("GetOverdueCount baseline: %v", err)
 	}
@@ -225,11 +225,11 @@ func TestGetDashboardStatsExcludesUnclaimedKanbanOverdue(t *testing.T) {
 		t.Fatalf("dashboard overdue_count should ignore unclaimed kanban, want %d got %d", before.OverdueCount, after.OverdueCount)
 	}
 
-	digestAfter, err := tasks.GetOverdueCount(1, "America/New_York")
+	overdueAfter, err := tasks.GetOverdueCount(1, "America/New_York")
 	if err != nil {
 		t.Fatalf("GetOverdueCount after unclaimed kanban: %v", err)
 	}
-	if digestAfter != digestBefore+1 {
-		t.Fatalf("digest overdue count should still include unclaimed kanban, want %d got %d", digestBefore+1, digestAfter)
+	if overdueAfter != overdueBefore+1 {
+		t.Fatalf("raw overdue count should still include unclaimed kanban, want %d got %d", overdueBefore+1, overdueAfter)
 	}
 }

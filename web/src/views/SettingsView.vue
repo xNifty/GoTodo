@@ -22,8 +22,6 @@ const router = useRouter()
 
 const timezone = ref('UTC')
 const itemsPerPage = ref(15)
-const digestEnabled = ref(false)
-const digestHour = ref(8)
 const allowProjectInvites = ref(true)
 const busy = ref(false)
 
@@ -34,8 +32,6 @@ const activeSection = computed(() =>
 function applyUserPrefs(u: User) {
   timezone.value = u.timezone || 'UTC'
   itemsPerPage.value = u.items_per_page || 15
-  digestEnabled.value = u.digest_enabled
-  digestHour.value = u.digest_hour
   allowProjectInvites.value = u.allow_project_invites !== false
 }
 
@@ -45,8 +41,6 @@ const prefsDirty = computed(() => {
   return (
     timezone.value.trim() !== (u.timezone || 'UTC') ||
     Number(itemsPerPage.value) !== (u.items_per_page || 15) ||
-    digestEnabled.value !== u.digest_enabled ||
-    Number(digestHour.value) !== u.digest_hour ||
     allowProjectInvites.value !== (u.allow_project_invites !== false)
   )
 })
@@ -84,8 +78,6 @@ async function save() {
     await updateProfile({
       timezone: timezone.value.trim(),
       items_per_page: Number(itemsPerPage.value),
-      digest_enabled: digestEnabled.value,
-      digest_hour: Number(digestHour.value),
       allow_project_invites: allowProjectInvites.value,
     })
     push('Profile updated', 'success')
@@ -150,8 +142,6 @@ onUnmounted(() => {
           v-else-if="activeSection === 'preferences'"
           v-model:timezone="timezone"
           v-model:items-per-page="itemsPerPage"
-          v-model:digest-enabled="digestEnabled"
-          v-model:digest-hour="digestHour"
           v-model:allow-project-invites="allowProjectInvites"
           :busy="busy"
           :dirty="prefsDirty"

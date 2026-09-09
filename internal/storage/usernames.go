@@ -198,7 +198,7 @@ func SetUsername(userID int, name string, changeAvailable bool) error {
 }
 
 // UpdateUserProfilePrefsByID updates mutable prefs without changing user_name.
-func UpdateUserProfilePrefsByID(userID int, timezone string, itemsPerPage int, digestEnabled bool, digestHour int, allowProjectInvites bool) error {
+func UpdateUserProfilePrefsByID(userID int, timezone string, itemsPerPage int, allowProjectInvites bool) error {
 	pool, err := OpenDatabase()
 	if err != nil {
 		return err
@@ -207,10 +207,10 @@ func UpdateUserProfilePrefsByID(userID int, timezone string, itemsPerPage int, d
 
 	_, err = pool.Exec(context.Background(), `
 		UPDATE users SET timezone = $1, items_per_page = $2,
-		       digest_enabled = $3, digest_hour = $4, allow_project_invites = $5,
+		       allow_project_invites = $3,
 		       updated_at = CURRENT_TIMESTAMP
-		WHERE id = $6`,
-		timezone, itemsPerPage, digestEnabled, digestHour, allowProjectInvites, userID)
+		WHERE id = $4`,
+		timezone, itemsPerPage, allowProjectInvites, userID)
 	return err
 }
 

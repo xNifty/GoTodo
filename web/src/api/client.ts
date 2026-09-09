@@ -227,7 +227,7 @@ export const api = {
     return request<{ ok: boolean }>('/api/v1/auth/logout', { method: 'POST' })
   },
 
-  patchMe(payload: Partial<Pick<User, 'timezone' | 'items_per_page' | 'digest_enabled' | 'digest_hour' | 'allow_project_invites'>>) {
+  patchMe(payload: Partial<Pick<User, 'timezone' | 'items_per_page' | 'allow_project_invites'>>) {
     return request<User>('/api/v1/me', {
       method: 'PATCH',
       body: JSON.stringify(payload),

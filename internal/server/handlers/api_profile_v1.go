@@ -16,8 +16,6 @@ import (
 type apiMePatchRequest struct {
 	Timezone            *string `json:"timezone"`
 	ItemsPerPage        *int    `json:"items_per_page"`
-	DigestEnabled       *bool   `json:"digest_enabled"`
-	DigestHour          *int    `json:"digest_hour"`
 	AllowProjectInvites *bool   `json:"allow_project_invites"`
 }
 
@@ -79,8 +77,6 @@ func apiV1PatchMe(w http.ResponseWriter, r *http.Request) {
 	in := domain.UpdateProfileInput{
 		Timezone:            current.Timezone,
 		ItemsPerPage:        current.ItemsPerPage,
-		DigestEnabled:       current.DigestEnabled,
-		DigestHour:          current.DigestHour,
 		AllowProjectInvites: current.AllowProjectInvites,
 	}
 	if req.Timezone != nil {
@@ -88,12 +84,6 @@ func apiV1PatchMe(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.ItemsPerPage != nil {
 		in.ItemsPerPage = *req.ItemsPerPage
-	}
-	if req.DigestEnabled != nil {
-		in.DigestEnabled = *req.DigestEnabled
-	}
-	if req.DigestHour != nil {
-		in.DigestHour = *req.DigestHour
 	}
 	if req.AllowProjectInvites != nil {
 		in.AllowProjectInvites = *req.AllowProjectInvites

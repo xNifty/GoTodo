@@ -53,8 +53,8 @@ func RunMigrations() error {
 		fmt.Printf("migration: MigrateUsersAddCalendarToken failed: %v\n", err)
 		errCount++
 	}
-	if err := MigrateUsersAddDigestSettings(); err != nil {
-		fmt.Printf("migration: MigrateUsersAddDigestSettings failed: %v\n", err)
+	if err := MigrateUsersRemoveDigestSettings(); err != nil {
+		fmt.Printf("migration: MigrateUsersRemoveDigestSettings failed: %v\n", err)
 		errCount++
 	}
 	if err := MigrateUsersAddAllowProjectInvites(); err != nil {

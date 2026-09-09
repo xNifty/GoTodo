@@ -3238,7 +3238,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [password_reset, password_changed, site_invite, join_request, project_invite, daily_digest]
+            enum: [password_reset, password_changed, site_invite, join_request, project_invite]
         - name: q
           in: query
           description: Case-insensitive substring match on recipient email
@@ -3588,12 +3588,6 @@ components:
           type: array
           items:
             type: string
-        digest_enabled:
-          type: boolean
-        digest_hour:
-          type: integer
-          minimum: 0
-          maximum: 23
         allow_project_invites:
           type: boolean
           description: When false, the user cannot be invited to shared projects
@@ -3665,12 +3659,6 @@ components:
         items_per_page:
           type: integer
           enum: [10, 15, 25, 50]
-        digest_enabled:
-          type: boolean
-        digest_hour:
-          type: integer
-          minimum: 0
-          maximum: 23
         allow_project_invites:
           type: boolean
 

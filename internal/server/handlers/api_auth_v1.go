@@ -37,8 +37,6 @@ type apiUserMeJSON struct {
 	Timezone                string   `json:"timezone"`
 	ItemsPerPage            int      `json:"items_per_page"`
 	Permissions             []string `json:"permissions"`
-	DigestEnabled           bool     `json:"digest_enabled"`
-	DigestHour              int      `json:"digest_hour"`
 	AllowProjectInvites     bool     `json:"allow_project_invites"`
 	UsernameChangeAvailable bool     `json:"username_change_available"`
 	MFAEnabled              bool     `json:"mfa_enabled"`
@@ -57,8 +55,6 @@ func profileToMeJSON(p *storage.UserProfile) apiUserMeJSON {
 		Timezone:                p.Timezone,
 		ItemsPerPage:            p.ItemsPerPage,
 		Permissions:             perms,
-		DigestEnabled:           p.DigestEnabled,
-		DigestHour:              p.DigestHour,
 		AllowProjectInvites:     p.AllowProjectInvites,
 		UsernameChangeAvailable: p.UsernameChangeAvailable,
 		MFAEnabled:              p.MFAEnabled,

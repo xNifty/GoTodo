@@ -141,10 +141,7 @@ func UpdateProfileWithoutUsername(ctx context.Context, userID int, in UpdateProf
 	if !itemsPerPageOK {
 		return nil, fmt.Errorf("%w: invalid items per page", ErrValidation)
 	}
-	if in.DigestHour < 0 || in.DigestHour > 23 {
-		return nil, fmt.Errorf("%w: digest_hour must be between 0 and 23", ErrValidation)
-	}
-	if err := storage.UpdateUserProfilePrefsByID(userID, in.Timezone, in.ItemsPerPage, in.DigestEnabled, in.DigestHour, in.AllowProjectInvites); err != nil {
+	if err := storage.UpdateUserProfilePrefsByID(userID, in.Timezone, in.ItemsPerPage, in.AllowProjectInvites); err != nil {
 		return nil, err
 	}
 	return storage.GetUserProfileByID(userID)

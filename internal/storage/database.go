@@ -503,25 +503,21 @@ func MigrateUsersAddItemsPerPage() error {
 	return nil
 }
 
-// MigrateUsersAddDigestSettings adds email digest preference columns.
-func MigrateUsersAddDigestSettings() error {
+// MigrateUsersRemoveDigestSettings drops email digest preference columns if present.
+func MigrateUsersRemoveDigestSettings() error {
 	pool, err := OpenDatabase()
 	if err != nil {
 		return fmt.Errorf("failed to open database: %v", err)
 	}
 	defer CloseDatabase(pool)
 
-	_, err = pool.Exec(context.Background(), "ALTER TABLE users ADD COLUMN IF NOT EXISTS digest_enabled BOOLEAN DEFAULT FALSE")
+	_, err = pool.Exec(context.Background(), `
+		ALTER TABLE users
+		DROP COLUMN IF EXISTS digest_enabled,
+		DROP COLUMN IF EXISTS digest_hour,
+		DROP COLUMN IF EXISTS last_digest_sent`)
 	if err != nil {
-		return fmt.Errorf("failed to add digest_enabled: %v", err)
-	}
-	_, err = pool.Exec(context.Background(), "ALTER TABLE users ADD COLUMN IF NOT EXISTS digest_hour INTEGER DEFAULT 8")
-	if err != nil {
-		return fmt.Errorf("failed to add digest_hour: %v", err)
-	}
-	_, err = pool.Exec(context.Background(), "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_digest_sent DATE")
-	if err != nil {
-		return fmt.Errorf("failed to add last_digest_sent: %v", err)
+		return fmt.Errorf("failed to drop digest columns: %v", err)
 	}
 	return nil
 }
